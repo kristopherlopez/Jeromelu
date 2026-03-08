@@ -1,0 +1,6 @@
+sqlalchemy==2.0.*
+psycopg[binary]==3.2.*
+boto3==1.36.*
+openai==1.65.*
+python-dotenv==1.0.*
+temporalio==1.9.*
