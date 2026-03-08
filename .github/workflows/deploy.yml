@@ -1,0 +1,140 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-southeast-2
+  ECR_REGISTRY: 111424988703.dkr.ecr.ap-southeast-2.amazonaws.com
+  ECS_CLUSTER: jeromelu
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.changes.outputs.api }}
+      web: ${{ steps.changes.outputs.web }}
+      worker-ingestion: ${{ steps.changes.outputs.worker-ingestion }}
+      worker-extraction: ${{ steps.changes.outputs.worker-extraction }}
+      worker-decision: ${{ steps.changes.outputs.worker-decision }}
+      worker-publishing: ${{ steps.changes.outputs.worker-publishing }}
+      db: ${{ steps.changes.outputs.db }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            api:
+              - 'services/api/**'
+            web:
+              - 'services/web/**'
+            worker-ingestion:
+              - 'services/worker-ingestion/**'
+            worker-extraction:
+              - 'services/worker-extraction/**'
+            worker-decision:
+              - 'services/worker-decision/**'
+            worker-publishing:
+              - 'services/worker-publishing/**'
+            db:
+              - 'packages/db/**'
+
+  build-and-deploy:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - service: api
+            path: services/api
+            ecr_repo: jeromelu/api
+            ecs_service: jeromelu-api
+            changed: ${{ needs.detect-changes.outputs.api }}
+          - service: web
+            path: services/web
+            ecr_repo: jeromelu/web
+            ecs_service: jeromelu-web
+            changed: ${{ needs.detect-changes.outputs.web }}
+          - service: worker-ingestion
+            path: services/worker-ingestion
+            ecr_repo: jeromelu/worker-ingestion
+            ecs_service: jeromelu-worker-ingestion
+            changed: ${{ needs.detect-changes.outputs.worker-ingestion }}
+          - service: worker-extraction
+            path: services/worker-extraction
+            ecr_repo: jeromelu/worker-extraction
+            ecs_service: jeromelu-worker-extraction
+            changed: ${{ needs.detect-changes.outputs.worker-extraction }}
+          - service: worker-decision
+            path: services/worker-decision
+            ecr_repo: jeromelu/worker-decision
+            ecs_service: jeromelu-worker-decision
+            changed: ${{ needs.detect-changes.outputs.worker-decision }}
+          - service: worker-publishing
+            path: services/worker-publishing
+            ecr_repo: jeromelu/worker-publishing
+            ecs_service: jeromelu-worker-publishing
+            changed: ${{ needs.detect-changes.outputs.worker-publishing }}
+    steps:
+      - name: Skip if unchanged
+        if: matrix.changed != 'true'
+        run: echo "No changes in ${{ matrix.service }}, skipping."
+
+      - uses: actions/checkout@v4
+        if: matrix.changed == 'true'
+
+      - name: Configure AWS credentials
+        if: matrix.changed == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        if: matrix.changed == 'true'
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        if: matrix.changed == 'true'
+        run: |
+          IMAGE="${{ env.ECR_REGISTRY }}/${{ matrix.ecr_repo }}"
+          docker build -t $IMAGE:${{ github.sha }} -t $IMAGE:latest ${{ matrix.path }}
+          docker push $IMAGE:${{ github.sha }}
+          docker push $IMAGE:latest
+
+      - name: Deploy to ECS
+        if: matrix.changed == 'true'
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ matrix.ecs_service }} \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+
+  migrate:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.db == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Run database migration
+        run: |
+          echo "Database migration detected. Review and run manually:"
+          echo "  aws ecs run-task --cluster jeromelu --task-definition jeromelu-migrate ..."
+          echo "Automated migration disabled for safety. Approve via workflow_dispatch."
