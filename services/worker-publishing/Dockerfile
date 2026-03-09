@@ -2,9 +2,14 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
+# Install shared package
+COPY packages/shared /tmp/shared
+RUN pip install --no-cache-dir /tmp/shared && rm -rf /tmp/shared
+
+# Install service dependencies
+COPY services/worker-publishing/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY services/worker-publishing/ .
 
 CMD ["python", "-m", "app.main"]

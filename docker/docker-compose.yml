@@ -3,7 +3,7 @@ services:
     image: pgvector/pgvector:pg16
     container_name: jeromelu-postgres
     ports:
-      - "5432:5432"
+      - "5440:5432"
     environment:
       POSTGRES_DB: jeromelu
       POSTGRES_USER: jeromelu_admin
@@ -29,6 +29,34 @@ services:
     command: server /data --console-address ":9001"
     volumes:
       - minio_data:/data
+
+  temporal:
+    image: temporalio/auto-setup:latest
+    container_name: jeromelu-temporal
+    ports:
+      - "7233:7233"
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=jeromelu_admin
+      - POSTGRES_PWD=localdev123
+      - POSTGRES_SEEDS=postgres
+      - TEMPORAL_NAMESPACE=jeromelu
+      - SKIP_DYNAMIC_CONFIG=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  temporal-ui:
+    image: temporalio/ui:latest
+    container_name: jeromelu-temporal-ui
+    ports:
+      - "8080:8080"
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+    depends_on:
+      - temporal
 
 volumes:
   postgres_data:

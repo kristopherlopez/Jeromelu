@@ -20,6 +20,7 @@ jobs:
     outputs:
       api: ${{ steps.changes.outputs.api }}
       web: ${{ steps.changes.outputs.web }}
+      worker-orchestrator: ${{ steps.changes.outputs.worker-orchestrator }}
       worker-ingestion: ${{ steps.changes.outputs.worker-ingestion }}
       worker-extraction: ${{ steps.changes.outputs.worker-extraction }}
       worker-decision: ${{ steps.changes.outputs.worker-decision }}
@@ -33,16 +34,24 @@ jobs:
           filters: |
             api:
               - 'services/api/**'
+              - 'packages/shared/**'
             web:
               - 'services/web/**'
+            worker-orchestrator:
+              - 'services/worker-orchestrator/**'
+              - 'packages/shared/**'
             worker-ingestion:
               - 'services/worker-ingestion/**'
+              - 'packages/shared/**'
             worker-extraction:
               - 'services/worker-extraction/**'
+              - 'packages/shared/**'
             worker-decision:
               - 'services/worker-decision/**'
+              - 'packages/shared/**'
             worker-publishing:
               - 'services/worker-publishing/**'
+              - 'packages/shared/**'
             db:
               - 'packages/db/**'
 
@@ -62,6 +71,11 @@ jobs:
             ecr_repo: jeromelu/web
             ecs_service: jeromelu-web
             changed: ${{ needs.detect-changes.outputs.web }}
+          - service: worker-orchestrator
+            path: services/worker-orchestrator
+            ecr_repo: jeromelu/worker-orchestrator
+            ecs_service: jeromelu-worker-orchestrator
+            changed: ${{ needs.detect-changes.outputs.worker-orchestrator }}
           - service: worker-ingestion
             path: services/worker-ingestion
             ecr_repo: jeromelu/worker-ingestion
@@ -106,7 +120,7 @@ jobs:
         if: matrix.changed == 'true'
         run: |
           IMAGE="${{ env.ECR_REGISTRY }}/${{ matrix.ecr_repo }}"
-          docker build -t $IMAGE:${{ github.sha }} -t $IMAGE:latest ${{ matrix.path }}
+          docker build -f ${{ matrix.path }}/Dockerfile -t $IMAGE:${{ github.sha }} -t $IMAGE:latest .
           docker push $IMAGE:${{ github.sha }}
           docker push $IMAGE:latest
 
