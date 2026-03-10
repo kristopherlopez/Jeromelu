@@ -20,6 +20,7 @@ CREATE TABLE sources (
 CREATE TABLE source_documents (
     document_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     source_id UUID NOT NULL REFERENCES sources(source_id),
+    s3_key TEXT,
     raw_text TEXT,
     cleaned_text TEXT,
     transcript_available BOOLEAN NOT NULL DEFAULT FALSE,

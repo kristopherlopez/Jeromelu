@@ -68,6 +68,7 @@ async def index_document(video: dict, collection_result: dict) -> dict:
         # Create SourceDocument record
         document = SourceDocument(
             source_id=source.source_id,
+            s3_key=s3_key,
             raw_text=plain_text,
             transcript_available=True,
             language="en",

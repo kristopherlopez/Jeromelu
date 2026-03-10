@@ -32,3 +32,4 @@ docker/data/
 # Sensitive files
 docs/aws-resource-inventory.md
 *.egg-info
+commits/

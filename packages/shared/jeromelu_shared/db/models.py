@@ -59,6 +59,7 @@ class SourceDocument(Base):
 
     document_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
     source_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("sources.source_id"), nullable=False)
+    s3_key: Mapped[str | None] = mapped_column(Text)
     raw_text: Mapped[str | None] = mapped_column(Text)
     cleaned_text: Mapped[str | None] = mapped_column(Text)
     transcript_available: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

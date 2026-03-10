@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    database_url: str = "postgresql://jeromelu_admin:localdev123@localhost:5440/jeromelu"
+    database_url: str = "postgresql+psycopg://jeromelu_admin:localdev123@localhost:5440/jeromelu"
     s3_endpoint: str = "http://localhost:9000"
     s3_access_key: str = "minioadmin"
     s3_secret_key: str = "minioadmin"
