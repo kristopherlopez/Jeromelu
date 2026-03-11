@@ -47,12 +47,4 @@
 
 ---
 
-## What's Already Built
-- Database schema deployed (12 tables, 21 indexes) — `packages/db/migrations/001_initial_schema.sql`
-- SQLAlchemy ORM models — `packages/shared/jeromelu_shared/db/models.py`
-- Shared Python package (config, DB session, S3 helpers, LLM helpers) — `packages/shared/`
-- Docker Compose (Postgres + pgvector, MinIO, Temporal, Temporal UI) — `docker/docker-compose.yml`
-- CI/CD pipeline (GitHub Actions, per-service Docker builds) — `.github/workflows/deploy.yml`
-- Next.js landing page — `services/web/`
-- FastAPI health check — `services/api/`
-- All service Dockerfiles updated for shared package
+See [docs/BUILT.md](../BUILT.md) for what's already implemented.

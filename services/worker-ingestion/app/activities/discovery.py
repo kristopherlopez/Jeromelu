@@ -1,31 +1,27 @@
 """Discovery activity — find new videos on whitelisted YouTube channels."""
 
-import json
 import logging
 import subprocess
-from dataclasses import dataclass
-from pathlib import Path
+from datetime import datetime, timezone
 
 import feedparser
 from temporalio import activity
 
-from jeromelu_shared.db import SessionLocal, Source
+from jeromelu_shared.db import Channel, SessionLocal, Source
 
 logger = logging.getLogger(__name__)
-
-CHANNELS_FILE = Path(__file__).resolve().parents[2] / "channels.json"
 
 # Max recent videos to check per channel per sweep
 MAX_VIDEOS_PER_CHANNEL = 15
 
 
-def load_channels() -> list[dict]:
-    """Load whitelisted channels from the seed JSON file."""
-    if not CHANNELS_FILE.exists():
-        logger.warning("No channels.json found at %s", CHANNELS_FILE)
-        return []
-    with open(CHANNELS_FILE) as f:
-        return json.load(f)
+def _load_youtube_channels(session) -> list[Channel]:
+    """Load active YouTube channels with an external_id from the DB."""
+    return session.query(Channel).filter(
+        Channel.platform == "youtube",
+        Channel.active == True,  # noqa: E712
+        Channel.external_id.isnot(None),
+    ).all()
 
 
 def _discover_via_rss(channel_id: str) -> list[dict] | None:
@@ -110,54 +106,79 @@ def _get_existing_video_urls(session, urls: list[str]) -> set[str]:
 @activity.defn
 async def discover_new_videos() -> list[dict]:
     """Poll all whitelisted channels for new videos not yet in DB."""
-    channels = load_channels()
-    if not channels:
-        logger.info("No channels configured — skipping discovery")
-        return []
-
-    all_videos: list[dict] = []
-
-    for ch in channels:
-        channel_id = ch["channel_id"]
-        channel_name = ch["name"]
-
-        try:
-            # Try RSS first (fast, free)
-            videos = _discover_via_rss(channel_id)
-            if videos is not None:
-                logger.info("RSS: found %d videos on %s", len(videos), channel_name)
-            else:
-                # Fallback to yt-dlp
-                logger.info("RSS unavailable for %s — falling back to yt-dlp", channel_name)
-                videos = _discover_via_ytdlp(channel_id)
-                logger.info("yt-dlp: found %d videos on %s", len(videos), channel_name)
-
-            # Attach channel metadata to each video
-            for v in videos:
-                v["channel_id"] = channel_id
-                v["channel_name"] = channel_name
-                v["url"] = f"https://www.youtube.com/watch?v={v['video_id']}"
-
-            all_videos.extend(videos)
-
-        except Exception:
-            logger.exception("Failed to discover videos for channel %s", channel_name)
-
-    if not all_videos:
-        return []
-
-    # Filter out videos already in DB (watermark via canonical_url)
-    all_urls = [v["url"] for v in all_videos]
     session = SessionLocal()
     try:
+        channels = _load_youtube_channels(session)
+        if not channels:
+            logger.info("No active YouTube channels in DB — skipping discovery")
+            return []
+
+        all_videos: list[dict] = []
+
+        for ch in channels:
+            channel_id = ch.external_id
+            channel_name = ch.name
+
+            try:
+                # Try RSS first (fast, free)
+                videos = _discover_via_rss(channel_id)
+                if videos is not None:
+                    logger.info("RSS: found %d videos on %s", len(videos), channel_name)
+                else:
+                    # Fallback to yt-dlp
+                    logger.info("RSS unavailable for %s — falling back to yt-dlp", channel_name)
+                    videos = _discover_via_ytdlp(channel_id)
+                    logger.info("yt-dlp: found %d videos on %s", len(videos), channel_name)
+
+                # Attach channel metadata to each video
+                for v in videos:
+                    v["channel_id"] = channel_id
+                    v["channel_name"] = channel_name
+                    v["url"] = f"https://www.youtube.com/watch?v={v['video_id']}"
+
+                all_videos.extend(videos)
+
+                # Update last_polled_at
+                ch.last_polled_at = datetime.now(timezone.utc)
+
+            except Exception:
+                logger.exception("Failed to discover videos for channel %s", channel_name)
+
+        if not all_videos:
+            session.commit()
+            return []
+
+        # Filter out videos already in DB (watermark via canonical_url)
+        all_urls = [v["url"] for v in all_videos]
         existing_urls = _get_existing_video_urls(session, all_urls)
+
+        new_videos = [v for v in all_videos if v["url"] not in existing_urls]
+
+        # Only ingest content published from 2026-01-01 onwards
+        cutoff = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        filtered = []
+        for v in new_videos:
+            pub = v.get("published_at", "")
+            if not pub:
+                filtered.append(v)  # Keep videos without a date (rare edge case)
+                continue
+            try:
+                dt = datetime.fromisoformat(pub.replace("Z", "+00:00"))
+                if dt >= cutoff:
+                    filtered.append(v)
+            except ValueError:
+                filtered.append(v)  # Keep if date can't be parsed
+        skipped = len(new_videos) - len(filtered)
+        if skipped:
+            logger.info("Filtered out %d videos published before 2026-01-01", skipped)
+        new_videos = filtered
+        logger.info(
+            "Discovered %d new videos (%d already ingested)",
+            len(new_videos), len(all_videos) - len(new_videos),
+        )
+
+        session.commit()
     finally:
         session.close()
-
-    new_videos = [v for v in all_videos if v["url"] not in existing_urls]
-    logger.info(
-        "Discovered %d new videos (%d already ingested)",
-        len(new_videos), len(all_videos) - len(new_videos),
-    )
 
     return new_videos

@@ -31,10 +31,40 @@ class Base(DeclarativeBase):
     pass
 
 
+class Channel(Base):
+    __tablename__ = "channels"
+
+    channel_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    slug: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    platform: Mapped[str] = mapped_column(Text, nullable=False)
+    external_id: Mapped[str | None] = mapped_column(Text)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    url: Mapped[str | None] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
+    quality_rating: Mapped[int] = mapped_column(Integer, default=5)
+    tags: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    last_polled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+    sources: Mapped[list["Source"]] = relationship(back_populates="channel")
+
+    __table_args__ = (
+        CheckConstraint(
+            "platform IN ('youtube', 'podcast', 'website', 'twitter', 'instagram')",
+            name="ck_channel_platform",
+        ),
+        UniqueConstraint("platform", "external_id", name="uq_channel_platform_external"),
+        Index("idx_channels_platform", "platform"),
+        Index("idx_channels_active", "active"),
+    )
+
+
 class Source(Base):
     __tablename__ = "sources"
 
     source_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    channel_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("channels.channel_id"))
     source_type: Mapped[str] = mapped_column(Text, nullable=False)
     title: Mapped[str] = mapped_column(Text, nullable=False)
     creator_name: Mapped[str | None] = mapped_column(Text)
@@ -45,6 +75,7 @@ class Source(Base):
     ingested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
+    channel: Mapped["Channel | None"] = relationship(back_populates="sources")
     documents: Mapped[list["SourceDocument"]] = relationship(back_populates="source", cascade="all, delete-orphan")
 
     __table_args__ = (

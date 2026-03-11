@@ -3,6 +3,8 @@
 :root {
   --background: #000000;
   --foreground: #ededed;
+  --tigers-orange: #F58220;
+  --tigers-orange-glow: rgba(245, 130, 32, 0.4);
 }
 
 @theme inline {

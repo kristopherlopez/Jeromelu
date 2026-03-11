@@ -88,7 +88,15 @@ UNION ALL SELECT 'claims', count(*) FROM claims;
 | `decision` | worker-decision |
 | `publishing` | worker-publishing |
 
+**Timezone:** All schedules use `Australia/Sydney`. The server runs in UTC but each schedule specifies its own timezone.
+
 **CLI (inside container):** `docker exec jeromelu-temporal bash -c "tctl --address 172.22.0.4:7233 --namespace jeromelu workflow list"`
+
+### Schedules
+
+| Schedule | Frequency | Time | Script |
+|----------|-----------|------|--------|
+| `daily-intel-sweep` | Daily | 10:00 PM AEST/AEDT | `python -m app.create_schedule` |
 
 ---
 

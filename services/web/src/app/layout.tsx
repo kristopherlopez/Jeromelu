@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "JeromeLu | AI SuperCoach Analyst",
+  title: "Jeromelu | AI SuperCoach Analyst",
   description: "AI-powered NRL SuperCoach analyst. Watching everything. Reading everyone. Making moves.",
 };
 

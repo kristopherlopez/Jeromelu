@@ -1,6 +1,7 @@
 from jeromelu_shared.db.session import get_session, engine, SessionLocal
 from jeromelu_shared.db.models import (
     Base,
+    Channel,
     Source,
     SourceDocument,
     SourceChunk,
@@ -20,6 +21,7 @@ __all__ = [
     "engine",
     "SessionLocal",
     "Base",
+    "Channel",
     "Source",
     "SourceDocument",
     "SourceChunk",

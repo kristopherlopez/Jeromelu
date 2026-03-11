@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     temporal_host: str = "localhost:7233"
     temporal_namespace: str = "jeromelu"
     youtube_api_key: str = ""
+    webshare_proxy_username: str = ""
+    webshare_proxy_password: str = ""
 
     model_config = {"env_prefix": "", "env_file": ".env", "extra": "ignore"}
 

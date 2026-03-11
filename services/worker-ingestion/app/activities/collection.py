@@ -11,7 +11,9 @@ from youtube_transcript_api import (
     TranscriptsDisabled,
     YouTubeTranscriptApi,
 )
+from youtube_transcript_api.proxies import WebshareProxyConfig
 
+from jeromelu_shared.config import settings
 from jeromelu_shared.s3 import upload_raw
 
 logger = logging.getLogger(__name__)
@@ -38,7 +40,13 @@ def _fetch_transcript(video_id: str) -> list[dict]:
     Other errors are raised as-is for Temporal retry.
     """
     try:
-        ytt_api = YouTubeTranscriptApi()
+        proxy_config = None
+        if settings.webshare_proxy_username:
+            proxy_config = WebshareProxyConfig(
+                proxy_username=settings.webshare_proxy_username,
+                proxy_password=settings.webshare_proxy_password,
+            )
+        ytt_api = YouTubeTranscriptApi(proxy_config=proxy_config)
         transcript = ytt_api.fetch(video_id)
         return [
             {

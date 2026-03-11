@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from temporalio import activity
 
-from jeromelu_shared.db import SessionLocal, Source, SourceDocument
+from jeromelu_shared.db import Channel, SessionLocal, Source, SourceDocument
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +51,17 @@ async def index_document(video: dict, collection_result: dict) -> dict:
                 "skipped": True,
             }
 
+        # Look up channel by external_id
+        channel = None
+        ext_id = video.get("channel_id")
+        if ext_id:
+            channel = session.query(Channel).filter(
+                Channel.external_id == ext_id
+            ).first()
+
         # Create Source record (one per video)
         source = Source(
+            channel_id=channel.channel_id if channel else None,
             source_type="youtube",
             title=video.get("title", f"YouTube video {video_id}"),
             creator_name=video.get("channel_name"),
