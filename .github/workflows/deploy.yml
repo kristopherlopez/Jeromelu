@@ -133,6 +133,24 @@ jobs:
             --force-new-deployment \
             --region ${{ env.AWS_REGION }}
 
+  invalidate-cdn:
+    needs: [detect-changes, build-and-deploy]
+    if: needs.detect-changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id E2G6FL11A3JP8F \
+            --paths "/*"
+
   migrate:
     needs: detect-changes
     if: needs.detect-changes.outputs.db == 'true'
