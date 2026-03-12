@@ -2,24 +2,36 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  MessageCircle,
+  Zap,
+  ClipboardList,
+  Brain,
+  TrendingUp,
+  Trophy,
+  User,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { useNavHover } from "./NavHoverContext";
 
-interface LetterConfig {
+export interface LetterConfig {
   char: string;
   key: string;
   label: string;
   href: string;
   delay: number; // ms delay for entrance animation
+  icon: LucideIcon;
 }
 
-const LETTERS: LetterConfig[] = [
-  { char: "J", key: "j", label: "Chat", href: "/", delay: 0 },
-  { char: "e", key: "e", label: "Energy", href: "/energy", delay: 700 },
-  { char: "r", key: "r", label: "Roster", href: "/roster", delay: 500 },
-  { char: "o", key: "o", label: "On my mind", href: "/stream", delay: 400 },
-  { char: "m", key: "m", label: "Market", href: "/market", delay: 300 },
-  { char: "e", key: "e", label: "Energy", href: "/energy", delay: 200 },
-  { char: "l", key: "l", label: "Leaderboard", href: "/leaderboard", delay: 100 },
-  { char: "u", key: "u", label: "You", href: "/settings", delay: 0 },
+export const LETTERS: LetterConfig[] = [
+  { char: "J", key: "j", label: "Chat", href: "/", delay: 0, icon: MessageCircle },
+  { char: "e", key: "e", label: "Energy", href: "/energy", delay: 700, icon: Zap },
+  { char: "r", key: "r", label: "Roster", href: "/roster", delay: 500, icon: ClipboardList },
+  { char: "o", key: "o", label: "On my mind", href: "/stream", delay: 400, icon: Brain },
+  { char: "m", key: "m", label: "Market", href: "/market", delay: 300, icon: TrendingUp },
+  { char: "e", key: "e", label: "Energy", href: "/energy", delay: 200, icon: Zap },
+  { char: "l", key: "l", label: "Leaderboard", href: "/leaderboard", delay: 100, icon: Trophy },
+  { char: "u", key: "u", label: "You", href: "/settings", delay: 0, icon: User },
 ];
 
 const DEFAULT_TAGLINE =
@@ -34,6 +46,7 @@ export default function JeromeluLogo() {
   const [litLetters, setLitLetters] = useState<Set<number>>(new Set());
   const [animationDone, setAnimationDone] = useState(false);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const { hoveredHref, setHoveredHref } = useNavHover();
 
   // Entrance animation — orange sweeps in from ends, then white sweeps in from ends
   useEffect(() => {
@@ -100,26 +113,40 @@ export default function JeromeluLogo() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
+  // Effective hovered index: local hover takes priority, then corner nav hover
+  const effectiveIndex = hoveredIndex ?? (
+    hoveredHref !== null
+      ? LETTERS.findIndex((l) => l.href === hoveredHref)
+      : null
+  );
+
   // Determine if a letter is "lit" (orange) — entrance animation OR hover
   const getIsLit = (index: number): boolean => {
     if (litLetters.has(index)) return true;
-    if (hoveredIndex === null) return false;
+    if (effectiveIndex === null) return false;
 
     // If hovering an "e", light both "e"s
-    if (LETTERS[hoveredIndex].char === "e" && LETTERS[index].char === "e") {
+    if (LETTERS[effectiveIndex].char === "e" && LETTERS[index].char === "e") {
       return true;
     }
-    return hoveredIndex === index;
+    // Match by href for corner nav (lights up all letters sharing that route)
+    if (hoveredIndex === null && hoveredHref !== null) {
+      return LETTERS[index].href === hoveredHref;
+    }
+    return effectiveIndex === index;
   };
 
   // Check if a letter should be dimmed (another letter is hovered, but not this one)
   const getIsDimmed = (index: number): boolean => {
-    if (!animationDone || hoveredIndex === null) return false;
+    if (!animationDone || effectiveIndex === null) return false;
     // If hovering an "e", don't dim either "e"
-    if (LETTERS[hoveredIndex].char === "e" && LETTERS[index].char === "e") {
+    if (LETTERS[effectiveIndex].char === "e" && LETTERS[index].char === "e") {
       return false;
     }
-    return hoveredIndex !== index;
+    if (hoveredIndex === null && hoveredHref !== null) {
+      return LETTERS[index].href !== hoveredHref;
+    }
+    return effectiveIndex !== index;
   };
 
   const handleClick = (letter: LetterConfig) => {
@@ -128,17 +155,17 @@ export default function JeromeluLogo() {
 
   const handleMouseEnter = (index: number) => {
     setHoveredIndex(index);
+    setHoveredHref(LETTERS[index].href);
   };
 
   const handleMouseLeave = () => {
     setHoveredIndex(null);
+    setHoveredHref(null);
   };
 
-  // Build the hover tagline text
-  const hoverTagline =
-    hoveredIndex !== null
-      ? `[${LETTERS[hoveredIndex].key}] ${LETTERS[hoveredIndex].label}`
-      : null;
+  // Build the hover tagline
+  const hoveredLetter = effectiveIndex !== null ? LETTERS[effectiveIndex] : null;
+  const HoveredIcon = hoveredLetter?.icon ?? null;
 
   return (
     <div className="flex flex-col items-center gap-6">
@@ -161,7 +188,7 @@ export default function JeromeluLogo() {
                   ? "0 0 20px var(--tigers-orange-glow), 0 0 40px var(--tigers-orange-glow)"
                   : "none",
                 opacity: isDimmed ? 0.4 : 1,
-                transform: isLit && animationDone && hoveredIndex !== null ? "scale(1.1)" : "scale(1)",
+                transform: isLit && animationDone && effectiveIndex !== null ? "scale(1.1)" : "scale(1)",
               }}
               aria-label={`${letter.label} (press ${letter.key})`}
             >
@@ -174,19 +201,20 @@ export default function JeromeluLogo() {
       {/* Tagline with crossfade */}
       <div className="grid w-full max-w-md [&>*]:col-start-1 [&>*]:row-start-1">
         <p
-          className="text-center text-lg text-zinc-400 transition-opacity duration-300"
-          style={{ opacity: hoverTagline ? 0 : 1 }}
+          className="text-center text-lg leading-7 text-zinc-400 transition-opacity duration-300"
+          style={{ opacity: hoveredLetter ? 0 : 1 }}
         >
           {DEFAULT_TAGLINE}
         </p>
         <p
-          className="text-center text-lg transition-opacity duration-300"
+          className="flex items-center justify-center gap-2 text-lg leading-7 transition-opacity duration-300"
           style={{
-            opacity: hoverTagline ? 1 : 0,
+            opacity: hoveredLetter ? 1 : 0,
             color: "var(--tigers-orange)",
           }}
         >
-          {hoverTagline ?? "\u00A0"}
+          {HoveredIcon && <HoveredIcon size={18} className="shrink-0" style={{ position: "relative", top: "1px" }} />}
+          <span>{hoveredLetter ? `[${hoveredLetter.key}] ${hoveredLetter.label}` : "\u00A0"}</span>
         </p>
       </div>
     </div>
