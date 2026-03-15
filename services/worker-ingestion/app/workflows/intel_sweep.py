@@ -1,6 +1,6 @@
 """IntelSweepWorkflow — orchestrates the ingestion pipeline.
 
-Runs on a schedule (every 4-6 hours):
+Runs on a schedule (daily at 10 PM AEST):
 1. Discovery — find new videos on whitelisted channels
 2. Collection — fetch transcripts, store JSON in S3
 3. Indexing — write Source + SourceDocument to DB

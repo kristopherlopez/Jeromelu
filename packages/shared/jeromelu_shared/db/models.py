@@ -1,12 +1,13 @@
 import hashlib
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -114,13 +115,17 @@ class SourceChunk(Base):
     chunk_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
     document_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("source_documents.document_id"), nullable=False)
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
-    text: Mapped[str] = mapped_column(Text, nullable=False)
+    raw_text: Mapped[str] = mapped_column(Text, nullable=False)
+    clean_text: Mapped[str | None] = mapped_column(Text)
     start_offset: Mapped[int | None] = mapped_column(Integer)
     end_offset: Mapped[int | None] = mapped_column(Integer)
+    start_ts: Mapped[float | None] = mapped_column(Float)
+    end_ts: Mapped[float | None] = mapped_column(Float)
     embedding = mapped_column(Vector(1536))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
     document: Mapped["SourceDocument"] = relationship(back_populates="chunks")
+    claim_links: Mapped[list["ClaimChunk"]] = relationship(back_populates="chunk")
 
     __table_args__ = (
         Index("idx_source_chunks_document", "document_id"),
@@ -167,19 +172,41 @@ class Quote(Base):
     )
 
 
+class ClaimChunk(Base):
+    __tablename__ = "claim_chunks"
+
+    claim_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("claims.claim_id", ondelete="CASCADE"), primary_key=True)
+    chunk_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("source_chunks.chunk_id", ondelete="CASCADE"), primary_key=True)
+    ordinal: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    claim: Mapped["Claim"] = relationship(back_populates="chunk_links")
+    chunk: Mapped["SourceChunk"] = relationship(back_populates="claim_links")
+
+    __table_args__ = (
+        Index("idx_claim_chunks_chunk", "chunk_id"),
+    )
+
+
 class Claim(Base):
     __tablename__ = "claims"
 
     claim_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    document_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("source_documents.document_id"))
     quote_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("quotes.quote_id"))
     subject_entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("entities.entity_id"))
     claim_type: Mapped[str] = mapped_column(Text, nullable=False)
+    claim_text: Mapped[str | None] = mapped_column(Text)
     polarity: Mapped[float | None] = mapped_column(Float)
     strength: Mapped[float | None] = mapped_column(Float)
     effective_round: Mapped[int | None] = mapped_column(Integer)
+    season: Mapped[int | None] = mapped_column(Integer)
+    start_ts: Mapped[float | None] = mapped_column(Float)
+    end_ts: Mapped[float | None] = mapped_column(Float)
     extracted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
+    document: Mapped["SourceDocument | None"] = relationship()
     quote: Mapped["Quote | None"] = relationship(back_populates="claims")
+    chunk_links: Mapped[list["ClaimChunk"]] = relationship(back_populates="claim", cascade="all, delete-orphan")
 
     __table_args__ = (
         CheckConstraint(
@@ -188,6 +215,8 @@ class Claim(Base):
         ),
         Index("idx_claims_subject", "subject_entity_id"),
         Index("idx_claims_type", "claim_type"),
+        Index("idx_claims_document", "document_id"),
+        Index("idx_claims_round_season", "effective_round", "season"),
     )
 
 
@@ -294,6 +323,130 @@ class Event(Base):
             "created_at": self.created_at.isoformat() if self.created_at else "",
         }, sort_keys=True)
         return hashlib.sha256(payload.encode()).hexdigest()
+
+
+class PlayerRound(Base):
+    __tablename__ = "player_rounds"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    player_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    player_name: Mapped[str] = mapped_column(Text, nullable=False)
+    team: Mapped[str] = mapped_column(Text, nullable=False)
+    position: Mapped[str] = mapped_column(Text, nullable=False)
+    round: Mapped[int] = mapped_column(Integer, nullable=False)
+    season: Mapped[int] = mapped_column(Integer, nullable=False)
+    score: Mapped[int | None] = mapped_column(Integer)
+    price: Mapped[int | None] = mapped_column(Integer)
+    breakeven: Mapped[int | None] = mapped_column(Integer)
+    minutes: Mapped[int | None] = mapped_column(Integer)
+    selected_pct: Mapped[float | None] = mapped_column(Float)
+
+    # SC Breakdown
+    base: Mapped[int | None] = mapped_column(Integer)
+    attack: Mapped[int | None] = mapped_column(Integer)
+    playmaking: Mapped[int | None] = mapped_column(Integer)
+    power: Mapped[int | None] = mapped_column(Integer)
+    negative: Mapped[int | None] = mapped_column(Integer)
+
+    # Scoring
+    tries: Mapped[int | None] = mapped_column(Integer)
+    try_assists: Mapped[int | None] = mapped_column(Integer)
+    goals: Mapped[int | None] = mapped_column(Integer)
+    missed_goals: Mapped[int | None] = mapped_column(Integer)
+    field_goals: Mapped[int | None] = mapped_column(Integer)
+    missed_field_goals: Mapped[int | None] = mapped_column(Integer)
+
+    # Attack
+    line_breaks: Mapped[int | None] = mapped_column(Integer)
+    line_break_assists: Mapped[int | None] = mapped_column(Integer)
+    last_touch: Mapped[int | None] = mapped_column(Integer)
+    tackle_busts: Mapped[int | None] = mapped_column(Integer)
+    offloads: Mapped[int | None] = mapped_column(Integer)
+    ineffective_offloads: Mapped[int | None] = mapped_column(Integer)
+    hitups_8m: Mapped[int | None] = mapped_column(Integer)
+    hitups_under_8m: Mapped[int | None] = mapped_column(Integer)
+    kick_metres: Mapped[int | None] = mapped_column(Integer)
+
+    # Defence
+    tackles_made: Mapped[int | None] = mapped_column(Integer)
+    missed_tackles: Mapped[int | None] = mapped_column(Integer)
+    intercepts: Mapped[int | None] = mapped_column(Integer)
+
+    # Discipline
+    forced_dropouts: Mapped[int | None] = mapped_column(Integer)
+    forty_twentys: Mapped[int | None] = mapped_column(Integer)
+    kicked_dead: Mapped[int | None] = mapped_column(Integer)
+    penalties: Mapped[int | None] = mapped_column(Integer)
+    errors: Mapped[int | None] = mapped_column(Integer)
+    sin_bins: Mapped[int | None] = mapped_column(Integer)
+    handover_given: Mapped[int | None] = mapped_column(Integer)
+
+    # Derived
+    ppm: Mapped[float | None] = mapped_column(Float)
+    base_ppm: Mapped[float | None] = mapped_column(Float)
+    base_power: Mapped[int | None] = mapped_column(Integer)
+    base_power_ppm: Mapped[float | None] = mapped_column(Float)
+
+    # Averages
+    avg_score: Mapped[float | None] = mapped_column(Float)
+    two_rd_avg: Mapped[float | None] = mapped_column(Float)
+    three_rd_avg: Mapped[float | None] = mapped_column(Float)
+    five_rd_avg: Mapped[float | None] = mapped_column(Float)
+    season_avg: Mapped[float | None] = mapped_column(Float)
+
+    # Percentages
+    hitup_8m_pct: Mapped[float | None] = mapped_column(Float)
+    tackle_bust_pct: Mapped[float | None] = mapped_column(Float)
+    missed_tackle_pct: Mapped[float | None] = mapped_column(Float)
+    offload_involvement_pct: Mapped[float | None] = mapped_column(Float)
+    base_pct: Mapped[float | None] = mapped_column(Float)
+
+    # Price
+    start_price: Mapped[int | None] = mapped_column(Integer)
+    end_price: Mapped[int | None] = mapped_column(Integer)
+    round_price_change: Mapped[int | None] = mapped_column(Integer)
+    season_price_change: Mapped[int | None] = mapped_column(Integer)
+    magic_number: Mapped[int | None] = mapped_column(Integer)
+
+    # Context
+    opposition: Mapped[str | None] = mapped_column(Text)
+    venue: Mapped[str | None] = mapped_column(Text)
+    weather: Mapped[str | None] = mapped_column(Text)
+    surface: Mapped[str | None] = mapped_column(Text)
+    jersey: Mapped[int | None] = mapped_column(Integer)
+    bye_round: Mapped[str | None] = mapped_column(Text)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("player_id", "round", "season", name="uq_player_round_season"),
+        Index("idx_player_rounds_season_round", "season", "round"),
+        Index("idx_player_rounds_player", "player_id"),
+    )
+
+
+class PlayerTeamHistory(Base):
+    __tablename__ = "player_team_history"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    player_name: Mapped[str] = mapped_column(Text, nullable=False)
+    team_key: Mapped[str] = mapped_column(Text, nullable=False)
+    team_name: Mapped[str] = mapped_column(Text, nullable=False)
+    position: Mapped[str | None] = mapped_column(Text)
+    player_id: Mapped[int | None] = mapped_column(Integer)
+    effective_from: Mapped[date] = mapped_column(Date, nullable=False)
+    effective_to: Mapped[date | None] = mapped_column(Date)
+    is_current: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    source: Mapped[str] = mapped_column(Text, nullable=False, default="seed")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("player_name", "effective_from", name="uq_player_team_effective"),
+        Index("idx_pth_player_current", "player_name", "is_current"),
+        Index("idx_pth_team_current", "team_key", "is_current"),
+        Index("idx_pth_player_id", "player_id"),
+    )
 
 
 class Outcome(Base):

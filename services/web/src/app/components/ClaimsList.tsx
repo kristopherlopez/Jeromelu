@@ -2,17 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ClaimDetail } from "@/lib/types";
+import { CLAIM_TYPE_COLORS } from "@/lib/constants";
 import ClaimCard from "./ClaimCard";
-
-const TYPE_COLORS: Record<string, string> = {
-  buy: "#22c55e",
-  sell: "#ef4444",
-  hold: "#eab308",
-  captain: "#f97316",
-  avoid: "#991b1b",
-  breakout: "#06b6d4",
-  matchup_edge: "#a855f7",
-};
 
 interface Props {
   claims: ClaimDetail[];
@@ -56,7 +47,7 @@ export default function ClaimsList({ claims, activeClaimId, onSeek }: Props) {
           All ({claims.length})
         </button>
         {types.map((t) => {
-          const color = TYPE_COLORS[t] || "#71717a";
+          const color = CLAIM_TYPE_COLORS[t] || "#71717a";
           const active = filter === t;
           const count = claims.filter((c) => c.claim_type === t).length;
           return (
@@ -91,9 +82,18 @@ export default function ClaimsList({ claims, activeClaimId, onSeek }: Props) {
           />
         ))}
         {filtered.length === 0 && (
-          <p className="py-8 text-center text-sm text-zinc-600">
-            No claims {filter ? `of type "${filter}"` : "found"}
-          </p>
+          <div className="py-12 text-center">
+            <p className="text-sm text-zinc-500">
+              {filter
+                ? `No claims of type "${filter.replace("_", " ")}"`
+                : "No claims extracted yet"}
+            </p>
+            {!filter && (
+              <p className="mt-1 text-xs text-zinc-600">
+                Claims will appear here once this source is processed.
+              </p>
+            )}
+          </div>
         )}
       </div>
     </div>

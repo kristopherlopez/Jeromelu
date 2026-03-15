@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     s3_raw_bucket: str = "jeromelu-raw-transcripts"
     s3_clean_bucket: str = "jeromelu-clean-documents"
     s3_assets_bucket: str = "jeromelu-public-assets"
+    s3_player_data_bucket: str = "jeromelu-player-data"
     openai_api_key: str = ""
     env: str = "development"
     admin_api_key: str = "local-dev-admin-key"

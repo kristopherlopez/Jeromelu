@@ -14,7 +14,7 @@ from youtube_transcript_api import (
 from youtube_transcript_api.proxies import WebshareProxyConfig
 
 from jeromelu_shared.config import settings
-from jeromelu_shared.s3 import upload_raw
+from jeromelu_shared.s3 import download_raw, upload_raw
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +94,27 @@ async def collect_transcript(video: dict) -> dict:
     Returns a dict with: video_id, s3_key, checksum, plain_text, success, error
     """
     video_id = video["video_id"]
+    s3_key = f"youtube/{video['channel_id']}/{video_id}.json"
+
+    # Skip if transcript already exists in S3
+    try:
+        existing = download_raw(s3_key)
+        doc = json.loads(existing)
+        segments = doc.get("segments", [])
+        plain_text = _segments_to_plain_text(segments)
+        checksum = _compute_checksum(plain_text)
+        logger.info("S3 hit for %s — skipping download", video_id)
+        return {
+            "video_id": video_id,
+            "s3_key": s3_key,
+            "checksum": checksum,
+            "plain_text": plain_text,
+            "success": True,
+            "error": None,
+        }
+    except Exception:
+        pass  # Not in S3 — proceed with collection
+
     logger.info("Collecting transcript for video %s: %s", video_id, video.get("title", ""))
 
     try:
@@ -121,7 +142,6 @@ async def collect_transcript(video: dict) -> dict:
 
     # Build JSON and upload to S3
     s3_doc = _build_s3_json(video, segments)
-    s3_key = f"youtube/{video['channel_id']}/{video_id}.json"
 
     s3_body = json.dumps(s3_doc, ensure_ascii=False, indent=2)
     upload_raw(s3_key, s3_body)

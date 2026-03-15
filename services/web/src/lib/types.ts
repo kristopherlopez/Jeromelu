@@ -15,7 +15,8 @@ export interface ChunkDetail {
   chunk_id: string;
   start_ts: number | null;
   end_ts: number | null;
-  text: string;
+  raw_text: string;
+  clean_text: string | null;
 }
 
 export interface ClaimDetail {
@@ -26,6 +27,8 @@ export interface ClaimDetail {
   strength: number | null;
   effective_round: number | null;
   season: number | null;
+  start_ts: number | null;
+  end_ts: number | null;
   player_name: string | null;
   chunks: ChunkDetail[];
 }
@@ -33,7 +36,8 @@ export interface ClaimDetail {
 export interface TranscriptChunk {
   chunk_id: string;
   chunk_index: number;
-  text: string;
+  raw_text: string;
+  clean_text: string | null;
   start_ts: number | null;
   end_ts: number | null;
   has_claims: boolean;

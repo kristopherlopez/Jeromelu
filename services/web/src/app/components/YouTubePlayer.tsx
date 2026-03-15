@@ -125,8 +125,9 @@ const YouTubePlayer = forwardRef<YouTubePlayerHandle, Props>(
     }
 
     return (
-      <div className="relative aspect-video w-full overflow-hidden rounded-lg border border-zinc-800">
-        <div ref={containerRef} className="h-full w-full" />
+      <div className="yt-player-wrap relative aspect-video w-full shrink-0 overflow-hidden rounded-lg border border-zinc-800">
+        <style>{`.yt-player-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; }`}</style>
+        <div ref={containerRef} className="absolute inset-0" />
         {!ready && (
           <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 text-zinc-500">
             Loading player...

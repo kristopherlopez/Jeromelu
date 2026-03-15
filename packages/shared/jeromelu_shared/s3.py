@@ -26,3 +26,10 @@ def download_raw(key: str) -> bytes:
     client = get_s3_client()
     resp = client.get_object(Bucket=settings.s3_raw_bucket, Key=key)
     return resp["Body"].read()
+
+
+def upload_player_data(key: str, body: bytes | str) -> None:
+    client = get_s3_client()
+    if isinstance(body, str):
+        body = body.encode("utf-8")
+    client.put_object(Bucket=settings.s3_player_data_bucket, Key=key, Body=body)

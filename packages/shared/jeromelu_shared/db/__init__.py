@@ -8,12 +8,15 @@ from jeromelu_shared.db.models import (
     Entity,
     Quote,
     Claim,
+    ClaimChunk,
     Prediction,
     ConsensusSnapshot,
     Decision,
     Plan,
     Event,
     Outcome,
+    PlayerRound,
+    PlayerTeamHistory,
 )
 
 __all__ = [
@@ -28,10 +31,13 @@ __all__ = [
     "Entity",
     "Quote",
     "Claim",
+    "ClaimChunk",
     "Prediction",
     "ConsensusSnapshot",
     "Decision",
     "Plan",
     "Event",
     "Outcome",
+    "PlayerRound",
+    "PlayerTeamHistory",
 ]

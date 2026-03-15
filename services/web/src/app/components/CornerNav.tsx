@@ -15,6 +15,9 @@ export default function CornerNav() {
   const pathname = usePathname();
   const { hoveredHref, setHoveredHref } = useNavHover();
 
+  // Hide on stream detail pages (content-dense layout)
+  if (pathname.startsWith("/stream/")) return null;
+
   return (
     <nav className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
       {NAV_ITEMS.map((item) => {

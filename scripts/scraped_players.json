@@ -1,0 +1,1126 @@
+{
+  "BRONCOS": [
+    {
+      "name": "Payne Haas",
+      "price": ""
+    },
+    {
+      "name": "Reece Walsh",
+      "price": ""
+    },
+    {
+      "name": "Gehamat Shibasaki",
+      "price": ""
+    },
+    {
+      "name": "Kotoni Staggs",
+      "price": ""
+    },
+    {
+      "name": "Patrick Carrigan",
+      "price": ""
+    },
+    {
+      "name": "Adam Reynolds",
+      "price": ""
+    },
+    {
+      "name": "Josiah Karapani",
+      "price": ""
+    },
+    {
+      "name": "Ezra Mam",
+      "price": ""
+    },
+    {
+      "name": "Jordan Riki",
+      "price": ""
+    },
+    {
+      "name": "Deine Mariner",
+      "price": ""
+    },
+    {
+      "name": "Ben Hunt",
+      "price": ""
+    },
+    {
+      "name": "Xavier Willison",
+      "price": ""
+    },
+    {
+      "name": "Corey Jensen",
+      "price": ""
+    },
+    {
+      "name": "Ben Talty",
+      "price": ""
+    },
+    {
+      "name": "Aublix Tawha",
+      "price": ""
+    },
+    {
+      "name": "Jack Gosiewski",
+      "price": ""
+    },
+    {
+      "name": "Cory Paix",
+      "price": ""
+    }
+  ],
+  "BULLDOGS": [
+    {
+      "name": "Jacob Kiraz",
+      "price": ""
+    },
+    {
+      "name": "Jacob Preston",
+      "price": ""
+    },
+    {
+      "name": "Viliame Kikau",
+      "price": ""
+    },
+    {
+      "name": "Connor Tracey",
+      "price": ""
+    },
+    {
+      "name": "Stephen Crichton",
+      "price": ""
+    },
+    {
+      "name": "Max King",
+      "price": ""
+    },
+    {
+      "name": "Matt Burton",
+      "price": ""
+    },
+    {
+      "name": "Lachlan Galvin",
+      "price": ""
+    },
+    {
+      "name": "Joshua Curran",
+      "price": ""
+    },
+    {
+      "name": "Bronson Xerri",
+      "price": ""
+    },
+    {
+      "name": "Harry Hayes",
+      "price": ""
+    },
+    {
+      "name": "Marcelo Montoya",
+      "price": ""
+    },
+    {
+      "name": "Sitili Tupouniua",
+      "price": ""
+    },
+    {
+      "name": "Samuel Hughes",
+      "price": ""
+    },
+    {
+      "name": "Kurt Mann",
+      "price": ""
+    },
+    {
+      "name": "Bailey Hayward",
+      "price": ""
+    },
+    {
+      "name": "Jaeman Salmon",
+      "price": ""
+    }
+  ],
+  "RAIDERS": [
+    {
+      "name": "Hudson Young",
+      "price": ""
+    },
+    {
+      "name": "Joseph Tapine",
+      "price": ""
+    },
+    {
+      "name": "Zac Hosking",
+      "price": ""
+    },
+    {
+      "name": "Ethan Strange",
+      "price": ""
+    },
+    {
+      "name": "Corey Horsburgh",
+      "price": ""
+    },
+    {
+      "name": "Tom Starling",
+      "price": ""
+    },
+    {
+      "name": "Savelio Tamale",
+      "price": ""
+    },
+    {
+      "name": "Kaeo Weekes",
+      "price": ""
+    },
+    {
+      "name": "Sebastian Kris",
+      "price": ""
+    },
+    {
+      "name": "Josh Papalii",
+      "price": ""
+    },
+    {
+      "name": "Morgan Smithies",
+      "price": ""
+    },
+    {
+      "name": "Xavier Savage",
+      "price": ""
+    },
+    {
+      "name": "Simi Sasagi",
+      "price": ""
+    },
+    {
+      "name": "Ata Mariota",
+      "price": ""
+    },
+    {
+      "name": "Jayden Brailey",
+      "price": ""
+    },
+    {
+      "name": "Noah Martin",
+      "price": ""
+    },
+    {
+      "name": "Ethan Sanders",
+      "price": ""
+    }
+  ],
+  "DRAGONS": [
+    {
+      "name": "Valentine Holmes",
+      "price": ""
+    },
+    {
+      "name": "Christian Tuipulotu",
+      "price": ""
+    },
+    {
+      "name": "Clint Gutherson",
+      "price": ""
+    },
+    {
+      "name": "Jaydn SuA",
+      "price": ""
+    },
+    {
+      "name": "Toby Couchman",
+      "price": ""
+    },
+    {
+      "name": "Mathew Feagai",
+      "price": ""
+    },
+    {
+      "name": "Damien Cook",
+      "price": ""
+    },
+    {
+      "name": "Kyle Flanagan",
+      "price": ""
+    },
+    {
+      "name": "Moses Suli",
+      "price": ""
+    },
+    {
+      "name": "Luciano Leilua",
+      "price": ""
+    },
+    {
+      "name": "Emre Guler",
+      "price": ""
+    },
+    {
+      "name": "Hamish Stewart",
+      "price": ""
+    },
+    {
+      "name": "Josh Kerr",
+      "price": ""
+    },
+    {
+      "name": "Hame Sele",
+      "price": ""
+    },
+    {
+      "name": "Ryan Couchman",
+      "price": ""
+    },
+    {
+      "name": "Daniel Atkinson",
+      "price": ""
+    },
+    {
+      "name": "Setu Tu",
+      "price": ""
+    }
+  ],
+  "SEA EAGLES": [
+    {
+      "name": "Tom Trbojevic",
+      "price": ""
+    },
+    {
+      "name": "Jamal Fogarty",
+      "price": ""
+    },
+    {
+      "name": "Reuben Garrick",
+      "price": ""
+    },
+    {
+      "name": "Haumole Olakauatu",
+      "price": ""
+    },
+    {
+      "name": "Tolutau Koula",
+      "price": ""
+    },
+    {
+      "name": "Lehi Hopoate",
+      "price": ""
+    },
+    {
+      "name": "Ben Trbojevic",
+      "price": ""
+    },
+    {
+      "name": "Siua Taukeiaho",
+      "price": ""
+    },
+    {
+      "name": "Luke Brooks",
+      "price": ""
+    },
+    {
+      "name": "Jason Saab",
+      "price": ""
+    },
+    {
+      "name": "Ethan Bullemor",
+      "price": ""
+    },
+    {
+      "name": "Corey Waddell",
+      "price": ""
+    },
+    {
+      "name": "Kobe Hetherington",
+      "price": ""
+    },
+    {
+      "name": "Jake Simpkin",
+      "price": ""
+    },
+    {
+      "name": "Jake Trbojevic",
+      "price": ""
+    },
+    {
+      "name": "Taniela Paseka",
+      "price": ""
+    },
+    {
+      "name": "Nathan Brown",
+      "price": ""
+    }
+  ],
+  "STORM": [
+    {
+      "name": "Cameron Munster",
+      "price": ""
+    },
+    {
+      "name": "Jahrome Hughes",
+      "price": ""
+    },
+    {
+      "name": "Harry Grant",
+      "price": ""
+    },
+    {
+      "name": "Nick Meaney",
+      "price": ""
+    },
+    {
+      "name": "Stefano Utoikamanu",
+      "price": ""
+    },
+    {
+      "name": "Sua Faalogo",
+      "price": ""
+    },
+    {
+      "name": "Josh King",
+      "price": ""
+    },
+    {
+      "name": "Jack Howarth",
+      "price": ""
+    },
+    {
+      "name": "William Warbrick",
+      "price": ""
+    },
+    {
+      "name": "Tyran Wishart",
+      "price": ""
+    },
+    {
+      "name": "Davvy Moale",
+      "price": ""
+    },
+    {
+      "name": "Alec MacDonald",
+      "price": ""
+    },
+    {
+      "name": "Joe Chan",
+      "price": ""
+    },
+    {
+      "name": "Ativalu Lisati",
+      "price": ""
+    },
+    {
+      "name": "Tui Kamikamica",
+      "price": ""
+    },
+    {
+      "name": "Moses Leo",
+      "price": ""
+    },
+    {
+      "name": "Preston Conn",
+      "price": ""
+    },
+    {
+      "name": "Cooper Clarke",
+      "price": ""
+    }
+  ],
+  "KNIGHTS": [
+    {
+      "name": "Dylan Lucas",
+      "price": ""
+    },
+    {
+      "name": "Fletcher Sharpe",
+      "price": ""
+    },
+    {
+      "name": "Bradman Best",
+      "price": ""
+    },
+    {
+      "name": "Greg Marzhew",
+      "price": ""
+    },
+    {
+      "name": "Kalyn Ponga",
+      "price": ""
+    },
+    {
+      "name": "Dane Gagai",
+      "price": ""
+    },
+    {
+      "name": "Dylan Brown",
+      "price": ""
+    },
+    {
+      "name": "Dominic Young",
+      "price": ""
+    },
+    {
+      "name": "Sandon Smith",
+      "price": ""
+    },
+    {
+      "name": "Trey Mooney",
+      "price": ""
+    },
+    {
+      "name": "Matt Croker",
+      "price": ""
+    },
+    {
+      "name": "Jacob Saifiti",
+      "price": ""
+    },
+    {
+      "name": "Tyson Frizell",
+      "price": ""
+    },
+    {
+      "name": "Jermaine McEwen",
+      "price": ""
+    },
+    {
+      "name": "Phoenix Crossland",
+      "price": ""
+    },
+    {
+      "name": "Thomas Cant",
+      "price": ""
+    },
+    {
+      "name": "Pasami Saulo",
+      "price": ""
+    }
+  ],
+  "COWBOYS": [
+    {
+      "name": "Scott Drinkwater",
+      "price": ""
+    },
+    {
+      "name": "Murray Taulagi",
+      "price": ""
+    },
+    {
+      "name": "Thomas Dearden",
+      "price": ""
+    },
+    {
+      "name": "Braidon Burns",
+      "price": ""
+    },
+    {
+      "name": "Jaxon Purdue",
+      "price": ""
+    },
+    {
+      "name": "Jake Clifford",
+      "price": ""
+    },
+    {
+      "name": "Reuben Cotter",
+      "price": ""
+    },
+    {
+      "name": "Jason Taumalolo",
+      "price": ""
+    },
+    {
+      "name": "Griffin Neame",
+      "price": ""
+    },
+    {
+      "name": "Reed Mahoney",
+      "price": ""
+    },
+    {
+      "name": "Coen Hess",
+      "price": ""
+    },
+    {
+      "name": "Sam McIntyre",
+      "price": ""
+    },
+    {
+      "name": "Heilum Luki",
+      "price": ""
+    },
+    {
+      "name": "Matthew Lodge",
+      "price": ""
+    },
+    {
+      "name": "Thomas Mikaele",
+      "price": ""
+    },
+    {
+      "name": "Kai ODonnell",
+      "price": ""
+    },
+    {
+      "name": "Tom Chester",
+      "price": ""
+    }
+  ],
+  "DOLPHINS": [
+    {
+      "name": "Herbie Farnworth",
+      "price": ""
+    },
+    {
+      "name": "Hamiso Tabuai-Fidow",
+      "price": ""
+    },
+    {
+      "name": "Isaiya Katoa",
+      "price": ""
+    },
+    {
+      "name": "Jamayne Isaako",
+      "price": ""
+    },
+    {
+      "name": "Kodi Nikorima",
+      "price": ""
+    },
+    {
+      "name": "Jake Averillo",
+      "price": ""
+    },
+    {
+      "name": "Trai Fuller",
+      "price": ""
+    },
+    {
+      "name": "Connelly Lemuelu",
+      "price": ""
+    },
+    {
+      "name": "Selwyn Cobbo",
+      "price": ""
+    },
+    {
+      "name": "Tom Gilbert",
+      "price": ""
+    },
+    {
+      "name": "Kulikefu Finefeuiaki",
+      "price": ""
+    },
+    {
+      "name": "Morgan Knowles",
+      "price": ""
+    },
+    {
+      "name": "Oryn Keeley",
+      "price": ""
+    },
+    {
+      "name": "Thomas Flegler",
+      "price": ""
+    },
+    {
+      "name": "Felise Kaufusi",
+      "price": ""
+    },
+    {
+      "name": "Brad Schneider",
+      "price": ""
+    },
+    {
+      "name": "Brent Woolf",
+      "price": ""
+    }
+  ],
+  "EELS": [
+    {
+      "name": "Isaiah Iongi",
+      "price": ""
+    },
+    {
+      "name": "Jack Williams",
+      "price": ""
+    },
+    {
+      "name": "Brian Kelly",
+      "price": ""
+    },
+    {
+      "name": "Junior Paulo",
+      "price": ""
+    },
+    {
+      "name": "Mitchell Moses",
+      "price": ""
+    },
+    {
+      "name": "Kitione Kautoga",
+      "price": ""
+    },
+    {
+      "name": "Jmaine Hopgood",
+      "price": ""
+    },
+    {
+      "name": "Jack deBelin",
+      "price": ""
+    },
+    {
+      "name": "Will Penisini",
+      "price": ""
+    },
+    {
+      "name": "Bailey Simonsson",
+      "price": ""
+    },
+    {
+      "name": "Dylan Walker",
+      "price": ""
+    },
+    {
+      "name": "Sean Russell",
+      "price": ""
+    },
+    {
+      "name": "Ryley Smith",
+      "price": ""
+    },
+    {
+      "name": "Joash Papalii",
+      "price": ""
+    },
+    {
+      "name": "Matthew Doorey",
+      "price": ""
+    },
+    {
+      "name": "Jonah Pezet",
+      "price": ""
+    },
+    {
+      "name": "Tallyn DaSilva",
+      "price": ""
+    }
+  ],
+  "PANTHERS": [
+    {
+      "name": "Nathan Cleary",
+      "price": ""
+    },
+    {
+      "name": "Dylan Edwards",
+      "price": ""
+    },
+    {
+      "name": "Casey McLean",
+      "price": ""
+    },
+    {
+      "name": "Paul Alamoti",
+      "price": ""
+    },
+    {
+      "name": "Lindsay Smith",
+      "price": ""
+    },
+    {
+      "name": "Isaah Yeo",
+      "price": ""
+    },
+    {
+      "name": "Thomas Jenkins",
+      "price": ""
+    },
+    {
+      "name": "Brian Too",
+      "price": ""
+    },
+    {
+      "name": "Blaize Talagi",
+      "price": ""
+    },
+    {
+      "name": "Isaiah Papalii",
+      "price": ""
+    },
+    {
+      "name": "Luke Garner",
+      "price": ""
+    },
+    {
+      "name": "Scott Sorensen",
+      "price": ""
+    },
+    {
+      "name": "Moses Leota",
+      "price": ""
+    },
+    {
+      "name": "Mitchell Kenny",
+      "price": ""
+    },
+    {
+      "name": "Jack Cogger",
+      "price": ""
+    },
+    {
+      "name": "Kalani Going",
+      "price": ""
+    },
+    {
+      "name": "Billy Phillips",
+      "price": ""
+    }
+  ],
+  "SHARKS": [
+    {
+      "name": "Nicholas Hynes",
+      "price": ""
+    },
+    {
+      "name": "Kayal Iro",
+      "price": ""
+    },
+    {
+      "name": "Blayke Brailey",
+      "price": ""
+    },
+    {
+      "name": "Addin Fonua-Blake",
+      "price": ""
+    },
+    {
+      "name": "Briton Nikora",
+      "price": ""
+    },
+    {
+      "name": "Sione Katoa",
+      "price": ""
+    },
+    {
+      "name": "William Kennedy",
+      "price": ""
+    },
+    {
+      "name": "Jesse Ramien",
+      "price": ""
+    },
+    {
+      "name": "Sam Stonestreet",
+      "price": ""
+    },
+    {
+      "name": "Billy Burns",
+      "price": ""
+    },
+    {
+      "name": "Braydon Trindall",
+      "price": ""
+    },
+    {
+      "name": "Thomas Hazelton",
+      "price": ""
+    },
+    {
+      "name": "Oregon Kaufusi",
+      "price": ""
+    },
+    {
+      "name": "Siosifa Talakai",
+      "price": ""
+    },
+    {
+      "name": "Braden Uele",
+      "price": ""
+    },
+    {
+      "name": "Jesse Colquhoun",
+      "price": ""
+    },
+    {
+      "name": "Toby Rudolf",
+      "price": ""
+    }
+  ],
+  "RABBITOHS": [
+    {
+      "name": "Keaon Koloamatangi",
+      "price": ""
+    },
+    {
+      "name": "Alex Johnston",
+      "price": ""
+    },
+    {
+      "name": "Latrell Mitchell",
+      "price": ""
+    },
+    {
+      "name": "Tallis Duncan",
+      "price": ""
+    },
+    {
+      "name": "Jye Gray",
+      "price": ""
+    },
+    {
+      "name": "Cameron Murray",
+      "price": ""
+    },
+    {
+      "name": "Euan Aitken",
+      "price": ""
+    },
+    {
+      "name": "David Fifita",
+      "price": ""
+    },
+    {
+      "name": "Peter Mamouzelos",
+      "price": ""
+    },
+    {
+      "name": "Lachlan Hubner",
+      "price": ""
+    },
+    {
+      "name": "Jack Wighton",
+      "price": ""
+    },
+    {
+      "name": "Tevita Tatola",
+      "price": ""
+    },
+    {
+      "name": "Campbell Graham",
+      "price": ""
+    },
+    {
+      "name": "Cody Walker",
+      "price": ""
+    },
+    {
+      "name": "Bronson Garlick",
+      "price": ""
+    },
+    {
+      "name": "Ashton Ward",
+      "price": ""
+    },
+    {
+      "name": "Jayden Sullivan",
+      "price": ""
+    }
+  ],
+  "ROOSTERS": [
+    {
+      "name": "James Tedesco",
+      "price": ""
+    },
+    {
+      "name": "Mark Nawaqanitawase",
+      "price": ""
+    },
+    {
+      "name": "Sam Walker",
+      "price": ""
+    },
+    {
+      "name": "Daniel Tupou",
+      "price": ""
+    },
+    {
+      "name": "Daly Cherry-Evans",
+      "price": ""
+    },
+    {
+      "name": "Angus Crichton",
+      "price": ""
+    },
+    {
+      "name": "Naufahu Whyte",
+      "price": ""
+    },
+    {
+      "name": "Connor Watson",
+      "price": ""
+    },
+    {
+      "name": "Siua Wong",
+      "price": ""
+    },
+    {
+      "name": "Billy Smith",
+      "price": ""
+    },
+    {
+      "name": "Nat Butcher",
+      "price": ""
+    },
+    {
+      "name": "Fetalagia Pauga",
+      "price": ""
+    },
+    {
+      "name": "Egan Butcher",
+      "price": ""
+    },
+    {
+      "name": "Lindsay Collins",
+      "price": ""
+    },
+    {
+      "name": "Blake Steep",
+      "price": ""
+    },
+    {
+      "name": "Salesi Foketi",
+      "price": ""
+    },
+    {
+      "name": "Benaiah Ioelu",
+      "price": ""
+    }
+  ],
+  "TITANS": [
+    {
+      "name": "Tino Faasuamaleaui",
+      "price": ""
+    },
+    {
+      "name": "Beau Fermor",
+      "price": ""
+    },
+    {
+      "name": "Alexander Brimson",
+      "price": ""
+    },
+    {
+      "name": "Phillip Sami",
+      "price": ""
+    },
+    {
+      "name": "Sam Verrills",
+      "price": ""
+    },
+    {
+      "name": "Moeaki Fotuaika",
+      "price": ""
+    },
+    {
+      "name": "Keano Kini",
+      "price": ""
+    },
+    {
+      "name": "Jojo Fifita",
+      "price": ""
+    },
+    {
+      "name": "Chris Randall",
+      "price": ""
+    },
+    {
+      "name": "Max Feagai",
+      "price": ""
+    },
+    {
+      "name": "Klese Haas",
+      "price": ""
+    },
+    {
+      "name": "Lachlan Ilias",
+      "price": ""
+    },
+    {
+      "name": "Kurtis Morrin",
+      "price": ""
+    },
+    {
+      "name": "Tukimihia Simpkins",
+      "price": ""
+    },
+    {
+      "name": "Arama Hau",
+      "price": ""
+    },
+    {
+      "name": "Cooper Bai",
+      "price": ""
+    },
+    {
+      "name": "Sialetili Faeamani",
+      "price": ""
+    }
+  ],
+  "WARRIORS": [
+    {
+      "name": "Erin Clark",
+      "price": ""
+    },
+    {
+      "name": "Roger Tuivasa-Sheck",
+      "price": ""
+    },
+    {
+      "name": "Jackson Ford",
+      "price": ""
+    },
+    {
+      "name": "Tanah Boyd",
+      "price": ""
+    },
+    {
+      "name": "Chanel Harris-Tavita",
+      "price": ""
+    },
+    {
+      "name": "James Fisher-Harris",
+      "price": ""
+    },
+    {
+      "name": "Wayde Egan",
+      "price": ""
+    },
+    {
+      "name": "Charnze Nicoll-Klokstad",
+      "price": ""
+    },
+    {
+      "name": "Leka Halasima",
+      "price": ""
+    },
+    {
+      "name": "Ali Leiataua",
+      "price": ""
+    },
+    {
+      "name": "Adam Pompey",
+      "price": ""
+    },
+    {
+      "name": "Kurt Capewell",
+      "price": ""
+    },
+    {
+      "name": "Sam Healey",
+      "price": ""
+    },
+    {
+      "name": "Dallin Watene-Zelezniak",
+      "price": ""
+    },
+    {
+      "name": "Demitric Vaimauga",
+      "price": ""
+    },
+    {
+      "name": "Tanner Stowers-Smith",
+      "price": ""
+    },
+    {
+      "name": "Jacob Laban",
+      "price": ""
+    }
+  ]
+}

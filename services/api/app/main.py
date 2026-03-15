@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .routers.admin import router as admin_router
 from .routers.sources import router as sources_router
 
 app = FastAPI(title="Jeromelu API", version="0.1.0")
@@ -14,6 +15,7 @@ app.add_middleware(
 )
 
 app.include_router(sources_router, prefix="/api")
+app.include_router(admin_router, prefix="/api")
 
 
 @app.get("/health")

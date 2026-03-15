@@ -115,13 +115,16 @@ def get_source(source_id: uuid.UUID, db: Session = Depends(get_db)):
                 "strength": claim.strength,
                 "effective_round": claim.effective_round,
                 "season": claim.season,
+                "start_ts": claim.start_ts,
+                "end_ts": claim.end_ts,
                 "player_name": entity.canonical_name if entity else None,
                 "chunks": [
                     {
                         "chunk_id": str(cl.chunk.chunk_id),
                         "start_ts": cl.chunk.start_ts,
                         "end_ts": cl.chunk.end_ts,
-                        "text": cl.chunk.text,
+                        "raw_text": cl.chunk.raw_text,
+                        "clean_text": cl.chunk.clean_text,
                     }
                     for cl in claim_chunks
                     if cl.chunk
@@ -129,8 +132,10 @@ def get_source(source_id: uuid.UUID, db: Session = Depends(get_db)):
             }
         )
 
-    # Sort claims by earliest chunk timestamp
+    # Sort claims by claim-level timestamp, falling back to chunk timestamp
     def sort_key(c):
+        if c["start_ts"] is not None:
+            return c["start_ts"]
         ts_list = [ch["start_ts"] for ch in c["chunks"] if ch["start_ts"] is not None]
         return min(ts_list) if ts_list else float("inf")
 
@@ -150,7 +155,8 @@ def get_source(source_id: uuid.UUID, db: Session = Depends(get_db)):
             {
                 "chunk_id": str(ch.chunk_id),
                 "chunk_index": ch.chunk_index,
-                "text": ch.text,
+                "raw_text": ch.raw_text,
+                "clean_text": ch.clean_text,
                 "start_ts": ch.start_ts,
                 "end_ts": ch.end_ts,
                 "has_claims": ch.chunk_id in claim_chunk_ids,

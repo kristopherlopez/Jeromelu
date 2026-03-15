@@ -12,6 +12,7 @@ INGESTION_QUEUE = "ingestion"
 EXTRACTION_QUEUE = "extraction"
 DECISION_QUEUE = "decision"
 PUBLISHING_QUEUE = "publishing"
+SCRAPER_QUEUE = "scraper"
 
 _client: Client | None = None
 

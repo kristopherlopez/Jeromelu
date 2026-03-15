@@ -28,6 +28,7 @@ Thumbs.db
 
 # Docker
 docker/data/
+data/
 
 # Sensitive files
 docs/aws-resource-inventory.md

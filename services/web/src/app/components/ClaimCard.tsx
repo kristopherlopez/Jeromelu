@@ -2,16 +2,7 @@
 
 import { forwardRef } from "react";
 import type { ClaimDetail } from "@/lib/types";
-
-const TYPE_COLORS: Record<string, string> = {
-  buy: "#22c55e",
-  sell: "#ef4444",
-  hold: "#eab308",
-  captain: "#f97316",
-  avoid: "#991b1b",
-  breakout: "#06b6d4",
-  matchup_edge: "#a855f7",
-};
+import { CLAIM_TYPE_COLORS } from "@/lib/constants";
 
 function formatTimestamp(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -27,11 +18,13 @@ interface Props {
 
 const ClaimCard = forwardRef<HTMLDivElement, Props>(
   ({ claim, isActive, onSeek }, ref) => {
-    const color = TYPE_COLORS[claim.claim_type] || "#71717a";
-    const earliestTs = claim.chunks
-      .map((c) => c.start_ts)
-      .filter((t): t is number => t !== null)
-      .sort((a, b) => a - b)[0];
+    const color = CLAIM_TYPE_COLORS[claim.claim_type] || "#71717a";
+    const earliestTs =
+      claim.start_ts ??
+      claim.chunks
+        .map((c) => c.start_ts)
+        .filter((t): t is number => t !== null)
+        .sort((a, b) => a - b)[0];
 
     return (
       <div
@@ -56,6 +49,12 @@ const ClaimCard = forwardRef<HTMLDivElement, Props>(
           {claim.player_name && (
             <span className="text-sm font-medium text-zinc-200">
               {claim.player_name}
+            </span>
+          )}
+          {claim.effective_round != null && (
+            <span className="rounded border border-white/[0.08] bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
+              Rd <span className="font-bold text-zinc-200">{claim.effective_round}</span>
+              {claim.season != null && <> &middot; {claim.season}</>}
             </span>
           )}
           <span className="flex-1" />
