@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import CornerNav from "./components/CornerNav";
+import Sidebar from "./components/Sidebar";
+import SidebarLayout from "./components/SidebarLayout";
 import { NavHoverProvider } from "./components/NavHoverContext";
 
 const geistSans = Geist({
@@ -30,8 +31,8 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <NavHoverProvider>
-          {children}
-          <CornerNav />
+          <Sidebar />
+          <SidebarLayout>{children}</SidebarLayout>
         </NavHoverProvider>
       </body>
     </html>
