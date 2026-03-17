@@ -1,4 +1,4 @@
-.PHONY: up down db-shell api web logs clean prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean
+.PHONY: up down db-shell api web logs clean prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all
 
 # Start local infrastructure
 up:
@@ -80,3 +80,35 @@ prod-update-clean:
 		-H "Content-Type: application/json" \
 		-H "X-Admin-Key: $(ADMIN_KEY)" \
 		-d '{"video_id":"$(VIDEO)","channel_id":"$(CHANNEL)"}' | python -m json.tool
+
+# Sync raw transcripts from local MinIO to production S3
+# Requires: Docker running (MinIO) + AWS credentials configured
+prod-sync:
+	python scripts/sync_minio_to_s3.py
+
+# Dry run — show what would be synced without uploading
+prod-sync-dry-run:
+	python scripts/sync_minio_to_s3.py --dry-run
+
+# Full sync: copy MinIO -> S3, then ingest all clean+claims transcripts
+# Usage: make prod-sync-all ADMIN_KEY=xxx
+prod-sync-all:
+	python scripts/sync_minio_to_s3.py
+	@echo "\nUploading clean transcripts and claims to S3..."
+	@for f in data/transcripts/clean/*.json; do \
+		filename=$$(basename "$$f" .json); \
+		channel=$$(echo "$$filename" | sed 's/_[^_]*$$//'); \
+		video=$$(echo "$$filename" | sed 's/^.*_//'); \
+		echo "Uploading clean: $$channel/$$video"; \
+		aws s3 cp "$$f" "s3://$(CLEAN_BUCKET)/youtube/$$channel/$$video.json" --region $(REGION); \
+		if [ -f "data/transcripts/processed/$$filename.json" ]; then \
+			echo "Uploading claims: $$video"; \
+			aws s3 cp "data/transcripts/processed/$$filename.json" "s3://$(CLEAN_BUCKET)/claims/$$video.json" --region $(REGION); \
+			echo "Ingesting: $$channel/$$video"; \
+			curl -s -X POST $(PROD_API)/api/admin/ingest \
+				-H "Content-Type: application/json" \
+				-H "X-Admin-Key: $(ADMIN_KEY)" \
+				-d "{\"video_id\":\"$$video\",\"channel_id\":\"$$channel\"}" | python -m json.tool; \
+		fi; \
+	done
+	@echo "\nSync complete."
