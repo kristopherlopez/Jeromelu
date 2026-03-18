@@ -9,6 +9,7 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY services/web/ .
+ENV NEXT_PUBLIC_API_URL=https://api.jeromelu.ai
 RUN npm run build
 
 FROM base AS runner
