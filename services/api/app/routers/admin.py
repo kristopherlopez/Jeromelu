@@ -194,6 +194,90 @@ def _download_json(bucket: str, key: str) -> dict:
 # Endpoints
 # ---------------------------------------------------------------------------
 
+class IngestRawRequest(BaseModel):
+    video_id: str
+    channel_id: str
+
+
+@router.post("/admin/ingest-raw", dependencies=[Depends(require_admin)])
+def ingest_raw(req: IngestRawRequest, db: Session = Depends(get_db)):
+    """Ingest a raw transcript from S3 into the database (no claims required).
+
+    Creates Source + SourceDocument + SourceChunks from the raw transcript only.
+    """
+    video_id = req.video_id
+    channel_id = req.channel_id
+    canonical_url = f"https://youtube.com/watch?v={video_id}"
+
+    existing = db.query(Source).filter(Source.canonical_url == canonical_url).first()
+    if existing:
+        return {"skipped": True, "source_id": str(existing.source_id)}
+
+    prefix = f"youtube/{channel_id}/{video_id}.json"
+    try:
+        raw_data = _download_json(settings.s3_raw_bucket, prefix)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Raw transcript not found: {e}")
+
+    raw_segments = raw_data.get("segments", [])
+    stitched_text, deduped_raw = _stitch_segments(raw_segments)
+    chunk_dicts = _chunk_segments(deduped_raw)
+
+    pub_dt = None
+    if raw_data.get("published_at"):
+        try:
+            pub_dt = datetime.fromisoformat(raw_data["published_at"].replace("Z", "+00:00"))
+        except (ValueError, AttributeError):
+            pass
+
+    try:
+        source = Source(
+            source_type="youtube",
+            title=raw_data.get("title", f"YouTube video {video_id}"),
+            canonical_url=canonical_url,
+            approved_flag=True,
+            ingestion_status="completed",
+            published_at=pub_dt,
+            ingested_at=datetime.now(timezone.utc),
+        )
+        db.add(source)
+        db.flush()
+
+        doc = SourceDocument(
+            source_id=source.source_id,
+            s3_key=prefix,
+            raw_text=stitched_text,
+            transcript_available=True,
+            language="en",
+            checksum=_checksum(stitched_text),
+            chunk_count=len(chunk_dicts),
+        )
+        db.add(doc)
+        db.flush()
+
+        for cd in chunk_dicts:
+            db.add(SourceChunk(
+                document_id=doc.document_id,
+                chunk_index=cd["chunk_index"],
+                raw_text=cd["raw_text"],
+                start_offset=cd.get("start_offset"),
+                end_offset=cd.get("end_offset"),
+                start_ts=cd.get("start_ts"),
+                end_ts=cd.get("end_ts"),
+            ))
+        db.commit()
+
+        return {
+            "source_id": str(source.source_id),
+            "document_id": str(doc.document_id),
+            "chunks_created": len(chunk_dicts),
+        }
+    except Exception:
+        db.rollback()
+        logger.exception("Failed to ingest-raw %s", video_id)
+        raise
+
+
 class IngestRequest(BaseModel):
     video_id: str
     channel_id: str | None = None
