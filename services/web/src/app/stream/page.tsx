@@ -8,10 +8,11 @@ export default async function StreamPage() {
   let data: SourceListResponse;
   try {
     data = await apiFetch<SourceListResponse>("/api/sources");
-  } catch {
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
     return (
       <main className="flex min-h-screen items-center justify-center p-8">
-        <p className="text-zinc-500">Failed to load sources. Is the API running?</p>
+        <p className="text-zinc-500">Failed to load sources: {msg}</p>
       </main>
     );
   }
