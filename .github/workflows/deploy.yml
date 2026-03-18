@@ -20,7 +20,6 @@ jobs:
     outputs:
       api: ${{ steps.changes.outputs.api }}
       web: ${{ steps.changes.outputs.web }}
-      worker-orchestrator: ${{ steps.changes.outputs.worker-orchestrator }}
       worker-ingestion: ${{ steps.changes.outputs.worker-ingestion }}
       worker-extraction: ${{ steps.changes.outputs.worker-extraction }}
       worker-decision: ${{ steps.changes.outputs.worker-decision }}
@@ -37,9 +36,6 @@ jobs:
               - 'packages/shared/**'
             web:
               - 'services/web/**'
-            worker-orchestrator:
-              - 'services/worker-orchestrator/**'
-              - 'packages/shared/**'
             worker-ingestion:
               - 'services/worker-ingestion/**'
               - 'packages/shared/**'
@@ -72,11 +68,6 @@ jobs:
             ecr_repo: jeromelu/web
             ecs_service: jeromelu-web
             changed: ${{ needs.detect-changes.outputs.web }}
-          - service: worker-orchestrator
-            path: services/worker-orchestrator
-            ecr_repo: jeromelu/worker-orchestrator
-            ecs_service: jeromelu-worker-orchestrator
-            changed: ${{ needs.detect-changes.outputs.worker-orchestrator }}
           - service: worker-ingestion
             path: services/worker-ingestion
             ecr_repo: jeromelu/worker-ingestion
@@ -125,14 +116,44 @@ jobs:
           docker push $IMAGE:${{ github.sha }}
           docker push $IMAGE:latest
 
-      - name: Deploy to ECS
+      - name: Update task definition and deploy
         if: matrix.changed == 'true'
         run: |
+          IMAGE="${{ env.ECR_REGISTRY }}/${{ matrix.ecr_repo }}:${{ github.sha }}"
+          FAMILY="${{ matrix.ecs_service }}"
+
+          # Get current task definition (preserves env vars, secrets, etc.)
+          CURRENT=$(aws ecs describe-task-definition \
+            --task-definition "$FAMILY" \
+            --region ${{ env.AWS_REGION }} \
+            --query 'taskDefinition')
+
+          # Update the container image in the existing definition
+          UPDATED=$(echo "$CURRENT" | jq \
+            --arg image "$IMAGE" \
+            '.containerDefinitions[0].image = $image')
+
+          # Strip fields that can't be passed to register-task-definition
+          CLEANED=$(echo "$UPDATED" | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)')
+
+          # Register new revision (keeps all env vars, log config, etc.)
+          NEW_ARN=$(aws ecs register-task-definition \
+            --cli-input-json "$CLEANED" \
+            --region ${{ env.AWS_REGION }} \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+
+          echo "Registered task definition: $NEW_ARN"
+
+          # Deploy with the new revision
           aws ecs update-service \
             --cluster ${{ env.ECS_CLUSTER }} \
             --service ${{ matrix.ecs_service }} \
+            --task-definition "$NEW_ARN" \
             --force-new-deployment \
             --region ${{ env.AWS_REGION }}
+
+          echo "Deployed ${{ matrix.service }} with image $IMAGE"
 
   invalidate-cdn:
     needs: [detect-changes, build-and-deploy]
