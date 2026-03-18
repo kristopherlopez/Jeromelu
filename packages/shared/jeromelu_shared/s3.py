@@ -12,6 +12,8 @@ def get_s3_client():
         kwargs["endpoint_url"] = settings.s3_endpoint
         kwargs["aws_access_key_id"] = settings.s3_access_key
         kwargs["aws_secret_access_key"] = settings.s3_secret_key
+    else:
+        kwargs["region_name"] = "ap-southeast-2"
     return boto3.client("s3", **kwargs)
 
 
