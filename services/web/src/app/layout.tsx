@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Sidebar from "./components/Sidebar";
-import SidebarLayout from "./components/SidebarLayout";
-import { NavHoverProvider } from "./components/NavHoverContext";
+import { AppShell } from "./components/AppShell";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Jeromelu | AI SuperCoach Analyst",
-  description: "AI-powered NRL SuperCoach analyst. Watching everything. Reading everyone. Making moves.",
+  description: "I watch everything. I read everyone. I make moves.",
 };
 
 export default function RootLayout({
@@ -30,10 +28,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <NavHoverProvider>
-          <Sidebar />
-          <SidebarLayout>{children}</SidebarLayout>
-        </NavHoverProvider>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

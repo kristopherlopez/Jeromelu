@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef } from "react";
 import type { TranscriptChunk, ClaimDetail } from "@/lib/types";
 import { CLAIM_TYPE_COLORS } from "@/lib/constants";
 
-/** Get display text for a chunk, preferring clean_text over raw_text. */
 function chunkText(chunk: TranscriptChunk): string {
   return chunk.clean_text ?? chunk.raw_text;
 }
@@ -15,143 +14,69 @@ function formatTimestamp(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-interface ClaimSpan {
+// ---------------------------------------------------------------------------
+// Build a flat list of inline tokens: words and claim markers interleaved
+// ---------------------------------------------------------------------------
+
+interface WordToken {
+  kind: "word";
   text: string;
-  isClaim: boolean;
-  ts: number | null;
-  claim?: ClaimDetail;
-  /** Character offset of this span within the full chunk text */
-  charOffset: number;
+  ts: number;
 }
 
-interface Sentence {
-  text: string;
-  estimatedStart: number;
-  estimatedEnd: number;
+interface ClaimMarker {
+  kind: "claim";
+  claim: ClaimDetail;
 }
 
-/** Split a non-claim span's text into sentences with interpolated timestamps. */
-function splitIntoSentences(
-  spanText: string,
-  spanCharOffset: number,
-  chunkLen: number,
-  chunkStart: number,
-  chunkEnd: number
-): Sentence[] {
-  const parts = spanText.split(/(?<=\.)\s+/);
-  const sentences: Sentence[] = [];
-  let offset = spanCharOffset;
+type Token = WordToken | ClaimMarker;
 
-  for (const part of parts) {
-    if (!part) continue;
-    const startFrac = offset / chunkLen;
-    const endFrac = (offset + part.length) / chunkLen;
-    sentences.push({
-      text: part + (part.endsWith(".") ? " " : ""),
-      estimatedStart: chunkStart + startFrac * (chunkEnd - chunkStart),
-      estimatedEnd: chunkStart + endFrac * (chunkEnd - chunkStart),
-    });
-    offset += part.length + 1; // +1 for the split whitespace
-  }
-
-  return sentences;
-}
-
-/**
- * Split a chunk's text into claim / non-claim spans by matching claim_text
- * excerpts within the chunk.
- */
-function splitChunkByClaims(
-  chunk: TranscriptChunk,
+function buildTokens(
+  chunks: TranscriptChunk[],
   claims: ClaimDetail[]
-): ClaimSpan[] {
-  const relevant = claims.filter((c) => {
-    if (c.start_ts == null || chunk.start_ts == null || chunk.end_ts == null)
-      return false;
-    return c.start_ts >= chunk.start_ts && c.start_ts < chunk.end_ts;
-  });
+): Token[] {
+  // Sort claims by start_ts
+  const sorted = claims
+    .filter((c) => c.start_ts != null)
+    .sort((a, b) => a.start_ts! - b.start_ts!);
 
-  if (relevant.length === 0) {
-    return [{ text: chunkText(chunk), isClaim: false, ts: chunk.start_ts, charOffset: 0 }];
-  }
+  const tokens: Token[] = [];
+  let claimIdx = 0;
 
-  const chunkLower = chunkText(chunk).toLowerCase();
-  const matches: { start: number; end: number; ts: number | null; claim: ClaimDetail }[] = [];
+  for (const chunk of chunks) {
+    const ts = chunk.start_ts ?? 0;
 
-  for (const claim of relevant) {
-    if (!claim.claim_text) continue;
-
-    // Strip "Player Name —" prefix for matching
-    let search = claim.claim_text;
-    const dashIdx = search.indexOf("\u2014");
-    if (dashIdx !== -1 && dashIdx < 40) {
-      search = search.slice(dashIdx + 1).trim();
+    // Insert any claim markers that start before/at this chunk
+    while (claimIdx < sorted.length && sorted[claimIdx].start_ts! <= ts) {
+      tokens.push({ kind: "claim", claim: sorted[claimIdx] });
+      claimIdx++;
     }
 
-    const key = search.slice(0, 80).toLowerCase().replace(/[.,!?]/g, "");
-    const words = key.split(/\s+/).filter(Boolean);
-    let bestPos = -1;
-
-    for (let len = Math.min(words.length, 8); len >= 3; len--) {
-      if (bestPos !== -1) break;
-      for (let i = 0; i <= words.length - len; i++) {
-        const phrase = words.slice(i, i + len).join(" ");
-        const pos = chunkLower.indexOf(phrase);
-        if (pos !== -1) {
-          bestPos = pos;
-          break;
-        }
-      }
-    }
-
-    if (bestPos !== -1) {
-      let start = bestPos;
-      let end = Math.min(bestPos + search.length, chunkText(chunk).length);
-
-      const prevPeriod = chunkText(chunk).lastIndexOf(". ", start);
-      if (prevPeriod !== -1 && start - prevPeriod < 80) {
-        start = prevPeriod + 2;
-      }
-      const nextPeriod = chunkText(chunk).indexOf(". ", end - 10);
-      if (nextPeriod !== -1 && nextPeriod - end < 80) {
-        end = nextPeriod + 1;
-      }
-
-      matches.push({ start, end, ts: claim.start_ts, claim });
+    // Add the chunk's words as a single word token
+    const text = chunkText(chunk).trim();
+    if (text) {
+      tokens.push({ kind: "word", text, ts });
     }
   }
 
-  if (matches.length === 0) {
-    return [{ text: chunkText(chunk), isClaim: false, ts: chunk.start_ts, charOffset: 0 }];
+  // Any remaining claims after the last chunk
+  while (claimIdx < sorted.length) {
+    tokens.push({ kind: "claim", claim: sorted[claimIdx] });
+    claimIdx++;
   }
 
-  // Sort and merge overlapping (keep first claim reference)
-  matches.sort((a, b) => a.start - b.start);
-  const merged: typeof matches = [matches[0]];
-  for (let i = 1; i < matches.length; i++) {
-    const prev = merged[merged.length - 1];
-    if (matches[i].start <= prev.end) {
-      prev.end = Math.max(prev.end, matches[i].end);
-    } else {
-      merged.push(matches[i]);
-    }
-  }
-
-  const spans: ClaimSpan[] = [];
-  let cursor = 0;
-  for (const m of merged) {
-    if (m.start > cursor) {
-      spans.push({ text: chunkText(chunk).slice(cursor, m.start), isClaim: false, ts: chunk.start_ts, charOffset: cursor });
-    }
-    spans.push({ text: chunkText(chunk).slice(m.start, m.end), isClaim: true, ts: m.ts, claim: m.claim, charOffset: m.start });
-    cursor = m.end;
-  }
-  if (cursor < chunkText(chunk).length) {
-    spans.push({ text: chunkText(chunk).slice(cursor), isClaim: false, ts: chunk.start_ts, charOffset: cursor });
-  }
-
-  return spans;
+  return tokens;
 }
+
+// ---------------------------------------------------------------------------
+// Timestamp markers: show a clickable timestamp every ~60s
+// ---------------------------------------------------------------------------
+
+const TIMESTAMP_INTERVAL = 60;
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 interface Props {
   chunks: TranscriptChunk[];
@@ -160,52 +85,36 @@ interface Props {
   onSeek: (seconds: number) => void;
 }
 
-export default function TranscriptPanel({ chunks, claims, currentTime, onSeek }: Props) {
-  const splitChunks = useMemo(
-    () => chunks.map((chunk) => ({ chunk, spans: splitChunkByClaims(chunk, claims) })),
-    [chunks, claims]
-  );
+export default function TranscriptPanel({
+  chunks,
+  claims,
+  currentTime,
+  onSeek,
+}: Props) {
+  const tokens = useMemo(() => buildTokens(chunks, claims), [chunks, claims]);
 
-  const claimSpanCount = splitChunks.reduce(
-    (n, sc) => n + sc.spans.filter((s) => s.isClaim).length,
-    0
-  );
-
-  // Track which claim is active based on current video time
-  const activeClaimTs = useMemo(() => {
-    for (const claim of claims) {
-      if (
-        claim.start_ts !== null &&
-        claim.end_ts !== null &&
-        currentTime >= claim.start_ts &&
-        currentTime < claim.end_ts
-      ) {
-        return claim.start_ts;
-      }
-    }
-    return null;
-  }, [claims, currentTime]);
-
-  // Auto-scroll to the active sentence
+  // Auto-scroll
   const scrollRef = useRef<HTMLDivElement>(null);
-  const activeSentenceRef = useRef<HTMLSpanElement>(null);
+  const activeRef = useRef<HTMLSpanElement>(null);
   const lastScrollTime = useRef(0);
 
   useEffect(() => {
-    if (activeSentenceRef.current && scrollRef.current) {
-      // Throttle scrolling to avoid jitter
+    if (activeRef.current && scrollRef.current) {
       const now = Date.now();
-      if (now - lastScrollTime.current < 1000) return;
+      if (now - lastScrollTime.current < 2000) return;
       lastScrollTime.current = now;
 
       const container = scrollRef.current;
-      const el = activeSentenceRef.current;
+      const el = activeRef.current;
       const elTop = el.offsetTop - container.offsetTop;
       const elBottom = elTop + el.offsetHeight;
       const scrollTop = container.scrollTop;
       const viewHeight = container.clientHeight;
 
-      if (elTop < scrollTop + viewHeight * 0.3 || elBottom > scrollTop + viewHeight * 0.7) {
+      if (
+        elTop < scrollTop + viewHeight * 0.2 ||
+        elBottom > scrollTop + viewHeight * 0.8
+      ) {
         container.scrollTo({
           top: elTop - viewHeight * 0.35,
           behavior: "smooth",
@@ -214,124 +123,120 @@ export default function TranscriptPanel({ chunks, claims, currentTime, onSeek }:
     }
   }, [currentTime]);
 
+  // Track which timestamps we've emitted
+  let lastTimestampBucket = -1;
+
   return (
     <div className="rounded-lg border border-zinc-800 relative flex flex-col h-full min-h-0">
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-800 shrink-0">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-          Transcript &middot; {claimSpanCount} claim regions highlighted
+          Transcript &middot; {claims.length} claims
         </span>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-3 min-h-0 custom-scrollbar">
-        {splitChunks.map(({ chunk, spans }, chunkIdx) => (
-          <div key={chunk.chunk_id} className="mb-3">
-            <span>
-              {spans.map((span, i) => {
-                if (!span.isClaim) {
-                  const chunkStart = chunk.start_ts;
-                  const chunkEnd = chunk.end_ts;
-
-                  // If chunk has no timestamps, render plain
-                  if (chunkStart == null || chunkEnd == null) {
-                    return (
-                      <span
-                        key={i}
-                        className="inline text-[0.8125rem] leading-[1.9]"
-                        style={{ color: "#71717a" }}
-                      >
-                        {span.text}
-                      </span>
-                    );
-                  }
-
-                  const sentences = splitIntoSentences(
-                    span.text,
-                    span.charOffset,
-                    chunkText(chunk).length,
-                    chunkStart,
-                    chunkEnd
-                  );
-
-                  return (
-                    <span key={i}>
-                      {sentences.map((s, j) => {
-                        const isActive =
-                          currentTime >= s.estimatedStart &&
-                          currentTime < s.estimatedEnd;
-                        return (
-                          <span
-                            key={j}
-                            ref={isActive ? activeSentenceRef : undefined}
-                            className="inline text-[0.8125rem] leading-[1.9] transition-all duration-300"
-                            style={{
-                              color: isActive ? "#d4d4d8" : "#71717a",
-                              backgroundColor: isActive ? "rgba(251,146,60,0.30)" : "transparent",
-                              borderRadius: isActive ? "3px" : undefined,
-                              padding: isActive ? "1px 3px" : undefined,
-                            }}
-                          >
-                            {s.text}
-                          </span>
-                        );
-                      })}
-                    </span>
-                  );
-                }
-
-                const claim = span.claim!;
-                const color = CLAIM_TYPE_COLORS[claim.claim_type] || "#71717a";
-                const isActive = span.ts !== null && span.ts === activeClaimTs;
-
-                return (
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-3 min-h-0 custom-scrollbar"
+      >
+        <div className="text-[0.8125rem] leading-[2]">
+          {tokens.map((token, i) => {
+            if (token.kind === "claim") {
+              const claim = token.claim;
+              const color =
+                CLAIM_TYPE_COLORS[claim.claim_type] || "#71717a";
+              return (
+                <span
+                  key={`c-${claim.claim_id}`}
+                  className="inline-flex items-center gap-1 mx-1 align-baseline cursor-pointer"
+                  onClick={() => {
+                    if (claim.start_ts != null) onSeek(claim.start_ts);
+                  }}
+                  title={claim.claim_text ?? undefined}
+                >
                   <span
-                    key={i}
-                    onClick={() => {
-                      if (span.ts !== null) onSeek(span.ts);
-                    }}
-                    className="inline cursor-pointer rounded transition-all"
+                    className="rounded px-1 py-px font-semibold uppercase"
                     style={{
-                      backgroundColor: isActive
-                        ? color + "22"
-                        : "rgba(255,255,255,0.03)",
-                      border: `1px solid ${isActive ? color + "55" : "rgba(255,255,255,0.06)"}`,
-                      padding: "2px 4px",
-                      fontSize: "0.8125rem",
-                      lineHeight: 1.9,
-                      color: isActive ? "#f5f5f5" : "#d4d4d8",
-                      WebkitBoxDecorationBreak: "clone",
-                      boxDecorationBreak: "clone" as const,
+                      backgroundColor: color + "1a",
+                      color,
+                      fontSize: "0.5625rem",
+                      letterSpacing: "0.04em",
                     }}
                   >
-                    {/* Inline label */}
+                    {claim.claim_type.replace("_", " ")}
+                  </span>
+                  {claim.player_name && (
                     <span
-                      className="inline-flex items-center gap-1 mr-1.5 align-baseline"
+                      className="font-medium text-zinc-300"
                       style={{ fontSize: "0.6875rem" }}
                     >
-                      <span
-                        className="rounded px-1 py-px font-semibold uppercase"
-                        style={{ backgroundColor: color + "22", color, fontSize: "0.5625rem", letterSpacing: "0.04em" }}
-                      >
-                        {claim.claim_type.replace("_", " ")}
-                      </span>
-                      {claim.player_name && (
-                        <span className="font-medium text-zinc-300" style={{ fontSize: "0.6875rem" }}>
-                          {claim.player_name}
-                        </span>
-                      )}
+                      {claim.player_name}
                     </span>
-                    {span.text}
-                  </span>
-                );
-              })}
-            </span>
-          </div>
-        ))}
+                  )}
+                </span>
+              );
+            }
+
+            // Word token
+            const ts = token.ts;
+            const isActive =
+              currentTime >= ts &&
+              (i + 1 < tokens.length
+                ? tokens[i + 1].kind === "word"
+                  ? currentTime < (tokens[i + 1] as WordToken).ts
+                  : true
+                : true);
+
+            // Periodic timestamp marker
+            const bucket = Math.floor(ts / TIMESTAMP_INTERVAL);
+            let showTimestamp = false;
+            if (bucket > lastTimestampBucket) {
+              lastTimestampBucket = bucket;
+              showTimestamp = true;
+            }
+
+            return (
+              <span key={`w-${i}`}>
+                {showTimestamp && (
+                  <button
+                    onClick={() => onSeek(ts)}
+                    className="inline-block mx-1 align-baseline transition-colors hover:text-orange-400"
+                    style={{
+                      color: "#52525b",
+                      fontSize: "0.625rem",
+                      fontVariantNumeric: "tabular-nums",
+                      verticalAlign: "baseline",
+                    }}
+                    title={`Seek to ${formatTimestamp(ts)}`}
+                  >
+                    {formatTimestamp(ts)}
+                  </button>
+                )}
+                <span
+                  ref={isActive ? activeRef : undefined}
+                  className="transition-colors duration-300"
+                  style={{
+                    color: isActive ? "#e4e4e7" : "#71717a",
+                    backgroundColor: isActive
+                      ? "rgba(251,146,60,0.15)"
+                      : "transparent",
+                    borderRadius: isActive ? "2px" : undefined,
+                    padding: isActive ? "1px 2px" : undefined,
+                  }}
+                >
+                  {token.text}{" "}
+                </span>
+              </span>
+            );
+          })}
+        </div>
       </div>
 
       {/* Bottom fade */}
       <div
         className="absolute bottom-0 left-0 right-0 h-8 rounded-b-lg pointer-events-none"
-        style={{ background: "linear-gradient(to top, var(--background), transparent)" }}
+        style={{
+          background: "linear-gradient(to top, var(--background), transparent)",
+        }}
       />
     </div>
   );

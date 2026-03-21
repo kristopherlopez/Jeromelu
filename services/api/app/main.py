@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .routers.admin import router as admin_router
 from .routers.sources import router as sources_router
 
-app = FastAPI(title="Jeromelu API", version="0.3.0")
+app = FastAPI(title="Jeromelu API", version="0.3.1")
 
 app.add_middleware(
     CORSMiddleware,

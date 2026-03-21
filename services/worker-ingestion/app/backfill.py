@@ -13,18 +13,18 @@ from jeromelu_shared.config import settings
 from jeromelu_shared.db import SessionLocal, Source, SourceDocument
 from jeromelu_shared.s3 import get_s3_client, upload_raw
 
+from youtube_utils import fetch_transcript
+from youtube_utils.exceptions import NoTranscriptAvailable, RateLimitError
+
 from app.activities.collection import (
-    _fetch_transcript,
     _build_s3_json,
     _segments_to_plain_text,
     _compute_checksum,
-    RateLimitError,
 )
 from app.activities.discovery import load_channels
 from app.activities.indexing import _parse_published_at, _checksum_exists
 
 from datetime import datetime, timezone
-from youtube_transcript_api import NoTranscriptFound, TranscriptsDisabled
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -122,12 +122,12 @@ def main():
 
             # Collect transcript
             try:
-                segments = _fetch_transcript(video_id)
+                segments = fetch_transcript(video_id)
             except RateLimitError as e:
                 logger.warning("%s Rate limited on %s — stopping backfill to avoid ban", progress, video_id)
                 errors.append({"video_id": video_id, "error": str(e)})
                 break  # Stop entirely on rate limit
-            except (NoTranscriptFound, TranscriptsDisabled) as e:
+            except NoTranscriptAvailable as e:
                 logger.warning("%s No transcript for %s: %s — skipping", progress, video_id, e)
                 skipped += 1
                 continue

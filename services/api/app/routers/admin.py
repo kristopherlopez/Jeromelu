@@ -444,6 +444,182 @@ def ingest(req: IngestRequest, db: Session = Depends(get_db)):
         raise
 
 
+# ---------------------------------------------------------------------------
+# Pipeline dashboard endpoints
+# ---------------------------------------------------------------------------
+
+@router.get("/admin/pipeline")
+def pipeline_status(db: Session = Depends(get_db)):
+    """Return pipeline stage for every source (DB-only, fast)."""
+    # Subquery: claim count per source
+    claim_count_sq = (
+        db.query(
+            SourceDocument.source_id,
+            func.count(Claim.claim_id).label("claim_count"),
+        )
+        .join(Claim, Claim.document_id == SourceDocument.document_id)
+        .group_by(SourceDocument.source_id)
+        .subquery()
+    )
+
+    # Subquery: has any chunk with clean_text
+    has_clean_sq = (
+        db.query(
+            SourceDocument.source_id,
+            func.bool_or(SourceChunk.clean_text.isnot(None)).label("has_clean"),
+        )
+        .join(SourceChunk, SourceChunk.document_id == SourceDocument.document_id)
+        .group_by(SourceDocument.source_id)
+        .subquery()
+    )
+
+    rows = (
+        db.query(
+            Source,
+            SourceDocument.s3_key,
+            SourceDocument.chunk_count,
+            claim_count_sq.c.claim_count,
+            has_clean_sq.c.has_clean,
+        )
+        .outerjoin(SourceDocument, SourceDocument.source_id == Source.source_id)
+        .outerjoin(claim_count_sq, claim_count_sq.c.source_id == Source.source_id)
+        .outerjoin(has_clean_sq, has_clean_sq.c.source_id == Source.source_id)
+        .order_by(Source.published_at.desc().nullslast())
+        .all()
+    )
+
+    by_stage = {"discovered": 0, "collected": 0, "indexed": 0, "cleaned": 0, "extracted": 0}
+    items = []
+
+    for src, s3_key, chunk_count, claim_count, has_clean in rows:
+        chunk_count = chunk_count or 0
+        claim_count = claim_count or 0
+        has_clean = bool(has_clean)
+
+        stages = {
+            "discovered": True,
+            "collected": s3_key is not None or chunk_count > 0,
+            "indexed": chunk_count > 0,
+            "cleaned": has_clean,
+            "extracted": claim_count > 0,
+        }
+
+        # Derive current stage (highest completed)
+        current = "discovered"
+        for stage in ("collected", "indexed", "cleaned", "extracted"):
+            if stages[stage]:
+                current = stage
+        by_stage[current] += 1
+
+        # Extract video_id from canonical_url
+        video_id = None
+        if src.canonical_url and "v=" in src.canonical_url:
+            video_id = src.canonical_url.split("v=")[-1].split("&")[0]
+
+        items.append({
+            "source_id": str(src.source_id),
+            "title": src.title,
+            "video_id": video_id,
+            "published_at": src.published_at.isoformat() if src.published_at else None,
+            "stages": stages,
+            "chunk_count": chunk_count,
+            "claim_count": claim_count,
+        })
+
+    return {
+        "summary": {"total": len(items), "by_stage": by_stage},
+        "items": items,
+    }
+
+
+@router.get("/admin/sync-status")
+def sync_status(db: Session = Depends(get_db)):
+    """Cross-reference local files, MinIO, and DB to find mismatches."""
+    import os
+    import re
+
+    # 1. Scan local transcript directories
+    local_raw: set[str] = set()
+    local_clean: set[str] = set()
+    local_claims: set[str] = set()
+
+    transcript_base = os.environ.get("TRANSCRIPT_DIR", "/data/transcripts")
+    vid_pattern = re.compile(r"(?:.*_)?([A-Za-z0-9_-]{11})\.json$")
+
+    for subdir, target_set in [
+        ("raw", local_raw),
+        ("clean", local_clean),
+        ("processed", local_claims),
+    ]:
+        dirpath = os.path.join(transcript_base, subdir)
+        if not os.path.isdir(dirpath):
+            continue
+        for fname in os.listdir(dirpath):
+            m = vid_pattern.match(fname)
+            if m:
+                target_set.add(m.group(1))
+
+    # 2. Scan MinIO buckets
+    minio_raw: set[str] = set()
+    minio_clean: set[str] = set()
+
+    try:
+        client = get_s3_client()
+        for bucket, target_set in [
+            (settings.s3_raw_bucket, minio_raw),
+            (settings.s3_clean_bucket, minio_clean),
+        ]:
+            try:
+                paginator = client.get_paginator("list_objects_v2")
+                for page in paginator.paginate(Bucket=bucket, Prefix="youtube/"):
+                    for obj in page.get("Contents", []):
+                        key = obj["Key"]
+                        # youtube/{channel_id}/{video_id}.json
+                        parts = key.rstrip("/").split("/")
+                        if len(parts) >= 3 and parts[-1].endswith(".json"):
+                            vid = parts[-1].replace(".json", "")
+                            target_set.add(vid)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    # 3. DB video IDs from canonical_url
+    db_urls = db.query(Source.canonical_url).filter(Source.canonical_url.isnot(None)).all()
+    db_vids: set[str] = set()
+    for (url,) in db_urls:
+        if url and "v=" in url:
+            db_vids.add(url.split("v=")[-1].split("&")[0])
+
+    # 4. Build mismatch list
+    all_vids = local_raw | local_clean | local_claims | minio_raw | minio_clean | db_vids
+    mismatches = []
+    for vid in sorted(all_vids):
+        entry = {
+            "video_id": vid,
+            "local_raw": vid in local_raw,
+            "local_clean": vid in local_clean,
+            "local_claims": vid in local_claims,
+            "minio_raw": vid in minio_raw,
+            "minio_clean": vid in minio_clean,
+            "in_db": vid in db_vids,
+        }
+        values = list(entry.values())[1:]  # skip video_id
+        if not all(values):
+            mismatches.append(entry)
+
+    # Summary counts
+    summary = {
+        "total_videos": len(all_vids),
+        "mismatches": len(mismatches),
+        "local_not_in_minio": len((local_raw | local_clean) - (minio_raw | minio_clean)),
+        "minio_not_in_db": len((minio_raw | minio_clean) - db_vids),
+        "db_not_in_minio": len(db_vids - (minio_raw | minio_clean)),
+    }
+
+    return {"summary": summary, "items": mismatches}
+
+
 class UpdateCleanTextRequest(BaseModel):
     video_id: str
     channel_id: str

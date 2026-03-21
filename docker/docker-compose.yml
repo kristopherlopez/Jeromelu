@@ -10,7 +10,8 @@ services:
       POSTGRES_PASSWORD: localdev123
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ../packages/db/migrations:/docker-entrypoint-initdb.d
+      - ../packages/db/migrations:/migrations
+      - ../packages/db/docker-entrypoint-initdb.sh:/docker-entrypoint-initdb.d/00_migrate.sh
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U jeromelu_admin -d jeromelu"]
       interval: 5s

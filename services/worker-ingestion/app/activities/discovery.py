@@ -1,11 +1,10 @@
 """Discovery activity — find new videos on whitelisted YouTube channels."""
 
 import logging
-import subprocess
 from datetime import datetime, timezone
 
-import feedparser
 from temporalio import activity
+from youtube_utils import list_channel_videos
 
 from jeromelu_shared.db import Channel, SessionLocal, Source
 
@@ -22,75 +21,6 @@ def _load_youtube_channels(session) -> list[Channel]:
         Channel.active == True,  # noqa: E712
         Channel.external_id.isnot(None),
     ).all()
-
-
-def _discover_via_rss(channel_id: str) -> list[dict] | None:
-    """Try RSS feed first (free, fast, no dependencies).
-
-    Returns None if RSS is unavailable (404), so caller can fall back.
-    """
-    feed_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
-    feed = feedparser.parse(feed_url)
-
-    if feed.get("status") == 404 or not feed.entries:
-        return None
-
-    videos = []
-    for entry in feed.entries:
-        video_id = entry.get("yt_videoid", "")
-        if not video_id:
-            continue
-        videos.append({
-            "video_id": video_id,
-            "title": entry.get("title", ""),
-            "published_at": entry.get("published", ""),
-        })
-
-    return videos
-
-
-def _discover_via_ytdlp(channel_id: str) -> list[dict]:
-    """Fallback: use yt-dlp to list recent videos from a channel."""
-    channel_url = f"https://www.youtube.com/channel/{channel_id}/videos"
-    # Use tab as delimiter since video titles can contain pipes
-    result = subprocess.run(
-        [
-            "yt-dlp",
-            "--print", "%(id)s\t%(title)s\t%(upload_date)s",
-            "--playlist-items", f"1:{MAX_VIDEOS_PER_CHANNEL}",
-            "--skip-download",
-            channel_url,
-        ],
-        capture_output=True,
-        text=True,
-        timeout=120,
-    )
-
-    if result.returncode != 0:
-        logger.error("yt-dlp failed for channel %s: %s", channel_id, result.stderr[-300:])
-        return []
-
-    videos = []
-    for line in result.stdout.strip().split("\n"):
-        if not line or "\t" not in line:
-            continue
-        parts = line.split("\t", 2)
-        if len(parts) < 3:
-            continue
-        video_id, title, upload_date = parts
-
-        # Convert YYYYMMDD to ISO format
-        published_at = ""
-        if upload_date and upload_date != "NA" and len(upload_date) == 8:
-            published_at = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:8]}T00:00:00Z"
-
-        videos.append({
-            "video_id": video_id,
-            "title": title,
-            "published_at": published_at,
-        })
-
-    return videos
 
 
 def _get_existing_video_urls(session, urls: list[str]) -> set[str]:
@@ -120,15 +50,7 @@ async def discover_new_videos() -> list[dict]:
             channel_name = ch.name
 
             try:
-                # Try RSS first (fast, free)
-                videos = _discover_via_rss(channel_id)
-                if videos is not None:
-                    logger.info("RSS: found %d videos on %s", len(videos), channel_name)
-                else:
-                    # Fallback to yt-dlp
-                    logger.info("RSS unavailable for %s — falling back to yt-dlp", channel_name)
-                    videos = _discover_via_ytdlp(channel_id)
-                    logger.info("yt-dlp: found %d videos on %s", len(videos), channel_name)
+                videos = list_channel_videos(channel_id, max_results=MAX_VIDEOS_PER_CHANNEL)
 
                 # Attach channel metadata to each video
                 for v in videos:

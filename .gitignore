@@ -22,6 +22,10 @@ build/
 # Claude Code
 .claude/
 
+# Assets (large binaries)
+assets/
+*.mp3
+
 # OS
 .DS_Store
 Thumbs.db

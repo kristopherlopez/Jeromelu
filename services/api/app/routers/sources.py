@@ -18,6 +18,30 @@ from ..deps import get_db
 router = APIRouter()
 
 
+@router.get("/stats")
+def get_stats(db: Session = Depends(get_db)):
+    """Lightweight stats for the home page activity pulse."""
+    source_count = db.query(func.count(Source.source_id)).scalar() or 0
+    claim_count = db.query(func.count(Claim.claim_id)).scalar() or 0
+
+    # Most recent source ingested
+    latest_source = (
+        db.query(Source)
+        .order_by(Source.ingested_at.desc().nullslast())
+        .first()
+    )
+
+    return {
+        "sources_scanned": source_count,
+        "claims_extracted": claim_count,
+        "latest_source": {
+            "title": latest_source.title,
+            "creator_name": latest_source.creator_name,
+            "ingested_at": latest_source.ingested_at.isoformat() if latest_source.ingested_at else None,
+        } if latest_source else None,
+    }
+
+
 @router.get("/sources")
 def list_sources(db: Session = Depends(get_db)):
     """List sources that have chunks, with claim counts."""
@@ -36,6 +60,7 @@ def list_sources(db: Session = Depends(get_db)):
         .join(SourceDocument, SourceDocument.source_id == Source.source_id)
         .outerjoin(claim_count_sq, claim_count_sq.c.source_id == Source.source_id)
         .filter(SourceDocument.chunk_count > 0)
+        .filter(SourceDocument.cleaned_text.isnot(None))
         .order_by(Source.published_at.desc().nullslast())
         .all()
     )
@@ -70,11 +95,11 @@ def get_source(source_id: uuid.UUID, db: Session = Depends(get_db)):
     if not doc:
         raise HTTPException(status_code=404, detail="No document for source")
 
-    # Get all chunks ordered by index
+    # Get all chunks ordered by start timestamp for contiguous display
     chunks = (
         db.query(SourceChunk)
         .filter(SourceChunk.document_id == doc.document_id)
-        .order_by(SourceChunk.chunk_index)
+        .order_by(SourceChunk.start_ts)
         .all()
     )
 

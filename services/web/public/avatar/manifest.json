@@ -1,0 +1,14 @@
+{
+  "clips": [
+    {
+      "id": "breathing-1",
+      "file": "breathing1.mp4",
+      "category": "idle",
+      "mood": "neutral",
+      "duration_ms": 5000,
+      "loop": true,
+      "transitions_to": [],
+      "priority": 0
+    }
+  ]
+}

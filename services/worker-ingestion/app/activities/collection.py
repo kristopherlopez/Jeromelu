@@ -6,21 +6,13 @@ import logging
 from dataclasses import dataclass
 
 from temporalio import activity
-from youtube_transcript_api import (
-    NoTranscriptFound,
-    TranscriptsDisabled,
-    YouTubeTranscriptApi,
-)
-from youtube_transcript_api.proxies import WebshareProxyConfig
+from youtube_utils import fetch_transcript
+from youtube_utils.exceptions import NoTranscriptAvailable, RateLimitError
 
 from jeromelu_shared.config import settings
 from jeromelu_shared.s3 import download_raw, upload_raw
 
 logger = logging.getLogger(__name__)
-
-
-class RateLimitError(Exception):
-    """Raised when we detect YouTube rate limiting."""
 
 
 @dataclass
@@ -31,39 +23,6 @@ class CollectionResult:
     plain_text: str
     success: bool
     error: str | None = None
-
-
-def _fetch_transcript(video_id: str) -> list[dict]:
-    """Fetch transcript segments from YouTube.
-
-    Raises RateLimitError for rate limits (skip immediately, don't retry).
-    Other errors are raised as-is for Temporal retry.
-    """
-    try:
-        proxy_config = None
-        if settings.webshare_proxy_username:
-            proxy_config = WebshareProxyConfig(
-                proxy_username=settings.webshare_proxy_username,
-                proxy_password=settings.webshare_proxy_password,
-            )
-        ytt_api = YouTubeTranscriptApi(proxy_config=proxy_config)
-        transcript = ytt_api.fetch(video_id)
-        return [
-            {
-                "start": snippet.start,
-                "end": snippet.start + snippet.duration,
-                "text": snippet.text,
-                "speaker": None,
-            }
-            for snippet in transcript
-        ]
-    except (NoTranscriptFound, TranscriptsDisabled) as e:
-        raise  # Permanent failure — Temporal will not retry ApplicationError
-    except Exception as e:
-        error_msg = str(e).lower()
-        if "429" in error_msg or "rate" in error_msg or "too many" in error_msg:
-            raise RateLimitError(f"Rate limited fetching transcript for {video_id}") from e
-        raise
 
 
 def _build_s3_json(video: dict, segments: list[dict]) -> dict:
@@ -118,7 +77,13 @@ async def collect_transcript(video: dict) -> dict:
     logger.info("Collecting transcript for video %s: %s", video_id, video.get("title", ""))
 
     try:
-        segments = _fetch_transcript(video_id)
+        proxy = None
+        if settings.webshare_proxy_username:
+            proxy = {
+                "username": settings.webshare_proxy_username,
+                "password": settings.webshare_proxy_password,
+            }
+        segments = fetch_transcript(video_id, proxy=proxy)
     except RateLimitError as e:
         logger.warning("Rate limited — skipping video %s: %s", video_id, e)
         return {
@@ -129,7 +94,7 @@ async def collect_transcript(video: dict) -> dict:
             "success": False,
             "error": f"rate_limit: {e}",
         }
-    except (NoTranscriptFound, TranscriptsDisabled) as e:
+    except NoTranscriptAvailable as e:
         logger.warning("No transcript available for video %s: %s", video_id, e)
         return {
             "video_id": video_id,

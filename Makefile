@@ -1,4 +1,4 @@
-.PHONY: up down db-shell api web logs clean prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all
+.PHONY: up down db-shell migrate migrate-status api web logs clean prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all
 
 # Start local infrastructure
 up:
@@ -7,6 +7,14 @@ up:
 # Stop local infrastructure
 down:
 	cd docker && docker compose down
+
+# Run pending database migrations
+migrate:
+	bash packages/db/migrate.sh
+
+# Show migration status (applied vs pending)
+migrate-status:
+	bash packages/db/migrate.sh --status
 
 # Open database shell
 db-shell:
