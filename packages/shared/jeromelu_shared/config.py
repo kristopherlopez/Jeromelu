@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     s3_assets_bucket: str = "jeromelu-public-assets"
     s3_player_data_bucket: str = "jeromelu-player-data"
     openai_api_key: str = ""
+    openrouter_api_key: str = ""
+    llm_provider: str = "openai"  # "openai" or "openrouter"
+    llm_model: str = "gpt-4o"  # model ID for chat completions
     env: str = "development"
     admin_api_key: str = "local-dev-admin-key"
     temporal_host: str = "localhost:7233"

@@ -301,14 +301,17 @@ class Event(Base):
     related_entity_ids: Mapped[list[uuid.UUID]] = mapped_column(ARRAY(UUID(as_uuid=True)), default=list)
     related_decision_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("decisions.decision_id"))
     related_prediction_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("predictions.prediction_id"))
+    related_claim_ids: Mapped[list[uuid.UUID]] = mapped_column(ARRAY(UUID(as_uuid=True)), default=list)
+    related_source_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("sources.source_id"))
     display_text: Mapped[str] = mapped_column(Text, nullable=False)
     display_mode: Mapped[str] = mapped_column(Text, nullable=False)
+    metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
     visibility: Mapped[str] = mapped_column(Text, nullable=False, default="public")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
     immutable_hash: Mapped[str | None] = mapped_column(Text)
 
     __table_args__ = (
-        CheckConstraint("display_mode IN ('thought', 'action', 'system', 'prediction', 'review')", name="ck_display_mode"),
+        CheckConstraint("display_mode IN ('watching', 'signal', 'thinking', 'prediction', 'action', 'review', 'sys', 'question', 'answer')", name="ck_display_mode"),
         CheckConstraint("visibility IN ('public', 'private')", name="ck_visibility"),
         Index("idx_events_type", "event_type"),
         Index("idx_events_created", "created_at"),
@@ -446,6 +449,34 @@ class PlayerTeamHistory(Base):
         Index("idx_pth_player_current", "player_name", "is_current"),
         Index("idx_pth_team_current", "team_key", "is_current"),
         Index("idx_pth_player_id", "player_id"),
+    )
+
+
+class KnowledgeBase(Base):
+    __tablename__ = "knowledge_base"
+
+    kb_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    kb_type: Mapped[str] = mapped_column(Text, nullable=False)
+    subject_entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("entities.entity_id"))
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding = mapped_column(Vector(1536))
+    metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
+    effective_round: Mapped[int | None] = mapped_column(Integer)
+    season: Mapped[int | None] = mapped_column(Integer)
+    source_claim_ids: Mapped[list[uuid.UUID]] = mapped_column(ARRAY(UUID(as_uuid=True)), default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        CheckConstraint(
+            "kb_type IN ('player_summary', 'round_brief', 'decision', 'opinion', 'source_digest')",
+            name="ck_kb_type",
+        ),
+        Index("idx_kb_type", "kb_type"),
+        Index("idx_kb_entity", "subject_entity_id"),
+        Index("idx_kb_round_season", "effective_round", "season"),
     )
 
 

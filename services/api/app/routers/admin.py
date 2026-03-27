@@ -661,3 +661,104 @@ def update_clean_text(req: UpdateCleanTextRequest, db: Session = Depends(get_db)
 
     db.commit()
     return {"source_id": str(source.source_id), "chunks_updated": updated}
+
+
+# ---------------------------------------------------------------------------
+# Transcript diff viewer (test files)
+# ---------------------------------------------------------------------------
+
+def _transcript_base() -> str:
+    """Resolve transcript directory — works in Docker and local dev."""
+    import os
+    from_env = os.environ.get("TRANSCRIPT_DIR")
+    if from_env and os.path.isdir(from_env):
+        return from_env
+    # Local dev: project root / data / transcripts
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
+    local = os.path.join(project_root, "data", "transcripts")
+    if os.path.isdir(local):
+        return local
+    return from_env or "/data/transcripts"
+
+
+@router.get("/admin/transcript-test-files")
+def list_test_files():
+    """List transcript files in the test directory with their raw counterparts."""
+    import os
+    import glob as globmod
+
+    transcript_base = _transcript_base()
+    test_dir = os.path.join(transcript_base, "test")
+    raw_dir = os.path.join(transcript_base, "raw")
+    archive_raw_dir = os.path.join(transcript_base, "archive", "raw")
+
+    if not os.path.isdir(test_dir):
+        return {"files": []}
+
+    files = []
+    for path in sorted(globmod.glob(os.path.join(test_dir, "*.json"))):
+        fname = os.path.basename(path)
+        has_raw = os.path.isfile(os.path.join(raw_dir, fname)) or os.path.isfile(
+            os.path.join(archive_raw_dir, fname)
+        )
+        # Read title from test file
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            title = data.get("title", fname)
+        except Exception:
+            title = fname
+        files.append({"filename": fname, "title": title, "has_raw": has_raw})
+
+    return {"files": files}
+
+
+@router.get("/admin/transcript-diff/{filename}")
+def transcript_diff(filename: str):
+    """Return raw vs test transcript segments for diffing."""
+    import os
+
+    if not filename.endswith(".json"):
+        raise HTTPException(status_code=400, detail="Must be a .json file")
+
+    transcript_base = _transcript_base()
+    test_path = os.path.join(transcript_base, "test", filename)
+    raw_path = os.path.join(transcript_base, "raw", filename)
+    archive_raw_path = os.path.join(transcript_base, "archive", "raw", filename)
+
+    if not os.path.isfile(test_path):
+        raise HTTPException(status_code=404, detail="Test file not found")
+
+    # Find the raw file
+    actual_raw = raw_path if os.path.isfile(raw_path) else archive_raw_path
+    if not os.path.isfile(actual_raw):
+        raise HTTPException(status_code=404, detail="Raw file not found")
+
+    with open(actual_raw, encoding="utf-8") as f:
+        raw_data = json.load(f)
+    with open(test_path, encoding="utf-8") as f:
+        test_data = json.load(f)
+
+    raw_segs = raw_data.get("segments", [])
+    test_segs = test_data.get("segments", [])
+
+    # Build diff: only include segments where text differs
+    diffs = []
+    total = min(len(raw_segs), len(test_segs))
+    for i in range(total):
+        raw_text = raw_segs[i].get("text", "")
+        test_text = test_segs[i].get("text", "")
+        if raw_text != test_text:
+            diffs.append({
+                "index": i,
+                "start": raw_segs[i].get("start", 0),
+                "raw": raw_text,
+                "test": test_text,
+            })
+
+    return {
+        "title": raw_data.get("title", filename),
+        "total_segments": total,
+        "diff_count": len(diffs),
+        "diffs": diffs,
+    }

@@ -5,6 +5,24 @@ from temporalio.worker import Worker
 
 from jeromelu_shared.temporal import get_temporal_client, PUBLISHING_QUEUE
 
+from app.activities.generate_events import (
+    fetch_unprocessed_claims,
+    generate_feed_events,
+    persist_events,
+)
+from app.activities.generate_kb import (
+    generate_player_summaries,
+    generate_round_briefs,
+    generate_decisions_log,
+    generate_player_opinions,
+    generate_source_digests,
+    embed_kb_entries,
+)
+from app.activities.generate_reviews import generate_review_data
+from app.activities.update_consensus import update_consensus_snapshots
+from app.workflows.feed_generation import FeedGenerationWorkflow
+from app.workflows.kb_generation import KBGenerationWorkflow
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -14,13 +32,23 @@ async def main():
 
     client = await get_temporal_client()
 
-    # Activity functions will be registered here as they are built
-    activities: list = []
-
     worker = Worker(
         client,
         task_queue=PUBLISHING_QUEUE,
-        activities=activities,
+        workflows=[FeedGenerationWorkflow, KBGenerationWorkflow],
+        activities=[
+            fetch_unprocessed_claims,
+            generate_feed_events,
+            persist_events,
+            generate_review_data,
+            update_consensus_snapshots,
+            generate_player_summaries,
+            generate_round_briefs,
+            generate_decisions_log,
+            generate_player_opinions,
+            generate_source_digests,
+            embed_kb_entries,
+        ],
     )
 
     logger.info("Publishing worker listening on queue '%s'", PUBLISHING_QUEUE)

@@ -8,6 +8,8 @@ import {
   Zap,
   RotateCcw,
   Settings,
+  MessageCircle,
+  BotMessageSquare,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { FeedItem, FeedItemType } from "./feed-data";
@@ -16,13 +18,15 @@ const TYPE_CONFIG: Record<
   FeedItemType,
   { icon: LucideIcon; label: string; color: string }
 > = {
-  reaction: { icon: Eye, label: "watching", color: "rgb(113, 113, 122)" },
-  narrative_shift: { icon: TrendingUp, label: "signal", color: "var(--tigers-orange)" },
-  reasoning: { icon: Brain, label: "thinking", color: "rgb(168, 85, 247)" },
+  watching: { icon: Eye, label: "watching", color: "rgb(113, 113, 122)" },
+  signal: { icon: TrendingUp, label: "signal", color: "var(--tigers-orange)" },
+  thinking: { icon: Brain, label: "thinking", color: "rgb(168, 85, 247)" },
   prediction: { icon: Target, label: "prediction", color: "rgb(59, 130, 246)" },
   action: { icon: Zap, label: "action", color: "var(--tigers-orange)" },
   review: { icon: RotateCcw, label: "review", color: "rgb(234, 179, 8)" },
-  system: { icon: Settings, label: "sys", color: "rgb(63, 63, 70)" },
+  sys: { icon: Settings, label: "sys", color: "rgb(63, 63, 70)" },
+  question: { icon: MessageCircle, label: "question", color: "rgb(59, 130, 246)" },
+  answer: { icon: BotMessageSquare, label: "answer", color: "var(--tigers-orange)" },
 };
 
 function timeAgo(dateStr: string): string {
@@ -52,7 +56,6 @@ function PlayerInline({ name }: { name: string }) {
 function renderTextWithPlayers(text: string, players?: { name: string }[]) {
   if (!players || players.length === 0) return text;
 
-  // Build a regex that matches any player name
   const escaped = players.map((p) => p.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   const regex = new RegExp(`(${escaped.join("|")})`, "g");
   const parts = text.split(regex);
@@ -73,18 +76,20 @@ function PredictionStatus({ status }: { status: "pending" | "correct" | "wrong" 
 export default function FeedItemCard({ item }: { item: FeedItem }) {
   const config = TYPE_CONFIG[item.type];
   const Icon = config.icon;
-  const isSystem = item.type === "system";
+  const isSystem = item.type === "sys";
   const isAction = item.type === "action";
+  const isQuestion = item.type === "question";
+  const isAnswer = item.type === "answer";
 
   return (
     <div
       className={`group flex gap-0 py-1.5 transition-colors hover:bg-white/[0.02] ${
         isSystem ? "opacity-50" : ""
-      }`}
+      } ${isAnswer ? "mb-3 pb-3 border-b border-zinc-800/20" : ""}`}
     >
       {/* Timestamp gutter */}
       <div className="w-10 shrink-0 flex items-center justify-end" style={{ height: 22 }}>
-        <span className="font-mono text-[11px] text-zinc-700">{timeAgo(item.timestamp)}</span>
+        <span className="font-mono text-[11px] text-zinc-500">{timeAgo(item.timestamp)}</span>
       </div>
 
       {/* Type icon */}
@@ -96,6 +101,10 @@ export default function FeedItemCard({ item }: { item: FeedItem }) {
       <div className="flex-1 min-w-0">
         {isSystem ? (
           <p className="font-mono text-xs text-zinc-600">{item.text}</p>
+        ) : isQuestion ? (
+          <span className="text-[13px] leading-relaxed text-zinc-300 italic">
+            {item.text}
+          </span>
         ) : (
           <>
             {/* Action prefix */}
@@ -112,11 +121,25 @@ export default function FeedItemCard({ item }: { item: FeedItem }) {
               {item.prediction && <PredictionStatus status={item.prediction.status} />}
             </span>
 
-            {/* Source attribution */}
+            {/* Single source attribution */}
             {item.source && (
               <span className="ml-2 text-[11px] text-zinc-600 hover:text-zinc-400 cursor-pointer transition-colors">
                 via {item.source.creator || item.source.title}
               </span>
+            )}
+
+            {/* Multiple sources (answer events) */}
+            {isAnswer && item.sources && item.sources.length > 0 && (
+              <div className="mt-0.5 flex flex-wrap gap-2">
+                {item.sources.map((s) => (
+                  <span
+                    key={s.sourceId}
+                    className="font-mono text-[10px] text-zinc-500"
+                  >
+                    via {s.creator || s.title}
+                  </span>
+                ))}
+              </div>
             )}
 
             {/* Review outcome inline */}

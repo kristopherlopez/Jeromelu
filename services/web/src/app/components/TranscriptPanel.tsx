@@ -22,6 +22,7 @@ interface WordToken {
   kind: "word";
   text: string;
   ts: number;
+  endTs: number;
 }
 
 interface ClaimMarker {
@@ -35,7 +36,6 @@ function buildTokens(
   chunks: TranscriptChunk[],
   claims: ClaimDetail[]
 ): Token[] {
-  // Sort claims by start_ts
   const sorted = claims
     .filter((c) => c.start_ts != null)
     .sort((a, b) => a.start_ts! - b.start_ts!);
@@ -45,6 +45,7 @@ function buildTokens(
 
   for (const chunk of chunks) {
     const ts = chunk.start_ts ?? 0;
+    const endTs = chunk.end_ts ?? ts;
 
     // Insert any claim markers that start before/at this chunk
     while (claimIdx < sorted.length && sorted[claimIdx].start_ts! <= ts) {
@@ -52,14 +53,12 @@ function buildTokens(
       claimIdx++;
     }
 
-    // Add the chunk's words as a single word token
     const text = chunkText(chunk).trim();
     if (text) {
-      tokens.push({ kind: "word", text, ts });
+      tokens.push({ kind: "word", text, ts, endTs });
     }
   }
 
-  // Any remaining claims after the last chunk
   while (claimIdx < sorted.length) {
     tokens.push({ kind: "claim", claim: sorted[claimIdx] });
     claimIdx++;
@@ -68,11 +67,18 @@ function buildTokens(
   return tokens;
 }
 
-// ---------------------------------------------------------------------------
-// Timestamp markers: show a clickable timestamp every ~60s
-// ---------------------------------------------------------------------------
-
-const TIMESTAMP_INTERVAL = 60;
+/** Find the claim (if any) that covers a given timestamp */
+function findCoveringClaim(
+  ts: number,
+  claims: ClaimDetail[]
+): ClaimDetail | null {
+  for (const c of claims) {
+    if (c.start_ts != null && c.end_ts != null && ts >= c.start_ts && ts < c.end_ts) {
+      return c;
+    }
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -92,6 +98,10 @@ export default function TranscriptPanel({
   onSeek,
 }: Props) {
   const tokens = useMemo(() => buildTokens(chunks, claims), [chunks, claims]);
+  const sortedClaims = useMemo(
+    () => claims.filter((c) => c.start_ts != null && c.end_ts != null),
+    [claims]
+  );
 
   // Auto-scroll
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -122,9 +132,6 @@ export default function TranscriptPanel({
       }
     }
   }, [currentTime]);
-
-  // Track which timestamps we've emitted
-  let lastTimestampBucket = -1;
 
   return (
     <div className="rounded-lg border border-zinc-800 relative flex flex-col h-full min-h-0">
@@ -176,55 +183,44 @@ export default function TranscriptPanel({
               );
             }
 
-            // Word token
-            const ts = token.ts;
-            const isActive =
-              currentTime >= ts &&
-              (i + 1 < tokens.length
-                ? tokens[i + 1].kind === "word"
-                  ? currentTime < (tokens[i + 1] as WordToken).ts
-                  : true
-                : true);
+            // Word token — each corresponds to one transcript segment/chunk
+            const { ts, endTs } = token;
+            const isActive = currentTime >= ts && currentTime < endTs;
 
-            // Periodic timestamp marker
-            const bucket = Math.floor(ts / TIMESTAMP_INTERVAL);
-            let showTimestamp = false;
-            if (bucket > lastTimestampBucket) {
-              lastTimestampBucket = bucket;
-              showTimestamp = true;
+            // Check if this chunk falls within a claim's range
+            const coveringClaim = findCoveringClaim(ts, sortedClaims);
+            const claimColor = coveringClaim
+              ? CLAIM_TYPE_COLORS[coveringClaim.claim_type] || "#71717a"
+              : null;
+
+            // Determine styling based on state
+            let textColor: string;
+            let bgColor: string;
+            if (isActive) {
+              textColor = "#f4f4f5";
+              bgColor = "rgba(251,146,60,0.18)";
+            } else if (coveringClaim) {
+              textColor = "#d4d4d8";
+              bgColor = claimColor + "12";
+            } else {
+              textColor = "#71717a";
+              bgColor = "transparent";
             }
 
             return (
-              <span key={`w-${i}`}>
-                {showTimestamp && (
-                  <button
-                    onClick={() => onSeek(ts)}
-                    className="inline-block mx-1 align-baseline transition-colors hover:text-orange-400"
-                    style={{
-                      color: "#52525b",
-                      fontSize: "0.625rem",
-                      fontVariantNumeric: "tabular-nums",
-                      verticalAlign: "baseline",
-                    }}
-                    title={`Seek to ${formatTimestamp(ts)}`}
-                  >
-                    {formatTimestamp(ts)}
-                  </button>
-                )}
-                <span
-                  ref={isActive ? activeRef : undefined}
-                  className="transition-colors duration-300"
-                  style={{
-                    color: isActive ? "#e4e4e7" : "#71717a",
-                    backgroundColor: isActive
-                      ? "rgba(251,146,60,0.15)"
-                      : "transparent",
-                    borderRadius: isActive ? "2px" : undefined,
-                    padding: isActive ? "1px 2px" : undefined,
-                  }}
-                >
-                  {token.text}{" "}
-                </span>
+              <span
+                key={`w-${i}`}
+                ref={isActive ? activeRef : undefined}
+                className="cursor-pointer transition-colors duration-300"
+                onClick={() => onSeek(ts)}
+                style={{
+                  color: textColor,
+                  backgroundColor: bgColor,
+                  borderRadius: isActive || coveringClaim ? "2px" : undefined,
+                  padding: isActive || coveringClaim ? "1px 3px" : undefined,
+                }}
+              >
+                {token.text}{" "}
               </span>
             );
           })}

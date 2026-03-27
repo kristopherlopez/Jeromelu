@@ -23,7 +23,7 @@ const NAV_BUBBLES: NavBubble[] = [
   { label: "My Squad", href: "/squad", icon: Users },
   { label: "The Dossier", href: "/dossier", icon: FileText },
   { label: "The Ledger", href: "/ledger", icon: BookOpen },
-  { label: "Ask Me", href: "/ask", icon: MessageCircle },
+  { label: "Ask Me", href: "/feed", icon: MessageCircle },
 ];
 
 // 5 bubbles spread evenly across the top of the circle (210° to 330° in standard math,

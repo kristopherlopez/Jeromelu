@@ -1,0 +1,47 @@
+# Golden examples for Ask Me evaluation.
+#
+# Each example defines:
+#   question:             The user question
+#   temperature:          Which tone mode to test (straight|sharp|roast)
+#   expected_topics:      Topics/entities the answer should reference
+#   must_not_contain:     Things the answer must NOT include (hallucination guard)
+#   context_type:         What type of KB entries should be retrieved (optional filter)
+#   notes:                Why this example exists
+#
+# To add new examples: capture interesting real Q&A pairs and add them here.
+# Run with: deepeval test run tests/evals/test_ask_me.py
+
+- question: "Should I trade Cleary this week?"
+  temperature: "sharp"
+  expected_topics: ["Nathan Cleary", "breakeven", "price"]
+  must_not_contain: []
+  context_type: null
+  notes: "Core trade question — should trigger player_summary and opinion KB entries"
+
+- question: "Who's the best captain for this round?"
+  temperature: "straight"
+  expected_topics: []
+  must_not_contain: []
+  context_type: null
+  notes: "Open-ended captain question — should pull from round_brief and opinions"
+
+- question: "What did KingOfSC say about the halves this week?"
+  temperature: "sharp"
+  expected_topics: []
+  must_not_contain: []
+  context_type: "source_digest"
+  notes: "Source-specific question — should find source_digest entries"
+
+- question: "How have your captain picks been going?"
+  temperature: "roast"
+  expected_topics: []
+  must_not_contain: []
+  context_type: "decision"
+  notes: "Self-reflection question — should pull from decision KB entries"
+
+- question: "Tell me about Blaize Talagi's SuperCoach ceiling"
+  temperature: "straight"
+  expected_topics: []
+  must_not_contain: []
+  context_type: null
+  notes: "Potentially sparse context — if no KB entries exist, should admit it honestly"

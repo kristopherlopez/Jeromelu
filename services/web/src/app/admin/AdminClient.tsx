@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL!;
 
@@ -46,6 +46,26 @@ interface SyncResponse {
 
 type StageKey = keyof PipelineStages;
 const STAGES: StageKey[] = ["discovered", "collected", "indexed", "cleaned", "extracted"];
+
+interface TestFile {
+  filename: string;
+  title: string;
+  has_raw: boolean;
+}
+
+interface DiffEntry {
+  index: number;
+  start: number;
+  raw: string;
+  test: string;
+}
+
+interface DiffResponse {
+  title: string;
+  total_segments: number;
+  diff_count: number;
+  diffs: DiffEntry[];
+}
 
 type SortField = "title" | "published_at" | "stage" | "chunk_count" | "claim_count";
 type SortDir = "asc" | "desc";
@@ -101,6 +121,153 @@ function SortHeader({
         {active ? (dir === "asc" ? "▲" : "▼") : ""}
       </span>
     </th>
+  );
+}
+
+// --- Diff helpers ---
+
+function highlightDiff(raw: string, test: string): { rawParts: React.ReactNode[]; testParts: React.ReactNode[] } {
+  // Simple word-level diff highlighting
+  const rawWords = raw.split(/(\s+)/);
+  const testWords = test.split(/(\s+)/);
+
+  const rawParts: React.ReactNode[] = [];
+  const testParts: React.ReactNode[] = [];
+
+  const maxLen = Math.max(rawWords.length, testWords.length);
+
+  for (let i = 0; i < maxLen; i++) {
+    const rw = i < rawWords.length ? rawWords[i] : "";
+    const tw = i < testWords.length ? testWords[i] : "";
+
+    if (rw === tw) {
+      rawParts.push(rw);
+      testParts.push(tw);
+    } else {
+      if (rw) rawParts.push(<span key={`r${i}`} className="bg-red-900/60 text-red-300 rounded px-0.5">{rw}</span>);
+      if (tw) testParts.push(<span key={`t${i}`} className="bg-green-900/60 text-green-300 rounded px-0.5">{tw}</span>);
+    }
+  }
+
+  return { rawParts, testParts };
+}
+
+function formatTs(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function TranscriptDiffPanel() {
+  const [files, setFiles] = useState<TestFile[]>([]);
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [diff, setDiff] = useState<DiffResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/admin/transcript-test-files`)
+      .then((r) => r.json())
+      .then((data) => {
+        setFiles(data.files ?? []);
+        if (data.files?.length === 1) {
+          setSelectedFile(data.files[0].filename);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!selectedFile) return;
+    setLoading(true);
+    setError(null);
+    setDiff(null);
+    fetch(`${API_BASE}/api/admin/transcript-diff/${encodeURIComponent(selectedFile)}`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`${r.status}`);
+        return r.json();
+      })
+      .then((data) => setDiff(data))
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [selectedFile]);
+
+  if (files.length === 0) return null;
+
+  return (
+    <div className="rounded-lg border border-zinc-800">
+      <div className="flex items-center gap-3 px-4 py-3">
+        <span className="text-sm font-medium text-zinc-300">Transcript Diff</span>
+        {files.length > 1 && (
+          <select
+            value={selectedFile ?? ""}
+            onChange={(e) => setSelectedFile(e.target.value || null)}
+            className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-white"
+          >
+            <option value="">Select file...</option>
+            {files.map((f) => (
+              <option key={f.filename} value={f.filename}>
+                {f.title}
+              </option>
+            ))}
+          </select>
+        )}
+        {diff && (
+          <span className="ml-auto text-xs text-zinc-500">
+            {diff.diff_count} differences / {diff.total_segments} segments
+          </span>
+        )}
+      </div>
+
+      {loading && (
+        <div className="border-t border-zinc-800 px-4 py-8 text-center text-sm text-zinc-500">
+          Loading diff...
+        </div>
+      )}
+
+      {error && (
+        <div className="border-t border-zinc-800 px-4 py-3 text-sm text-red-400">
+          Error: {error}
+        </div>
+      )}
+
+      {diff && diff.diffs.length > 0 && (
+        <div className="border-t border-zinc-800">
+          {/* Column headers */}
+          <div className="grid grid-cols-[60px_1fr_1fr] border-b border-zinc-800 px-2 py-1.5 text-xs font-medium text-zinc-500">
+            <div>Seg</div>
+            <div>Raw (auto-caption)</div>
+            <div>Test (corrected)</div>
+          </div>
+
+          {/* Diff rows */}
+          <div className="max-h-[600px] overflow-y-auto">
+            {diff.diffs.map((d) => {
+              const { rawParts, testParts } = highlightDiff(d.raw, d.test);
+              return (
+                <div
+                  key={d.index}
+                  className="grid grid-cols-[60px_1fr_1fr] border-b border-zinc-800/50 px-2 py-1.5 text-sm hover:bg-zinc-900/50"
+                >
+                  <div className="text-xs text-zinc-600 pt-0.5">
+                    <div>{d.index}</div>
+                    <div className="text-[10px]">{formatTs(d.start)}</div>
+                  </div>
+                  <div className="pr-2 text-zinc-400 break-words">{rawParts}</div>
+                  <div className="pl-2 border-l border-zinc-800 text-zinc-300 break-words">{testParts}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {diff && diff.diffs.length === 0 && (
+        <div className="border-t border-zinc-800 px-4 py-6 text-center text-sm text-green-400">
+          No differences — raw and test files are identical.
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -282,8 +449,13 @@ export default function AdminClient() {
                     key={item.source_id}
                     className="border-b border-zinc-800/50 hover:bg-zinc-900/50"
                   >
-                    <td className="max-w-xs truncate px-3 py-2 text-white">
-                      {item.title}
+                    <td className="max-w-xs truncate px-3 py-2">
+                      <a
+                        href={`/stream/${item.source_id}`}
+                        className="text-orange-400 hover:text-orange-300 hover:underline"
+                      >
+                        {item.title}
+                      </a>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-zinc-500">
                       {item.published_at
@@ -322,7 +494,10 @@ export default function AdminClient() {
         </div>
       )}
 
-      {/* Section 3: Sync Status (expandable) */}
+      {/* Section 3: Transcript Diff Viewer */}
+      <TranscriptDiffPanel />
+
+      {/* Section 4: Sync Status (expandable) */}
       <div className="rounded-lg border border-zinc-800">
         <button
           onClick={() => {

@@ -28,7 +28,7 @@ export const LETTERS: LetterConfig[] = [
   { char: "m", key: "m", label: "The Ledger", href: "/ledger", delay: 300, icon: BookOpen },
   { char: "e", key: "e", label: "The Feed", href: "/feed", delay: 200, icon: Activity },
   { char: "l", key: "l", label: "The Ledger", href: "/ledger", delay: 100, icon: BookOpen },
-  { char: "u", key: "u", label: "Ask Me", href: "/ask", delay: 0, icon: MessageCircle },
+  { char: "u", key: "u", label: "Ask Me", href: "/feed", delay: 0, icon: MessageCircle },
 ];
 
 const DEFAULT_TAGLINE =

@@ -24,7 +24,7 @@ const NAV_DOTS: NavDot[] = [
   { label: "My Squad", href: "/squad", icon: Users },
   { label: "The Dossier", href: "/dossier", icon: FileText },
   { label: "The Ledger", href: "/ledger", icon: BookOpen },
-  { label: "Ask Me", href: "/ask", icon: MessageCircle },
+  { label: "Ask Me", href: "/feed", icon: MessageCircle },
 ];
 
 // 5 dots spread evenly across a full circle

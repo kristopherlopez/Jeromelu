@@ -1,12 +1,19 @@
+import { apiFetch } from "@/lib/api";
 import FeedClient from "./FeedClient";
-import { DUMMY_FEED } from "./feed-data";
+import type { FeedResponse } from "./feed-data";
 
 export const metadata = {
   title: "The Feed | Jeromelu",
-  description: "What I'm seeing, thinking, and doing.",
+  description: "What I'm seeing, thinking, and doing. Ask me anything.",
 };
 
-export default function FeedPage() {
-  // TODO: Replace with real API fetch once Feed pipeline is live
-  return <FeedClient items={DUMMY_FEED} />;
+export default async function FeedPage() {
+  let items: FeedResponse["items"] = [];
+  try {
+    const data = await apiFetch<FeedResponse>("/api/feed?limit=50");
+    items = data.items;
+  } catch {
+    // API may not be running — render empty feed
+  }
+  return <FeedClient items={items} />;
 }
