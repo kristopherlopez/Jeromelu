@@ -96,10 +96,11 @@ export default function FeedClient({ items: serverItems }: { items: FeedItem[] }
   }, [items, filter]);
 
   const itemsWithDividers = useMemo(() => {
+    const chronological = [...filtered].reverse();
     const result: ({ type: "divider"; label: string } | { type: "item"; item: FeedItem })[] = [];
     let lastDay = "";
 
-    for (const item of filtered) {
+    for (const item of chronological) {
       const day = getDayLabel(item.timestamp);
       if (day !== lastDay) {
         result.push({ type: "divider", label: day });
@@ -111,10 +112,10 @@ export default function FeedClient({ items: serverItems }: { items: FeedItem[] }
     return result;
   }, [filtered]);
 
-  // Scroll to top when new items are added
+  // Scroll to bottom when new items are added (Twitch-style)
   useEffect(() => {
     if (scrollRef.current && loading === false) {
-      scrollRef.current.scrollTop = 0;
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [items.length, loading]);
 
@@ -133,7 +134,7 @@ export default function FeedClient({ items: serverItems }: { items: FeedItem[] }
         text: question.trim(),
         timestamp: new Date().toISOString(),
       };
-      setItems((prev) => [tempQuestion, ...prev]);
+      setItems((prev) => [tempQuestion, ...prev]); // prepend (newest-first in data, reversed for display)
 
       try {
         const res = await apiPost<FeedAskResponse, FeedAskRequest>("/api/feed/ask", {
@@ -205,6 +206,20 @@ export default function FeedClient({ items: serverItems }: { items: FeedItem[] }
           </div>
         ) : (
           <div>
+            {filtered.length > 0 && (
+              <div className="mb-4 pb-4 border-b border-zinc-800/20 text-center font-mono text-[11px] text-zinc-500">
+                &gt; beginning of stream
+              </div>
+            )}
+
+            {itemsWithDividers.map((entry, i) =>
+              entry.type === "divider" ? (
+                <DayDivider key={`div-${entry.label}`} label={entry.label} />
+              ) : (
+                <FeedItemCard key={entry.item.id} item={entry.item} />
+              )
+            )}
+
             {/* Thinking indicator */}
             {loading && (
               <div className="flex gap-0 py-1.5">
@@ -221,19 +236,6 @@ export default function FeedClient({ items: serverItems }: { items: FeedItem[] }
                 <div className="w-10 shrink-0" />
                 <div className="w-8 shrink-0" />
                 <span className="text-[13px] text-red-400">{error}</span>
-              </div>
-            )}
-
-            {itemsWithDividers.map((entry, i) =>
-              entry.type === "divider" ? (
-                <DayDivider key={`div-${entry.label}`} label={entry.label} />
-              ) : (
-                <FeedItemCard key={entry.item.id} item={entry.item} />
-              )
-            )}
-            {filtered.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-zinc-800/20 text-center font-mono text-[11px] text-zinc-500">
-                &gt; end of stream. watching for new intel...
               </div>
             )}
           </div>

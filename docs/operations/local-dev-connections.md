@@ -1,8 +1,17 @@
 # Local Development Connections
 
-All services run via Docker Compose (`docker/docker-compose.yml`).
+Infrastructure (Postgres, MinIO, Temporal) runs via Docker Compose. The API and web services run separately.
 
-Start everything: `docker compose -f docker/docker-compose.yml up -d`
+```bash
+# 1. Start infrastructure
+make up  # or: docker compose -f docker/docker-compose.yml up -d
+
+# 2. Start API (separate terminal)
+make api  # or: cd services/api && source .venv/Scripts/activate && uvicorn app.main:app --reload --port 8000
+
+# 3. Start web (separate terminal)
+make web  # or: cd services/web && npm run dev
+```
 
 ---
 

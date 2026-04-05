@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { ConnectedAvatar } from "./ConnectedAvatar";
 import { useAvatarEngine } from "./AvatarEngine";
 import JeromeluLogo from "./JeromeluLogo";
-import { StatusLine } from "./StatusLine";
+import { CrewStatus } from "./CrewStatus";
 import { LatestThought } from "./LatestThought";
 import { ActivityPulse } from "./ActivityPulse";
 import { usePageTransition, TRANSITION_DURATION_MS, CONTENT_DELAY_MS, CONTENT_FADE_MS } from "./TransitionContext";
@@ -489,7 +489,7 @@ export function JeromeluPresence() {
       >
         <JeromeluLogo key={logoKey} />
         <div className="mt-6">
-          <StatusLine />
+          <CrewStatus />
         </div>
         <div className="mt-4">
           <LatestThought />

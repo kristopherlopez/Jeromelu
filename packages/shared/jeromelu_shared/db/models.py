@@ -480,6 +480,83 @@ class KnowledgeBase(Base):
     )
 
 
+class CrewActivity(Base):
+    __tablename__ = "crew_activity"
+
+    activity_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    agent_id: Mapped[str] = mapped_column(Text, nullable=False)
+    agent_name: Mapped[str] = mapped_column(Text, nullable=False)
+    activity_type: Mapped[str] = mapped_column(Text, nullable=False)
+    round: Mapped[int | None] = mapped_column(Integer)
+    season: Mapped[int] = mapped_column(Integer, default=2026)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    detail_json: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+    __table_args__ = (
+        CheckConstraint(
+            "agent_id IN ('scout', 'scribe', 'analyst', 'stats', 'fixtures')",
+            name="ck_crew_agent_id",
+        ),
+        CheckConstraint(
+            "activity_type IN ('started', 'completed', 'failed', 'handoff')",
+            name="ck_crew_activity_type",
+        ),
+        Index("idx_crew_activity_agent", "agent_id"),
+        Index("idx_crew_activity_round", "round", "season"),
+        Index("idx_crew_activity_created", "created_at"),
+    )
+
+
+class SquadSlot(Base):
+    __tablename__ = "squad_slots"
+
+    slot_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    position: Mapped[str] = mapped_column(Text, nullable=False)
+    slot_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    player_entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("entities.entity_id"))
+    player_name: Mapped[str] = mapped_column(Text, nullable=False)
+    is_captain: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_vice_captain: Mapped[bool] = mapped_column(Boolean, default=False)
+    rationale: Mapped[str | None] = mapped_column(Text)
+    conviction: Mapped[str] = mapped_column(Text, default="medium")
+    added_round: Mapped[int | None] = mapped_column(Integer)
+    season: Mapped[int] = mapped_column(Integer, default=2026)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    __table_args__ = (
+        CheckConstraint("conviction IN ('low', 'medium', 'high')", name="ck_squad_conviction"),
+        CheckConstraint(
+            "position IN ('FLB', 'CTW', '5/8', 'HFB', 'HOK', 'FRF', '2RF', 'FLX')",
+            name="ck_squad_position",
+        ),
+        Index("idx_squad_player", "player_entity_id"),
+        Index("idx_squad_season", "season"),
+    )
+
+
+class SquadTrade(Base):
+    __tablename__ = "squad_trades"
+
+    trade_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    decision_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("decisions.decision_id"))
+    round: Mapped[int] = mapped_column(Integer, nullable=False)
+    season: Mapped[int] = mapped_column(Integer, default=2026)
+    player_out_entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("entities.entity_id"))
+    player_out_name: Mapped[str] = mapped_column(Text, nullable=False)
+    player_in_entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("entities.entity_id"))
+    player_in_name: Mapped[str] = mapped_column(Text, nullable=False)
+    rationale: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+    __table_args__ = (
+        Index("idx_squad_trades_round", "round", "season"),
+        Index("idx_squad_trades_created", "created_at"),
+    )
+
+
 class Outcome(Base):
     __tablename__ = "outcomes"
 

@@ -13,8 +13,10 @@ The system revolves around structured entities:
 - Prediction
 - Decision
 - Event
+- **Remark** — the atomic output unit; an opinionated, voiced analytical piece with an open→locked→resolved lifecycle
 - Plan
 - Outcome
+- **Alignment Score** — per-entity prediction accuracy tracking for the Alignment Index
 
 ## Lineage Principle
 Every meaningful opinion or claim should trace back to the exact source words.
@@ -38,6 +40,9 @@ Visible to users:
 - expert tracking
 - consensus tracking
 - event timeline
+- remarks (open, locked, and resolved)
+- alignment index (expert leaderboard, user scores, Jeromelu's record)
+- crew activity (Scout/Analyst/Jeromelu status and recent actions)
 
 ## Private State
 Internal only:
@@ -172,5 +177,63 @@ Internal only:
 - actual_value_json
 - result_label
 - scored_at
+
+### squad_slots
+- slot_id
+- position (CTW, 5/8, HFB, HOK, FRF, 2RF, LOCK, FLX)
+- slot_index (1-17: 1-13 starting, 14-17 bench)
+- player_entity_id
+- player_name
+- is_captain
+- is_vice_captain
+- rationale
+- conviction (low, medium, high)
+- added_round
+- season
+- active
+
+### squad_trades
+- trade_id
+- decision_id
+- round
+- season
+- player_out_entity_id / player_out_name
+- player_in_entity_id / player_in_name
+- rationale
+
+### remarks
+- remark_id
+- voice_text (Jeromelu's voiced output)
+- subject_entity_ids (players, teams, matchups referenced)
+- position (buy, sell, hold, captain, avoid)
+- conviction (low, medium, high)
+- status (open, locked, resolved)
+- evidence_claim_ids (upstream claims that built this remark)
+- decision_id (link to the decision that produced it)
+- resolution_json (outcome data once resolved)
+- resolved_at
+- created_at
+- round
+- season
+- immutable_hash
+
+### remark_reactions
+- reaction_id
+- remark_id
+- user_id
+- reaction_type (agree, disagree)
+- created_at
+
+### alignment_scores
+- score_id
+- entity_id (expert, user, or Jeromelu)
+- entity_type (expert, user, system)
+- score_type (overall, captain_picks, buy_sell, matchup)
+- period (round, month, season)
+- period_value (e.g. round number or season year)
+- total_predictions
+- correct_predictions
+- alignment_pct
+- updated_at
 
 This schema is enough for V1 and does not overcomplicate things.

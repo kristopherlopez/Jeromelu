@@ -71,3 +71,9 @@ body {
   0%, 100% { transform: translateY(0px); }
   50% { transform: translateY(-3px); }
 }
+
+/* Crew status pill pulse */
+@keyframes crew-pill-pulse {
+  0%, 100% { border-color: rgba(245, 130, 32, 0.2); }
+  50% { border-color: rgba(245, 130, 32, 0.4); }
+}

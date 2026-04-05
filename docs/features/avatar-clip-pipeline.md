@@ -261,11 +261,160 @@ lighting, photorealistic, cinematic color grading, shallow depth of field,
 static tripod shot, fixed camera, no zoom, no pan, no camera movement
 ```
 
+#### Talking clips (loop: no, 5-15s each, script-driven)
+
+Talking clips are generated when Jeromelu has something specific to say — a prediction call, a bold take, a weekly recap line. Unlike silent reaction clips, these include lip-synced speech driven by a text script.
+
+**Kling settings:** Image-to-video mode, duration matched to script length (5-15s), High Quality / Professional, 1080p, 24fps. Use `assets/avatar/reference.png` as input image. Enable audio/lip-sync if available, otherwise generate silent and dub with TTS in post.
+
+**How it works:** Pick the emotion that matches the content of the script. Swap `[SCRIPT]` with the actual line. The emotion shapes the delivery — same words sound completely different when said with confidence vs. frustration.
+
+**Base talking template** — swap `[EMOTION_DIRECTION]` for the emotion block and `[SCRIPT]` for the actual words:
+
+```
+Living portrait, person speaking directly to camera saying "[SCRIPT]",
+natural lip movement synced to speech, [EMOTION_DIRECTION], natural
+hand gestures where appropriate, warm studio lighting, photorealistic,
+cinematic color grading, shallow depth of field, static tripod shot,
+fixed camera, no zoom, no pan, no camera movement
+```
+
+**Negative prompt (if field available):**
+```
+no camera shake, no zoom, no pan, no morphing, no warping, no distortion,
+no face deformation, no identity change, no fast motion, no text,
+no watermark, no exaggerated mouth movement, no robotic lip sync
+```
+
+### Emotion prompts for talking clips
+
+Each prompt below includes an example script in the `saying "..."` portion. Replace it with the actual line before generating.
+
+**talking-confident** — Bold calls, predictions, trade announcements
+```
+Living portrait, person speaking directly to camera saying "I'm locking
+in Cleary as captain. Not even close.", natural lip movement synced to
+speech, confident self-assured expression, subtle smirk while talking,
+relaxed posture leaning back slightly, steady eye contact, occasional
+knowing nod between phrases, delivering with authority, warm studio
+lighting, photorealistic, cinematic color grading, shallow depth of
+field, static tripod shot, fixed camera, no zoom, no pan, no camera
+movement
+```
+
+**talking-fired-up** — Hype moments, big wins, streak milestones
+```
+Living portrait, person speaking directly to camera saying "Three in a
+row. The model is cooking.", natural lip movement synced to speech,
+animated and energised expression, slightly faster speech cadence,
+forward lean with engaged posture, emphatic hand gestures, eyes bright
+and alive, restrained excitement building through the delivery, warm
+studio lighting, photorealistic, cinematic color grading, shallow depth
+of field, static tripod shot, fixed camera, no zoom, no pan, no camera
+movement
+```
+
+**talking-measured** — Analysis breakdowns, explaining reasoning
+```
+Living portrait, person speaking directly to camera saying "Here's why
+the matchup data says sell Munster this week.", natural lip movement
+synced to speech, thoughtful measured expression, deliberate pacing,
+occasional pause as if choosing words carefully, slight head tilts while
+explaining, calm authoritative tone, hand gestures marking key points,
+warm studio lighting, photorealistic, cinematic color grading, shallow
+depth of field, static tripod shot, fixed camera, no zoom, no pan,
+no camera movement
+```
+
+**talking-frustrated** — Bad beats, variance rants, missed calls
+```
+Living portrait, person speaking directly to camera saying "Sixty-two
+points on the bench. The process was right. The result was pain.",
+natural lip movement synced to speech, mild frustration in expression,
+slight jaw tension, occasional head shake while talking, exhale between
+points, composing himself as he speaks, maintains eye contact but with
+visible irritation, warm studio lighting, photorealistic, cinematic
+color grading, shallow depth of field, static tripod shot, fixed camera,
+no zoom, no pan, no camera movement
+```
+
+**talking-sarcastic** — Roasting consensus, contrarian takes
+```
+Living portrait, person speaking directly to camera saying "Everyone's
+panic-trading Cleary. I'm shopping while you're crying.", natural lip
+movement synced to speech, dry amused expression, one eyebrow slightly
+raised, subtle smirk that comes and goes, slight lean to one side,
+deadpan delivery with occasional knowing look, as if sharing an inside
+joke with the viewer, warm studio lighting, photorealistic, cinematic
+color grading, shallow depth of field, static tripod shot, fixed camera,
+no zoom, no pan, no camera movement
+```
+
+**talking-serious** — Warnings, risk flags, important caveats
+```
+Living portrait, person speaking directly to camera saying "Do not chase
+the hype on this one. The bye schedule is brutal.", natural lip movement
+synced to speech, serious focused expression, direct unwavering eye
+contact, minimal gestures, still posture, slower deliberate delivery,
+slight forward lean conveying gravity, warm studio lighting,
+photorealistic, cinematic color grading, shallow depth of field, static
+tripod shot, fixed camera, no zoom, no pan, no camera movement
+```
+
+**talking-playful** — Teases, previews, audience engagement
+```
+Living portrait, person speaking directly to camera saying "I've got a
+spicy trade brewing for Round 8. Stay tuned.", natural lip movement
+synced to speech, playful mischievous expression, hint of a grin, slight
+head tilt, relaxed casual posture, animated eyebrows, delivery that
+suggests he knows something the viewer doesn't yet, warm studio lighting,
+photorealistic, cinematic color grading, shallow depth of field, static
+tripod shot, fixed camera, no zoom, no pan, no camera movement
+```
+
+### Talking clip naming conventions
+
+```
+talking-confident-1.mp4, talking-confident-2.mp4
+talking-fired-up-1.mp4
+talking-measured-1.mp4
+talking-frustrated-1.mp4
+talking-sarcastic-1.mp4
+talking-serious-1.mp4
+talking-playful-1.mp4
+```
+
+### Talking clip manifest entry
+
+```json
+{
+  "id": "talking-confident-1",
+  "file": "talking-confident-1.mp4",
+  "category": "talking",
+  "mood": "confident",
+  "duration_ms": 8000,
+  "loop": false,
+  "transitions_to": [],
+  "priority": 15,
+  "script": "I'm locking in Cleary as captain. Not even close."
+}
+```
+
+### Post-production for talking clips
+
+1. **If Kling generates with lip sync:** Trim, compress, keep audio track (do NOT strip audio)
+2. **If generating silent + TTS dub:** Generate the silent video with mouth movement, then overlay TTS audio (ElevenLabs or similar) in post using FFmpeg:
+   ```bash
+   ffmpeg -i talking-confident-1_silent.mp4 -i voiceover.mp3 \
+     -c:v copy -c:a aac -shortest talking-confident-1.mp4
+   ```
+3. **Audio spec:** AAC, 128kbps, mono. Keep file size under 2MB total.
+
 ---
 
 ## Step 2: Prepare Clips for Web
 
-Use the trim script to crop, scale, compress, and strip audio.
+Use the trim script to crop, scale, compress, and strip audio (for non-talking clips).
 
 ### Usage
 
@@ -282,7 +431,7 @@ python scripts/trim_clip.py assets/raw_clip.mp4 --out ... --size 600 --crf 24
 
 ### What it does
 
-1. Strips audio track
+1. Strips audio track (skip `--strip-audio` for talking clips)
 2. Center-crops to square (based on smallest dimension)
 3. Scales to 400x400 (retina-ready for 200px display)
 4. Compresses with H.264 CRF 28 (~100-200KB per clip)
@@ -329,7 +478,7 @@ Add an entry to `services/web/public/avatar/manifest.json` for each new clip.
 |-------|------|-------------|
 | `id` | string | Unique identifier. Convention: `{category}-{variant}` or `{mood}-{variant}` |
 | `file` | string | Filename in `public/avatar/` |
-| `category` | string | `idle`, `reaction`, `directional`, or `micro` |
+| `category` | string | `idle`, `reaction`, `directional`, `micro`, or `talking` |
 | `mood` | string | Emotional state: `neutral`, `confident`, `annoyed`, `glance-left`, etc. |
 | `duration_ms` | number | Clip length in milliseconds |
 | `loop` | boolean | `true` for idle clips, `false` for reactions/directional/micro |
@@ -350,6 +499,10 @@ impatient-1.mp4
 engaged-1.mp4
 glance-left.mp4, glance-right.mp4, glance-up.mp4
 micro-blink.mp4, micro-adjust.mp4, micro-shift.mp4
+talking-confident-1.mp4, talking-fired-up-1.mp4
+talking-measured-1.mp4, talking-frustrated-1.mp4
+talking-sarcastic-1.mp4, talking-serious-1.mp4
+talking-playful-1.mp4
 ```
 
 ---

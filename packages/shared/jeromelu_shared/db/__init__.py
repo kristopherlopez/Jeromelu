@@ -11,6 +11,7 @@ from jeromelu_shared.db.models import (
     ClaimChunk,
     Prediction,
     ConsensusSnapshot,
+    CrewActivity,
     Decision,
     Plan,
     Event,
@@ -18,6 +19,8 @@ from jeromelu_shared.db.models import (
     Outcome,
     PlayerRound,
     PlayerTeamHistory,
+    SquadSlot,
+    SquadTrade,
 )
 
 __all__ = [
@@ -35,6 +38,7 @@ __all__ = [
     "ClaimChunk",
     "Prediction",
     "ConsensusSnapshot",
+    "CrewActivity",
     "Decision",
     "Plan",
     "Event",
@@ -42,4 +46,6 @@ __all__ = [
     "Outcome",
     "PlayerRound",
     "PlayerTeamHistory",
+    "SquadSlot",
+    "SquadTrade",
 ]

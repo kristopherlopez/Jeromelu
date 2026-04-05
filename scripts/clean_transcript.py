@@ -3,14 +3,20 @@
 Pipeline:
   Step 0: Resolve round context + build scoped player pool
   Layer 1: Deterministic exact-match corrections
-  Layer 2: Phonetic + fuzzy matching with local context tracking
+  Layer 1.5: Topic segmentation (keyword blocks for downstream chapter detection)
   Report: Confidence-tagged JSON report
+
+Phonetic/fuzzy name corrections are intentionally NOT applied here.
+They lack conversational context and produce false positives on common
+English words (e.g. "Today" → "Todd", "Furious" → "Francis").
+All fuzzy name resolution is deferred to the Phase 3 specialist agents
+in the analyse-transcript pipeline, where each agent has chapter context
+and a scoped player pool.
 
 Usage:
   python scripts/clean_transcript.py data/transcripts/raw/CHANNEL_VIDEO.json
   python scripts/clean_transcript.py --all
   python scripts/clean_transcript.py --dry-run data/transcripts/raw/CHANNEL_VIDEO.json
-  python scripts/clean_transcript.py --threshold 0.80 data/transcripts/raw/CHANNEL_VIDEO.json
 """
 
 from __future__ import annotations
@@ -37,7 +43,6 @@ from cleaning.context import (
     build_round_context,
 )
 from cleaning.deterministic import apply_deterministic, load_corrections
-from cleaning.phonetic import build_phonetic_index, scan_all_segments
 from cleaning.report import build_report, print_summary, write_report
 from cleaning.segmentation import segment_transcript
 
@@ -49,10 +54,12 @@ REPORTS_DIR = DATA_DIR / "transcripts" / "reports"
 
 def clean_transcript(
     raw_path: Path,
-    threshold: float = 0.85,
     dry_run: bool = False,
 ) -> dict:
-    """Run the full cleaning pipeline on a single transcript.
+    """Run the deterministic cleaning pipeline on a single transcript.
+
+    Phonetic/fuzzy corrections are deferred to the analyse-transcript
+    pipeline where Phase 3 specialist agents have chapter context.
 
     Returns the cleaning report dict.
     """
@@ -72,7 +79,7 @@ def clean_transcript(
     print(f"Primary players: {len(round_context.primary_players)}, "
           f"Secondary: {len(round_context.secondary_players)}")
 
-    # Layer 1: Deterministic corrections
+    # Layer 1: Deterministic corrections (exact match, 100% confidence)
     corrections = load_corrections()
     det_records = apply_deterministic(segments, corrections)
     print(f"Layer 1 (deterministic): {len(det_records)} corrections applied")
@@ -94,23 +101,8 @@ def clean_transcript(
               f"{block.block_type:8s} | {block.label:40s} | "
               f"{seg_count:4d} segs, {primary_count:3d} primary players")
 
-    # Layer 2: Phonetic + fuzzy matching (block-scoped)
-    index = build_phonetic_index(round_context)
-    phon_records = scan_all_segments(
-        segments=segments,
-        index=index,
-        round_context=round_context,
-        local_context=local_context,
-        team_lookup=team_lookup,
-        threshold=threshold,
-        topic_blocks=topic_blocks,
-    )
-    applied = sum(1 for r in phon_records if r["confidence"] == "MEDIUM")
-    flagged = sum(1 for r in phon_records if r["confidence"] == "LOW")
-    print(f"Layer 2 (phonetic): {applied} applied, {flagged} flagged")
-
-    # Build report
-    report = build_report(round_context, det_records, phon_records, topic_blocks)
+    # Build report (no phonetic records — fuzzy matching deferred to Phase 3)
+    report = build_report(round_context, det_records, [], topic_blocks)
     print_summary(report)
 
     if dry_run:
@@ -151,12 +143,6 @@ def main() -> None:
         action="store_true",
         help="Show what would change without writing files",
     )
-    parser.add_argument(
-        "--threshold",
-        type=float,
-        default=0.85,
-        help="Phonetic match threshold (default: 0.85)",
-    )
 
     args = parser.parse_args()
 
@@ -167,13 +153,13 @@ def main() -> None:
             sys.exit(1)
         print(f"Found {len(raw_files)} raw transcripts")
         for raw_path in raw_files:
-            clean_transcript(raw_path, args.threshold, args.dry_run)
+            clean_transcript(raw_path, args.dry_run)
     elif args.path:
         raw_path = Path(args.path)
         if not raw_path.exists():
             print(f"File not found: {raw_path}")
             sys.exit(1)
-        clean_transcript(raw_path, args.threshold, args.dry_run)
+        clean_transcript(raw_path, args.dry_run)
     else:
         parser.print_help()
         sys.exit(1)
