@@ -191,7 +191,7 @@ For local development, the same operations run directly against the local databa
 | Step | Production | Local |
 |------|------------|-------|
 | Persist | `prod-upload-clean` + `prod-upload-claims` + `prod-ingest` | `/upload-transcript <clean-transcript-path>` |
-| Update clean text | `prod-upload-clean` + `prod-update-clean` | `python scripts/process_transcript.py update-transcript <path>` |
+| Update clean text | `prod-upload-clean` + `prod-update-clean` | `python scripts/transcripts/process_transcript.py update-transcript <path>` |
 
 ### API Reference
 

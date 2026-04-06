@@ -6,7 +6,7 @@ The analyse-transcript pipeline replaces the flat clean+process approach with pr
 Raw Transcript (3000+ segments)
     |
     v
-Phase 1: Deterministic Pre-Clean (scripts/clean_transcript.py)
+Phase 1: Deterministic Pre-Clean (scripts/transcripts/clean_transcript.py)
     |  corrections.yaml exact-match + phonetic matching
     |  Output: clean transcript + cleaning report with keyword blocks
     v

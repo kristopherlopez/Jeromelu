@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stay Human: Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f0e8; --surface: #fdfaf4; --ink: #1c1a14; --ink-muted: #5c5848;
+    --ink-faint: #9c9484; --accent: #b85c38; --accent-light: #f0ddd5;
+    --teal: #2d7d6b; --teal-light: #d4ede8; --amber: #8a6a20; --amber-light: #f0e5c8;
+    --purple: #5a3d8a; --purple-light: #e8e0f5; --green: #2d6040; --green-light: #d4ead8;
+    --red: #9a2020; --red-light: #f5dada;
+    --border: rgba(28,26,20,0.12);
+    --serif: 'Cormorant Garamond', Georgia, serif;
+    --sans: 'Outfit', sans-serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.7}
+  nav{position:sticky;top:0;z-index:100;background:rgba(245,240,232,0.93);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:0 2rem;display:flex;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+  nav::-webkit-scrollbar{display:none}
+  nav a{font-size:11px;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;color:var(--ink-muted);text-decoration:none;padding:0.85rem 0.9rem;border-bottom:2px solid transparent;transition:color 0.2s,border-color 0.2s;flex-shrink:0}
+  nav a:hover{color:var(--accent);border-bottom-color:var(--accent)}
+  .hero{max-width:820px;margin:0 auto;padding:5rem 2rem 3rem;text-align:center}
+  .hero .kicker{font-size:11px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:var(--accent);margin-bottom:1rem}
+  .hero h1{font-family:var(--serif);font-size:clamp(2.6rem,5.5vw,4rem);font-weight:600;line-height:1.1;margin-bottom:0.75rem}
+  .hero h1 em{font-style:italic;color:var(--accent)}
+  .hero .subtitle{font-family:var(--serif);font-size:1.2rem;font-style:italic;color:var(--ink-muted);margin-bottom:2rem}
+  .hero-meta{display:flex;align-items:center;justify-content:center;gap:2rem;font-size:13px;color:var(--ink-faint)}
+  .hero-meta span::before{content:'·';margin-right:2rem}
+  .hero-meta span:first-child::before{display:none}
+  .hero-divider{width:60px;height:1px;background:var(--accent);margin:2.5rem auto 0;opacity:0.4}
+  .content{max-width:820px;margin:0 auto;padding:0 2rem 6rem}
+  section{padding:4rem 0 2rem;border-top:1px solid var(--border)}
+  section:first-child{border-top:none;padding-top:3rem}
+  .section-label{font-size:11px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:var(--accent);margin-bottom:0.75rem}
+  h2{font-family:var(--serif);font-size:clamp(1.8rem,4vw,2.4rem);font-weight:600;line-height:1.2;color:var(--ink);margin-bottom:1.25rem}
+  h3{font-family:var(--serif);font-size:1.25rem;font-weight:600;color:var(--ink);margin:2rem 0 0.6rem}
+  p{margin-bottom:1rem;color:var(--ink-muted)}
+  p strong{color:var(--ink);font-weight:600}
+  .meta-box{background:var(--surface);border:1px solid var(--border);padding:1.5rem;margin:1.5rem 0;display:grid;grid-template-columns:1fr 1fr;gap:1.25rem}
+  @media(max-width:560px){.meta-box{grid-template-columns:1fr}}
+  .meta-label{font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:0.3rem}
+  .meta-value{font-size:14px;color:var(--ink-muted);line-height:1.5}
+  .meta-value strong{color:var(--ink)}
+  .flag{display:inline-block;background:var(--accent-light);color:var(--accent);font-size:11px;font-weight:600;padding:0.15rem 0.5rem;border-radius:2px;letter-spacing:0.06em;text-transform:uppercase;margin-top:0.4rem}
+  .callout{background:var(--accent-light);border-left:3px solid var(--accent);padding:1.25rem 1.5rem;margin:1.5rem 0;font-size:15px;color:var(--ink);line-height:1.6}
+  .mechanism{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--teal);padding:1.25rem 1.5rem;margin:1.5rem 0;font-size:14px;color:var(--ink-muted);line-height:1.6}
+  .mechanism strong{color:var(--ink);font-weight:600}
+  .cards{display:grid;gap:1px;background:var(--border);border:1px solid var(--border);margin:1.5rem 0}
+  .cards.cols-3{grid-template-columns:repeat(3,1fr)}
+  .cards.cols-2{grid-template-columns:repeat(2,1fr)}
+  @media(max-width:640px){.cards.cols-3,.cards.cols-2{grid-template-columns:1fr}}
+  .card{background:var(--surface);padding:1.4rem}
+  .card-tag{font-size:10px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:0.5rem;display:inline-block;padding:0.2rem 0.55rem;border-radius:2px}
+  .card-tag.teal{background:var(--teal-light);color:var(--teal)}
+  .card-tag.amber{background:var(--amber-light);color:var(--amber)}
+  .card-tag.purple{background:var(--purple-light);color:var(--purple)}
+  .card-tag.accent{background:var(--accent-light);color:var(--accent)}
+  .card-tag.green{background:var(--green-light);color:var(--green)}
+  .card-tag.gray{background:#e8e5de;color:#5c5848}
+  .card h3{font-family:var(--serif);font-size:1.1rem;font-weight:600;margin:0.2rem 0 0.4rem;color:var(--ink)}
+  .card p{font-size:14px;line-height:1.55;color:var(--ink-muted);margin:0}
+  .card .sub{font-size:11px;color:var(--ink-faint);margin-top:0.5rem}
+  .card .fn{margin-top:0.6rem;padding-top:0.6rem;border-top:1px solid var(--border);font-size:12px;color:var(--ink-faint)}
+  .card .fn strong{color:var(--ink-muted);font-weight:500}
+  .face-header{display:flex;align-items:center;gap:1rem;margin:2.5rem 0 1rem}
+  .face-header-line{flex:1;height:1px;background:var(--border)}
+  .face-header-label{font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-faint);white-space:nowrap}
+  .journey{display:flex;flex-direction:column;margin:2rem 0;position:relative}
+  .journey::before{content:'';position:absolute;left:19px;top:20px;bottom:20px;width:2px;background:linear-gradient(to bottom,var(--teal),var(--accent),var(--purple));opacity:0.3}
+  .journey-step{display:flex;gap:1.5rem;padding:1.25rem 0}
+  .journey-num{flex-shrink:0;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:1.1rem;font-weight:600;position:relative;z-index:1}
+  .journey-num.c1{background:var(--teal-light);color:var(--teal)}
+  .journey-num.c2{background:var(--amber-light);color:var(--amber)}
+  .journey-num.c3{background:var(--purple-light);color:var(--purple)}
+  .journey-num.c4{background:var(--accent-light);color:var(--accent)}
+  .journey-num.c5{background:var(--green-light);color:var(--green)}
+  .journey-body{padding-top:0.4rem}
+  .journey-body h4{font-size:13px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink);margin:0 0 0.4rem}
+  .journey-body p{font-size:14px;margin:0 0 0.3rem;color:var(--ink-muted)}
+  .journey-body .signal{font-size:13px;color:var(--ink-faint);font-style:italic}
+  .arch-table{width:100%;border-collapse:collapse;margin:1.5rem 0;font-size:14px}
+  .arch-table th{text-align:left;font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:0.6rem 1rem;border-bottom:1px solid var(--border);background:var(--surface)}
+  .arch-table td{padding:0.9rem 1rem;border-bottom:1px solid var(--border);vertical-align:top;color:var(--ink-muted);line-height:1.5}
+  .arch-table tr:last-child td{border-bottom:none}
+  .arch-table tr:hover td{background:var(--surface)}
+  .arch-table td:first-child{font-weight:500;color:var(--ink);width:22%}
+  .arch-table td:nth-child(2){width:42%}
+  .arch-table td:nth-child(3){color:var(--ink-faint);font-size:13px}
+  .trust-list{margin:1.5rem 0;display:flex;flex-direction:column;border:1px solid var(--border)}
+  .trust-item{display:grid;grid-template-columns:100px 1fr;border-bottom:1px solid var(--border)}
+  .trust-item:last-child{border-bottom:none}
+  .trust-rating{padding:1rem;display:flex;align-items:flex-start;justify-content:center;border-right:1px solid var(--border)}
+  .trust-rating span{font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;padding:0.25rem 0.6rem;border-radius:2px}
+  .trust-rating.solid span{background:var(--green-light);color:var(--green)}
+  .trust-rating.plausible span{background:var(--amber-light);color:var(--amber)}
+  .trust-rating.speculative span{background:var(--red-light);color:var(--red)}
+  .trust-body{padding:1rem 1.25rem}
+  .trust-body strong{display:block;font-size:14px;font-weight:600;color:var(--ink);margin-bottom:0.2rem}
+  .trust-body p{font-size:13px;margin:0;color:var(--ink-muted)}
+  .verdict{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--amber);padding:1rem 1.4rem;margin:1.5rem 0;font-size:14px;color:var(--ink-muted)}
+  .verdict strong{color:var(--ink);font-weight:600}
+  .apply-list{counter-reset:apply;list-style:none;margin:1.5rem 0;border:1px solid var(--border)}
+  .apply-list li{counter-increment:apply;display:grid;grid-template-columns:56px 1fr;border-bottom:1px solid var(--border)}
+  .apply-list li:last-child{border-bottom:none}
+  .apply-list li::before{content:counter(apply,decimal-leading-zero);font-family:var(--serif);font-size:1.3rem;color:var(--accent);opacity:0.5;display:flex;align-items:flex-start;justify-content:center;padding:1.1rem 0;border-right:1px solid var(--border);background:var(--surface)}
+  .apply-body{padding:1.1rem 1.4rem}
+  .apply-body strong{display:block;font-size:15px;font-weight:600;color:var(--ink);margin-bottom:0.25rem}
+  .apply-body p{font-size:14px;margin:0;color:var(--ink-muted)}
+  .convo-box{background:var(--surface);border:1px solid var(--border);margin:1.5rem 0;padding:1.5rem}
+  .convo-box h4{font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 1rem}
+  .convo-item{margin-bottom:1rem}
+  .convo-item:last-child{margin-bottom:0}
+  .convo-who{font-size:12px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--accent);margin-bottom:0.2rem}
+  .convo-line{font-family:var(--serif);font-style:italic;font-size:1.05rem;color:var(--ink);margin:0}
+  .stress-blocks{display:grid;grid-template-columns:1fr;gap:1px;background:var(--border);border:1px solid var(--border);margin:1.5rem 0}
+  .stress-block{background:var(--surface);padding:1.5rem}
+  .stress-block h4{font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:0.75rem}
+  .stress-block p{font-size:14px;color:var(--ink-muted);margin:0 0 0.75rem;line-height:1.6}
+  .stress-block p:last-child{margin-bottom:0}
+  .stress-block p strong{color:var(--ink)}
+  footer{text-align:center;padding:3rem 2rem;border-top:1px solid var(--border);font-size:12px;color:var(--ink-faint);letter-spacing:0.05em}
+  footer strong{color:var(--ink-muted);font-weight:500}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+  .hero{animation:fadeUp 0.6s ease both}
+  section{animation:fadeUp 0.4s ease both;animation-delay:0.08s}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="#source-check">Source Check</a>
+  <a href="#core-claim">Core Claim</a>
+  <a href="#key-concepts">Key Concepts</a>
+  <a href="#how-built">How It's Built</a>
+  <a href="#what-to-trust">What to Trust</a>
+  <a href="#apply">Apply It</a>
+  <a href="#conversations">Conversations</a>
+  <a href="#stress-test">Stress Test</a>
+</nav>
+
+<div class="hero">
+  <p class="kicker">Book Analysis</p>
+  <h1><em>Stay Human:</em><br>Authoring Your Mind<br>in the AI Age</h1>
+  <p class="subtitle">Helen Edwards · Artificiality Institute · 2026</p>
+  <div class="hero-meta"><span>7 chapters</span><span>Psychology of AI use</span><span>Framework-heavy</span></div>
+  <div class="hero-divider"></div>
+</div>
+
+<div class="content">
+
+  <section id="source-check">
+    <p class="section-label">Section 0</p>
+    <h2>Source Check</h2>
+    <div class="meta-box">
+      <div><div class="meta-label">Author</div><div class="meta-value"><strong>Helen Edwards</strong>, co-founder of Artificiality Institute. Decade of human-AI interaction research. Not a cognitive scientist or academic psychologist. Research conducted through workshops, not a laboratory.</div><span class="flag">Practitioner, not academic</span></div>
+      <div><div class="meta-label">Currency</div><div class="meta-value">Published February 2026. Current.</div></div>
+      <div><div class="meta-label">Motivation</div><div class="meta-value">Building a community and research programme around human authorship. Writing from inside the subject. Not a neutral observer.</div><span class="flag">Advocate position</span></div>
+      <div><div class="meta-label">Evidence Base</div><div class="meta-value">Workshop observations (1,000+ people), self-reported stories, online forums. No control groups. No longitudinal tracking. The 4% Co-Author figure is the only hard number.</div><span class="flag">Observational, no controls</span></div>
+    </div>
+    <p>The frameworks are conceptual, not empirical. The cases are illustrative, not causal. Read this as a well-observed map of patterns, not a scientific finding.</p>
+  </section>
+
+  <section id="core-claim">
+    <p class="section-label">Section 1</p>
+    <h2>Core Claim</h2>
+    <div class="callout">The danger of AI is not using it too much but losing authorship of your own goals without noticing.</div>
+    <p>The book is not a guide to AI tools. It does not cover prompting, model selection, or workflow optimisation. It does not argue against using AI. It does not predict where AI is heading.</p>
+    <div class="mechanism">
+      <strong>Mechanism:</strong> AI blends into your thinking (Blending), your identity attaches to what AI lets you do (Bonding), and your meaning frameworks flex around AI outputs (Bending). When these three shifts happen without external accountability, you drift from authorship into autopilot. The drift is invisible from inside because the outputs look good. Only other humans who watch you think can see the gap between producing and understanding. This holds when AI interaction is frequent, when no peer review is scheduled, and when the task involves judgment rather than execution.
+    </div>
+  </section>
+
+  <section id="key-concepts">
+    <p class="section-label">Section 2</p>
+    <h2>Key Concepts</h2>
+    <p>Three interlocking frameworks form a system. The shifts say what is happening to you. The states say where you are. The roles say what position you have given AI.</p>
+
+    <h3>The three shifts</h3>
+    <div class="cards cols-3">
+      <div class="card">
+        <span class="card-tag teal">Thinking</span>
+        <h3>Blending</h3>
+        <p>How AI responses mix into your thinking until you cannot separate yours from its. The clinical coder uses it productively. The developer who autopiloted does not. Same depth, opposite awareness.</p>
+        <div class="fn"><strong>Function:</strong> explains how understanding gets borrowed without the borrower noticing. <strong>Remove it:</strong> the competence illusion has no mechanism.</div>
+      </div>
+      <div class="card">
+        <span class="card-tag purple">Identity</span>
+        <h3>Bonding</h3>
+        <p>How your sense of self gets tied to AI. The ADHD artist cried with relief. The novelist keeps AI away from her writing. The programmer chose the bond and chose what to withhold. Same phenomenon, different relationships.</p>
+        <div class="fn"><strong>Function:</strong> explains why people resist changing their AI setup even when it is not working. <strong>Remove it:</strong> the back-face roles (Outsourcer, Builder, Creator, Co-Author) lose their foundation.</div>
+      </div>
+      <div class="card">
+        <span class="card-tag amber">Meaning</span>
+        <h3>Bending</h3>
+        <p>Your capacity to revise your frameworks when reality stops fitting them. The content creator who rebuilt from creator to curator. The grad student who holds both truths without resolving them.</p>
+        <div class="fn"><strong>Function:</strong> moderates everything. Without it, high Blending is drift and high Bonding is substitution. <strong>Remove it:</strong> the cube collapses from three dimensions to two. No way to distinguish productive from destructive integration.</div>
+      </div>
+    </div>
+
+    <h3>The five states</h3>
+    <div class="journey">
+      <div class="journey-step"><div class="journey-num c1">1</div><div class="journey-body"><h4>Wake-Up</h4><p>When AI becomes real. Wonder, dread, or both. Some people orbit this for months.</p><p class="signal">Signs: still surprised. Showing other people. Not yet settled.</p></div></div>
+      <div class="journey-step"><div class="journey-num c2">2</div><div class="journey-body"><h4>Groove</h4><p>AI becomes infrastructure. Efficient, unremarkable. The most dangerous state because it feels settled. You stop watching. Can drift into Merge without your noticing.</p><p class="signal">Check-in: when did you last ask whether your groove has shifted somewhere you did not intend?</p></div></div>
+      <div class="journey-step"><div class="journey-num c3">3</div><div class="journey-body"><h4>Merge</h4><p>The boundary dissolves. Can feel identical to the Groove when you are not paying attention. The clinical coder is in the Merge and knows it. The developer was in it and did not.</p><p class="signal">Diagnostic: can you explain your reasoning, not just your output, to someone who was not in the AI conversation?</p></div></div>
+      <div class="journey-step"><div class="journey-num c4">4</div><div class="journey-body"><h4>Breaking</h4><p>Something gives way. Can come from your own AI use, from AI's presence in the environment, or from market forces.</p><p class="signal">Signs: exhaustion, confusion, anger, grief about work. Avoiding certain conversations.</p></div></div>
+      <div class="journey-step"><div class="journey-num c5">5</div><div class="journey-body"><h4>Rebuild</h4><p>Constructing new frameworks. Key insight: AI is most useful where you have no expertise. The danger is every area where you do not know enough to notice AI got it wrong.</p><p class="signal">Signs: can explain their reasoning. Has thought deliberately about where AI fits.</p></div></div>
+    </div>
+
+    <h3>The eight roles</h3>
+    <p>Three axes create a cube. These are positions, not identities. You move between them.</p>
+    <div class="face-header"><div class="face-header-line"></div><div class="face-header-label">Front face: AI stays outside your identity</div><div class="face-header-line"></div></div>
+    <div class="cards cols-2">
+      <div class="card"><span class="card-tag gray">Doer</span><div class="sub">Low Blending · Low Bonding · Low Bending</div><h3>AI as simple tool</h3><p>Bounded tasks. Transactional. Safe, but Edwards admits the skill of tidying her own thoughts is slipping, and it always seems like a tomorrow problem.</p><div class="fn"><strong>Function:</strong> baseline position. Shows what minimal AI integration looks like. <strong>Remove it:</strong> no reference point for measuring deeper integration.</div></div>
+      <div class="card"><span class="card-tag teal">Framer</span><div class="sub">High Blending · Low Bonding · Low Bending</div><h3>You think, AI structures</h3><p>You do the theory of mind. AI handles language and structure. The clinical coder is the archetype.</p><div class="fn"><strong>Function:</strong> shows productive high Blending is possible when identity stays separate. <strong>Remove it:</strong> no positive example of deep cognitive integration without identity entanglement.</div></div>
+      <div class="card"><span class="card-tag amber">Catalyst</span><div class="sub">Low Blending · Low Bonding · High Bending</div><h3>AI sparks, you curate</h3><p>AI generates possibilities. You select and verify. The fantasy writer who never tells AI which ideas she liked. Authorship stays pure. The ceiling may be lower.</p><div class="fn"><strong>Function:</strong> shows the cost of protecting purity. <strong>Remove it:</strong> the framework has no way to talk about the trade-off between protection and potential.</div></div>
+      <div class="card"><span class="card-tag purple">Partner</span><div class="sub">High Blending · Low Bonding · High Bending</div><h3>Deep collaboration, identity intact</h3><p>Works for people crossing disciplines. Key risk: the knowledge illusion.</p><div class="fn"><strong>Function:</strong> the front-face ceiling. Shows how far integration can go without identity entanglement. <strong>Remove it:</strong> no bridge between the safe front face and the risky back face.</div></div>
+    </div>
+    <div class="face-header"><div class="face-header-line"></div><div class="face-header-label">Back face: AI becomes part of who you are</div><div class="face-header-line"></div></div>
+    <div class="cards cols-2">
+      <div class="card"><span class="card-tag accent">Outsourcer</span><div class="sub">Low Blending · High Bonding · Low Bending</div><h3>The bond is emotional</h3><p>"Things" AI handles has quietly expanded to include relating, processing, listening. Dependency builds one convenience at a time.</p><div class="fn"><strong>Function:</strong> shows how Bonding operates without cognitive depth. The emotional route to drift. <strong>Remove it:</strong> no way to explain non-cognitive dependency.</div></div>
+      <div class="card"><span class="card-tag teal">Builder</span><div class="sub">High Blending · High Bonding · Low Bending</div><h3>Deep integration, stable domains</h3><p>The funeral director who feels "somewhat replaceable." Integration happened task by task. No single moment of decision.</p><div class="fn"><strong>Function:</strong> shows what happens when integration is deep but frameworks are rigid. The magpie risk. <strong>Remove it:</strong> no account of how someone can be deeply integrated and stuck at the same time.</div></div>
+      <div class="card"><span class="card-tag amber">Creator</span><div class="sub">Low Blending · High Bonding · High Bending</div><h3>AI produces, you keep voice</h3><p>Dave dropped Midjourney. The tool was impressive. It did not let him feel like the creator. The feeling mattered more than the output.</p><div class="fn"><strong>Function:</strong> shows identity protection can hold even when Bonding is high, if Bending is high enough. <strong>Remove it:</strong> the argument that Bending moderates everything loses its strongest case.</div></div>
+      <div class="card"><span class="card-tag green">Co-Author</span><div class="sub">High Blending · High Bonding · High Bending</div><h3>Full integration, authorship intact</h3><p>About 4% of participants. What united them: iterative back-and-forth, editorial control, language like "director" and "creative partner." Cannot be sustained alone.</p><div class="fn"><strong>Function:</strong> the aspiration point. Shows the goal is not less AI but more structure around AI. <strong>Remove it:</strong> the book has no positive vision of where deep integration leads.</div></div>
+    </div>
+
+    <h3>Theory of Mind gap</h3>
+    <p>AI builds its model from what you type. Humans who have watched you live can see what you hide from yourself. Dave knows Edwards rationalises overwork as dedication. He calls it out because he has watched her pay costs for it. AI does not know what she hides from herself because she does not type it.</p>
+    <div class="fn" style="font-size:12px;color:var(--ink-faint);margin-top:0.5rem"><strong>Function:</strong> grounds the accountability argument in something concrete. Explains why other humans are structurally necessary, not just helpful. <strong>Remove it:</strong> "schedule the humans" has no justification beyond discipline.</div>
+  </section>
+
+  <section id="how-built">
+    <p class="section-label">Section 3</p>
+    <h2>How It's Built</h2>
+    <table class="arch-table">
+      <thead><tr><th>Chapter</th><th>What it argues</th><th>Why it sits here</th></tr></thead>
+      <tbody>
+        <tr><td>1. Our Story</td><td>Personal failure (cube disaster) alongside success (Chronicle research). Previews the full framework.</td><td>Removes the "this won't happen to me" defence before the reader builds it.</td></tr>
+        <tr><td>2. Right to a Future Tense</td><td>Why this matters. Andy Clark's extended mind. Same technology, diverging futures.</td><td>Without stakes, the three shifts sound like self-help.</td></tr>
+        <tr><td>3. Three Ways You're Changing</td><td>Blending, Bonding, Bending with case studies.</td><td>The diagnostic framework. Must precede states and roles because those are built on these three axes.</td></tr>
+        <tr><td>4. The Journey People Take</td><td>Five states: Wake-Up through Rebuild.</td><td>Adds temporal dimension. The shifts say what. The states say where.</td></tr>
+        <tr><td>5. Roles You're Choosing</td><td>Front face: Doer, Framer, Catalyst, Partner.</td><td>Front face first because it is safer territory.</td></tr>
+        <tr><td>6. Roles That Change You</td><td>Back face: Outsourcer, Builder, Creator, Co-Author.</td><td>The harder chapter. Reader is equipped and ready for confronting territory.</td></tr>
+        <tr><td>7. Knowing the Mind You're Working With</td><td>Theory of Mind. AI's model of you versus humans' model of you.</td><td>Closes by grounding in relationship. The people who maintained authorship all had someone.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="what-to-trust">
+    <p class="section-label">Section 4</p>
+    <h2>What to Trust</h2>
+    <div class="trust-list">
+      <div class="trust-item"><div class="trust-rating solid"><span>Solid</span></div><div class="trust-body"><strong>The competence illusion</strong><p>Well documented in cognitive science independent of AI. AI amplifying it is a plausible extension.</p></div></div>
+      <div class="trust-item"><div class="trust-rating solid"><span>Solid</span></div><div class="trust-body"><strong>Andy Clark's extended mind</strong><p>Established philosophy of mind. Cognition flowing into tools is not new or contested.</p></div></div>
+      <div class="trust-item"><div class="trust-rating solid"><span>Solid</span></div><div class="trust-body"><strong>Theory of Mind as a human capacity built from observation over time</strong><p>Well-established developmental psychology. AI cannot replicate this from text alone.</p></div></div>
+      <div class="trust-item"><div class="trust-rating plausible"><span>Plausible</span></div><div class="trust-body"><strong>The three shifts framework</strong><p>Conceptually coherent. Grounded in real observations. Not empirically validated. The three-axis structure is Edwards and Edwards, not prior research.</p></div></div>
+      <div class="trust-item"><div class="trust-rating plausible"><span>Plausible</span></div><div class="trust-body"><strong>Same technology, diverging futures</strong><p>Real cases, consistent pattern. But self-selected stories. Causal claims cannot be drawn.</p></div></div>
+      <div class="trust-item"><div class="trust-rating plausible"><span>Plausible</span></div><div class="trust-body"><strong>The five states sequence</strong><p>Observationally grounded. A map from cross-sectional observation, not a proven developmental path.</p></div></div>
+      <div class="trust-item"><div class="trust-rating plausible"><span>Plausible</span></div><div class="trust-body"><strong>Accountability collapse as the mechanism behind authorship loss</strong><p>The Chronicle vs cube comparison is one personal case. Compelling, but one data point.</p></div></div>
+      <div class="trust-item"><div class="trust-rating speculative"><span>Speculative</span></div><div class="trust-body"><strong>The 4% Co-Author figure</strong><p>Only hard number in the book. No methodology described. Treat as indicative, not precise.</p></div></div>
+      <div class="trust-item"><div class="trust-rating speculative"><span>Speculative</span></div><div class="trust-body"><strong>The economy shifting from attention to intimacy</strong><p>Asserted. No evidence cited. A directional claim, not a measured finding.</p></div></div>
+    </div>
+    <div class="verdict"><strong>Overall verdict:</strong> The observational patterns are real and consistent. The frameworks are plausible and useful. The causal claims are not supported by the evidence base. A well-observed map, not a scientific report.</div>
+  </section>
+
+  <section id="apply">
+    <p class="section-label">Section 5</p>
+    <h2>Apply It</h2>
+    <ul class="apply-list">
+      <li><div class="apply-body"><strong>Schedule the humans before you go deep</strong><p>Before starting a major AI work session, name who will review your thinking afterwards. Put it in your calendar. If you know you will have to explain your reasoning to a specific person, you work differently. Do not rely on discipline. Build the checkpoint in before you start. From Ch 1 and 6.</p></div></li>
+      <li><div class="apply-body"><strong>Write down what you want before you open AI</strong><p>One sentence: what am I trying to figure out? At the end, return to it. Did you get there, or did you get what AI gave you and call it good enough? Takes ten seconds. From Ch 1.</p></div></li>
+      <li><div class="apply-body"><strong>Walk someone through your reasoning without the transcript</strong><p>After AI-assisted work, explain what you did and why to someone who was not in the conversation. Do not open the chat. If you can reconstruct the logic, the understanding is yours. From Ch 3 and 7.</p></div></li>
+      <li><div class="apply-body"><strong>Map where AI helps, hurts, and misleads in your domain</strong><p>The lecturer's rule: one third useful, one third not helpful, one third actively wrong. Write your own version before you need it. From Ch 7.</p></div></li>
+      <li><div class="apply-body"><strong>Name the humans who know your mind</strong><p>Write down who has years of watching you think. If you struggle to name them, that is the most important information in the book. From Ch 7.</p></div></li>
+    </ul>
+
+    <h3>Conversations to have</h3>
+    <div class="convo-box"><h4>With someone in the Wake-Up</h4><div class="convo-item"><div class="convo-who">What helps</div><p class="convo-line">"What are you finding? What's surprised you?"</p></div><div class="convo-item"><div class="convo-who">Do not</div><p class="convo-line">Jump to warnings. Be the person who was curious.</p></div></div>
+    <div class="convo-box"><h4>With someone in the Groove</h4><div class="convo-item"><div class="convo-who">What helps</div><p class="convo-line">"Has anything surprised you lately about how AI is affecting your work?"</p></div></div>
+    <div class="convo-box"><h4>With someone whose self-concept is coming from AI</h4><div class="convo-item"><div class="convo-who">What helps</div><p class="convo-line">"That's interesting that AI said that about you. Does it match what other people have told you?"</p></div></div>
+    <div class="convo-box"><h4>With yourself, after any major AI session</h4><div class="convo-item"><div class="convo-who">Three questions</div><p class="convo-line">Did I get what I actually wanted, or what AI gave me? Can I explain my reasoning without the transcript? When did I last do something the slow way, just to know I still could?</p></div></div>
+  </section>
+
+  <section id="stress-test">
+    <p class="section-label">Section 7</p>
+    <h2>Stress Test</h2>
+    <div class="stress-blocks">
+      <div class="stress-block"><h4>Compression</h4><p>The people who thrive with AI stay the authors of their own questions. That requires other humans holding you accountable, not discipline.</p></div>
+      <div class="stress-block"><h4>Translation</h4><p>Edwards' example: she spent hours generating frameworks with AI, felt productive, could not explain any of it to Dave.</p><p><strong>Your version:</strong> the last time you used AI to prepare for a meeting, did you walk in with your own view or with AI's view that you had adopted? If your manager pushed back, could you defend your reasoning without the chat open? That is the same gap. Find one instance from this week.</p></div>
+      <div class="stress-block"><h4>Prediction</h4><p>If this book is right, in two to three years you will see a growing split between professionals who can explain their reasoning and those who cannot. Job interviews, client calls, and performance reviews will increasingly reveal the gap between people who own their thinking and people who lease it. The first generation of workers who built their expertise entirely with AI will start hitting walls when asked to reason without it.</p></div>
+      <div class="stress-block"><h4>Opposition</h4><p>The book assumes cognitive sovereignty is achievable with the right practices. A sharp critic would ask: what if the design of these systems makes authorship structurally impossible at scale? The accountability structures require other people with time and willingness. Most people do not have that.</p><p>The evidence base is self-selected stories from people willing to share. The patterns are real. Whether they are universal is an open question the book does not address. And the single most important finding, the 4% Co-Author figure, has no described methodology. The book's one hard number is also its weakest.</p></div>
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  <p>Analysis of <strong>Stay Human: Authoring Your Mind in the AI Age</strong> by Helen Edwards</p>
+  <p style="margin-top:0.4rem;">Artificiality Institute · 2026 · All chapter content belongs to the original author</p>
+</footer>
+</body>
+</html>

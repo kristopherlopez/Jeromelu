@@ -24,7 +24,7 @@ const NAV_DOTS: NavDot[] = [
   { label: "My Squad", href: "/squad", icon: Users },
   { label: "The Dossier", href: "/dossier", icon: FileText },
   { label: "The Ledger", href: "/ledger", icon: BookOpen },
-  { label: "Ask Me", href: "/feed", icon: MessageCircle },
+  { label: "Ask Me", href: "/ask", icon: MessageCircle },
 ];
 
 // 5 dots spread evenly across a full circle
@@ -146,11 +146,11 @@ export function OrbitalNav() {
                   backgroundColor:
                     isActive || isHovered
                       ? "rgba(245, 130, 32, 0.15)"
-                      : "rgba(255, 255, 255, 0.04)",
+                      : "rgba(255, 255, 255, 0.10)",
                   border:
                     isActive || isHovered
                       ? "1.5px solid rgba(245, 130, 32, 0.5)"
-                      : "1.5px solid rgba(255, 255, 255, 0.08)",
+                      : "1.5px solid rgba(255, 255, 255, 0.18)",
                   boxShadow:
                     isActive
                       ? "0 0 12px rgba(245, 130, 32, 0.3)"
@@ -173,7 +173,7 @@ export function OrbitalNav() {
                     color:
                       isActive || isHovered
                         ? "var(--tigers-orange)"
-                        : "rgba(255, 255, 255, 0.35)",
+                        : "rgba(255, 255, 255, 0.55)",
                     transition: "color 200ms",
                   }}
                 />

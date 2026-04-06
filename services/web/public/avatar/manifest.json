@@ -1,11 +1,41 @@
 {
   "clips": [
     {
-      "id": "breathing-1",
-      "file": "breathing1.mp4",
+      "id": "idle-1-1",
+      "file": "clips/idle-1-1.mp4",
       "category": "idle",
       "mood": "neutral",
       "duration_ms": 5000,
+      "loop": true,
+      "transitions_to": [],
+      "priority": 0
+    },
+    {
+      "id": "idle-1-2",
+      "file": "clips/idle-1-2.mp4",
+      "category": "idle",
+      "mood": "neutral",
+      "duration_ms": 5000,
+      "loop": true,
+      "transitions_to": [],
+      "priority": 0
+    },
+    {
+      "id": "idle-1",
+      "file": "clips/idle-1.mp4",
+      "category": "idle",
+      "mood": "neutral",
+      "duration_ms": 4000,
+      "loop": true,
+      "transitions_to": [],
+      "priority": 0
+    },
+    {
+      "id": "idle-1b",
+      "file": "clips/idle-1b.mp4",
+      "category": "idle",
+      "mood": "neutral",
+      "duration_ms": 4000,
       "loop": true,
       "transitions_to": [],
       "priority": 0

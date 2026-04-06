@@ -12,9 +12,9 @@ export function JeromeluAvatar({ size = 140, clipSrc }: JeromeluAvatarProps) {
   const videoARef = useRef<HTMLVideoElement>(null);
   const videoBRef = useRef<HTMLVideoElement>(null);
   const [activeVideo, setActiveVideo] = useState<"a" | "b">("a");
-  const currentSrcRef = useRef<string>(clipSrc || "/avatar/breathing1.mp4");
+  const currentSrcRef = useRef<string>(clipSrc || "/avatar/clips/idle-1-1.mp4");
 
-  const src = clipSrc || "/avatar/breathing1.mp4";
+  const src = clipSrc || "/avatar/clips/idle-1-1.mp4";
 
   // Crossfade when clipSrc changes
   useEffect(() => {

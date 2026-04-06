@@ -91,9 +91,10 @@ Internal only:
 
 ### entities
 - entity_id
-- entity_type (player, team, expert, matchup)
+- entity_type (player, team, expert, advisor, matchup, round)
 - canonical_name
 - aliases
+- slug
 - metadata_json
 
 ### quotes
@@ -235,5 +236,29 @@ Internal only:
 - correct_predictions
 - alignment_pct
 - updated_at
+
+### wiki_pages
+- page_id
+- entity_id (FK → entities)
+- page_type (player, team, advisor, round)
+- slug (unique, URL-safe)
+- title
+- content (markdown with `[[slug]]` wiki-links)
+- summary
+- metadata_json
+- status (stub, draft, published)
+- created_at
+- updated_at
+
+### wiki_revisions
+- revision_id
+- page_id (FK → wiki_pages)
+- section_heading
+- summary (agent-written change description)
+- content_snapshot
+- source_trigger
+- source_id (FK → sources)
+- metadata_json
+- created_at
 
 This schema is enough for V1 and does not overcomplicate things.

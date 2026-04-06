@@ -94,7 +94,7 @@ export function AvatarEngineProvider({ children }: { children: ReactNode }) {
   const [manifest, setManifest] = useState<Manifest | null>(null);
   const [state, setState] = useState<AvatarState>({
     currentClip: null,
-    clipSrc: "/avatar/breathing1.mp4",
+    clipSrc: "/avatar/clips/idle-1-1.mp4",
     isTransitioning: false,
   });
 

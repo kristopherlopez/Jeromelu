@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useIsWiki } from "../wiki/useIsWiki";
 import { ConnectedAvatar } from "./ConnectedAvatar";
 import { useAvatarEngine } from "./AvatarEngine";
 import JeromeluLogo from "./JeromeluLogo";
@@ -27,9 +28,9 @@ interface NavBubble {
 const NAV_BUBBLES: NavBubble[] = [
   { label: "The Feed", href: "/feed", icon: Activity },
   { label: "My Squad", href: "/squad", icon: Users },
-  { label: "The Dossier", href: "/dossier", icon: FileText },
+  { label: "The Wiki", href: "/wiki", icon: FileText },
   { label: "The Ledger", href: "/ledger", icon: BookOpen },
-  { label: "Ask Me", href: "/feed", icon: MessageCircle },
+  { label: "Ask Me", href: "/ask", icon: MessageCircle },
 ];
 
 // Hero: upper arc (landing — text below needs clearance)
@@ -58,9 +59,49 @@ function toRad(deg: number) {
   return (deg * Math.PI) / 180;
 }
 
+// Theme colours — swap for wiki (light) pages
+const DARK_THEME = {
+  bubbleBg: "rgba(255,255,255,0.10)",
+  bubbleBorder: "rgba(255,255,255,0.18)",
+  bubbleBgActive: "rgba(245,130,32,0.12)",
+  bubbleBorderActive: "rgba(245,130,32,0.5)",
+  bubbleIcon: "rgba(255,255,255,0.55)",
+  bubbleIconActive: "var(--tigers-orange)",
+  bubbleShadowActive: "0 0 16px rgba(245,130,32,0.25)",
+  bubbleShadowHover: "0 0 8px rgba(245,130,32,0.2)",
+  connectorDefault: "rgba(255,255,255,0.08)",
+  connectorHover: "rgba(245,130,32,0.35)",
+  connectorGlow: "rgba(245,130,32,0.8)",
+  tooltipBg: "rgba(245,130,32,0.12)",
+  tooltipBorder: "rgba(245,130,32,0.2)",
+  tooltipColor: "var(--tigers-orange)",
+  onlineText: "rgb(113,113,122)",
+  fadedOpacity: 0.6,
+};
+
+const LIGHT_THEME = {
+  bubbleBg: "rgba(28,26,20,0.10)",
+  bubbleBorder: "rgba(28,26,20,0.25)",
+  bubbleBgActive: "rgba(120,60,30,0.14)",
+  bubbleBorderActive: "rgba(120,60,30,0.50)",
+  bubbleIcon: "rgba(28,26,20,0.55)",
+  bubbleIconActive: "#8b4513",
+  bubbleShadowActive: "0 2px 8px rgba(28,26,20,0.20), 0 0 0 1px rgba(28,26,20,0.08)",
+  bubbleShadowHover: "0 1px 4px rgba(28,26,20,0.15)",
+  connectorDefault: "rgba(28,26,20,0.18)",
+  connectorHover: "rgba(120,60,30,0.45)",
+  connectorGlow: "rgba(120,60,30,0.70)",
+  tooltipBg: "rgba(28,26,20,0.08)",
+  tooltipBorder: "rgba(28,26,20,0.18)",
+  tooltipColor: "#5c4030",
+  onlineText: "#7a7060",
+  fadedOpacity: 0.5,
+};
+
 export function JeromeluPresence() {
   const pathname = usePathname();
   const router = useRouter();
+  const isWiki = useIsWiki();
   const { triggerClip } = useAvatarEngine();
   const { isTransitioning } = usePageTransition();
   const isHome = pathname === "/";
@@ -69,6 +110,8 @@ export function JeromeluPresence() {
 
   // Hide presence on admin and stream pages
   if (isAdmin || isStream) return null;
+
+  const theme = isWiki ? LIGHT_THEME : DARK_THEME;
 
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [clusterHovered, setClusterHovered] = useState(false);
@@ -245,10 +288,10 @@ export function JeromeluPresence() {
     <div
       className="fixed z-50 pointer-events-none"
       style={{
-        top: "50%",
-        left: isHome ? "50%" : "calc((100vw - 48rem) / 4)",
-        transform: "translate(-50%, -50%)",
-        transition: `left ${T}`,
+        top: isHome ? "50%" : "32px",
+        left: isHome ? "50%" : "32px",
+        transform: isHome ? "translate(-50%, -50%)" : "none",
+        transition: `top ${T}, left ${T}, transform ${T}`,
       }}
     >
       {/* Cluster container */}
@@ -273,8 +316,12 @@ export function JeromeluPresence() {
             top: center - avatarSize / 2,
             transition: `left ${T}, top ${T}, box-shadow 300ms ease`,
             boxShadow: avatarGlow
-              ? "0 0 24px 8px rgba(245, 130, 32, 0.4), 0 0 48px 16px rgba(245, 130, 32, 0.15)"
-              : "none",
+              ? isWiki
+                ? "0 2px 12px rgba(28,26,20,0.25), 0 0 0 2px rgba(28,26,20,0.12)"
+                : "0 0 24px 8px rgba(245, 130, 32, 0.4), 0 0 48px 16px rgba(245, 130, 32, 0.15)"
+              : isWiki
+                ? "0 1px 6px rgba(28,26,20,0.15), 0 0 0 1.5px rgba(28,26,20,0.10)"
+                : "none",
           }}
           onClick={() => !isHome && router.push("/")}
           aria-label="Home"
@@ -295,10 +342,10 @@ export function JeromeluPresence() {
             }}
           >
             <span className="relative flex h-1.5 w-1.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--tigers-orange)] opacity-75" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--tigers-orange)]" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75" style={{ backgroundColor: isWiki ? "#5c4030" : "var(--tigers-orange)" }} />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full" style={{ backgroundColor: isWiki ? "#5c4030" : "var(--tigers-orange)" }} />
             </span>
-            <span className="text-zinc-500 whitespace-nowrap">online</span>
+            <span className="whitespace-nowrap" style={{ color: theme.onlineText }}>online</span>
           </div>
         )}
 
@@ -325,14 +372,14 @@ export function JeromeluPresence() {
                   height: dotSz,
                   backgroundColor:
                     isHoverGlowing || isGlowing
-                      ? "rgba(245, 130, 32, 0.8)"
+                      ? theme.connectorGlow
                       : hoveredIndex === i
-                        ? "rgba(245, 130, 32, 0.35)"
-                        : "rgba(255, 255, 255, 0.08)",
+                        ? theme.connectorHover
+                        : theme.connectorDefault,
                   boxShadow: isHoverGlowing
-                    ? "0 0 12px rgba(245, 130, 32, 0.7)"
+                    ? `0 0 12px ${theme.connectorGlow}`
                     : isGlowing
-                      ? "0 0 8px rgba(245, 130, 32, 0.5)"
+                      ? `0 0 8px ${theme.connectorGlow}`
                       : "none",
                   opacity: isHome && isConnVisible ? 1 : 0,
                   transform: isConnVisible
@@ -408,16 +455,16 @@ export function JeromeluPresence() {
                   height: dotSize,
                   backgroundColor:
                     isActive || isHovered || isBubbleGlowing
-                      ? "rgba(245, 130, 32, 0.12)"
-                      : "rgba(255, 255, 255, 0.04)",
+                      ? theme.bubbleBgActive
+                      : theme.bubbleBg,
                   border:
                     isActive || isHovered || isBubbleGlowing
-                      ? "1.5px solid rgba(245, 130, 32, 0.5)"
-                      : "1.5px solid rgba(255, 255, 255, 0.08)",
+                      ? `1.5px solid ${theme.bubbleBorderActive}`
+                      : `1.5px solid ${theme.bubbleBorder}`,
                   boxShadow: isActive || isBubbleGlowing
-                    ? "0 0 16px rgba(245, 130, 32, 0.25)"
+                    ? theme.bubbleShadowActive
                     : isHovered
-                      ? "0 0 8px rgba(245, 130, 32, 0.2)"
+                      ? theme.bubbleShadowHover
                       : "none",
                   transform: isVisible
                     ? isHovered
@@ -426,7 +473,7 @@ export function JeromeluPresence() {
                     : "scale(0)",
                   opacity: isVisible
                     ? !isHome && !clusterHovered && !isActive
-                      ? 0.6
+                      ? theme.fadedOpacity
                       : 1
                     : 0,
                   animation:
@@ -445,8 +492,8 @@ export function JeromeluPresence() {
                   style={{
                     color:
                       isActive || isHovered || isBubbleGlowing
-                        ? "var(--tigers-orange)"
-                        : "rgba(255, 255, 255, 0.35)",
+                        ? theme.bubbleIconActive
+                        : theme.bubbleIcon,
                     transition: "color 300ms",
                   }}
                 />
@@ -460,9 +507,9 @@ export function JeromeluPresence() {
                     left: tooltipX,
                     top: tooltipY,
                     transform: tooltipTransform,
-                    backgroundColor: "rgba(245, 130, 32, 0.12)",
-                    color: "var(--tigers-orange)",
-                    border: "1px solid rgba(245, 130, 32, 0.2)",
+                    backgroundColor: theme.tooltipBg,
+                    color: theme.tooltipColor,
+                    border: `1px solid ${theme.tooltipBorder}`,
                   }}
                 >
                   {bubble.label}

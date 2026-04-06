@@ -66,10 +66,39 @@ body {
   scrollbar-color: rgba(0, 0, 0, 0.12) transparent;
 }
 
-/* Thought bubble float animation */
+/* ── Wiki typography & component tokens ── */
+.wiki-prose {
+  --wiki-serif: var(--font-serif), Georgia, serif;
+  --wiki-surface: rgba(255, 255, 255, 0.03);
+  --wiki-border: rgba(255, 255, 255, 0.08);
+  --wiki-ink: #ededed;
+  --wiki-ink-muted: #a1a1aa;
+  --wiki-ink-faint: #71717a;
+  /* Domain-color palette (dark-mode adapted from stay-human) */
+  --wiki-teal: #34d399;
+  --wiki-teal-bg: rgba(52, 211, 153, 0.08);
+  --wiki-amber: #fbbf24;
+  --wiki-amber-bg: rgba(251, 191, 36, 0.08);
+  --wiki-purple: #a78bfa;
+  --wiki-purple-bg: rgba(167, 139, 250, 0.08);
+  --wiki-green: #4ade80;
+  --wiki-green-bg: rgba(74, 222, 128, 0.08);
+  --wiki-red: #f87171;
+  --wiki-red-bg: rgba(248, 113, 113, 0.08);
+}
+
+/* Thought bubble float + breathing glow animation */
 @keyframes thought-float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-3px); }
+  0%, 100% {
+    transform: translateY(0px);
+    box-shadow: 0 0 0px rgba(245, 130, 32, 0);
+    border-color: rgba(255, 255, 255, 0.18);
+  }
+  50% {
+    transform: translateY(-3px);
+    box-shadow: 0 0 12px rgba(245, 130, 32, 0.15);
+    border-color: rgba(245, 130, 32, 0.2);
+  }
 }
 
 /* Crew status pill pulse */

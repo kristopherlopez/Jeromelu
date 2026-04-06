@@ -18,19 +18,19 @@ This document covers the end-to-end workflow: generating clips, preparing them f
                    │ raw clips
                    ▼
 ┌─────────────────────────────────────────────────┐
-│            scripts/trim_clip.py                  │
+│            scripts/video/trim_clip.py                  │
 │     crop · scale · compress · strip audio        │
 └──────────────────┬──────────────────────────────┘
                    │ web-ready clips
                    ▼
 ┌─────────────────────────────────────────────────┐
-│     services/web/public/avatar/*.mp4             │
+│     services/web/public/avatar/clips/*.mp4        │
 │     services/web/public/avatar/manifest.json     │
 └──────────────────┬──────────────────────────────┘
                    │ manifest + clips
                    ▼
 ┌─────────────────────────────────────────────────┐
-│       scripts/match_clip_frames.py               │
+│       scripts/video/match_clip_frames.py               │
 │   extract boundary frames · compute similarity   │
 │   auto-populate transitions_to in manifest       │
 └──────────────────┬──────────────────────────────┘
@@ -420,13 +420,13 @@ Use the trim script to crop, scale, compress, and strip audio (for non-talking c
 
 ```bash
 # Basic — auto-crop to square, scale to 400x400, compress
-python scripts/trim_clip.py assets/raw_clip.mp4 --out services/web/public/avatar/idle-2.mp4
+python scripts/video/trim_clip.py assets/raw_clip.mp4 --out services/web/public/avatar/clips/idle-2.mp4
 
 # With trimming — cut to specific time range
-python scripts/trim_clip.py assets/raw_clip.mp4 --start 0.3 --end 3.8 --out services/web/public/avatar/confident-1.mp4
+python scripts/video/trim_clip.py assets/raw_clip.mp4 --start 0.3 --end 3.8 --out services/web/public/avatar/clips/confident-1.mp4
 
 # Custom size or quality
-python scripts/trim_clip.py assets/raw_clip.mp4 --out ... --size 600 --crf 24
+python scripts/video/trim_clip.py assets/raw_clip.mp4 --out ... --size 600 --crf 24
 ```
 
 ### What it does
@@ -477,7 +477,7 @@ Add an entry to `services/web/public/avatar/manifest.json` for each new clip.
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | string | Unique identifier. Convention: `{category}-{variant}` or `{mood}-{variant}` |
-| `file` | string | Filename in `public/avatar/` |
+| `file` | string | Path relative to `public/avatar/` (e.g. `clips/idle-1.mp4`) |
 | `category` | string | `idle`, `reaction`, `directional`, `micro`, or `talking` |
 | `mood` | string | Emotional state: `neutral`, `confident`, `annoyed`, `glance-left`, etc. |
 | `duration_ms` | number | Clip length in milliseconds |
@@ -514,7 +514,7 @@ Run the frame matching script to automatically populate `transitions_to` based o
 ### Usage
 
 ```bash
-python scripts/match_clip_frames.py
+python scripts/video/match_clip_frames.py
 ```
 
 ### What it does
@@ -617,29 +617,27 @@ triggerClip("reaction", "confident");
 ## Quick Reference: Full Workflow
 
 ```bash
-# 1. Generate clip in Kling (external)
+# 1. Generate clip via Replicate Kling v3 API
+#    (generates → downloads → post-processes → updates manifest)
+python scripts/video/generate_clip.py confident-1 \
+  --prompt "Living portrait, person develops a subtle confident smirk..." \
+  --start-image assets/avatar/reference.png \
+  --category reaction --mood confident
 
-# 2. Trim and compress
-python scripts/trim_clip.py assets/new_clip.mp4 \
-  --out services/web/public/avatar/confident-1.mp4
+# With end frame guidance (avatar returns to same pose):
+python scripts/video/generate_clip.py idle-2 \
+  --prompt "Living portrait, natural idle animation..." \
+  --start-image assets/avatar/reference.png \
+  --end-image assets/avatar/reference.png
 
-# 3. Add to manifest.json
-# Edit services/web/public/avatar/manifest.json:
-# {
-#   "id": "confident-1",
-#   "file": "confident-1.mp4",
-#   "category": "reaction",
-#   "mood": "confident",
-#   "duration_ms": 4000,
-#   "loop": false,
-#   "transitions_to": [],
-#   "priority": 10
-# }
+# 1b. Manual alternative: trim and compress a raw clip
+python scripts/video/trim_clip.py assets/new_clip.mp4 \
+  --out services/web/public/avatar/clips/confident-1.mp4
 
-# 4. Auto-detect transitions
-python scripts/match_clip_frames.py
+# 2. Auto-detect transitions
+python scripts/video/match_clip_frames.py
 
-# 5. Review manifest, test in browser
+# 3. Review manifest, test in browser
 # The frontend picks it up immediately — no rebuild needed
 # (manifest.json is served as a static file)
 ```
@@ -650,12 +648,14 @@ python scripts/match_clip_frames.py
 
 | File | Purpose |
 |------|---------|
-| `services/web/public/avatar/*.mp4` | Processed clip files |
+| `services/web/public/avatar/clips/*.mp4` | Processed clip files |
+| `services/web/public/avatar/prompts/*.md` | Kling prompts per clip (source of truth) |
 | `services/web/public/avatar/manifest.json` | Clip metadata and transition graph |
 | `services/web/public/avatar/frames/` | Extracted boundary frames (auto-generated) |
 | `services/web/src/app/components/AvatarEngine.tsx` | Sequencing state machine |
 | `services/web/src/app/components/JeromeluAvatar.tsx` | Video player with crossfade |
 | `services/web/src/app/components/ConnectedAvatar.tsx` | Connects avatar to engine |
-| `scripts/trim_clip.py` | Clip preparation script |
-| `scripts/match_clip_frames.py` | Frame matching script |
+| `scripts/video/generate_clip.py` | Kling v3 clip generation via Replicate API |
+| `scripts/video/trim_clip.py` | Clip preparation script |
+| `scripts/video/match_clip_frames.py` | Frame matching script |
 | `docs/avatar-system.md` | High-level avatar system design |

@@ -139,11 +139,12 @@ class Entity(Base):
     entity_type: Mapped[str] = mapped_column(Text, nullable=False)
     canonical_name: Mapped[str] = mapped_column(Text, nullable=False)
     aliases: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
+    slug: Mapped[str | None] = mapped_column(Text)
     metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
     __table_args__ = (
-        CheckConstraint("entity_type IN ('player', 'team', 'expert', 'matchup')", name="ck_entity_type"),
+        CheckConstraint("entity_type IN ('player', 'team', 'expert', 'advisor', 'matchup', 'round')", name="ck_entity_type"),
         Index("idx_entities_type", "entity_type"),
         Index("idx_entities_name", "canonical_name"),
     )
@@ -477,6 +478,55 @@ class KnowledgeBase(Base):
         Index("idx_kb_type", "kb_type"),
         Index("idx_kb_entity", "subject_entity_id"),
         Index("idx_kb_round_season", "effective_round", "season"),
+    )
+
+
+class WikiPage(Base):
+    __tablename__ = "wiki_pages"
+
+    page_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    entity_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("entities.entity_id"), nullable=False)
+    page_type: Mapped[str] = mapped_column(Text, nullable=False)
+    slug: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    summary: Mapped[str | None] = mapped_column(Text)
+    metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="stub")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    revisions: Mapped[list["WikiRevision"]] = relationship(back_populates="page", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        CheckConstraint("page_type IN ('player', 'team', 'advisor', 'round')", name="ck_wiki_page_type"),
+        CheckConstraint("status IN ('stub', 'draft', 'published')", name="ck_wiki_status"),
+        Index("idx_wiki_pages_type", "page_type"),
+        Index("idx_wiki_pages_slug", "slug"),
+        Index("idx_wiki_pages_entity", "entity_id"),
+        Index("idx_wiki_pages_updated", "updated_at"),
+        Index("idx_wiki_pages_status", "status"),
+    )
+
+
+class WikiRevision(Base):
+    __tablename__ = "wiki_revisions"
+
+    revision_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    page_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("wiki_pages.page_id", ondelete="CASCADE"), nullable=False)
+    section_heading: Mapped[str | None] = mapped_column(Text)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    content_snapshot: Mapped[str | None] = mapped_column(Text)
+    source_trigger: Mapped[str | None] = mapped_column(Text)
+    source_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("sources.source_id"))
+    metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+    page: Mapped["WikiPage"] = relationship(back_populates="revisions")
+
+    __table_args__ = (
+        Index("idx_wiki_revisions_page", "page_id", "created_at"),
+        Index("idx_wiki_revisions_created", "created_at"),
     )
 
 
