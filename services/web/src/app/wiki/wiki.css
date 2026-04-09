@@ -4,64 +4,137 @@
    ═══════════════════════════════════════════════════════ */
 
 .wiki-page {
+  /* Box variant style — options: top-rule, bottom-rule, pull-quote, inline-mark */
+  /* Change this one value to switch all box styles globally */
+
   --wiki-serif: var(--font-serif), Georgia, serif;
-  --wiki-bg: #e8e3d9;
-  --wiki-surface: #f0ebe2;
-  --wiki-border: rgba(28,26,20,0.12);
-  --wiki-border-strong: rgba(28,26,20,0.18);
+}
+
+/* ── Light theme (default for wiki/feed) ── */
+.wiki-page[data-theme="light"] {
+  --wiki-bg: #FAF9F5;
+  --wiki-surface: #FFFFFF;
+  --wiki-border: rgba(28,26,20,0.08);
+  --wiki-border-strong: rgba(28,26,20,0.14);
   --wiki-ink: #1c1a14;
   --wiki-ink-muted: #5c5848;
   --wiki-ink-faint: #9c9484;
   --wiki-teal: #2d7d6b;
-  --wiki-teal-bg: #d4ede8;
+  --wiki-teal-bg: #e8f5f0;
   --wiki-amber: #8a6a20;
-  --wiki-amber-bg: #f0e5c8;
+  --wiki-amber-bg: #f5ecd4;
   --wiki-purple: #5a3d8a;
-  --wiki-purple-bg: #e8e0f5;
+  --wiki-purple-bg: #f0eaf8;
   --wiki-green: #2d6040;
-  --wiki-green-bg: #d4ead8;
+  --wiki-green-bg: #e4f2e6;
   --wiki-red: #9a2020;
-  --wiki-red-bg: #f5dada;
+  --wiki-red-bg: #fae0e0;
   --wiki-accent: #b85c38;
-  --wiki-accent-bg: #f0ddd5;
+  --wiki-accent-bg: #FFF0E8;
 }
 
-/* ── Sticky section nav ── */
+/* ── Dark theme (Warm Earth) ── */
+.wiki-page[data-theme="dark"] {
+  --wiki-bg: var(--background);
+  --wiki-surface: var(--surface);
+  --wiki-border: var(--border);
+  --wiki-border-strong: var(--border-subtle);
+  --wiki-ink: var(--foreground);
+  --wiki-ink-muted: var(--foreground-secondary);
+  --wiki-ink-faint: var(--foreground-muted);
+  --wiki-teal: var(--teal);
+  --wiki-teal-bg: var(--teal-bg);
+  --wiki-amber: var(--ochre);
+  --wiki-amber-bg: var(--ochre-bg);
+  --wiki-purple: var(--lilac);
+  --wiki-purple-bg: var(--lilac-bg);
+  --wiki-green: var(--teal);
+  --wiki-green-bg: var(--teal-bg);
+  --wiki-red: var(--red);
+  --wiki-red-bg: var(--red-bg);
+  --wiki-accent: var(--accent);
+  --wiki-accent-bg: var(--accent-bg);
+}
+
+/* ── Sticky nav bar (breadcrumb + section anchors) ── */
+.wiki-page[data-theme="light"] { --wiki-nav-bg: rgba(250,249,245,0.93); }
+.wiki-page[data-theme="dark"] { --wiki-nav-bg: rgba(42,36,32,0.93); }
 .wiki-nav {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(232,227,217,0.93);
+  background: var(--wiki-nav-bg, rgba(250,249,245,0.93));
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--wiki-border);
   padding: 0 2rem;
   display: flex;
-  overflow-x: auto;
+  align-items: center;
   white-space: nowrap;
   scrollbar-width: none;
+  gap: 0;
 }
 .wiki-nav::-webkit-scrollbar { display: none; }
-.wiki-nav a {
+
+/* Shared nav link style — same visual language across the bar */
+.wiki-nav-link,
+.wiki-nav-sections a {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--wiki-ink-faint);
   text-decoration: none;
-  padding: 0.85rem 0.9rem;
+  padding: 0.85rem 0.5rem;
   border-bottom: 2px solid transparent;
   transition: color 0.2s, border-color 0.2s;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
 }
-.wiki-nav a:hover {
+.wiki-nav-link:hover,
+.wiki-nav-sections a:hover {
   color: var(--wiki-accent);
   border-bottom-color: var(--wiki-accent);
 }
 
+/* Back breadcrumb (left side) */
+.wiki-nav-back {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.wiki-nav-icon {
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+.wiki-nav-sep {
+  font-size: 11px;
+  color: var(--wiki-ink-faint);
+  opacity: 0.35;
+  padding: 0 0.15rem;
+  align-self: center;
+}
+
+/* Section anchors (right side, scroll if needed) */
+.wiki-nav-sections {
+  display: flex;
+  align-items: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-left: auto;
+  /* Inline divider: short vertical bar, not full height */
+  border-left: 1px solid var(--wiki-border);
+  margin-left: auto;
+  padding-left: 0.25rem;
+}
+.wiki-nav-sections::-webkit-scrollbar { display: none; }
+.wiki-nav-sections a { padding: 0.85rem 0.75rem; }
+
 /* ── Wiki page offset to clear avatar/sidebar on desktop ── */
 @media (min-width: 1024px) {
   .wiki-page {
-    padding-left: 240px;
+    padding-left: 300px;
   }
 }
 
@@ -232,51 +305,112 @@
   color: var(--wiki-ink-faint);
 }
 
-/* ── Callout box (agent's strong take) ── */
-.wiki-callout {
-  background: var(--wiki-accent-bg);
-  border-left: 3px solid var(--wiki-accent);
-  padding: 1.25rem 1.5rem;
+/* ══════════════════════════════════════════════════════
+   Box variants — controlled by --wiki-box-style
+   Options: top-rule (default), bottom-rule, pull-quote, inline-mark
+   Change the variable in .wiki-page to switch globally.
+   ══════════════════════════════════════════════════════ */
+
+/* ── Base: shared by all box types ── */
+.wiki-callout,
+.wiki-mechanism,
+.wiki-verdict,
+.wiki-warning {
   margin: 1.5rem 0;
-  font-size: 15px;
-  color: var(--wiki-ink);
   line-height: 1.65;
 }
-
-/* ── Mechanism box (factual context) ── */
-.wiki-mechanism {
-  background: var(--wiki-surface);
-  border: 1px solid var(--wiki-border);
-  border-left: 3px solid var(--wiki-teal);
-  padding: 1.25rem 1.5rem;
-  margin: 1.5rem 0;
-  font-size: 14px;
-  color: var(--wiki-ink-muted);
-  line-height: 1.65;
-}
-.wiki-mechanism strong { color: var(--wiki-ink); font-weight: 600; }
-
-/* ── Verdict box ── */
-.wiki-verdict {
-  background: var(--wiki-surface);
-  border: 1px solid var(--wiki-border);
-  border-left: 3px solid var(--wiki-amber);
-  padding: 1rem 1.4rem;
-  margin: 1.5rem 0;
-  font-size: 14px;
-  color: var(--wiki-ink-muted);
-}
+.wiki-callout { --box-color: var(--wiki-accent); --box-bg: var(--wiki-accent-bg); font-size: 15px; color: var(--wiki-ink); }
+.wiki-mechanism { --box-color: var(--wiki-teal); --box-bg: var(--wiki-teal-bg); font-size: 14px; color: var(--wiki-ink-muted); }
+.wiki-verdict { --box-color: var(--wiki-amber); --box-bg: var(--wiki-amber-bg); font-size: 14px; color: var(--wiki-ink-muted); }
+.wiki-warning { --box-color: var(--wiki-red); --box-bg: var(--wiki-red-bg); font-size: 14px; color: var(--wiki-ink); }
+.wiki-mechanism strong,
 .wiki-verdict strong { color: var(--wiki-ink); font-weight: 600; }
 
-/* ── Warning box ── */
-.wiki-warning {
-  background: var(--wiki-red-bg);
-  border-left: 3px solid var(--wiki-red);
-  padding: 1.25rem 1.5rem;
-  margin: 1.5rem 0;
-  font-size: 14px;
-  color: var(--wiki-ink);
-  line-height: 1.65;
+/* ── Style: top-rule (default) ── */
+.wiki-page:not([data-box-style]),
+.wiki-page[data-box-style="top-rule"] {
+  & .wiki-callout,
+  & .wiki-mechanism,
+  & .wiki-verdict,
+  & .wiki-warning {
+    padding: 0;
+    background: none;
+    border: none;
+    padding-top: 0.65rem;
+    border-top: 2px solid var(--box-color);
+    max-width: max-content;
+  }
+  & .wiki-callout { border-top-width: 2px; max-width: none; }
+}
+
+/* ── Style: bottom-rule ── */
+.wiki-page[data-box-style="bottom-rule"] {
+  & .wiki-callout,
+  & .wiki-mechanism,
+  & .wiki-verdict,
+  & .wiki-warning {
+    padding: 0.75rem 0;
+    background: none;
+    border: none;
+    border-bottom: 2px solid var(--box-color);
+  }
+}
+
+/* ── Style: pull-quote ── */
+.wiki-page[data-box-style="pull-quote"] {
+  & .wiki-callout,
+  & .wiki-mechanism,
+  & .wiki-verdict,
+  & .wiki-warning {
+    padding: 0 0 0 2.5rem;
+    background: none;
+    border: none;
+    position: relative;
+  }
+  & .wiki-callout::before,
+  & .wiki-mechanism::before,
+  & .wiki-verdict::before,
+  & .wiki-warning::before {
+    position: absolute;
+    left: 0;
+    top: -0.15rem;
+    font-family: var(--wiki-serif);
+    font-weight: 600;
+    line-height: 1;
+  }
+  & .wiki-callout::before { content: "\201C"; font-size: 2.8rem; color: var(--wiki-accent); }
+  & .wiki-mechanism::before { content: "\2727"; font-size: 2rem; color: var(--wiki-teal); }
+  & .wiki-verdict::before { content: "\2014"; font-size: 2rem; color: var(--wiki-amber); top: 0; }
+  & .wiki-warning::before { content: "\25B2"; font-size: 1.4rem; color: var(--wiki-red); top: 0.15rem; }
+}
+
+/* ── Style: inline-mark ── */
+.wiki-page[data-box-style="inline-mark"] {
+  & .wiki-callout,
+  & .wiki-mechanism,
+  & .wiki-verdict,
+  & .wiki-warning {
+    padding: 0 0 0 1.25rem;
+    background: none;
+    border: none;
+    position: relative;
+  }
+  & .wiki-callout::before,
+  & .wiki-mechanism::before,
+  & .wiki-verdict::before,
+  & .wiki-warning::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.35rem;
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+  }
+  & .wiki-callout::before { background: var(--wiki-accent); }
+  & .wiki-mechanism::before { background: var(--wiki-teal); }
+  & .wiki-verdict::before { background: var(--wiki-amber); }
+  & .wiki-warning::before { background: var(--wiki-red); }
 }
 
 /* ── Tags ── */
@@ -499,20 +633,6 @@
   margin-top: 0.3rem;
 }
 
-/* ── Breadcrumb ── */
-.wiki-breadcrumb {
-  max-width: 820px;
-  margin: 0 auto;
-  padding: 2rem 2rem 0;
-  font-size: 13px;
-  color: var(--wiki-ink-faint);
-}
-.wiki-breadcrumb a {
-  color: var(--wiki-ink-faint);
-  text-decoration: none;
-}
-.wiki-breadcrumb a:hover { color: var(--wiki-accent); }
-
 /* ── Animations ── */
 @keyframes wikiFadeUp {
   from { opacity: 0; transform: translateY(14px); }
@@ -520,3 +640,30 @@
 }
 .wiki-hero { animation: wikiFadeUp 0.6s ease both; }
 .wiki-content section { animation: wikiFadeUp 0.4s ease both; animation-delay: 0.08s; }
+
+/* ═══════════════════════════════════════════════════════
+   Dark theme override
+   Must live in the same stylesheet as the light defaults
+   so cascade order is guaranteed.
+   ═══════════════════════════════════════════════════════ */
+[data-theme="dark"].wiki-page {
+  --wiki-bg: var(--background);
+  --wiki-surface: var(--surface);
+  --wiki-border: var(--border);
+  --wiki-border-strong: var(--border-subtle);
+  --wiki-ink: var(--foreground);
+  --wiki-ink-muted: var(--foreground-secondary);
+  --wiki-ink-faint: var(--foreground-muted);
+  --wiki-accent: var(--accent);
+  --wiki-accent-bg: var(--accent-bg);
+  --wiki-teal: var(--teal);
+  --wiki-teal-bg: var(--teal-bg);
+  --wiki-amber: var(--ochre);
+  --wiki-amber-bg: var(--ochre-bg);
+  --wiki-purple: var(--lilac);
+  --wiki-purple-bg: var(--lilac-bg);
+  --wiki-green: var(--teal);
+  --wiki-green-bg: var(--teal-bg);
+  --wiki-red: var(--red);
+  --wiki-red-bg: var(--red-bg);
+}

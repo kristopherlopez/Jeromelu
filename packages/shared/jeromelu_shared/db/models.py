@@ -472,7 +472,9 @@ class KnowledgeBase(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "kb_type IN ('player_summary', 'round_brief', 'decision', 'opinion', 'source_digest')",
+            "kb_type IN ('player_summary', 'round_brief', 'decision', 'opinion', 'source_digest', "
+            "'article_tips', 'article_totw', 'article_trades', "
+            "'article_captains', 'article_stocks', 'article_consensus')",
             name="ck_kb_type",
         ),
         Index("idx_kb_type", "kb_type"),

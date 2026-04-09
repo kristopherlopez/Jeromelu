@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { AvatarEngineProvider } from "./AvatarEngine";
 import { JeromeluPresence } from "./JeromeluPresence";
+import { ThemeProvider, useTheme } from "./ThemeContext";
 import { TransitionProvider, CONTENT_DELAY_MS, CONTENT_FADE_MS } from "./TransitionContext";
 
 function PageContent({ children }: { children: ReactNode }) {
@@ -15,8 +16,8 @@ function PageContent({ children }: { children: ReactNode }) {
 
   // Detect route change synchronously during render — no flash
   if (prevPathnameRef.current !== pathname) {
-    const wasHome = prevPathnameRef.current === "/";
-    const nowHome = pathname === "/";
+    const wasHome = prevPathnameRef.current === "/landing";
+    const nowHome = pathname === "/landing";
     prevPathnameRef.current = pathname;
     if (wasHome !== nowHome) {
       phaseRef.current = "hidden";
@@ -44,8 +45,20 @@ function PageContent({ children }: { children: ReactNode }) {
       ? `opacity ${CONTENT_FADE_MS}ms ease-in`
       : "none";
 
+  const { isLight } = useTheme();
+
   return (
-    <div style={{ opacity, transition }}>
+    <div
+      className="wiki-page"
+      data-theme={isLight ? "light" : "dark"}
+      style={{
+        opacity,
+        transition,
+        minHeight: "100vh",
+        backgroundColor: isLight ? "var(--wiki-bg, #FAF9F5)" : "var(--background)",
+        color: isLight ? "var(--wiki-ink, #1c1a14)" : "var(--foreground)",
+      }}
+    >
       {children}
     </div>
   );
@@ -53,11 +66,13 @@ function PageContent({ children }: { children: ReactNode }) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
-    <AvatarEngineProvider>
-      <TransitionProvider>
-        <JeromeluPresence />
-        <PageContent>{children}</PageContent>
-      </TransitionProvider>
-    </AvatarEngineProvider>
+    <ThemeProvider>
+      <AvatarEngineProvider>
+        <TransitionProvider>
+          <JeromeluPresence />
+          <PageContent>{children}</PageContent>
+        </TransitionProvider>
+      </AvatarEngineProvider>
+    </ThemeProvider>
   );
 }

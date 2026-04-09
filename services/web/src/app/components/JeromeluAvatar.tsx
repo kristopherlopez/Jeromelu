@@ -5,16 +5,37 @@ import { useRef, useEffect, useState } from "react";
 interface JeromeluAvatarProps {
   size?: number;
   clipSrc?: string;
+  light?: boolean;
 }
 
-export function JeromeluAvatar({ size = 140, clipSrc }: JeromeluAvatarProps) {
+const RING_DARK = {
+  glow: "0 0 20px rgba(212,135,74,0.20), 0 0 40px rgba(212,135,74,0.10)",
+  border: "2px solid rgba(212,135,74,0.35)",
+  fallbackBg: "rgba(212,135,74,0.15)",
+  fallbackBorder: "2px solid rgba(212,135,74,0.35)",
+};
+
+const RING_LIGHT = {
+  glow: "0 2px 12px rgba(120,60,30,0.15), 0 0 24px rgba(120,60,30,0.08)",
+  border: "2px solid rgba(120,60,30,0.30)",
+  fallbackBg: "rgba(120,60,30,0.10)",
+  fallbackBorder: "2px solid rgba(120,60,30,0.30)",
+};
+
+const AVATAR_CDN_BASE = process.env.NEXT_PUBLIC_AVATAR_CDN_BASE || "";
+const DEFAULT_CLIP = AVATAR_CDN_BASE
+  ? `${AVATAR_CDN_BASE}/avatar/clips/idle-1-1.mp4`
+  : "/avatar/clips/idle-1-1.mp4";
+
+export function JeromeluAvatar({ size = 140, clipSrc, light }: JeromeluAvatarProps) {
+  const ring = light ? RING_LIGHT : RING_DARK;
   const [videoFailed, setVideoFailed] = useState(false);
   const videoARef = useRef<HTMLVideoElement>(null);
   const videoBRef = useRef<HTMLVideoElement>(null);
   const [activeVideo, setActiveVideo] = useState<"a" | "b">("a");
-  const currentSrcRef = useRef<string>(clipSrc || "/avatar/clips/idle-1-1.mp4");
+  const currentSrcRef = useRef<string>(clipSrc || DEFAULT_CLIP);
 
-  const src = clipSrc || "/avatar/clips/idle-1-1.mp4";
+  const src = clipSrc || DEFAULT_CLIP;
 
   // Crossfade when clipSrc changes
   useEffect(() => {
@@ -38,11 +59,11 @@ export function JeromeluAvatar({ size = 140, clipSrc }: JeromeluAvatarProps) {
         style={{
           width: size,
           height: size,
-          backgroundColor: "rgba(245, 130, 32, 0.15)",
-          color: "var(--tigers-orange)",
+          backgroundColor: ring.fallbackBg,
+          color: light ? "#5c4030" : "var(--accent)",
           fontSize: size * 0.4,
-          boxShadow: "0 0 20px rgba(245, 130, 32, 0.2), 0 0 40px rgba(245, 130, 32, 0.1)",
-          border: "2px solid rgba(245, 130, 32, 0.4)",
+          boxShadow: ring.glow,
+          border: ring.fallbackBorder,
         }}
       >
         J
@@ -62,18 +83,13 @@ export function JeromeluAvatar({ size = 140, clipSrc }: JeromeluAvatarProps) {
       {/* Outer glow ring */}
       <div
         className="absolute inset-0 rounded-full"
-        style={{
-          boxShadow:
-            "0 0 20px rgba(245, 130, 32, 0.2), 0 0 40px rgba(245, 130, 32, 0.1)",
-        }}
+        style={{ boxShadow: ring.glow }}
       />
 
       {/* Border ring */}
       <div
         className="absolute inset-0 rounded-full"
-        style={{
-          border: "2px solid rgba(245, 130, 32, 0.4)",
-        }}
+        style={{ border: ring.border }}
       />
 
       {/* Dual video elements for crossfade */}

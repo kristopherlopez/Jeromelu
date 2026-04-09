@@ -87,7 +87,7 @@ Migration: `packages/db/migrations/015_wiki.sql`
 
 | Endpoint | Purpose |
 |----------|---------|
-| `GET /api/wiki/pages` | List pages. Filters: `page_type`, `status`, `q`. Cursor pagination. |
+| `GET /api/wiki/pages` | List pages. Filters: `page_type`, `status`, `q`. Cursor pagination. Returns `metadata_json` per page for team/position/price grouping. |
 | `GET /api/wiki/pages/{slug}` | Full page detail + revisions + `linked_pages` map |
 | `GET /api/wiki/pages/{slug}/revisions` | Full revision history |
 | `GET /api/wiki/recent-changes` | Recent revisions across all pages |

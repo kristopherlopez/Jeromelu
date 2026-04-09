@@ -30,6 +30,28 @@ def download_raw(key: str) -> bytes:
     return resp["Body"].read()
 
 
+def upload_asset(key: str, file_path: str, content_type: str = "video/mp4") -> str:
+    """Upload a file to the public assets bucket. Returns the S3 key."""
+    client = get_s3_client()
+    client.upload_file(
+        str(file_path),
+        settings.s3_assets_bucket,
+        key,
+        ExtraArgs={
+            "ContentType": content_type,
+            "CacheControl": "public, max-age=31536000, immutable",
+        },
+    )
+    return key
+
+
+def get_asset_url(key: str) -> str:
+    """Return the public URL for an asset. Uses CDN in prod, MinIO in dev."""
+    if settings.cdn_base_url:
+        return f"{settings.cdn_base_url}/{key}"
+    return f"{settings.s3_endpoint}/{settings.s3_assets_bucket}/{key}"
+
+
 def upload_player_data(key: str, body: bytes | str) -> None:
     client = get_s3_client()
     if isinstance(body, str):

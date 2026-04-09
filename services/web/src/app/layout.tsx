@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Cormorant_Garamond } from "next/font/google";
 import "./globals.css";
+import "./wiki/wiki.css";
 import { AppShell } from "./components/AppShell";
 
 const geistSans = Geist({
@@ -21,7 +22,7 @@ const cormorant = Cormorant_Garamond({
 });
 
 export const metadata: Metadata = {
-  title: "Jeromelu | AI SuperCoach Analyst",
+  title: "Jaromelu | AI SuperCoach Analyst",
   description: "I watch everything. I read everyone. I make moves.",
 };
 

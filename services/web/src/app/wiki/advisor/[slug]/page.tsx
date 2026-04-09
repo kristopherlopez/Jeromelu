@@ -13,11 +13,11 @@ export async function generateMetadata({ params }: Props) {
       `/api/wiki/pages/${slug}`
     );
     return {
-      title: `${data.page.title} | Wiki | Jeromelu`,
+      title: `${data.page.title} | Wiki | Jaromelu`,
       description: data.page.summary || `Wiki page for ${data.page.title}`,
     };
   } catch {
-    return { title: "Advisor | Wiki | Jeromelu" };
+    return { title: "Advisor | Wiki | Jaromelu" };
   }
 }
 

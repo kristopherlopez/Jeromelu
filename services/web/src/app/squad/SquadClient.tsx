@@ -112,10 +112,10 @@ function ConvictionMeter({ level }: { level: string }) {
   const bars = level === "high" ? 3 : level === "medium" ? 2 : 1;
   const color =
     level === "high"
-      ? "var(--tigers-orange)"
+      ? "var(--accent)"
       : level === "medium"
-        ? "rgba(245, 130, 32, 0.6)"
-        : "rgba(245, 130, 32, 0.3)";
+        ? "var(--accent-glow)"
+        : "var(--accent-glow)";
 
   return (
     <div className="flex items-center gap-1">
@@ -124,7 +124,7 @@ function ConvictionMeter({ level }: { level: string }) {
           key={i}
           className="h-2 w-1.5 rounded-sm"
           style={{
-            background: i <= bars ? color : "rgba(255, 255, 255, 0.08)",
+            background: i <= bars ? color : "var(--border)",
           }}
         />
       ))}
@@ -186,26 +186,26 @@ function FieldPip({
         className="relative flex h-10 w-10 items-center justify-center rounded-full text-[12px] font-bold transition-all duration-200"
         style={{
           background: isSelected
-            ? "rgba(245, 130, 32, 0.25)"
-            : "rgba(255, 255, 255, 0.08)",
+            ? "var(--accent-border)"
+            : "var(--border)",
           border: isSelected
-            ? "2px solid var(--tigers-orange)"
+            ? "2px solid var(--accent)"
             : slot.is_captain
-              ? "2px solid rgba(245, 130, 32, 0.5)"
-              : "2px solid rgba(255, 255, 255, 0.12)",
+              ? "2px solid var(--accent-glow)"
+              : "2px solid var(--border-subtle)",
           boxShadow: isSelected
-            ? "0 0 16px rgba(245, 130, 32, 0.3)"
+            ? "0 0 16px var(--accent-glow)"
             : slot.is_captain
-              ? "0 0 12px rgba(245, 130, 32, 0.15)"
+              ? "0 0 12px var(--accent-border)"
               : "none",
-          color: isSelected ? "var(--tigers-orange)" : "#d4d4d8",
+          color: isSelected ? "var(--accent)" : "var(--foreground)",
         }}
       >
         {jersey}
         {slot.is_captain && (
           <span
             className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-black"
-            style={{ background: "var(--tigers-orange)", color: "#000" }}
+            style={{ background: "var(--accent)", color: "#000" }}
           >
             C
           </span>
@@ -214,9 +214,9 @@ function FieldPip({
           <span
             className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full text-[7px] font-bold"
             style={{
-              background: "rgba(255, 255, 255, 0.15)",
-              color: "#a1a1aa",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
+              background: "var(--border-subtle)",
+              color: "var(--foreground-secondary)",
+              border: "1px solid var(--border)",
             }}
           >
             VC
@@ -227,7 +227,7 @@ function FieldPip({
       {/* Name */}
       <span
         className="text-[10px] font-semibold leading-tight whitespace-nowrap"
-        style={{ color: isSelected ? "var(--tigers-orange)" : "#d4d4d8" }}
+        style={{ color: isSelected ? "var(--accent)" : "var(--foreground)" }}
       >
         {surname}
       </span>
@@ -250,11 +250,11 @@ function PlayerDetail({ slot }: { slot: SquadSlot }) {
       className="rounded-xl border p-4"
       style={{
         background: slot.is_captain
-          ? "rgba(245, 130, 32, 0.06)"
+          ? "var(--accent-bg)"
           : "rgba(255, 255, 255, 0.03)",
         borderColor: slot.is_captain
-          ? "rgba(245, 130, 32, 0.2)"
-          : "#27272a",
+          ? "var(--accent-border)"
+          : "var(--border)",
       }}
     >
       <div className="flex items-start justify-between">
@@ -267,8 +267,8 @@ function PlayerDetail({ slot }: { slot: SquadSlot }) {
               <span
                 className="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase"
                 style={{
-                  background: "rgba(245, 130, 32, 0.15)",
-                  color: "var(--tigers-orange)",
+                  background: "var(--accent-border)",
+                  color: "var(--accent)",
                 }}
               >
                 Captain
@@ -276,7 +276,7 @@ function PlayerDetail({ slot }: { slot: SquadSlot }) {
             )}
             {slot.is_vice_captain && (
               <span className="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase text-zinc-500"
-                style={{ background: "rgba(255, 255, 255, 0.05)" }}>
+                style={{ background: "var(--border)" }}>
                 Vice Captain
               </span>
             )}
@@ -487,7 +487,7 @@ function FieldLayout({
       {/* Attack direction indicator */}
       <div
         className="absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1 text-[8px] uppercase tracking-widest"
-        style={{ color: "rgba(255, 255, 255, 0.1)" }}
+        style={{ color: "var(--foreground-ghost)" }}
       >
         <span>&darr;</span>
         <span>Attack</span>
@@ -512,23 +512,23 @@ function BenchCard({ slot, onSelect, isSelected }: {
       className="flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left transition-colors"
       style={{
         background: isSelected
-          ? "rgba(245, 130, 32, 0.06)"
+          ? "var(--accent-bg)"
           : "rgba(255, 255, 255, 0.02)",
         borderColor: isSelected
-          ? "rgba(245, 130, 32, 0.2)"
-          : "#27272a",
+          ? "var(--accent-border)"
+          : "var(--border)",
       }}
     >
       <div
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
         style={{
           background: isSelected
-            ? "rgba(245, 130, 32, 0.2)"
-            : "rgba(255, 255, 255, 0.06)",
+            ? "var(--accent-border)"
+            : "var(--border)",
           border: isSelected
-            ? "1.5px solid rgba(245, 130, 32, 0.4)"
-            : "1.5px solid rgba(255, 255, 255, 0.08)",
-          color: isSelected ? "var(--tigers-orange)" : "#a1a1aa",
+            ? "1.5px solid var(--accent-glow)"
+            : "1.5px solid var(--border)",
+          color: isSelected ? "var(--accent)" : "var(--foreground-secondary)",
         }}
       >
         {slot.slot_index}
@@ -539,7 +539,7 @@ function BenchCard({ slot, onSelect, isSelected }: {
       <div className="min-w-0 flex-1">
         <div
           className="text-[12px] font-medium truncate"
-          style={{ color: isSelected ? "var(--tigers-orange)" : "#d4d4d8" }}
+          style={{ color: isSelected ? "var(--accent)" : "var(--foreground)" }}
         >
           {player.name}
         </div>
@@ -568,8 +568,8 @@ function CaptainCard({ captain }: { captain: CaptainPick }) {
     <div
       className="rounded-xl border p-4"
       style={{
-        background: "rgba(245, 130, 32, 0.06)",
-        borderColor: "rgba(245, 130, 32, 0.2)",
+        background: "var(--accent-bg)",
+        borderColor: "var(--accent-border)",
         position: "relative",
         overflow: "hidden",
       }}
@@ -581,7 +581,7 @@ function CaptainCard({ captain }: { captain: CaptainPick }) {
           top: 0,
           bottom: 0,
           width: 3,
-          background: "var(--tigers-orange)",
+          background: "var(--accent)",
           borderRadius: "3px 0 0 3px",
         }}
       />
@@ -589,7 +589,7 @@ function CaptainCard({ captain }: { captain: CaptainPick }) {
         <span className="text-lg">&#x1F451;</span>
         <span
           className="text-[10px] font-semibold uppercase tracking-wider"
-          style={{ color: "var(--tigers-orange)" }}
+          style={{ color: "var(--accent)" }}
         >
           Captain
         </span>
@@ -623,8 +623,8 @@ function TradeHistory({ trades }: { trades: TradeEntry[] }) {
       {trades.map((t, i) => (
         <div
           key={i}
-          className="rounded-xl border border-zinc-800 px-3.5 py-2.5"
-          style={{ background: "rgba(255, 255, 255, 0.02)" }}
+          className="rounded-xl border px-3.5 py-2.5"
+          style={{ borderColor: "var(--border)", background: "rgba(255, 255, 255, 0.02)" }}
         >
           <div className="flex items-center gap-2 text-[12px]">
             <span className="font-mono text-[10px] text-zinc-600">
@@ -653,7 +653,7 @@ function PlanCard({ plan }: { plan: SquadPlan }) {
       className="rounded-xl border p-4"
       style={{
         background: "rgba(255, 255, 255, 0.02)",
-        borderColor: "#27272a",
+        borderColor: "var(--border)",
       }}
     >
       <p className="text-[13px] leading-relaxed text-zinc-400">
@@ -684,8 +684,8 @@ function SectionHeader({
       <div
         className="flex h-7 w-7 items-center justify-center rounded-lg text-sm"
         style={{
-          background: "rgba(245, 130, 32, 0.12)",
-          border: "1px solid rgba(245, 130, 32, 0.15)",
+          background: "var(--accent-bg)",
+          border: "1px solid var(--accent-border)",
         }}
       >
         {icon}
@@ -707,8 +707,8 @@ function EmptySquad() {
     <div className="mx-auto max-w-[720px] px-6 py-10">
       <h1 className="mb-4 text-2xl font-bold text-zinc-200">My Squad</h1>
       <div
-        className="rounded-xl border border-zinc-800 p-8 text-center"
-        style={{ background: "rgba(255, 255, 255, 0.02)" }}
+        className="rounded-xl border p-8 text-center"
+        style={{ borderColor: "var(--border)", background: "rgba(255, 255, 255, 0.02)" }}
       >
         <p className="text-[15px] text-zinc-400">
           Squad hasn&apos;t been locked in yet.

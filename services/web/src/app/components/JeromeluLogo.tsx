@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   Activity,
-  Users,
+  Newspaper,
   FileText,
   BookOpen,
   MessageCircle,
@@ -21,15 +21,24 @@ export interface LetterConfig {
 }
 
 export const LETTERS: LetterConfig[] = [
-  { char: "J", key: "j", label: "The Feed", href: "/feed", delay: 0, icon: Activity },
-  { char: "e", key: "e", label: "The Feed", href: "/feed", delay: 700, icon: Activity },
-  { char: "r", key: "r", label: "My Squad", href: "/squad", delay: 500, icon: Users },
+  { char: "J", key: "j", label: "The Feed", href: "/", delay: 0, icon: Activity },
+  { char: "a", key: "a", label: "The Feed", href: "/", delay: 700, icon: Activity },
+  { char: "r", key: "r", label: "The Analysis", href: "/insights", delay: 500, icon: Newspaper },
   { char: "o", key: "o", label: "The Wiki", href: "/wiki", delay: 400, icon: FileText },
   { char: "m", key: "m", label: "The Ledger", href: "/ledger", delay: 300, icon: BookOpen },
-  { char: "e", key: "e", label: "The Feed", href: "/feed", delay: 200, icon: Activity },
+  { char: "e", key: "e", label: "The Feed", href: "/", delay: 200, icon: Activity },
   { char: "l", key: "l", label: "The Ledger", href: "/ledger", delay: 100, icon: BookOpen },
   { char: "u", key: "u", label: "Ask Me", href: "/ask", delay: 0, icon: MessageCircle },
 ];
+
+/** Unique shortcut bindings: Ctrl+letter → href. First occurrence wins for duplicate letters. */
+export const SHORTCUT_MAP: Record<string, string> = Object.fromEntries(
+  LETTERS.reduce<[string, string][]>((acc, l) => {
+    const k = l.key.toLowerCase();
+    if (!acc.some(([key]) => key === k)) acc.push([k, l.href]);
+    return acc;
+  }, []),
+);
 
 const DEFAULT_TAGLINE =
   "I watch everything. I read everyone. I make moves.";

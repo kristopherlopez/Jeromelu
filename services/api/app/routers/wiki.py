@@ -23,6 +23,7 @@ def _page_summary(page: WikiPage) -> dict:
         "page_type": page.page_type,
         "summary": page.summary,
         "status": page.status,
+        "metadata_json": page.metadata_json or {},
         "updated_at": page.updated_at.isoformat(),
     }
 

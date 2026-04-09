@@ -7,6 +7,7 @@ export interface WikiPageSummary {
   page_type: WikiPageType;
   summary: string | null;
   status: string;
+  metadata_json: Record<string, unknown>;
   updated_at: string;
 }
 

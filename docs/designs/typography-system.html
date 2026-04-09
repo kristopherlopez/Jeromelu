@@ -1,0 +1,376 @@
+<!--
+  Typography System — Jaromelu
+  2026-04-10
+
+  Three fonts, one scale, clear rules for when to use each.
+  Rendered live so you can see exactly how they look.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Typography System | Jaromelu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --serif: 'Cormorant Garamond', Georgia, serif;
+    --sans: 'Inter', -apple-system, sans-serif;
+    --mono: 'JetBrains Mono', 'SF Mono', monospace;
+    --bg: #2a2420; --bg-deep: #241e1a; --surface: #342c26;
+    --fg: #ede4d6; --fg2: #c0b4a0; --fgm: #948878; --fgf: #6e6458; --fgg: #504840;
+    --border: #3e3630;
+    --accent: #d4874a; --terra: #b85c38;
+    --teal: #5a9e8a; --slate: #8aadcc; --lilac: #a898c8; --ochre: #c4a840; --red: #c45050;
+    --lbg: #FAF9F5; --lsurface: #FFF; --link: #1c1a14; --lmuted: #5c5848; --lfaint: #9c9484;
+  }
+  body { font-family: var(--sans); background: var(--bg); color: var(--fg); line-height: 1.6; padding: 3rem 2rem 6rem; -webkit-font-smoothing: antialiased; }
+  .container { max-width: 960px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 3rem; }
+  header h1 { font-family: var(--serif); font-size: 2rem; font-weight: 600; margin-bottom: 0.4rem; }
+  header p { color: var(--fgm); font-size: 14px; }
+  header .div { width: 60px; height: 2px; background: var(--accent); margin: 1.25rem auto 0; opacity: 0.4; }
+
+  h2 { font-family: var(--serif); font-size: 1.4rem; font-weight: 600; margin-bottom: 0.3rem; }
+  .label { font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 0.5rem; }
+  .desc { font-size: 13px; color: var(--fgf); margin-bottom: 1.5rem; max-width: 640px; }
+  hr.sep { border: none; height: 1px; background: var(--border); margin: 2.5rem 0; }
+
+  /* Font specimen */
+  .specimen { margin-bottom: 2rem; }
+  .specimen-name { font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--fgm); margin-bottom: 0.5rem; }
+  .specimen-sample { margin-bottom: 0.3rem; }
+  .specimen-meta { font-size: 11px; font-family: var(--mono); color: var(--fgg); }
+
+  /* Scale table */
+  .scale { width: 100%; border-collapse: collapse; margin: 1rem 0 2rem; font-size: 13px; }
+  .scale th { text-align: left; font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--fgf); padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+  .scale td { padding: 0.6rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.03); vertical-align: middle; color: var(--fgm); }
+  .scale td:first-child { font-weight: 500; color: var(--fg2); }
+  .scale .live { color: var(--fg); }
+
+  /* Rule cards */
+  .rules { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.5rem 0; }
+  @media (max-width: 700px) { .rules { grid-template-columns: 1fr; } }
+  .rule { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem; }
+  .rule h4 { font-size: 12px; font-weight: 600; color: var(--fg); margin-bottom: 0.4rem; }
+  .rule p { font-size: 12px; color: var(--fgm); line-height: 1.5; }
+  .rule .ex { margin-top: 0.5rem; padding: 0.5rem 0.75rem; background: var(--bg); border-radius: 4px; }
+
+  /* Preview frames */
+  .preview { border-radius: 10px; overflow: hidden; border: 1px solid var(--border); margin: 1.5rem 0; }
+  .preview .bar { display: flex; align-items: center; gap: 5px; padding: 7px 12px; font-size: 10px; font-family: var(--mono); border-bottom: 1px solid var(--border); }
+  .preview .bar .dots { display: flex; gap: 4px; margin-right: 8px; }
+  .preview .bar .dot { width: 7px; height: 7px; border-radius: 50%; }
+
+  footer { text-align: center; font-size: 12px; color: var(--fgg); margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 2rem; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>Typography System</h1>
+    <p>Three fonts. One scale. Clear rules for every element.</p>
+    <div class="div"></div>
+  </header>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- THE THREE FONTS                            -->
+  <!-- ══════════════════════════════════════════ -->
+
+  <div class="label" style="color:var(--accent);">The Fonts</div>
+  <h2>Three Voices</h2>
+  <p class="desc">Each font has a distinct role. Serif is the editorial voice — headings, hero text, stat values. Sans is the workhorse — body text, labels, UI controls. Mono is the data layer — timestamps, scores, technical values.</p>
+
+  <div class="specimen">
+    <div class="specimen-name" style="color:var(--accent);">Cormorant Garamond — The Editorial Voice</div>
+    <div class="specimen-sample" style="font-family:var(--serif); font-size:2.4rem; font-weight:600; line-height:1.15;">Tom Trbojevic</div>
+    <div class="specimen-sample" style="font-family:var(--serif); font-size:1.4rem; font-weight:600; line-height:1.2;">Expert Opinions</div>
+    <div class="specimen-sample" style="font-family:var(--serif); font-size:1.1rem; font-style:italic; color:var(--fg2);">Elite ceiling, extensive injury history. High-risk, high-reward.</div>
+    <div class="specimen-meta">Cormorant Garamond · weights 400, 600 · italic · --font-serif</div>
+  </div>
+
+  <div class="specimen">
+    <div class="specimen-name" style="color:var(--slate);">Inter — The Workhorse</div>
+    <div class="specimen-sample" style="font-family:var(--sans); font-size:15px; line-height:1.7; color:var(--fg2);">Tom Trbojevic is one of the most devastating attacking fullbacks in the NRL when fit. Playing for the Sea Eagles, he combines elite speed, footballing instincts, and an ability to create something from nothing.</div>
+    <div class="specimen-sample" style="font-family:var(--sans); font-size:11px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--fgm); margin-top:0.5rem;">Round 5 Update · Player Profile · Advisor Consensus</div>
+    <div class="specimen-meta" style="margin-top:0.4rem;">Inter · weights 300–700 · --font-geist-sans</div>
+  </div>
+
+  <div class="specimen">
+    <div class="specimen-name" style="color:var(--ochre);">JetBrains Mono — The Data Layer</div>
+    <div class="specimen-sample" style="font-family:var(--mono); font-size:13px; color:var(--fg2);">$487,200 · 74.3 PPG · BE: 61 · 4/5 games</div>
+    <div class="specimen-sample" style="font-family:var(--mono); font-size:11px; color:var(--fgm); margin-top:0.3rem;">3m ago · Round 7 · 2026-04-10T14:32:00Z</div>
+    <div class="specimen-sample" style="font-family:var(--mono); font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:var(--fgf); margin-top:0.3rem;">scout · analyst · bookkeeper · archivist · critic</div>
+    <div class="specimen-meta" style="margin-top:0.4rem;">JetBrains Mono · weights 300–500 · --font-geist-mono</div>
+  </div>
+
+  <hr class="sep">
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- THE SCALE                                  -->
+  <!-- ══════════════════════════════════════════ -->
+
+  <div class="label" style="color:var(--accent);">The Scale</div>
+  <h2>Type Hierarchy</h2>
+  <p class="desc">Every text element maps to one of these levels. The font, size, weight, and colour are defined together — pick the level, get all four.</p>
+
+  <table class="scale">
+    <thead>
+      <tr><th>Level</th><th>Font</th><th>Size</th><th>Weight</th><th>Colour</th><th>Live Sample</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Page Title</td><td style="font-family:var(--mono); font-size:11px;">Serif</td><td style="font-family:var(--mono); font-size:11px;">1.8rem</td><td style="font-family:var(--mono); font-size:11px;">600</td><td style="font-family:var(--mono); font-size:11px;">ink / fg</td>
+        <td class="live" style="font-family:var(--serif); font-size:1.8rem; font-weight:600;">Knowledge Base</td>
+      </tr>
+      <tr>
+        <td>Wiki Hero</td><td style="font-family:var(--mono); font-size:11px;">Serif</td><td style="font-family:var(--mono); font-size:11px;">clamp(2.6rem,5.5vw,3.6rem)</td><td style="font-family:var(--mono); font-size:11px;">600</td><td style="font-family:var(--mono); font-size:11px;">ink / fg</td>
+        <td class="live" style="font-family:var(--serif); font-size:2.2rem; font-weight:600;">Tom Trbojevic</td>
+      </tr>
+      <tr>
+        <td>Section Heading</td><td style="font-family:var(--mono); font-size:11px;">Serif</td><td style="font-family:var(--mono); font-size:11px;">clamp(1.8rem,4vw,2.4rem)</td><td style="font-family:var(--mono); font-size:11px;">600</td><td style="font-family:var(--mono); font-size:11px;">ink / fg</td>
+        <td class="live" style="font-family:var(--serif); font-size:1.6rem; font-weight:600;">Expert Opinions</td>
+      </tr>
+      <tr>
+        <td>Subsection</td><td style="font-family:var(--mono); font-size:11px;">Serif</td><td style="font-family:var(--mono); font-size:11px;">1.25rem</td><td style="font-family:var(--mono); font-size:11px;">600</td><td style="font-family:var(--mono); font-size:11px;">ink / fg</td>
+        <td class="live" style="font-family:var(--serif); font-size:1.25rem; font-weight:600;">Injury History</td>
+      </tr>
+      <tr>
+        <td>Card Title</td><td style="font-family:var(--mono); font-size:11px;">Serif</td><td style="font-family:var(--mono); font-size:11px;">1.1rem</td><td style="font-family:var(--mono); font-size:11px;">600</td><td style="font-family:var(--mono); font-size:11px;">ink / fg</td>
+        <td class="live" style="font-family:var(--serif); font-size:1.1rem; font-weight:600;">Sea Eagles</td>
+      </tr>
+      <tr>
+        <td>Subtitle / Pull</td><td style="font-family:var(--mono); font-size:11px;">Serif</td><td style="font-family:var(--mono); font-size:11px;">1.15rem</td><td style="font-family:var(--mono); font-size:11px;">400</td><td style="font-family:var(--mono); font-size:11px;">muted</td>
+        <td class="live" style="font-family:var(--serif); font-size:1.15rem; font-style:italic; color:var(--fg2);">Elite ceiling, extensive injury history.</td>
+      </tr>
+      <tr>
+        <td>Stat Value</td><td style="font-family:var(--mono); font-size:11px;">Serif</td><td style="font-family:var(--mono); font-size:11px;">1.6rem</td><td style="font-family:var(--mono); font-size:11px;">600</td><td style="font-family:var(--mono); font-size:11px;">ink / semantic</td>
+        <td class="live" style="font-family:var(--serif); font-size:1.6rem; font-weight:600;">74.3</td>
+      </tr>
+      <tr style="border-top:1px solid var(--border);">
+        <td>Body</td><td style="font-family:var(--mono); font-size:11px;">Sans</td><td style="font-family:var(--mono); font-size:11px;">15px</td><td style="font-family:var(--mono); font-size:11px;">400</td><td style="font-family:var(--mono); font-size:11px;">muted</td>
+        <td class="live" style="font-size:15px; color:var(--fg2);">Pricing follows a boom-bust cycle driven by availability.</td>
+      </tr>
+      <tr>
+        <td>Body Small</td><td style="font-family:var(--mono); font-size:11px;">Sans</td><td style="font-family:var(--mono); font-size:11px;">14px</td><td style="font-family:var(--mono); font-size:11px;">400</td><td style="font-family:var(--mono); font-size:11px;">muted</td>
+        <td class="live" style="font-size:14px; color:var(--fg2);">Discount too steep to ignore. Buy at $452k.</td>
+      </tr>
+      <tr>
+        <td>Description</td><td style="font-family:var(--mono); font-size:11px;">Sans</td><td style="font-family:var(--mono); font-size:11px;">14px</td><td style="font-family:var(--mono); font-size:11px;">400</td><td style="font-family:var(--mono); font-size:11px;">faint</td>
+        <td class="live" style="font-size:14px; color:var(--fgm);">Players, teams, advisors, rounds.</td>
+      </tr>
+      <tr>
+        <td>Kicker / Label</td><td style="font-family:var(--mono); font-size:11px;">Sans</td><td style="font-family:var(--mono); font-size:11px;">11px</td><td style="font-family:var(--mono); font-size:11px;">600</td><td style="font-family:var(--mono); font-size:11px;">accent</td>
+        <td class="live"><span style="font-size:11px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:var(--accent);">Player</span></td>
+      </tr>
+      <tr>
+        <td>Section Label</td><td style="font-family:var(--mono); font-size:11px;">Sans</td><td style="font-family:var(--mono); font-size:11px;">11px</td><td style="font-family:var(--mono); font-size:11px;">600</td><td style="font-family:var(--mono); font-size:11px;">faint</td>
+        <td class="live"><span style="font-size:11px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--fgm);">Recent Changes</span></td>
+      </tr>
+      <tr>
+        <td>UI Button</td><td style="font-family:var(--mono); font-size:11px;">Sans</td><td style="font-family:var(--mono); font-size:11px;">12px</td><td style="font-family:var(--mono); font-size:11px;">600</td><td style="font-family:var(--mono); font-size:11px;">accent / faint</td>
+        <td class="live"><span style="font-size:12px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:var(--accent);">All</span> <span style="font-size:12px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:var(--fgm); margin-left:0.5rem;">Players</span> <span style="font-size:12px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:var(--fgm); margin-left:0.5rem;">Teams</span></td>
+      </tr>
+      <tr>
+        <td>Tag / Badge</td><td style="font-family:var(--mono); font-size:11px;">Sans</td><td style="font-family:var(--mono); font-size:11px;">10px</td><td style="font-family:var(--mono); font-size:11px;">600</td><td style="font-family:var(--mono); font-size:11px;">semantic</td>
+        <td class="live"><span style="font-size:10px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; padding:0.15rem 0.4rem; border-radius:2px; background:rgba(90,158,138,0.12); color:var(--teal);">BUY</span> <span style="font-size:10px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; padding:0.15rem 0.4rem; border-radius:2px; background:rgba(196,80,80,0.12); color:var(--red); margin-left:0.3rem;">SELL</span> <span style="font-size:10px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; padding:0.15rem 0.4rem; border-radius:2px; background:rgba(168,152,200,0.12); color:var(--lilac); margin-left:0.3rem;">CAPTAIN</span></td>
+      </tr>
+      <tr style="border-top:1px solid var(--border);">
+        <td>Timestamp</td><td style="font-family:var(--mono); font-size:11px;">Mono</td><td style="font-family:var(--mono); font-size:11px;">12px</td><td style="font-family:var(--mono); font-size:11px;">400</td><td style="font-family:var(--mono); font-size:11px;">faint</td>
+        <td class="live" style="font-family:var(--mono); font-size:12px; color:var(--fgm);">3m ago</td>
+      </tr>
+      <tr>
+        <td>Data Value</td><td style="font-family:var(--mono); font-size:11px;">Mono</td><td style="font-family:var(--mono); font-size:11px;">13px</td><td style="font-family:var(--mono); font-size:11px;">500</td><td style="font-family:var(--mono); font-size:11px;">secondary</td>
+        <td class="live" style="font-family:var(--mono); font-size:13px; font-weight:500; color:var(--fg2);">$487,200 · BE: 61</td>
+      </tr>
+      <tr>
+        <td>Crew Name</td><td style="font-family:var(--mono); font-size:11px;">Mono</td><td style="font-family:var(--mono); font-size:11px;">12px</td><td style="font-family:var(--mono); font-size:11px;">700</td><td style="font-family:var(--mono); font-size:11px;">crew colour</td>
+        <td class="live"><span style="font-family:var(--mono); font-size:12px; font-weight:700; color:var(--accent);">Jaromelu</span> <span style="font-family:var(--mono); font-size:12px; font-weight:700; color:var(--teal); margin-left:0.5rem;">Scout</span> <span style="font-family:var(--mono); font-size:12px; font-weight:700; color:var(--lilac); margin-left:0.5rem;">Bookkeeper</span></td>
+      </tr>
+      <tr>
+        <td>Agent Label</td><td style="font-family:var(--mono); font-size:11px;">Mono</td><td style="font-family:var(--mono); font-size:11px;">10px</td><td style="font-family:var(--mono); font-size:11px;">400</td><td style="font-family:var(--mono); font-size:11px;">ghost</td>
+        <td class="live" style="font-family:var(--mono); font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:var(--fgg);">jaromelu · scout · analyst</td>
+      </tr>
+      <tr>
+        <td>Sidebar Logo</td><td style="font-family:var(--mono); font-size:11px;">Sans</td><td style="font-family:var(--mono); font-size:11px;">1.125rem</td><td style="font-family:var(--mono); font-size:11px;">700</td><td style="font-family:var(--mono); font-size:11px;">accent</td>
+        <td class="live" style="font-size:1.125rem; font-weight:700; color:var(--accent);">J</td>
+      </tr>
+      <tr>
+        <td>Sidebar Name</td><td style="font-family:var(--mono); font-size:11px;">Sans</td><td style="font-family:var(--mono); font-size:11px;">0.875rem</td><td style="font-family:var(--mono); font-size:11px;">500</td><td style="font-family:var(--mono); font-size:11px;">secondary</td>
+        <td class="live" style="font-size:0.875rem; font-weight:500; color:var(--fg2);">Jaromelu</td>
+      </tr>
+      <tr>
+        <td>Sidebar Nav</td><td style="font-family:var(--mono); font-size:11px;">Sans</td><td style="font-family:var(--mono); font-size:11px;">0.875rem</td><td style="font-family:var(--mono); font-size:11px;">400</td><td style="font-family:var(--mono); font-size:11px;">secondary / accent</td>
+        <td class="live" style="font-size:0.875rem; color:var(--fg2);">Feed &nbsp;&nbsp; <span style="color:var(--accent);">Wiki</span> &nbsp;&nbsp; Ledger &nbsp;&nbsp; Ask</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <hr class="sep">
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- THE RULES                                  -->
+  <!-- ══════════════════════════════════════════ -->
+
+  <div class="label" style="color:var(--accent);">The Rules</div>
+  <h2>When to Use Each Font</h2>
+
+  <div class="rules">
+    <div class="rule">
+      <h4 style="color:var(--accent);">Serif — The Editorial Voice</h4>
+      <p>Headlines, hero text, section headings, stat hero values, subtitles, verdict text, the final call. Anything that would be a headline in a newspaper.</p>
+      <div class="ex">
+        <div style="font-family:var(--serif); font-size:1.4rem; font-weight:600; color:var(--fg);">Price Analysis</div>
+        <div style="font-family:var(--serif); font-size:1rem; font-style:italic; color:var(--fg2);">The market hasn't priced this in.</div>
+      </div>
+    </div>
+    <div class="rule">
+      <h4 style="color:var(--slate);">Sans — The Workhorse</h4>
+      <p>Body text, descriptions, labels, kickers, buttons, filters, navigation, tooltips, card content, list items. Everything the user reads and interacts with.</p>
+      <div class="ex">
+        <div style="font-size:15px; color:var(--fg2); line-height:1.65;">His price bottomed mid-season last year after missing eight straight rounds.</div>
+      </div>
+    </div>
+    <div class="rule">
+      <h4 style="color:var(--ochre);">Mono — The Data Layer</h4>
+      <p>Timestamps, prices, scores, breakevens, percentages, crew names in the stream, agent labels, round numbers, any technical identifier.</p>
+      <div class="ex">
+        <div style="font-family:var(--mono); font-size:12px; color:var(--fg2);">$487k · 74.3 PPG · BE: 61 · 3m ago</div>
+      </div>
+    </div>
+    <div class="rule">
+      <h4 style="color:var(--red);">Never</h4>
+      <p>No fourth font. No system font fallback for visible text. No mixing weights outside the scale. No font-size values that aren't in the table above.</p>
+    </div>
+  </div>
+
+  <hr class="sep">
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- UPPERCASE RULES                            -->
+  <!-- ══════════════════════════════════════════ -->
+
+  <div class="label" style="color:var(--accent);">Uppercase</div>
+  <h2>When to Shout</h2>
+  <p class="desc">Uppercase text is always Sans, always 10–12px, always with letter-spacing. It's used for labels, not content. Three tiers:</p>
+
+  <div style="display:flex; flex-direction:column; gap:1rem; margin:1rem 0 2rem;">
+    <div style="display:flex; align-items:center; gap:1.5rem;">
+      <span style="font-size:11px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:var(--accent); width:200px;">Kicker (accent)</span>
+      <span style="font-size:12px; color:var(--fgm);">Page type, content role. Always accent colour. <code style="font-family:var(--mono); font-size:11px; color:var(--fgg);">0.14em</code></span>
+    </div>
+    <div style="display:flex; align-items:center; gap:1.5rem;">
+      <span style="font-size:11px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--fgm); width:200px;">Section Label (faint)</span>
+      <span style="font-size:12px; color:var(--fgm);">Group headers, category dividers. Faint colour. <code style="font-family:var(--mono); font-size:11px; color:var(--fgg);">0.12em</code></span>
+    </div>
+    <div style="display:flex; align-items:center; gap:1.5rem;">
+      <span style="font-size:12px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:var(--accent); width:200px;">Filter / Button</span>
+      <span style="font-size:12px; color:var(--fgm);">Interactive controls. Accent when active, faint when inactive. <code style="font-family:var(--mono); font-size:11px; color:var(--fgg);">0.06em</code></span>
+    </div>
+  </div>
+
+  <hr class="sep">
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- APPLIED — dark and light previews          -->
+  <!-- ══════════════════════════════════════════ -->
+
+  <div class="label" style="color:var(--accent);">Applied</div>
+  <h2>Typography in Context</h2>
+  <p class="desc">The same hierarchy rendered on both themes. Every element maps to one level in the scale.</p>
+
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
+
+    <!-- Dark -->
+    <div class="preview">
+      <div class="bar" style="background:var(--bg-deep); color:var(--fgg); border-color:var(--border);">
+        <div class="dots"><div class="dot" style="background:var(--border);"></div><div class="dot" style="background:var(--border);"></div><div class="dot" style="background:var(--border);"></div></div>
+        Dark — Feed
+      </div>
+      <div style="background:var(--bg); padding:1.5rem; font-size:13px; line-height:1.6;">
+        <!-- Sidebar mock -->
+        <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:1.25rem; padding-bottom:0.75rem; border-bottom:1px solid var(--border);">
+          <span style="font-size:1.125rem; font-weight:700; color:var(--accent);">J</span>
+          <span style="font-size:0.875rem; font-weight:500; color:var(--fg2);">Jaromelu</span>
+          <span style="font-size:0.875rem; color:var(--fgm); margin-left:auto;">Feed</span>
+          <span style="font-size:0.875rem; color:var(--fgm);">Wiki</span>
+          <span style="font-size:0.875rem; color:var(--fgm);">Ledger</span>
+        </div>
+        <!-- Page title -->
+        <div style="font-family:var(--serif); font-size:1.8rem; font-weight:600; color:var(--fg); margin-bottom:0.1rem;">Live Stream</div>
+        <div style="font-size:14px; color:var(--fgm); margin-bottom:1rem;">What Jaromelu is watching, thinking, and doing.</div>
+        <!-- Filters -->
+        <div style="display:flex; gap:0.4rem; margin-bottom:1rem; padding-bottom:0.6rem; border-bottom:1px solid var(--border);">
+          <span style="font-size:12px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:var(--accent); padding:0.25rem 0.5rem; background:rgba(212,135,74,0.1); border-radius:4px;">All</span>
+          <span style="font-size:12px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:var(--fgm); padding:0.25rem 0.5rem;">Thoughts</span>
+          <span style="font-size:12px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:var(--fgm); padding:0.25rem 0.5rem;">Actions</span>
+        </div>
+        <!-- Feed item -->
+        <div style="display:flex; gap:0.5rem; padding:0.4rem 0;">
+          <span style="font-family:var(--mono); font-size:12px; color:var(--fgm); width:2.5rem; text-align:right; flex-shrink:0;">3m</span>
+          <div>
+            <span style="font-family:var(--mono); font-size:12px; font-weight:700; color:var(--teal);">Scout</span>
+            <span style="font-size:15px; color:var(--fg); margin-left:0.3rem;">Picked up 4 new episodes. 2 mention <strong style="font-weight:600; color:var(--accent);">Cleary</strong>.</span>
+          </div>
+        </div>
+        <div style="display:flex; gap:0.5rem; padding:0.4rem 0;">
+          <span style="font-family:var(--mono); font-size:12px; color:var(--fgm); width:2.5rem; text-align:right; flex-shrink:0;">1h</span>
+          <div>
+            <span style="font-family:var(--mono); font-size:12px; font-weight:700; color:var(--accent);">Jaromelu</span>
+            <span style="font-size:15px; color:var(--fg); margin-left:0.3rem;">Cleary is overpriced. The matchup is bad.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Light -->
+    <div class="preview">
+      <div class="bar" style="background:var(--lsurface); color:var(--lfaint); border-color:rgba(28,26,20,0.08);">
+        <div class="dots"><div class="dot" style="background:rgba(28,26,20,0.12);"></div><div class="dot" style="background:rgba(28,26,20,0.12);"></div><div class="dot" style="background:rgba(28,26,20,0.12);"></div></div>
+        Light — Wiki
+      </div>
+      <div style="background:var(--lbg); padding:1.5rem; font-size:13px; line-height:1.6; color:var(--link);">
+        <!-- Nav -->
+        <div style="display:flex; gap:0.5rem; margin-bottom:1rem; padding-bottom:0.6rem; border-bottom:1px solid rgba(28,26,20,0.08); font-size:11px; font-weight:600; letter-spacing:0.07em; text-transform:uppercase;">
+          <span style="color:var(--lfaint);">Wiki</span>
+          <span style="color:var(--lfaint); opacity:0.4;">›</span>
+          <span style="color:var(--lfaint);">Players</span>
+          <span style="color:var(--lfaint); opacity:0.4;">›</span>
+          <span style="color:var(--link);">Trbojevic</span>
+        </div>
+        <!-- Kicker + hero -->
+        <div style="text-align:center; margin-bottom:1rem;">
+          <div style="font-size:11px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:var(--terra); margin-bottom:0.3rem;">Player</div>
+          <div style="font-family:var(--serif); font-size:2rem; font-weight:600; color:var(--link); line-height:1.15;">Tom Trbojevic</div>
+          <div style="font-family:var(--serif); font-size:0.95rem; font-style:italic; color:var(--lmuted); margin-top:0.2rem;">Elite ceiling, extensive injury history.</div>
+          <div style="font-size:12px; color:var(--lfaint); margin-top:0.4rem;">Updated 5m ago · 12 revisions</div>
+        </div>
+        <!-- Stat cards -->
+        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:rgba(28,26,20,0.08); border:1px solid rgba(28,26,20,0.08); margin-bottom:0.75rem;">
+          <div style="background:var(--lbg); padding:0.35rem; text-align:center;"><div style="font-size:8px; font-weight:600; text-transform:uppercase; letter-spacing:0.1em; color:var(--lfaint);">Avg</div><div style="font-family:var(--serif); font-size:1rem; font-weight:600; color:var(--link);">74.3</div></div>
+          <div style="background:var(--lbg); padding:0.35rem; text-align:center;"><div style="font-size:8px; font-weight:600; text-transform:uppercase; letter-spacing:0.1em; color:var(--lfaint);">Price</div><div style="font-family:var(--serif); font-size:1rem; font-weight:600; color:var(--link);">$487k</div></div>
+          <div style="background:var(--lbg); padding:0.35rem; text-align:center;"><div style="font-size:8px; font-weight:600; text-transform:uppercase; letter-spacing:0.1em; color:var(--lfaint);">BE</div><div style="font-family:var(--serif); font-size:1rem; font-weight:600; color:#2d6040;">61</div></div>
+          <div style="background:var(--lbg); padding:0.35rem; text-align:center;"><div style="font-size:8px; font-weight:600; text-transform:uppercase; letter-spacing:0.1em; color:var(--lfaint);">Games</div><div style="font-family:var(--serif); font-size:1rem; font-weight:600; color:#8a6a20;">4/5</div></div>
+        </div>
+        <!-- Body -->
+        <div style="font-size:15px; color:var(--lmuted); line-height:1.7; margin-bottom:0.5rem;">Tom Trbojevic is one of the most devastating attacking fullbacks in the NRL when fit.</div>
+        <!-- Top rule box -->
+        <div style="border-top:2px solid var(--terra); padding-top:0.5rem; margin:0.75rem 0;">
+          <div style="font-size:11px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:var(--terra); margin-bottom:0.15rem;">Jaromelu's Take</div>
+          <div style="font-size:14px; color:var(--link);">Turbo is the definition of risk-reward.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>Typography System &mdash; Jaromelu Design Reference</p>
+  </footer>
+
+</div>
+</body>
+</html>

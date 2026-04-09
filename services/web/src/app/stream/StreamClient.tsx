@@ -107,15 +107,15 @@ function SourceRow({ source }: { source: SourceListItem }) {
   return (
     <Link
       href={`/stream/${source.source_id}`}
-      className="group flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-zinc-800/80 rounded-md"
+      className="group flex items-center gap-3 px-3 py-2.5 transition-colors rounded-md"
     >
       {/* Claim count badge */}
       <div
         className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-xs font-semibold"
         style={
           hasClaims
-            ? { backgroundColor: "rgba(245, 130, 32, 0.15)", color: "var(--tigers-orange)" }
-            : { backgroundColor: "rgba(255,255,255,0.04)", color: "rgb(82,82,91)" }
+            ? { backgroundColor: "var(--accent-border)", color: "var(--accent)" }
+            : { backgroundColor: "rgba(255,255,255,0.04)", color: "var(--foreground-ghost)" }
         }
       >
         {source.claim_count}
@@ -123,11 +123,11 @@ function SourceRow({ source }: { source: SourceListItem }) {
 
       {/* Content */}
       <div className="min-w-0 flex-1">
-        <h2 className="text-sm text-zinc-300 group-hover:text-white line-clamp-1 leading-snug">
+        <h2 className="text-sm group-hover:text-white line-clamp-1 leading-snug" style={{ color: "var(--foreground)" }}>
           {source.title}
         </h2>
         {source.creator_name && (
-          <p className="mt-0.5 text-xs text-zinc-600 truncate">
+          <p className="mt-0.5 text-xs truncate" style={{ color: "var(--foreground-ghost)" }}>
             {source.creator_name}
           </p>
         )}
@@ -135,7 +135,7 @@ function SourceRow({ source }: { source: SourceListItem }) {
 
       {/* Arrow */}
       <svg
-        className="h-3.5 w-3.5 flex-shrink-0 text-zinc-800 group-hover:text-zinc-400 transition-colors"
+        className="h-3.5 w-3.5 flex-shrink-0 transition-colors" style={{ color: "var(--border)" }}
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -150,8 +150,8 @@ function SourceRow({ source }: { source: SourceListItem }) {
 function DateHeader({ date }: { date: string }) {
   return (
     <div className="flex items-center gap-3 px-3 pt-5 pb-1.5 first:pt-0">
-      <span className="text-xs font-medium text-zinc-500">{date}</span>
-      <div className="flex-1 border-t border-zinc-800/50" />
+      <span className="text-xs font-medium" style={{ color: "var(--foreground-ghost)" }}>{date}</span>
+      <div className="flex-1 border-t" style={{ borderColor: "var(--border)" }} />
     </div>
   );
 }
@@ -165,7 +165,7 @@ function SourceListWithDateHeaders({
 }) {
   if (!showDateHeaders) {
     return (
-      <div className="divide-y divide-zinc-800/40">
+      <div className="divide-y" style={{ borderColor: "var(--border)" }}>
         {items.map((source) => (
           <SourceRow key={source.source_id} source={source} />
         ))}
@@ -201,10 +201,10 @@ function CollapsibleGroup({
     <div className="mb-2">
       <button
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left rounded-md hover:bg-zinc-800/40 transition-colors"
+        className="flex w-full items-center gap-2 px-3 py-2 text-left rounded-md transition-colors"
       >
         <svg
-          className={`h-3 w-3 text-zinc-600 transition-transform ${open ? "rotate-90" : ""}`}
+          className={`h-3 w-3 transition-transform ${open ? "rotate-90" : ""}`} style={{ color: "var(--foreground-ghost)" }}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -212,24 +212,24 @@ function CollapsibleGroup({
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
         </svg>
-        <span className="text-sm font-medium text-zinc-300">
+        <span className="text-sm font-medium" style={{ color: "var(--foreground)" }}>
           {group.label}
         </span>
-        <span className="text-xs text-zinc-600">
+        <span className="text-xs" style={{ color: "var(--foreground-ghost)" }}>
           {group.count}
         </span>
         {group.totalClaims > 0 && (
           <span
             className="text-xs"
-            style={{ color: "var(--tigers-orange)", opacity: 0.7 }}
+            style={{ color: "var(--accent)", opacity: 0.7 }}
           >
             {group.totalClaims} claims
           </span>
         )}
       </button>
       {open && (
-        <div className="ml-2 border-l border-zinc-800/60 pl-1">
-          <div className="divide-y divide-zinc-800/40">
+        <div className="ml-2 border-l pl-1" style={{ borderColor: "var(--border)" }}>
+          <div className="divide-y" style={{ borderColor: "var(--border)" }}>
             {group.items.map((source) => (
               <SourceRow key={source.source_id} source={source} />
             ))}
@@ -256,11 +256,12 @@ function CreatorDropdown({
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${
-          selected
-            ? "border-orange-800/50 bg-orange-950/30 text-orange-300"
-            : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-600"
-        }`}
+        className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors"
+        style={{
+          borderColor: selected ? "var(--accent-glow)" : "var(--border-subtle)",
+          backgroundColor: selected ? "var(--accent-bg)" : "var(--background-deep)",
+          color: selected ? "var(--accent)" : "var(--foreground-secondary)",
+        }}
       >
         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -282,28 +283,26 @@ function CreatorDropdown({
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full z-20 mt-1 w-64 rounded-lg border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
+          <div className="absolute left-0 top-full z-20 mt-1 w-64 rounded-lg border py-1 shadow-xl" style={{ borderColor: "var(--border-subtle)", backgroundColor: "var(--background-deep)" }}>
             <button
               onClick={() => { onSelect(null); setOpen(false); }}
-              className={`flex w-full items-center justify-between px-3 py-1.5 text-xs hover:bg-zinc-800 ${
-                !selected ? "text-white" : "text-zinc-400"
-              }`}
+              className="flex w-full items-center justify-between px-3 py-1.5 text-xs"
+              style={{ color: !selected ? "var(--foreground)" : "var(--foreground-secondary)" }}
             >
               All creators
               {!selected && <CheckIcon />}
             </button>
-            <div className="mx-2 my-1 border-t border-zinc-800" />
+            <div className="mx-2 my-1 border-t" style={{ borderColor: "var(--border)" }} />
             {creators.map(([name, count]) => (
               <button
                 key={name}
                 onClick={() => { onSelect(selected === name ? null : name); setOpen(false); }}
-                className={`flex w-full items-center justify-between px-3 py-1.5 text-xs hover:bg-zinc-800 ${
-                  selected === name ? "text-white" : "text-zinc-400"
-                }`}
+                className="flex w-full items-center justify-between px-3 py-1.5 text-xs"
+                style={{ color: selected === name ? "var(--foreground)" : "var(--foreground-secondary)" }}
               >
                 <span className="truncate">{name}</span>
                 <span className="ml-2 flex items-center gap-1.5">
-                  <span className="text-zinc-600">{count}</span>
+                  <span style={{ color: "var(--foreground-ghost)" }}>{count}</span>
                   {selected === name && <CheckIcon />}
                 </span>
               </button>
@@ -317,7 +316,7 @@ function CreatorDropdown({
 
 function CheckIcon() {
   return (
-    <svg className="h-3.5 w-3.5" style={{ color: "var(--tigers-orange)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+    <svg className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
     </svg>
   );
@@ -381,7 +380,7 @@ export default function StreamClient({ sources }: { sources: SourceListItem[] })
         {/* Search */}
         <div className="relative">
           <svg
-            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600"
+            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "var(--foreground-ghost)" }}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -397,12 +396,13 @@ export default function StreamClient({ sources }: { sources: SourceListItem[] })
               setSearch(e.target.value);
               setVisibleCount(PAGE_SIZE);
             }}
-            className="w-full rounded-md border border-zinc-800 bg-zinc-900/50 py-2 pl-10 pr-4 text-sm text-zinc-200 placeholder-zinc-600 outline-none focus:border-zinc-600 transition-colors"
+            className="w-full rounded-md border py-2 pl-10 pr-4 text-sm outline-none transition-colors"
+            style={{ borderColor: "var(--border)", backgroundColor: "var(--background-deep)", color: "var(--foreground)" }}
           />
           {search && (
             <button
               onClick={() => setSearch("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-zinc-400"
+              className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: "var(--foreground-ghost)" }}
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -422,7 +422,8 @@ export default function StreamClient({ sources }: { sources: SourceListItem[] })
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as SortKey)}
-            className="rounded-md border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-400 outline-none focus:border-zinc-600"
+            className="rounded-md border px-2.5 py-1.5 text-xs outline-none"
+            style={{ borderColor: "var(--border-subtle)", backgroundColor: "var(--background-deep)", color: "var(--foreground-secondary)" }}
           >
             <option value="newest">Newest</option>
             <option value="oldest">Oldest</option>
@@ -433,14 +434,15 @@ export default function StreamClient({ sources }: { sources: SourceListItem[] })
           <select
             value={groupBy}
             onChange={(e) => setGroupBy(e.target.value as GroupMode)}
-            className="rounded-md border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-400 outline-none focus:border-zinc-600"
+            className="rounded-md border px-2.5 py-1.5 text-xs outline-none"
+            style={{ borderColor: "var(--border-subtle)", backgroundColor: "var(--background-deep)", color: "var(--foreground-secondary)" }}
           >
             <option value="none">No grouping</option>
             <option value="creator">Group by creator</option>
             <option value="date">Group by date</option>
           </select>
 
-          <span className="ml-auto text-xs text-zinc-600">
+          <span className="ml-auto text-xs" style={{ color: "var(--foreground-ghost)" }}>
             {totalFiltered === sources.length
               ? `${totalFiltered} sources`
               : `${totalFiltered} of ${sources.length}`}
@@ -450,7 +452,7 @@ export default function StreamClient({ sources }: { sources: SourceListItem[] })
 
       {/* Results */}
       {totalFiltered === 0 ? (
-        <p className="text-center text-zinc-600 py-16 text-sm">
+        <p className="text-center py-16 text-sm" style={{ color: "var(--foreground-ghost)" }}>
           No sources match your filters.
         </p>
       ) : groupBy !== "none" ? (
@@ -471,7 +473,7 @@ export default function StreamClient({ sources }: { sources: SourceListItem[] })
             <div className="mt-4 text-center">
               <button
                 onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
-                className="rounded-md px-5 py-1.5 text-xs text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-colors"
+                className="rounded-md px-5 py-1.5 text-xs transition-colors" style={{ color: "var(--foreground-ghost)" }}
               >
                 Show more · {totalFiltered - visibleCount} remaining
               </button>

@@ -6,9 +6,11 @@ Status: **Draft — deciding on layout and feature placement**
 
 ## Context
 
-The feed page (`/feed`) is where the audience spends most of their time. We need to decide how to use the available screen real estate, particularly the three-column desktop layout now that the Jeromelu avatar + nav bubbles live in the top-left.
+The feed page (`/feed`) is now the default entry point — `/` redirects here. This is where the audience lands and spends most of their time. The decision to skip the landing page (see `01-landing-page.md`) means the feed must immediately deliver value: the show is already running when you arrive.
 
-The existing design principles (see `00-design-principles.md`) describe a single-screen "Stream" model. This document works through how that vision maps to the actual page layout and what belongs where.
+We need to decide how to use the available screen real estate, particularly the three-column desktop layout now that the Jeromelu avatar + nav bubbles live in the top-left.
+
+The existing design principles (see `../concepts/00-design-principles.md`) describe a single-screen "Stream" model. This document works through how that vision maps to the actual page layout and what belongs where.
 
 ---
 

@@ -10,6 +10,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY services/web/ .
 ENV NEXT_PUBLIC_API_URL=https://api.jeromelu.ai
+ENV NEXT_PUBLIC_AVATAR_CDN_BASE=https://jeromelu.ai
 RUN npm run build
 
 FROM base AS runner
@@ -20,6 +21,7 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 COPY --from=builder /app/public ./public
+RUN rm -rf ./public/avatar/clips
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 

@@ -283,7 +283,7 @@ export default function MarkdownRenderer({
         if (seg.type === "final-verdict") {
           return (
             <div key={i} className="wiki-final-verdict">
-              <p className="kicker">Jeromelu&apos;s Call</p>
+              <p className="kicker">Jaromelu&apos;s Call</p>
               <MarkdownSegment content={seg.content.trim()} />
             </div>
           );

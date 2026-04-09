@@ -22,7 +22,7 @@ export const usePageTransition = () => useContext(TransitionContext);
 
 export function TransitionProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isHome = pathname === "/";
+  const isHome = pathname === "/landing";
   const prevIsHomeRef = useRef(isHome);
   const transitioningRef = useRef(false);
   const [tick, setTick] = useState(0);

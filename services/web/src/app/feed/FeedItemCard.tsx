@@ -18,15 +18,15 @@ const TYPE_CONFIG: Record<
   FeedItemType,
   { icon: LucideIcon; label: string; color: string }
 > = {
-  watching: { icon: Eye, label: "watching", color: "rgb(113, 113, 122)" },
-  signal: { icon: TrendingUp, label: "signal", color: "var(--tigers-orange)" },
-  thinking: { icon: Brain, label: "thinking", color: "rgb(168, 85, 247)" },
-  prediction: { icon: Target, label: "prediction", color: "rgb(59, 130, 246)" },
-  action: { icon: Zap, label: "action", color: "var(--tigers-orange)" },
-  review: { icon: RotateCcw, label: "review", color: "rgb(234, 179, 8)" },
-  sys: { icon: Settings, label: "sys", color: "rgb(63, 63, 70)" },
-  question: { icon: MessageCircle, label: "question", color: "rgb(59, 130, 246)" },
-  answer: { icon: BotMessageSquare, label: "answer", color: "var(--tigers-orange)" },
+  watching: { icon: Eye, label: "watching", color: "var(--wiki-ink-faint)" },
+  signal: { icon: TrendingUp, label: "signal", color: "var(--wiki-accent)" },
+  thinking: { icon: Brain, label: "thinking", color: "var(--wiki-purple)" },
+  prediction: { icon: Target, label: "prediction", color: "var(--wiki-teal)" },
+  action: { icon: Zap, label: "action", color: "var(--wiki-accent)" },
+  review: { icon: RotateCcw, label: "review", color: "var(--wiki-amber)" },
+  sys: { icon: Settings, label: "sys", color: "var(--wiki-ink-faint)" },
+  question: { icon: MessageCircle, label: "question", color: "var(--wiki-teal)" },
+  answer: { icon: BotMessageSquare, label: "answer", color: "var(--wiki-accent)" },
 };
 
 function timeAgo(dateStr: string): string {
@@ -46,7 +46,7 @@ function PlayerInline({ name }: { name: string }) {
   return (
     <span
       className="cursor-pointer font-semibold hover:underline"
-      style={{ color: "var(--tigers-orange)" }}
+      style={{ color: "var(--wiki-accent)" }}
     >
       {name}
     </span>
@@ -68,9 +68,10 @@ function renderTextWithPlayers(text: string, players?: { name: string }[]) {
 }
 
 function PredictionStatus({ status }: { status: "pending" | "correct" | "wrong" }) {
-  if (status === "pending") return <span className="text-zinc-500"> [pending]</span>;
-  if (status === "correct") return <span style={{ color: "rgb(34, 197, 94)" }}> [correct]</span>;
-  return <span style={{ color: "rgb(239, 68, 68)" }}> [wrong]</span>;
+  const base = { fontSize: "12px", fontFamily: "var(--font-geist-mono, monospace)", letterSpacing: "0.03em" } as const;
+  if (status === "pending") return <span style={{ ...base, color: "var(--wiki-ink-faint)" }}> [pending]</span>;
+  if (status === "correct") return <span style={{ ...base, color: "var(--wiki-teal)" }}> [correct]</span>;
+  return <span style={{ ...base, color: "var(--red, #9a2020)" }}> [wrong]</span>;
 }
 
 export default function FeedItemCard({ item }: { item: FeedItem }) {
@@ -83,68 +84,99 @@ export default function FeedItemCard({ item }: { item: FeedItem }) {
 
   return (
     <div
-      className={`group flex gap-0 py-1.5 transition-colors hover:bg-white/[0.02] ${
+      className={`group flex gap-0 py-2.5 transition-colors ${
         isSystem ? "opacity-50" : ""
-      } ${isAnswer ? "mb-3 pb-3 border-b border-zinc-800/20" : ""}`}
+      }`}
+      style={{
+        paddingBottom: isAnswer ? "0.75rem" : undefined,
+      }}
     >
       {/* Timestamp gutter */}
-      <div className="w-10 shrink-0 flex items-center justify-end" style={{ height: 22 }}>
-        <span className="font-mono text-[11px] text-zinc-500">{timeAgo(item.timestamp)}</span>
+      <div className="w-12 shrink-0 flex items-start justify-end" style={{ paddingTop: "0.2rem" }}>
+        <span style={{ fontSize: "12px", fontFamily: "var(--font-geist-mono, monospace)", color: "var(--wiki-ink-faint)" }}>{timeAgo(item.timestamp)}</span>
       </div>
 
       {/* Type icon */}
-      <div className="w-8 shrink-0 flex items-center justify-center" style={{ height: 22 }}>
-        <Icon size={13} style={{ color: config.color }} />
+      <div className="w-8 shrink-0 flex items-start justify-center" style={{ paddingTop: "0.3rem" }}>
+        <Icon size={14} style={{ color: config.color }} />
       </div>
 
       {/* Content */}
       <div className="flex-1 min-w-0">
         {isSystem ? (
-          <p className="font-mono text-xs text-zinc-600">{item.text}</p>
+          <p style={{ fontSize: "13px", fontFamily: "var(--font-geist-mono, monospace)", color: "var(--wiki-ink-faint)" }}>{item.text}</p>
         ) : isQuestion ? (
-          <span className="text-[13px] leading-relaxed text-zinc-300 italic">
-            {item.text}
-          </span>
-        ) : (
-          <>
-            {/* Action prefix */}
-            {isAction && (
-              <span
-                className="font-mono text-xs font-bold mr-1.5"
-                style={{ color: "var(--tigers-orange)" }}
-              >
-                &gt;
-              </span>
-            )}
-            <span className="text-[13px] leading-relaxed text-zinc-300">
-              {renderTextWithPlayers(item.text, item.players)}
-              {item.prediction && <PredictionStatus status={item.prediction.status} />}
+          <div>
+            <span
+              style={{
+                fontSize: "12px",
+                fontWeight: 700,
+                fontFamily: "var(--font-geist-mono, monospace)",
+                color: item.user?.color || "var(--wiki-teal)",
+                marginRight: "0.5rem",
+              }}
+            >
+              {item.user?.name || "Coach"}
             </span>
-
-            {/* Single source attribution */}
-            {item.source && (
-              <span className="ml-2 text-[11px] text-zinc-600 hover:text-zinc-400 cursor-pointer transition-colors">
-                via {item.source.creator || item.source.title}
-              </span>
-            )}
-
-            {/* Multiple sources (answer events) */}
-            {isAnswer && item.sources && item.sources.length > 0 && (
-              <div className="mt-0.5 flex flex-wrap gap-2">
+            <span style={{ fontSize: "15px", lineHeight: 1.65, fontStyle: "italic", fontWeight: 600, color: "var(--wiki-ink)" }}>
+              {item.text}
+            </span>
+          </div>
+        ) : isAnswer ? (
+          <div>
+            <span
+              style={{
+                fontSize: "12px",
+                fontWeight: 700,
+                fontFamily: "var(--font-geist-mono, monospace)",
+                color: "var(--wiki-accent)",
+                marginRight: "0.5rem",
+              }}
+            >
+              Jaromelu
+            </span>
+            <span style={{ fontSize: "15px", lineHeight: 1.65, color: "var(--wiki-ink)" }}>
+              {renderTextWithPlayers(item.text, item.players)}
+            </span>
+            {item.sources && item.sources.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-2">
                 {item.sources.map((s) => (
                   <span
                     key={s.sourceId}
-                    className="font-mono text-[10px] text-zinc-500"
+                    style={{ fontSize: "11px", fontFamily: "var(--font-geist-mono, monospace)", color: "var(--wiki-ink-faint)" }}
                   >
                     via {s.creator || s.title}
                   </span>
                 ))}
               </div>
             )}
+          </div>
+        ) : (
+          <>
+            {/* Action prefix */}
+            {isAction && (
+              <span
+                className="font-bold mr-1.5"
+                style={{ fontSize: "14px", color: "var(--wiki-accent)" }}
+              >
+                &gt;
+              </span>
+            )}
+            <span style={{ fontSize: "15px", lineHeight: 1.65, color: "var(--wiki-ink)" }}>
+              {renderTextWithPlayers(item.text, item.players)}
+              {item.prediction && <PredictionStatus status={item.prediction.status} />}
+            </span>
+
+            {/* Single source attribution */}
+            {item.source && (
+              <span className="ml-2 cursor-pointer transition-colors" style={{ fontSize: "12px", fontFamily: "var(--font-geist-mono, monospace)", color: "var(--wiki-ink-faint)" }}>
+                via {item.source.creator || item.source.title}
+              </span>
+            )}
 
             {/* Review outcome inline */}
             {item.prediction?.outcome && (
-              <span className="ml-2 font-mono text-[11px] text-zinc-600 italic">
+              <span className="ml-2 italic" style={{ fontSize: "12px", color: "var(--wiki-ink-faint)" }}>
                 — {item.prediction.outcome}
               </span>
             )}

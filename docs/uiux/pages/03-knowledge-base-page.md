@@ -82,44 +82,83 @@ The serif/sans pairing (Cormorant Garamond for headings and display, Geist Sans 
 
 ### Wiki Index (`/wiki`)
 
+Designed to scale to 17 teams, 450+ players, and 50+ advisors. Each tab has a layout optimised for its content volume.
+
+**Design reference:** [docs/designs/wiki-index-at-scale.html](../../designs/wiki-index-at-scale.html)
+
+#### "All" tab — Dashboard summary
+
 ```
-┌────────────────────────────────────────────────────┐
-│                   KNOWLEDGE BASE                   │  ← kicker
-│                    The Wiki                        │  ← serif h1
-│        Everything Jeromelu knows — ...             │  ← italic subtitle
-│                    ───────                         │  ← accent divider
-│                                                    │
-│  [Search...] [All] [Players] [Teams] [Advisors]   │  ← filters
-│                                                    │
-│  ┌─────────────────────────────────┐ ┌───────────┐│
-│  │  TEAMS (3)                      │ │  RECENT   ││
-│  │ ┌─────┬─────┬─────┐            │ │  CHANGES  ││
-│  │ │card │card │card │  ← 1px gap │ │           ││
-│  │ └─────┴─────┴─────┘            │ │  Tom T.   ││
-│  │                                 │ │  Updated..││
-│  │  ADVISORS (2)                   │ │           ││
-│  │ ┌─────┬─────┐                  │ │  Cleary   ││
-│  │ │card │card │                  │ │  Updated..││
-│  │ └─────┴─────┘                  │ │           ││
-│  │                                 │ └───────────┘│
-│  │  PLAYERS (2)                    │              │
-│  │ ┌─────┬─────┐                  │              │
-│  │ │card │card │                  │              │
-│  │ └─────┴─────┘                  │              │
-│  └─────────────────────────────────┘              │
-└────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│  Knowledge Base                                      │
+│  Players, teams, advisors, rounds.                   │
+│                                                      │
+│  [Search...] [ALL] [Players] [Teams] [Advisors] ...  │
+│                                                      │
+│  ┌──────────┬──────────┬──────────┬──────────┐       │
+│  │   452    │    17    │    54    │     6    │       │  ← clickable summary cards
+│  │ PLAYERS  │  TEAMS   │ ADVISORS │  ROUNDS  │       │     navigate to that tab
+│  └──────────┴──────────┴──────────┴──────────┘       │
+│                                                      │
+│  RECENTLY UPDATED (10)                               │
+│  ┌─────────────────────┬─────────────────────┐       │
+│  │ [P] Tom Trbojevic   │ [P] Nathan Cleary   │       │  ← 2-col recent changes
+│  │     Injury update   │     Round 6 analysis │       │     from /api/wiki/recent-changes
+│  ├─────────────────────┼─────────────────────┤       │
+│  │ [T] Penrith Panthers│ [A] SC Playbook     │       │
+│  │     Roster update   │     New episode      │       │
+│  └─────────────────────┴─────────────────────┘       │
+└──────────────────────────────────────────────────────┘
 ```
 
-Cards use the 1px-gap grid pattern (container has border colour as background, cards sit in the gaps) for hairline dividers. Each card shows: serif title, summary (2-line clamp), timestamp, optional status badge.
+#### "Players" tab — Grouped, collapsible, with A-Z nav
+
+```
+┌──────────────────────────────────────────────────────┐
+│  PLAYERS (452)                    [Expand] [Collapse] │
+│                                                      │
+│  [A][B][C][D]...[M]...[P]...[W]                      │  ← A-Z jump bar
+│                                                      │
+│  ▼ Brisbane Broncos                      28 players  │  ← collapsible group
+│  ┌──────────────┬──────────────┬──────────────┐      │
+│  │ FLB R.Walsh  │ CTW S.Cobbo │ 5/8 E.Mam    │      │  ← compact 3-col rows
+│  │ $612k        │ $458k       │ $523k        │      │     position + name + price
+│  └──────────────┴──────────────┴──────────────┘      │
+│                                                      │
+│  ▶ Canterbury-Bankstown Bulldogs         26 players  │  ← collapsed
+│  ▶ Cronulla-Sutherland Sharks            27 players  │
+│                                                      │
+│  ▼ Melbourne Storm                       28 players  │
+│  ┌──────────────┬──────────────┬──────────────┐      │
+│  │ HFB J.Hughes │ CTW R.Papen │ FRF N.Asofa  │      │
+│  └──────────────┴──────────────┴──────────────┘      │
+└──────────────────────────────────────────────────────┘
+```
+
+Groups by `metadata_json.team` when available, otherwise alphabetically by first letter. Position tags and prices shown when `metadata_json.position` / `metadata_json.price` exist.
+
+#### "Teams" / "Advisors" / "Rounds" tabs — Paginated card grid
+
+```
+┌──────────────────────────────────────────────────────┐
+│  ┌─────────┬─────────┬─────────┐                     │
+│  │ Team 1  │ Team 2  │ Team 3  │  ← 3-col card grid │
+│  │ summary │ summary │ summary │     with 1px gaps   │
+│  └─────────┴─────────┴─────────┘                     │
+│  ...                                                 │
+│                                                      │
+│           « [1] [2] [3] ... [5] »                    │  ← pagination (30/page)
+└──────────────────────────────────────────────────────┘
+```
+
+Cards use the 1px-gap grid pattern (container has border colour as background, cards sit in the gaps) for hairline dividers. Each card shows: serif title, summary (2-line clamp), timestamp, optional status badge. Pagination appears at 30+ items.
 
 ### Wiki Entity Page (`/wiki/player/[slug]`)
 
 ```
 ┌────────────────────────────────────────────────────┐
-│ [OVERVIEW] [FORM] [PRICE] [EXPERTS] [INJURIES] .. │  ← sticky section nav
+│ ‹ Wiki / Players   OVERVIEW  FORM  PRICE  EXPERTS │  ← single sticky nav bar
 ├────────────────────────────────────────────────────┤
-│  Wiki › Players › Tom Trbojevic                    │  ← breadcrumb
-│                                                    │
 │                      PLAYER                        │  ← kicker
 │                 Tom Trbojevic                       │  ← serif h1
 │          Premium fullback for Manly...             │  ← italic subtitle
@@ -282,5 +321,6 @@ Renders as a centered bordered box with "Jeromelu's Call" kicker and serif itali
 | `services/web/src/app/wiki/wiki.css` | All wiki-specific styles and CSS variables |
 | `services/web/src/app/wiki/components/WikiPageClient.tsx` | Page layout — hero, nav, footer |
 | `services/web/src/app/wiki/components/MarkdownRenderer.tsx` | Markdown → editorial components |
-| `services/web/src/app/wiki/WikiIndexClient.tsx` | Index page — grid, filters, sidebar |
-| `docs/designs/wiki-player.html` | Standalone HTML design reference |
+| `services/web/src/app/wiki/WikiIndexClient.tsx` | Index page — dashboard, grouped players, pagination |
+| `docs/designs/wiki-player.html` | Standalone HTML design reference (player page) |
+| `docs/designs/wiki-index-at-scale.html` | Standalone HTML design reference (index at 500+ pages) |

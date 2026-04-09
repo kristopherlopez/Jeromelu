@@ -1,0 +1,574 @@
+<!--
+  Box Variant Exploration
+  2026-04-09
+
+  The left-border-with-tinted-bg pattern is predictable. Here are 8 different
+  approaches to content boxes, all using the Warm Earth palette.
+  Same content, different containers.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Box Variants — Exploration | Jeromelu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #2a2420;
+    color: #ede4d6;
+    line-height: 1.6;
+    padding: 3rem 2rem 6rem;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container { max-width: 800px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 3rem; }
+  header h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 2rem; font-weight: 600; margin-bottom: 0.4rem; }
+  header p { color: #948878; font-size: 14px; max-width: 560px; margin: 0 auto; }
+  header .divider { width: 60px; height: 2px; background: #d4874a; margin: 1.5rem auto 0; opacity: 0.4; }
+
+  .option { margin-bottom: 3.5rem; }
+  .option-header {
+    display: flex; align-items: baseline; gap: 0.75rem;
+    margin-bottom: 0.3rem;
+  }
+  .option-header h2 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 1.3rem; font-weight: 600; }
+  .option-header .num { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: #d4874a; }
+  .option-desc { font-size: 13px; color: #6e6458; margin-bottom: 1.25rem; }
+  .boxes { display: flex; flex-direction: column; gap: 0.6rem; }
+
+  hr.sep { border: none; height: 1px; background: #3e3630; margin: 0 0 3.5rem; }
+
+  /* shared text styles inside boxes */
+  .bx-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.2rem; }
+  .bx-body { font-size: 13px; line-height: 1.6; }
+  .bx-body strong { font-weight: 600; }
+
+  footer { text-align: center; font-size: 12px; color: #504840; margin-top: 2rem; border-top: 1px solid #3e3630; padding-top: 2rem; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>Box Variants</h1>
+    <p>Eight different container styles for crew content. Same words, different material. Pick the ones that feel right — you can mix and match.</p>
+    <div class="divider"></div>
+  </header>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- 1. CURRENT — left border + tinted bg      -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="option">
+    <div class="option-header">
+      <span class="num">01</span>
+      <h2>Left Border + Tint</h2>
+    </div>
+    <p class="option-desc">The current approach. Functional but predictable — every AI design system uses this pattern. It's become a visual cliché.</p>
+    <div class="boxes">
+      <div style="background:rgba(212,135,74,0.10); border-left:3px solid #d4874a; padding:0.85rem 1rem; border-radius:0 6px 6px 0;">
+        <div class="bx-label" style="color:#d4874a;">Jeromelu's Take</div>
+        <div class="bx-body" style="color:#ede4d6;">Turbo is the definition of risk-reward. When he plays, he's arguably the best fullback in the game.</div>
+      </div>
+      <div style="background:rgba(138,173,204,0.07); border-left:3px solid #8aadcc; padding:0.85rem 1rem; border-radius:0 6px 6px 0;">
+        <div class="bx-label" style="color:#8aadcc;">Analyst Context</div>
+        <div class="bx-body" style="color:#948878;"><strong style="color:#ede4d6;">Mechanism:</strong> Pricing follows a boom-bust cycle driven by availability, not form.</div>
+      </div>
+      <div style="background:rgba(196,80,80,0.08); border-left:3px solid #c45050; padding:0.85rem 1rem; border-radius:0 6px 6px 0;">
+        <div class="bx-label" style="color:#c45050;">Warning</div>
+        <div class="bx-body" style="color:#ede4d6;"><strong>Warning:</strong> 3 of last 4 seasons: 8+ games missed.</div>
+      </div>
+    </div>
+  </div>
+  <hr class="sep">
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- 2. INLINE MARK — no box at all            -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="option">
+    <div class="option-header">
+      <span class="num">02</span>
+      <h2>Inline Mark</h2>
+    </div>
+    <p class="option-desc">No container. Just a coloured mark/pip before the label, and the text flows naturally. Minimal, editorial, lets the content breathe. The "mark" could be a dot, dash, or small square.</p>
+    <div class="boxes" style="gap:1.25rem;">
+      <div style="padding-left:1rem;">
+        <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.15rem;">
+          <span style="width:8px; height:8px; border-radius:2px; background:#d4874a; flex-shrink:0;"></span>
+          <span class="bx-label" style="color:#d4874a; margin-bottom:0;">Jeromelu's Take</span>
+        </div>
+        <div class="bx-body" style="color:#c0b4a0; padding-left:1.1rem;">Turbo is the definition of risk-reward. When he plays, he's arguably the best fullback in the game.</div>
+      </div>
+      <div style="padding-left:1rem;">
+        <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.15rem;">
+          <span style="width:8px; height:8px; border-radius:2px; background:#8aadcc; flex-shrink:0;"></span>
+          <span class="bx-label" style="color:#8aadcc; margin-bottom:0;">Analyst Context</span>
+        </div>
+        <div class="bx-body" style="color:#948878; padding-left:1.1rem;"><strong style="color:#c0b4a0;">Mechanism:</strong> Pricing follows a boom-bust cycle driven by availability, not form.</div>
+      </div>
+      <div style="padding-left:1rem;">
+        <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.15rem;">
+          <span style="width:8px; height:8px; border-radius:2px; background:#c45050; flex-shrink:0;"></span>
+          <span class="bx-label" style="color:#c45050; margin-bottom:0;">Warning</span>
+        </div>
+        <div class="bx-body" style="color:#c0b4a0; padding-left:1.1rem;">3 of last 4 seasons: 8+ games missed.</div>
+      </div>
+    </div>
+  </div>
+  <hr class="sep">
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- 3. TOP RULE — horizontal line above       -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="option">
+    <div class="option-header">
+      <span class="num">03</span>
+      <h2>Top Rule</h2>
+    </div>
+    <p class="option-desc">A coloured horizontal rule above the content, like a magazine pull-quote or section divider. The colour sits above, not beside. Feels more editorial and less "component library."</p>
+    <div class="boxes" style="gap:1.5rem;">
+      <div>
+        <div style="height:2px; width:48px; background:#d4874a; margin-bottom:0.65rem; border-radius:1px;"></div>
+        <div class="bx-label" style="color:#d4874a;">Jeromelu's Take</div>
+        <div class="bx-body" style="color:#c0b4a0;">Turbo is the definition of risk-reward. When he plays, he's arguably the best fullback in the game.</div>
+      </div>
+      <div>
+        <div style="height:2px; width:48px; background:#8aadcc; margin-bottom:0.65rem; border-radius:1px;"></div>
+        <div class="bx-label" style="color:#8aadcc;">Analyst Context</div>
+        <div class="bx-body" style="color:#948878;"><strong style="color:#c0b4a0;">Mechanism:</strong> Pricing follows a boom-bust cycle driven by availability, not form.</div>
+      </div>
+      <div>
+        <div style="height:2px; width:48px; background:#c45050; margin-bottom:0.65rem; border-radius:1px;"></div>
+        <div class="bx-label" style="color:#c45050;">Warning</div>
+        <div class="bx-body" style="color:#c0b4a0;">3 of last 4 seasons: 8+ games missed.</div>
+      </div>
+    </div>
+  </div>
+  <hr class="sep">
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- 4. QUOTATION — large coloured quote mark  -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="option">
+    <div class="option-header">
+      <span class="num">04</span>
+      <h2>Pull Quote</h2>
+    </div>
+    <p class="option-desc">An oversized coloured quote mark or symbol as the visual anchor. The box type is communicated by the symbol itself — quote marks for takes, an asterisk for context, a warning triangle for warnings. Typographic, not structural.</p>
+    <div class="boxes" style="gap:1.75rem;">
+      <div style="display:flex; gap:1rem; align-items:flex-start;">
+        <span style="font-family:'Cormorant Garamond',Georgia,serif; font-size:3rem; line-height:1; color:#d4874a; flex-shrink:0; margin-top:-0.15rem;">&ldquo;</span>
+        <div>
+          <div class="bx-label" style="color:#d4874a;">Jeromelu's Take</div>
+          <div class="bx-body" style="color:#c0b4a0; font-style:italic;">Turbo is the definition of risk-reward. When he plays, he's arguably the best fullback in the game.</div>
+        </div>
+      </div>
+      <div style="display:flex; gap:1rem; align-items:flex-start;">
+        <span style="font-family:'Cormorant Garamond',Georgia,serif; font-size:2.4rem; line-height:1; color:#8aadcc; flex-shrink:0; margin-top:-0.1rem;">&#8727;</span>
+        <div>
+          <div class="bx-label" style="color:#8aadcc;">Analyst Context</div>
+          <div class="bx-body" style="color:#948878;"><strong style="color:#c0b4a0;">Mechanism:</strong> Pricing follows a boom-bust cycle driven by availability, not form.</div>
+        </div>
+      </div>
+      <div style="display:flex; gap:1rem; align-items:flex-start;">
+        <span style="font-size:1.6rem; line-height:1; color:#c45050; flex-shrink:0; margin-top:0.1rem;">&#9650;</span>
+        <div>
+          <div class="bx-label" style="color:#c45050;">Warning</div>
+          <div class="bx-body" style="color:#c0b4a0;">3 of last 4 seasons: 8+ games missed.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <hr class="sep">
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- 5. FULL BORDER — thin full outline        -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="option">
+    <div class="option-header">
+      <span class="num">05</span>
+      <h2>Full Border</h2>
+    </div>
+    <p class="option-desc">A thin coloured border all the way around. No background tint — the box is defined by its outline only. Cleaner, less heavy, the colour is in the frame not the fill.</p>
+    <div class="boxes">
+      <div style="border:1px solid rgba(212,135,74,0.3); padding:0.85rem 1rem; border-radius:8px;">
+        <div class="bx-label" style="color:#d4874a;">Jeromelu's Take</div>
+        <div class="bx-body" style="color:#c0b4a0;">Turbo is the definition of risk-reward. When he plays, he's arguably the best fullback in the game.</div>
+      </div>
+      <div style="border:1px solid rgba(138,173,204,0.25); padding:0.85rem 1rem; border-radius:8px;">
+        <div class="bx-label" style="color:#8aadcc;">Analyst Context</div>
+        <div class="bx-body" style="color:#948878;"><strong style="color:#c0b4a0;">Mechanism:</strong> Pricing follows a boom-bust cycle driven by availability, not form.</div>
+      </div>
+      <div style="border:1px solid rgba(196,80,80,0.3); padding:0.85rem 1rem; border-radius:8px;">
+        <div class="bx-label" style="color:#c45050;">Warning</div>
+        <div class="bx-body" style="color:#c0b4a0;">3 of last 4 seasons: 8+ games missed.</div>
+      </div>
+    </div>
+  </div>
+  <hr class="sep">
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- 6. BADGE HEADER — coloured header strip   -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="option">
+    <div class="option-header">
+      <span class="num">06</span>
+      <h2>Header Strip</h2>
+    </div>
+    <p class="option-desc">A compact coloured header bar with the label, then neutral body below. The colour is concentrated at the top like a filing tab or a sticky note header. Body is just the default card surface.</p>
+    <div class="boxes">
+      <div style="border-radius:8px; overflow:hidden; border:1px solid #3e3630;">
+        <div style="background:rgba(212,135,74,0.15); padding:0.45rem 0.85rem;">
+          <span class="bx-label" style="color:#d4874a; margin-bottom:0; font-size:10px;">Jeromelu's Take</span>
+        </div>
+        <div style="padding:0.75rem 0.85rem; background:#342c26;">
+          <div class="bx-body" style="color:#c0b4a0;">Turbo is the definition of risk-reward. When he plays, he's arguably the best fullback in the game.</div>
+        </div>
+      </div>
+      <div style="border-radius:8px; overflow:hidden; border:1px solid #3e3630;">
+        <div style="background:rgba(138,173,204,0.12); padding:0.45rem 0.85rem;">
+          <span class="bx-label" style="color:#8aadcc; margin-bottom:0; font-size:10px;">Analyst Context</span>
+        </div>
+        <div style="padding:0.75rem 0.85rem; background:#342c26;">
+          <div class="bx-body" style="color:#948878;"><strong style="color:#c0b4a0;">Mechanism:</strong> Pricing follows a boom-bust cycle driven by availability, not form.</div>
+        </div>
+      </div>
+      <div style="border-radius:8px; overflow:hidden; border:1px solid #3e3630;">
+        <div style="background:rgba(196,80,80,0.15); padding:0.45rem 0.85rem;">
+          <span class="bx-label" style="color:#c45050; margin-bottom:0; font-size:10px;">Warning</span>
+        </div>
+        <div style="padding:0.75rem 0.85rem; background:#342c26;">
+          <div class="bx-body" style="color:#c0b4a0;">3 of last 4 seasons: 8+ games missed.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <hr class="sep">
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- 7. INDENT — just indented with a label    -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="option">
+    <div class="option-header">
+      <span class="num">07</span>
+      <h2>Indented Block</h2>
+    </div>
+    <p class="option-desc">No border, no background, no decoration. Just indented text with a coloured label. The surrounding whitespace IS the container. Maximum restraint — trusts the content and the typography to carry it. Very "Her" energy.</p>
+    <div class="boxes" style="gap:2rem; padding-left:2rem;">
+      <div>
+        <div class="bx-label" style="color:#d4874a; font-size:10px; letter-spacing:0.12em;">Jeromelu's Take</div>
+        <div class="bx-body" style="color:#c0b4a0; font-size:14px; max-width:520px;">Turbo is the definition of risk-reward. When he plays, he's arguably the best fullback in the game.</div>
+      </div>
+      <div>
+        <div class="bx-label" style="color:#8aadcc; font-size:10px; letter-spacing:0.12em;">Analyst Context</div>
+        <div class="bx-body" style="color:#6e6458; font-size:14px; max-width:520px;"><strong style="color:#948878;">Mechanism:</strong> Pricing follows a boom-bust cycle driven by availability, not form.</div>
+      </div>
+      <div>
+        <div class="bx-label" style="color:#c45050; font-size:10px; letter-spacing:0.12em;">Warning</div>
+        <div class="bx-body" style="color:#c0b4a0; font-size:14px; max-width:520px;">3 of last 4 seasons: 8+ games missed.</div>
+      </div>
+    </div>
+  </div>
+  <hr class="sep">
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- 8. BOTTOM RULE — content first, rule after-->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="option">
+    <div class="option-header">
+      <span class="num">08</span>
+      <h2>Bottom Rule</h2>
+    </div>
+    <p class="option-desc">Content first, coloured rule underneath. The label is small and de-emphasised — the content leads. The rule acts as both a separator and a colour signal. Works well when boxes are stacked as a stream of notes.</p>
+    <div class="boxes" style="gap:0;">
+      <div style="padding:1rem 0; border-bottom:2px solid rgba(212,135,74,0.3);">
+        <div class="bx-body" style="color:#c0b4a0; margin-bottom:0.35rem;">Turbo is the definition of risk-reward. When he plays, he's arguably the best fullback in the game.</div>
+        <div style="font-size:10px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:#d4874a; opacity:0.6;">Jeromelu's Take</div>
+      </div>
+      <div style="padding:1rem 0; border-bottom:2px solid rgba(138,173,204,0.25);">
+        <div class="bx-body" style="color:#948878; margin-bottom:0.35rem;"><strong style="color:#c0b4a0;">Mechanism:</strong> Pricing follows a boom-bust cycle driven by availability, not form.</div>
+        <div style="font-size:10px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:#8aadcc; opacity:0.6;">Analyst Context</div>
+      </div>
+      <div style="padding:1rem 0; border-bottom:2px solid rgba(196,80,80,0.3);">
+        <div class="bx-body" style="color:#c0b4a0; margin-bottom:0.35rem;">3 of last 4 seasons: 8+ games missed.</div>
+        <div style="font-size:10px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:#c45050; opacity:0.6;">Warning</div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="sep" style="margin-top:3.5rem;">
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- MIX & MATCH SUGGESTION                     -->
+  <!-- ══════════════════════════════════════════ -->
+  <div style="max-width:560px; margin:0 auto; text-align:center;">
+    <div style="font-size:11px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#d4874a; margin-bottom:0.5rem;">Note</div>
+    <p style="font-size:14px; color:#948878; line-height:1.65;">You don't have to pick one style for all box types. You could use <strong style="color:#c0b4a0;">Pull Quote</strong> for Jeromelu's takes, <strong style="color:#c0b4a0;">Top Rule</strong> for analyst context, <strong style="color:#c0b4a0;">Inline Mark</strong> for bookkeeper numbers, and <strong style="color:#c0b4a0;">Full Border</strong> for warnings. Mixing styles based on the role of the content can feel more intentional than one pattern for everything.</p>
+  </div>
+
+  <hr class="sep">
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- IN-CONTEXT EXAMPLES                        -->
+  <!-- ══════════════════════════════════════════ -->
+
+  <div style="text-align:center; margin-bottom:2.5rem;">
+    <div style="font-size:11px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#d4874a; margin-bottom:0.5rem;">In Context</div>
+    <h2 style="font-family:'Cormorant Garamond',Georgia,serif; font-size:1.6rem; font-weight:600; margin-bottom:0.4rem;">Same Wiki Page, Eight Box Styles</h2>
+    <p style="font-size:14px; color:#6e6458; max-width:560px; margin:0 auto;">Each mini-page shows the same Trbojevic content — hero, stats, callout, mechanism, trust list, warning, verdict — using that option's box treatment.</p>
+  </div>
+
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
+
+    <!-- ── 01. LEFT BORDER + TINT ── -->
+    <div style="border-radius:10px; overflow:hidden; border:1px solid #3e3630;">
+      <div style="background:#241e1a; padding:6px 12px; font-size:10px; font-family:'JetBrains Mono',monospace; color:#504840; border-bottom:1px solid #3e3630; display:flex; align-items:center; gap:8px;">
+        <span style="display:flex; gap:4px;"><span style="width:8px; height:8px; border-radius:50%; background:#3e3630;"></span><span style="width:8px; height:8px; border-radius:50%; background:#3e3630;"></span><span style="width:8px; height:8px; border-radius:50%; background:#3e3630;"></span></span>
+        01 — Left Border + Tint
+      </div>
+      <div style="background:#2a2420; padding:1.25rem 1.5rem; font-size:12px; line-height:1.6; max-height:580px; overflow:hidden;">
+        <div style="text-align:center; margin-bottom:1rem;">
+          <div style="font-size:10px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#b85c38; margin-bottom:0.25rem;">Player</div>
+          <div style="font-family:'Cormorant Garamond',serif; font-size:1.6rem; font-weight:600; color:#ede4d6; line-height:1.15;">Tom Trbojevic</div>
+          <div style="font-family:'Cormorant Garamond',serif; font-size:0.8rem; font-style:italic; color:#948878; margin-top:0.2rem;">Elite ceiling, extensive injury history.</div>
+          <div style="width:36px; height:1px; background:#b85c38; margin:0.65rem auto 0; opacity:0.4;"></div>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:#3e3630; border:1px solid #3e3630; margin-bottom:0.75rem;">
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">Avg</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#ede4d6;">74.3</div></div>
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">Price</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#ede4d6;">$487k</div></div>
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">BE</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#5a9e8a;">61</div></div>
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">Games</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#c4a840;">4/5</div></div>
+        </div>
+        <div style="background:rgba(212,135,74,0.10); border-left:3px solid #d4874a; padding:0.6rem 0.75rem; margin-bottom:0.6rem; border-radius:0 6px 6px 0;"><div style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#d4874a; margin-bottom:0.15rem;">Jeromelu's Take</div><div style="font-size:11px; color:#c0b4a0;">Turbo is the definition of risk-reward.</div></div>
+        <div style="background:rgba(138,173,204,0.07); border-left:3px solid #8aadcc; padding:0.6rem 0.75rem; margin-bottom:0.6rem; border-radius:0 6px 6px 0;"><div style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#8aadcc; margin-bottom:0.15rem;">Mechanism</div><div style="font-size:11px; color:#948878;"><strong style="color:#c0b4a0;">Boom-bust cycle</strong> driven by availability.</div></div>
+        <div style="border:1px solid #3e3630; margin-bottom:0.6rem;">
+          <div style="display:grid; grid-template-columns:50px 1fr; border-bottom:1px solid #3e3630;"><div style="padding:0.35rem; display:flex; align-items:center; justify-content:center; border-right:1px solid #3e3630;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(90,158,138,0.12); color:#5a9e8a;">BULL</span></div><div style="padding:0.35rem 0.5rem;"><strong style="font-size:10px; color:#d4874a;">SC Playbook</strong><div style="font-size:9px; color:#948878;">Buy at $452k.</div></div></div>
+          <div style="display:grid; grid-template-columns:50px 1fr;"><div style="padding:0.35rem; display:flex; align-items:center; justify-content:center; border-right:1px solid #3e3630;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(196,168,64,0.12); color:#c4a840;">HOLD</span></div><div style="padding:0.35rem 0.5rem;"><strong style="font-size:10px; color:#d4874a;">SC NRL Pod</strong><div style="font-size:9px; color:#948878;">Wait for clean run.</div></div></div>
+        </div>
+        <div style="background:rgba(196,80,80,0.08); border-left:3px solid #c45050; padding:0.6rem 0.75rem; margin-bottom:0.6rem; border-radius:0 6px 6px 0;"><div style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#c45050; margin-bottom:0.15rem;">Warning</div><div style="font-size:11px; color:#c0b4a0;">3 of 4 seasons: 8+ games missed.</div></div>
+        <div style="background:#342c26; border:1px solid #3e3630; padding:0.65rem; text-align:center;"><div style="font-size:10px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:#d4874a; margin-bottom:0.2rem;">Jeromelu's Call</div><div style="font-family:'Cormorant Garamond',serif; font-size:0.8rem; font-style:italic; color:#ede4d6;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(90,158,138,0.15); color:#5a9e8a; font-style:normal;">BUY</span> with cover. <span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(196,80,80,0.15); color:#c45050; font-style:normal;">AVOID</span> if reliability needed.</div></div>
+      </div>
+    </div>
+
+    <!-- ── 02. INLINE MARK ── -->
+    <div style="border-radius:10px; overflow:hidden; border:1px solid #3e3630;">
+      <div style="background:#241e1a; padding:6px 12px; font-size:10px; font-family:'JetBrains Mono',monospace; color:#504840; border-bottom:1px solid #3e3630; display:flex; align-items:center; gap:8px;">
+        <span style="display:flex; gap:4px;"><span style="width:8px; height:8px; border-radius:50%; background:#3e3630;"></span><span style="width:8px; height:8px; border-radius:50%; background:#3e3630;"></span><span style="width:8px; height:8px; border-radius:50%; background:#3e3630;"></span></span>
+        02 — Inline Mark
+      </div>
+      <div style="background:#2a2420; padding:1.25rem 1.5rem; font-size:12px; line-height:1.6; max-height:580px; overflow:hidden;">
+        <div style="text-align:center; margin-bottom:1rem;">
+          <div style="font-size:10px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#b85c38; margin-bottom:0.25rem;">Player</div>
+          <div style="font-family:'Cormorant Garamond',serif; font-size:1.6rem; font-weight:600; color:#ede4d6; line-height:1.15;">Tom Trbojevic</div>
+          <div style="font-family:'Cormorant Garamond',serif; font-size:0.8rem; font-style:italic; color:#948878; margin-top:0.2rem;">Elite ceiling, extensive injury history.</div>
+          <div style="width:36px; height:1px; background:#b85c38; margin:0.65rem auto 0; opacity:0.4;"></div>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:#3e3630; border:1px solid #3e3630; margin-bottom:0.75rem;">
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">Avg</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#ede4d6;">74.3</div></div>
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">Price</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#ede4d6;">$487k</div></div>
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">BE</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#5a9e8a;">61</div></div>
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">Games</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#c4a840;">4/5</div></div>
+        </div>
+        <div style="padding:0.6rem 0 0.6rem 0.85rem; margin-bottom:0.5rem;"><div style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0.1rem;"><span style="width:7px; height:7px; border-radius:2px; background:#d4874a;"></span><span style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#d4874a;">Jeromelu's Take</span></div><div style="font-size:11px; color:#c0b4a0; padding-left:0.95rem;">Turbo is the definition of risk-reward.</div></div>
+        <div style="padding:0.6rem 0 0.6rem 0.85rem; margin-bottom:0.5rem;"><div style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0.1rem;"><span style="width:7px; height:7px; border-radius:2px; background:#8aadcc;"></span><span style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#8aadcc;">Mechanism</span></div><div style="font-size:11px; color:#948878; padding-left:0.95rem;"><strong style="color:#c0b4a0;">Boom-bust cycle</strong> driven by availability.</div></div>
+        <div style="border:1px solid #3e3630; margin-bottom:0.5rem;">
+          <div style="display:grid; grid-template-columns:50px 1fr; border-bottom:1px solid #3e3630;"><div style="padding:0.35rem; display:flex; align-items:center; justify-content:center; border-right:1px solid #3e3630;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(90,158,138,0.12); color:#5a9e8a;">BULL</span></div><div style="padding:0.35rem 0.5rem;"><strong style="font-size:10px; color:#d4874a;">SC Playbook</strong><div style="font-size:9px; color:#948878;">Buy at $452k.</div></div></div>
+          <div style="display:grid; grid-template-columns:50px 1fr;"><div style="padding:0.35rem; display:flex; align-items:center; justify-content:center; border-right:1px solid #3e3630;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(196,168,64,0.12); color:#c4a840;">HOLD</span></div><div style="padding:0.35rem 0.5rem;"><strong style="font-size:10px; color:#d4874a;">SC NRL Pod</strong><div style="font-size:9px; color:#948878;">Wait for clean run.</div></div></div>
+        </div>
+        <div style="padding:0.6rem 0 0.6rem 0.85rem; margin-bottom:0.5rem;"><div style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0.1rem;"><span style="width:7px; height:7px; border-radius:2px; background:#c45050;"></span><span style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#c45050;">Warning</span></div><div style="font-size:11px; color:#c0b4a0; padding-left:0.95rem;">3 of 4 seasons: 8+ games missed.</div></div>
+        <div style="background:#342c26; border:1px solid #3e3630; padding:0.65rem; text-align:center;"><div style="font-size:10px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:#d4874a; margin-bottom:0.2rem;">Jeromelu's Call</div><div style="font-family:'Cormorant Garamond',serif; font-size:0.8rem; font-style:italic; color:#ede4d6;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(90,158,138,0.15); color:#5a9e8a; font-style:normal;">BUY</span> with cover. <span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(196,80,80,0.15); color:#c45050; font-style:normal;">AVOID</span> if reliability needed.</div></div>
+      </div>
+    </div>
+
+    <!-- ── 03. TOP RULE ── -->
+    <div style="border-radius:10px; overflow:hidden; border:1px solid #3e3630;">
+      <div style="background:#241e1a; padding:6px 12px; font-size:10px; font-family:'JetBrains Mono',monospace; color:#504840; border-bottom:1px solid #3e3630; display:flex; align-items:center; gap:8px;">
+        <span style="display:flex; gap:4px;"><span style="width:8px; height:8px; border-radius:50%; background:#3e3630;"></span><span style="width:8px; height:8px; border-radius:50%; background:#3e3630;"></span><span style="width:8px; height:8px; border-radius:50%; background:#3e3630;"></span></span>
+        03 — Top Rule
+      </div>
+      <div style="background:#2a2420; padding:1.25rem 1.5rem; font-size:12px; line-height:1.6; max-height:580px; overflow:hidden;">
+        <div style="text-align:center; margin-bottom:1rem;">
+          <div style="font-size:10px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#b85c38; margin-bottom:0.25rem;">Player</div>
+          <div style="font-family:'Cormorant Garamond',serif; font-size:1.6rem; font-weight:600; color:#ede4d6; line-height:1.15;">Tom Trbojevic</div>
+          <div style="font-family:'Cormorant Garamond',serif; font-size:0.8rem; font-style:italic; color:#948878; margin-top:0.2rem;">Elite ceiling, extensive injury history.</div>
+          <div style="width:36px; height:1px; background:#b85c38; margin:0.65rem auto 0; opacity:0.4;"></div>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:#3e3630; border:1px solid #3e3630; margin-bottom:0.75rem;">
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">Avg</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#ede4d6;">74.3</div></div>
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">Price</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#ede4d6;">$487k</div></div>
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">BE</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#5a9e8a;">61</div></div>
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">Games</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#c4a840;">4/5</div></div>
+        </div>
+        <div style="margin-bottom:1rem;"><div style="height:2px; width:40px; background:#d4874a; margin-bottom:0.45rem; border-radius:1px;"></div><div style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#d4874a; margin-bottom:0.15rem;">Jeromelu's Take</div><div style="font-size:11px; color:#c0b4a0;">Turbo is the definition of risk-reward.</div></div>
+        <div style="margin-bottom:1rem;"><div style="height:2px; width:40px; background:#8aadcc; margin-bottom:0.45rem; border-radius:1px;"></div><div style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#8aadcc; margin-bottom:0.15rem;">Mechanism</div><div style="font-size:11px; color:#948878;"><strong style="color:#c0b4a0;">Boom-bust cycle</strong> driven by availability.</div></div>
+        <div style="border:1px solid #3e3630; margin-bottom:1rem;">
+          <div style="display:grid; grid-template-columns:50px 1fr; border-bottom:1px solid #3e3630;"><div style="padding:0.35rem; display:flex; align-items:center; justify-content:center; border-right:1px solid #3e3630;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(90,158,138,0.12); color:#5a9e8a;">BULL</span></div><div style="padding:0.35rem 0.5rem;"><strong style="font-size:10px; color:#d4874a;">SC Playbook</strong><div style="font-size:9px; color:#948878;">Buy at $452k.</div></div></div>
+          <div style="display:grid; grid-template-columns:50px 1fr;"><div style="padding:0.35rem; display:flex; align-items:center; justify-content:center; border-right:1px solid #3e3630;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(196,168,64,0.12); color:#c4a840;">HOLD</span></div><div style="padding:0.35rem 0.5rem;"><strong style="font-size:10px; color:#d4874a;">SC NRL Pod</strong><div style="font-size:9px; color:#948878;">Wait for clean run.</div></div></div>
+        </div>
+        <div style="margin-bottom:1rem;"><div style="height:2px; width:40px; background:#c45050; margin-bottom:0.45rem; border-radius:1px;"></div><div style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#c45050; margin-bottom:0.15rem;">Warning</div><div style="font-size:11px; color:#c0b4a0;">3 of 4 seasons: 8+ games missed.</div></div>
+        <div style="background:#342c26; border:1px solid #3e3630; padding:0.65rem; text-align:center;"><div style="font-size:10px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:#d4874a; margin-bottom:0.2rem;">Jeromelu's Call</div><div style="font-family:'Cormorant Garamond',serif; font-size:0.8rem; font-style:italic; color:#ede4d6;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(90,158,138,0.15); color:#5a9e8a; font-style:normal;">BUY</span> with cover. <span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(196,80,80,0.15); color:#c45050; font-style:normal;">AVOID</span> if reliability needed.</div></div>
+      </div>
+    </div>
+
+    <!-- ── 04. PULL QUOTE ── -->
+    <div style="border-radius:10px; overflow:hidden; border:1px solid #3e3630;">
+      <div style="background:#241e1a; padding:6px 12px; font-size:10px; font-family:'JetBrains Mono',monospace; color:#504840; border-bottom:1px solid #3e3630; display:flex; align-items:center; gap:8px;">
+        <span style="display:flex; gap:4px;"><span style="width:8px; height:8px; border-radius:50%; background:#3e3630;"></span><span style="width:8px; height:8px; border-radius:50%; background:#3e3630;"></span><span style="width:8px; height:8px; border-radius:50%; background:#3e3630;"></span></span>
+        04 — Pull Quote
+      </div>
+      <div style="background:#2a2420; padding:1.25rem 1.5rem; font-size:12px; line-height:1.6; max-height:580px; overflow:hidden;">
+        <div style="text-align:center; margin-bottom:1rem;">
+          <div style="font-size:10px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#b85c38; margin-bottom:0.25rem;">Player</div>
+          <div style="font-family:'Cormorant Garamond',serif; font-size:1.6rem; font-weight:600; color:#ede4d6; line-height:1.15;">Tom Trbojevic</div>
+          <div style="font-family:'Cormorant Garamond',serif; font-size:0.8rem; font-style:italic; color:#948878; margin-top:0.2rem;">Elite ceiling, extensive injury history.</div>
+          <div style="width:36px; height:1px; background:#b85c38; margin:0.65rem auto 0; opacity:0.4;"></div>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:#3e3630; border:1px solid #3e3630; margin-bottom:0.75rem;">
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">Avg</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#ede4d6;">74.3</div></div>
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">Price</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#ede4d6;">$487k</div></div>
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">BE</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#5a9e8a;">61</div></div>
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">Games</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#c4a840;">4/5</div></div>
+        </div>
+        <div style="display:flex; gap:0.65rem; align-items:flex-start; margin-bottom:0.75rem;"><span style="font-family:'Cormorant Garamond',serif; font-size:2.4rem; line-height:1; color:#d4874a; flex-shrink:0; margin-top:-0.1rem;">&ldquo;</span><div><div style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#d4874a; margin-bottom:0.1rem;">Jeromelu's Take</div><div style="font-size:11px; color:#c0b4a0; font-style:italic;">Turbo is the definition of risk-reward.</div></div></div>
+        <div style="display:flex; gap:0.65rem; align-items:flex-start; margin-bottom:0.75rem;"><span style="font-family:'Cormorant Garamond',serif; font-size:2rem; line-height:1; color:#8aadcc; flex-shrink:0; margin-top:-0.05rem;">&#8727;</span><div><div style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#8aadcc; margin-bottom:0.1rem;">Mechanism</div><div style="font-size:11px; color:#948878;"><strong style="color:#c0b4a0;">Boom-bust cycle</strong> driven by availability.</div></div></div>
+        <div style="border:1px solid #3e3630; margin-bottom:0.75rem;">
+          <div style="display:grid; grid-template-columns:50px 1fr; border-bottom:1px solid #3e3630;"><div style="padding:0.35rem; display:flex; align-items:center; justify-content:center; border-right:1px solid #3e3630;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(90,158,138,0.12); color:#5a9e8a;">BULL</span></div><div style="padding:0.35rem 0.5rem;"><strong style="font-size:10px; color:#d4874a;">SC Playbook</strong><div style="font-size:9px; color:#948878;">Buy at $452k.</div></div></div>
+          <div style="display:grid; grid-template-columns:50px 1fr;"><div style="padding:0.35rem; display:flex; align-items:center; justify-content:center; border-right:1px solid #3e3630;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(196,168,64,0.12); color:#c4a840;">HOLD</span></div><div style="padding:0.35rem 0.5rem;"><strong style="font-size:10px; color:#d4874a;">SC NRL Pod</strong><div style="font-size:9px; color:#948878;">Wait for clean run.</div></div></div>
+        </div>
+        <div style="display:flex; gap:0.65rem; align-items:flex-start; margin-bottom:0.75rem;"><span style="font-size:1.2rem; line-height:1; color:#c45050; flex-shrink:0; margin-top:0.1rem;">&#9650;</span><div><div style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#c45050; margin-bottom:0.1rem;">Warning</div><div style="font-size:11px; color:#c0b4a0;">3 of 4 seasons: 8+ games missed.</div></div></div>
+        <div style="background:#342c26; border:1px solid #3e3630; padding:0.65rem; text-align:center;"><div style="font-size:10px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:#d4874a; margin-bottom:0.2rem;">Jeromelu's Call</div><div style="font-family:'Cormorant Garamond',serif; font-size:0.8rem; font-style:italic; color:#ede4d6;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(90,158,138,0.15); color:#5a9e8a; font-style:normal;">BUY</span> with cover. <span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(196,80,80,0.15); color:#c45050; font-style:normal;">AVOID</span> if reliability needed.</div></div>
+      </div>
+    </div>
+
+    <!-- ── 05. FULL BORDER ── -->
+    <div style="border-radius:10px; overflow:hidden; border:1px solid #3e3630;">
+      <div style="background:#241e1a; padding:6px 12px; font-size:10px; font-family:'JetBrains Mono',monospace; color:#504840; border-bottom:1px solid #3e3630; display:flex; align-items:center; gap:8px;">
+        <span style="display:flex; gap:4px;"><span style="width:8px; height:8px; border-radius:50%; background:#3e3630;"></span><span style="width:8px; height:8px; border-radius:50%; background:#3e3630;"></span><span style="width:8px; height:8px; border-radius:50%; background:#3e3630;"></span></span>
+        05 — Full Border
+      </div>
+      <div style="background:#2a2420; padding:1.25rem 1.5rem; font-size:12px; line-height:1.6; max-height:580px; overflow:hidden;">
+        <div style="text-align:center; margin-bottom:1rem;">
+          <div style="font-size:10px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#b85c38; margin-bottom:0.25rem;">Player</div>
+          <div style="font-family:'Cormorant Garamond',serif; font-size:1.6rem; font-weight:600; color:#ede4d6; line-height:1.15;">Tom Trbojevic</div>
+          <div style="font-family:'Cormorant Garamond',serif; font-size:0.8rem; font-style:italic; color:#948878; margin-top:0.2rem;">Elite ceiling, extensive injury history.</div>
+          <div style="width:36px; height:1px; background:#b85c38; margin:0.65rem auto 0; opacity:0.4;"></div>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:#3e3630; border:1px solid #3e3630; margin-bottom:0.75rem;">
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">Avg</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#ede4d6;">74.3</div></div>
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">Price</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#ede4d6;">$487k</div></div>
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">BE</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#5a9e8a;">61</div></div>
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">Games</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#c4a840;">4/5</div></div>
+        </div>
+        <div style="border:1px solid rgba(212,135,74,0.3); padding:0.6rem 0.75rem; margin-bottom:0.5rem; border-radius:8px;"><div style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#d4874a; margin-bottom:0.15rem;">Jeromelu's Take</div><div style="font-size:11px; color:#c0b4a0;">Turbo is the definition of risk-reward.</div></div>
+        <div style="border:1px solid rgba(138,173,204,0.25); padding:0.6rem 0.75rem; margin-bottom:0.5rem; border-radius:8px;"><div style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#8aadcc; margin-bottom:0.15rem;">Mechanism</div><div style="font-size:11px; color:#948878;"><strong style="color:#c0b4a0;">Boom-bust cycle</strong> driven by availability.</div></div>
+        <div style="border:1px solid #3e3630; margin-bottom:0.5rem;">
+          <div style="display:grid; grid-template-columns:50px 1fr; border-bottom:1px solid #3e3630;"><div style="padding:0.35rem; display:flex; align-items:center; justify-content:center; border-right:1px solid #3e3630;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(90,158,138,0.12); color:#5a9e8a;">BULL</span></div><div style="padding:0.35rem 0.5rem;"><strong style="font-size:10px; color:#d4874a;">SC Playbook</strong><div style="font-size:9px; color:#948878;">Buy at $452k.</div></div></div>
+          <div style="display:grid; grid-template-columns:50px 1fr;"><div style="padding:0.35rem; display:flex; align-items:center; justify-content:center; border-right:1px solid #3e3630;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(196,168,64,0.12); color:#c4a840;">HOLD</span></div><div style="padding:0.35rem 0.5rem;"><strong style="font-size:10px; color:#d4874a;">SC NRL Pod</strong><div style="font-size:9px; color:#948878;">Wait for clean run.</div></div></div>
+        </div>
+        <div style="border:1px solid rgba(196,80,80,0.3); padding:0.6rem 0.75rem; margin-bottom:0.5rem; border-radius:8px;"><div style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#c45050; margin-bottom:0.15rem;">Warning</div><div style="font-size:11px; color:#c0b4a0;">3 of 4 seasons: 8+ games missed.</div></div>
+        <div style="background:#342c26; border:1px solid #3e3630; padding:0.65rem; text-align:center;"><div style="font-size:10px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:#d4874a; margin-bottom:0.2rem;">Jeromelu's Call</div><div style="font-family:'Cormorant Garamond',serif; font-size:0.8rem; font-style:italic; color:#ede4d6;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(90,158,138,0.15); color:#5a9e8a; font-style:normal;">BUY</span> with cover. <span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(196,80,80,0.15); color:#c45050; font-style:normal;">AVOID</span> if reliability needed.</div></div>
+      </div>
+    </div>
+
+    <!-- ── 06. HEADER STRIP ── -->
+    <div style="border-radius:10px; overflow:hidden; border:1px solid #3e3630;">
+      <div style="background:#241e1a; padding:6px 12px; font-size:10px; font-family:'JetBrains Mono',monospace; color:#504840; border-bottom:1px solid #3e3630; display:flex; align-items:center; gap:8px;">
+        <span style="display:flex; gap:4px;"><span style="width:8px; height:8px; border-radius:50%; background:#3e3630;"></span><span style="width:8px; height:8px; border-radius:50%; background:#3e3630;"></span><span style="width:8px; height:8px; border-radius:50%; background:#3e3630;"></span></span>
+        06 — Header Strip
+      </div>
+      <div style="background:#2a2420; padding:1.25rem 1.5rem; font-size:12px; line-height:1.6; max-height:580px; overflow:hidden;">
+        <div style="text-align:center; margin-bottom:1rem;">
+          <div style="font-size:10px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#b85c38; margin-bottom:0.25rem;">Player</div>
+          <div style="font-family:'Cormorant Garamond',serif; font-size:1.6rem; font-weight:600; color:#ede4d6; line-height:1.15;">Tom Trbojevic</div>
+          <div style="font-family:'Cormorant Garamond',serif; font-size:0.8rem; font-style:italic; color:#948878; margin-top:0.2rem;">Elite ceiling, extensive injury history.</div>
+          <div style="width:36px; height:1px; background:#b85c38; margin:0.65rem auto 0; opacity:0.4;"></div>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:#3e3630; border:1px solid #3e3630; margin-bottom:0.75rem;">
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">Avg</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#ede4d6;">74.3</div></div>
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">Price</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#ede4d6;">$487k</div></div>
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">BE</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#5a9e8a;">61</div></div>
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">Games</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#c4a840;">4/5</div></div>
+        </div>
+        <div style="border-radius:6px; overflow:hidden; border:1px solid #3e3630; margin-bottom:0.5rem;"><div style="background:rgba(212,135,74,0.15); padding:0.3rem 0.65rem;"><span style="font-size:9px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#d4874a;">Jeromelu's Take</span></div><div style="padding:0.55rem 0.65rem; background:#342c26;"><div style="font-size:11px; color:#c0b4a0;">Turbo is the definition of risk-reward.</div></div></div>
+        <div style="border-radius:6px; overflow:hidden; border:1px solid #3e3630; margin-bottom:0.5rem;"><div style="background:rgba(138,173,204,0.12); padding:0.3rem 0.65rem;"><span style="font-size:9px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#8aadcc;">Mechanism</span></div><div style="padding:0.55rem 0.65rem; background:#342c26;"><div style="font-size:11px; color:#948878;"><strong style="color:#c0b4a0;">Boom-bust cycle</strong> driven by availability.</div></div></div>
+        <div style="border:1px solid #3e3630; margin-bottom:0.5rem;">
+          <div style="display:grid; grid-template-columns:50px 1fr; border-bottom:1px solid #3e3630;"><div style="padding:0.35rem; display:flex; align-items:center; justify-content:center; border-right:1px solid #3e3630;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(90,158,138,0.12); color:#5a9e8a;">BULL</span></div><div style="padding:0.35rem 0.5rem;"><strong style="font-size:10px; color:#d4874a;">SC Playbook</strong><div style="font-size:9px; color:#948878;">Buy at $452k.</div></div></div>
+          <div style="display:grid; grid-template-columns:50px 1fr;"><div style="padding:0.35rem; display:flex; align-items:center; justify-content:center; border-right:1px solid #3e3630;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(196,168,64,0.12); color:#c4a840;">HOLD</span></div><div style="padding:0.35rem 0.5rem;"><strong style="font-size:10px; color:#d4874a;">SC NRL Pod</strong><div style="font-size:9px; color:#948878;">Wait for clean run.</div></div></div>
+        </div>
+        <div style="border-radius:6px; overflow:hidden; border:1px solid #3e3630; margin-bottom:0.5rem;"><div style="background:rgba(196,80,80,0.15); padding:0.3rem 0.65rem;"><span style="font-size:9px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#c45050;">Warning</span></div><div style="padding:0.55rem 0.65rem; background:#342c26;"><div style="font-size:11px; color:#c0b4a0;">3 of 4 seasons: 8+ games missed.</div></div></div>
+        <div style="background:#342c26; border:1px solid #3e3630; padding:0.65rem; text-align:center;"><div style="font-size:10px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:#d4874a; margin-bottom:0.2rem;">Jeromelu's Call</div><div style="font-family:'Cormorant Garamond',serif; font-size:0.8rem; font-style:italic; color:#ede4d6;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(90,158,138,0.15); color:#5a9e8a; font-style:normal;">BUY</span> with cover. <span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(196,80,80,0.15); color:#c45050; font-style:normal;">AVOID</span> if reliability needed.</div></div>
+      </div>
+    </div>
+
+    <!-- ── 07. INDENTED BLOCK ── -->
+    <div style="border-radius:10px; overflow:hidden; border:1px solid #3e3630;">
+      <div style="background:#241e1a; padding:6px 12px; font-size:10px; font-family:'JetBrains Mono',monospace; color:#504840; border-bottom:1px solid #3e3630; display:flex; align-items:center; gap:8px;">
+        <span style="display:flex; gap:4px;"><span style="width:8px; height:8px; border-radius:50%; background:#3e3630;"></span><span style="width:8px; height:8px; border-radius:50%; background:#3e3630;"></span><span style="width:8px; height:8px; border-radius:50%; background:#3e3630;"></span></span>
+        07 — Indented Block
+      </div>
+      <div style="background:#2a2420; padding:1.25rem 1.5rem; font-size:12px; line-height:1.6; max-height:580px; overflow:hidden;">
+        <div style="text-align:center; margin-bottom:1rem;">
+          <div style="font-size:10px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#b85c38; margin-bottom:0.25rem;">Player</div>
+          <div style="font-family:'Cormorant Garamond',serif; font-size:1.6rem; font-weight:600; color:#ede4d6; line-height:1.15;">Tom Trbojevic</div>
+          <div style="font-family:'Cormorant Garamond',serif; font-size:0.8rem; font-style:italic; color:#948878; margin-top:0.2rem;">Elite ceiling, extensive injury history.</div>
+          <div style="width:36px; height:1px; background:#b85c38; margin:0.65rem auto 0; opacity:0.4;"></div>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:#3e3630; border:1px solid #3e3630; margin-bottom:0.75rem;">
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">Avg</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#ede4d6;">74.3</div></div>
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">Price</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#ede4d6;">$487k</div></div>
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">BE</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#5a9e8a;">61</div></div>
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">Games</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#c4a840;">4/5</div></div>
+        </div>
+        <div style="padding-left:1.5rem; margin-bottom:1.25rem;"><div style="font-size:9px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:#d4874a; margin-bottom:0.1rem;">Jeromelu's Take</div><div style="font-size:12px; color:#c0b4a0;">Turbo is the definition of risk-reward.</div></div>
+        <div style="padding-left:1.5rem; margin-bottom:1.25rem;"><div style="font-size:9px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:#8aadcc; margin-bottom:0.1rem;">Mechanism</div><div style="font-size:12px; color:#6e6458;"><strong style="color:#948878;">Boom-bust cycle</strong> driven by availability.</div></div>
+        <div style="border:1px solid #3e3630; margin-bottom:1.25rem;">
+          <div style="display:grid; grid-template-columns:50px 1fr; border-bottom:1px solid #3e3630;"><div style="padding:0.35rem; display:flex; align-items:center; justify-content:center; border-right:1px solid #3e3630;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(90,158,138,0.12); color:#5a9e8a;">BULL</span></div><div style="padding:0.35rem 0.5rem;"><strong style="font-size:10px; color:#d4874a;">SC Playbook</strong><div style="font-size:9px; color:#948878;">Buy at $452k.</div></div></div>
+          <div style="display:grid; grid-template-columns:50px 1fr;"><div style="padding:0.35rem; display:flex; align-items:center; justify-content:center; border-right:1px solid #3e3630;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(196,168,64,0.12); color:#c4a840;">HOLD</span></div><div style="padding:0.35rem 0.5rem;"><strong style="font-size:10px; color:#d4874a;">SC NRL Pod</strong><div style="font-size:9px; color:#948878;">Wait for clean run.</div></div></div>
+        </div>
+        <div style="padding-left:1.5rem; margin-bottom:1.25rem;"><div style="font-size:9px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:#c45050; margin-bottom:0.1rem;">Warning</div><div style="font-size:12px; color:#c0b4a0;">3 of 4 seasons: 8+ games missed.</div></div>
+        <div style="background:#342c26; border:1px solid #3e3630; padding:0.65rem; text-align:center;"><div style="font-size:10px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:#d4874a; margin-bottom:0.2rem;">Jeromelu's Call</div><div style="font-family:'Cormorant Garamond',serif; font-size:0.8rem; font-style:italic; color:#ede4d6;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(90,158,138,0.15); color:#5a9e8a; font-style:normal;">BUY</span> with cover. <span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(196,80,80,0.15); color:#c45050; font-style:normal;">AVOID</span> if reliability needed.</div></div>
+      </div>
+    </div>
+
+    <!-- ── 08. BOTTOM RULE ── -->
+    <div style="border-radius:10px; overflow:hidden; border:1px solid #3e3630;">
+      <div style="background:#241e1a; padding:6px 12px; font-size:10px; font-family:'JetBrains Mono',monospace; color:#504840; border-bottom:1px solid #3e3630; display:flex; align-items:center; gap:8px;">
+        <span style="display:flex; gap:4px;"><span style="width:8px; height:8px; border-radius:50%; background:#3e3630;"></span><span style="width:8px; height:8px; border-radius:50%; background:#3e3630;"></span><span style="width:8px; height:8px; border-radius:50%; background:#3e3630;"></span></span>
+        08 — Bottom Rule
+      </div>
+      <div style="background:#2a2420; padding:1.25rem 1.5rem; font-size:12px; line-height:1.6; max-height:580px; overflow:hidden;">
+        <div style="text-align:center; margin-bottom:1rem;">
+          <div style="font-size:10px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#b85c38; margin-bottom:0.25rem;">Player</div>
+          <div style="font-family:'Cormorant Garamond',serif; font-size:1.6rem; font-weight:600; color:#ede4d6; line-height:1.15;">Tom Trbojevic</div>
+          <div style="font-family:'Cormorant Garamond',serif; font-size:0.8rem; font-style:italic; color:#948878; margin-top:0.2rem;">Elite ceiling, extensive injury history.</div>
+          <div style="width:36px; height:1px; background:#b85c38; margin:0.65rem auto 0; opacity:0.4;"></div>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:#3e3630; border:1px solid #3e3630; margin-bottom:0.75rem;">
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">Avg</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#ede4d6;">74.3</div></div>
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">Price</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#ede4d6;">$487k</div></div>
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">BE</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#5a9e8a;">61</div></div>
+          <div style="background:#2a2420; padding:0.4rem; text-align:center;"><div style="font-size:7px; font-weight:600; text-transform:uppercase; color:#6e6458;">Games</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#c4a840;">4/5</div></div>
+        </div>
+        <div style="padding:0.65rem 0; border-bottom:2px solid rgba(212,135,74,0.3);"><div style="font-size:11px; color:#c0b4a0; margin-bottom:0.2rem;">Turbo is the definition of risk-reward.</div><div style="font-size:9px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#d4874a; opacity:0.6;">Jeromelu's Take</div></div>
+        <div style="padding:0.65rem 0; border-bottom:2px solid rgba(138,173,204,0.25);"><div style="font-size:11px; color:#948878; margin-bottom:0.2rem;"><strong style="color:#c0b4a0;">Boom-bust cycle</strong> driven by availability.</div><div style="font-size:9px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#8aadcc; opacity:0.6;">Mechanism</div></div>
+        <div style="border:1px solid #3e3630; margin:0.6rem 0;">
+          <div style="display:grid; grid-template-columns:50px 1fr; border-bottom:1px solid #3e3630;"><div style="padding:0.35rem; display:flex; align-items:center; justify-content:center; border-right:1px solid #3e3630;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(90,158,138,0.12); color:#5a9e8a;">BULL</span></div><div style="padding:0.35rem 0.5rem;"><strong style="font-size:10px; color:#d4874a;">SC Playbook</strong><div style="font-size:9px; color:#948878;">Buy at $452k.</div></div></div>
+          <div style="display:grid; grid-template-columns:50px 1fr;"><div style="padding:0.35rem; display:flex; align-items:center; justify-content:center; border-right:1px solid #3e3630;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(196,168,64,0.12); color:#c4a840;">HOLD</span></div><div style="padding:0.35rem 0.5rem;"><strong style="font-size:10px; color:#d4874a;">SC NRL Pod</strong><div style="font-size:9px; color:#948878;">Wait for clean run.</div></div></div>
+        </div>
+        <div style="padding:0.65rem 0; border-bottom:2px solid rgba(196,80,80,0.3);"><div style="font-size:11px; color:#c0b4a0; margin-bottom:0.2rem;">3 of 4 seasons: 8+ games missed.</div><div style="font-size:9px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#c45050; opacity:0.6;">Warning</div></div>
+        <div style="background:#342c26; border:1px solid #3e3630; padding:0.65rem; text-align:center; margin-top:0.6rem;"><div style="font-size:10px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:#d4874a; margin-bottom:0.2rem;">Jeromelu's Call</div><div style="font-family:'Cormorant Garamond',serif; font-size:0.8rem; font-style:italic; color:#ede4d6;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(90,158,138,0.15); color:#5a9e8a; font-style:normal;">BUY</span> with cover. <span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(196,80,80,0.15); color:#c45050; font-style:normal;">AVOID</span> if reliability needed.</div></div>
+      </div>
+    </div>
+
+  </div><!-- end grid -->
+
+  <footer>
+    <p>Box Variant Exploration &mdash; Jeromelu Design Reference</p>
+  </footer>
+
+</div>
+</body>
+</html>

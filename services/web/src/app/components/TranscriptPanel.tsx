@@ -134,9 +134,9 @@ export default function TranscriptPanel({
   }, [currentTime]);
 
   return (
-    <div className="rounded-lg border border-zinc-800 relative flex flex-col h-full min-h-0">
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-800 shrink-0">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+    <div className="rounded-lg border relative flex flex-col h-full min-h-0" style={{ borderColor: "var(--border)" }}>
+      <div className="flex items-center justify-between px-4 py-2.5 border-b shrink-0" style={{ borderColor: "var(--border)" }}>
+        <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--foreground-ghost)" }}>
           Transcript &middot; {claims.length} claims
         </span>
       </div>
@@ -150,7 +150,7 @@ export default function TranscriptPanel({
             if (token.kind === "claim") {
               const claim = token.claim;
               const color =
-                CLAIM_TYPE_COLORS[claim.claim_type] || "#71717a";
+                CLAIM_TYPE_COLORS[claim.claim_type] || "var(--foreground-muted)";
               return (
                 <span
                   key={`c-${claim.claim_id}`}
@@ -173,8 +173,8 @@ export default function TranscriptPanel({
                   </span>
                   {claim.player_name && (
                     <span
-                      className="font-medium text-zinc-300"
-                      style={{ fontSize: "0.6875rem" }}
+                      className="font-medium"
+                      style={{ fontSize: "0.6875rem", color: "var(--foreground)" }}
                     >
                       {claim.player_name}
                     </span>
@@ -197,13 +197,13 @@ export default function TranscriptPanel({
             let textColor: string;
             let bgColor: string;
             if (isActive) {
-              textColor = "#f4f4f5";
-              bgColor = "rgba(251,146,60,0.18)";
+              textColor = "var(--foreground)";
+              bgColor = "var(--accent-border)";
             } else if (coveringClaim) {
-              textColor = "#d4d4d8";
+              textColor = "var(--foreground)";
               bgColor = claimColor + "12";
             } else {
-              textColor = "#71717a";
+              textColor = "var(--foreground-muted)";
               bgColor = "transparent";
             }
 

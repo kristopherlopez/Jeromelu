@@ -25,11 +25,17 @@ export interface PredictionResolution {
   outcome?: string;
 }
 
+export interface FeedUser {
+  name: string;
+  color?: string; // hex color for username display (Twitch-style)
+}
+
 export interface FeedItem {
   id: string;
   type: FeedItemType;
   text: string;
   timestamp: string; // ISO string
+  user?: FeedUser; // who asked (for question items in the shared feed)
   players?: PlayerRef[];
   source?: SourceRef;
   sources?: SourceRef[];

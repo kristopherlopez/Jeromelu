@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     llm_provider: str = "openai"  # "openai" or "openrouter"
     llm_model: str = "gpt-4o"  # model ID for chat completions
     env: str = "development"
+    cdn_base_url: str = ""  # empty for local dev; in prod: "https://jeromelu.ai"
     admin_api_key: str = "local-dev-admin-key"
     temporal_host: str = "localhost:7233"
     temporal_namespace: str = "jeromelu"

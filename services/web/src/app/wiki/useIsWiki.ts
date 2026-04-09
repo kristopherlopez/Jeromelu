@@ -2,8 +2,14 @@
 
 import { usePathname } from "next/navigation";
 
-/** Returns true when the current route is under /wiki */
-export function useIsWiki(): boolean {
+/** Light-themed routes — avatar and nav chrome adapt accordingly */
+const LIGHT_PREFIX_ROUTES = ["/wiki"];
+
+/** Returns true when the current route uses the light (parchment) theme */
+export function useIsLightTheme(): boolean {
   const pathname = usePathname();
-  return pathname.startsWith("/wiki");
+  return pathname === "/" || LIGHT_PREFIX_ROUTES.some((r) => pathname.startsWith(r));
 }
+
+/** @deprecated Use useIsLightTheme instead */
+export const useIsWiki = useIsLightTheme;

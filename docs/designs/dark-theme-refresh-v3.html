@@ -1,0 +1,745 @@
+<!--
+  Dark Theme Refresh v3 — Lifted & Warm
+  2026-04-07
+
+  Key insight: "warm room with the lights dimmed" not "theatre with lights off."
+  Base backgrounds lifted from #09-#11 to #24-#2c range. The whole palette
+  breathes more — less contrast, more cohesion, easier on the eyes.
+  Inspired by Claude's dark theme: warm brown-charcoal, cream text, nothing near-black.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dark Theme Refresh v3 — Lifted & Warm | Jeromelu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #1e1c18;
+    color: #e0dcd4;
+    line-height: 1.6;
+    padding: 3rem 2rem 6rem;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container { max-width: 1280px; margin: 0 auto; }
+
+  header { text-align: center; margin-bottom: 3rem; }
+  header h1 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(2rem, 4vw, 2.8rem); font-weight: 600;
+    margin-bottom: 0.4rem;
+  }
+  header p { color: #9c9484; font-size: 14px; max-width: 640px; margin: 0 auto; }
+  header .divider { width: 60px; height: 2px; margin: 1.5rem auto 0; opacity: 0.5; background: linear-gradient(to right, #d4874a, #6aab8e, #7a9ec4); }
+
+  hr.sep { border: none; height: 1px; background: rgba(255,255,255,0.06); margin: 3.5rem 0; }
+
+  .section-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.14em;
+    text-transform: uppercase; margin-bottom: 0.5rem;
+  }
+  h2 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 1.6rem; font-weight: 600; margin-bottom: 0.4rem;
+  }
+  .desc { font-size: 14px; color: #9c9484; margin-bottom: 2rem; max-width: 720px; }
+
+  .strip {
+    display: flex; border-radius: 10px; overflow: hidden; height: 48px; margin-bottom: 0.4rem;
+  }
+  .strip div { flex: 1; position: relative; }
+  .strip div .lbl {
+    position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%);
+    font-size: 8px; font-family: 'JetBrains Mono', monospace;
+    opacity: 0; transition: opacity 0.2s; white-space: nowrap;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+  }
+  .strip:hover div .lbl { opacity: 1; }
+  .strip-names {
+    display: flex; font-size: 9px; color: #666; margin-bottom: 1.5rem;
+  }
+  .strip-names span { flex: 1; text-align: center; }
+
+  .option { margin-bottom: 3.5rem; }
+  .option h3 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 1.4rem; font-weight: 600; margin-bottom: 0.2rem;
+  }
+  .option .tagline { font-size: 13px; margin-bottom: 1.5rem; }
+
+  .frame {
+    border-radius: 10px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .frame .bar {
+    display: flex; align-items: center; gap: 5px;
+    padding: 8px 12px; font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .frame .bar .dots { display: flex; gap: 4px; margin-right: 8px; }
+  .frame .bar .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  .note {
+    padding: 1rem 1.25rem; margin: 1.5rem 0;
+    font-size: 13px; line-height: 1.6; border-radius: 0 6px 6px 0;
+  }
+  .note strong { font-weight: 600; }
+
+  footer { text-align: center; font-size: 12px; color: #555; margin-top: 3rem; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <header>
+    <h1>Dark Theme Refresh v3</h1>
+    <p>Warm room with the lights dimmed. Backgrounds lifted from the #09–#11 near-black range to #24–#2c — the palette breathes, the contrast softens, everything feels warmer and more approachable.</p>
+    <div class="divider"></div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- BRIGHTNESS COMPARISON                                       -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+
+  <div class="section-label" style="color:#9c9484;">The Shift</div>
+  <h2>Lifted, Not Near-Black</h2>
+  <p class="desc">v2 sat in the #09–#11 range — theatre with the lights off. v3 lifts to #24–#2c — warm room, dimmed. Same difference as Claude's dark theme vs a terminal.</p>
+
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:2rem;">
+    <div>
+      <div style="font-size:9px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:#666; margin-bottom:0.4rem; text-align:center;">v2 — Too Dark</div>
+      <div style="display:flex; height:60px; border-radius:8px; overflow:hidden; border:1px solid rgba(255,255,255,0.04);">
+        <div style="flex:1; background:#0a100e;"></div>
+        <div style="flex:1; background:#110d08;"></div>
+        <div style="flex:1; background:#090c12;"></div>
+      </div>
+      <div style="display:flex; font-size:9px; color:#555; text-align:center;"><span style="flex:1;">Forest #0a</span><span style="flex:1;">Earth #11</span><span style="flex:1;">Midnight #09</span></div>
+    </div>
+    <div>
+      <div style="font-size:9px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:#9c9484; margin-bottom:0.4rem; text-align:center;">v3 — Lifted & Warm</div>
+      <div style="display:flex; height:60px; border-radius:8px; overflow:hidden; border:1px solid rgba(255,255,255,0.06);">
+        <div style="flex:1; background:#1e2a26;"></div>
+        <div style="flex:1; background:#2a2420;"></div>
+        <div style="flex:1; background:#1e2230;"></div>
+      </div>
+      <div style="display:flex; font-size:9px; color:#777; text-align:center;"><span style="flex:1;">Forest #1e</span><span style="flex:1;">Earth #2a</span><span style="flex:1;">Midnight #1e</span></div>
+    </div>
+  </div>
+
+  <hr class="sep">
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- OPTION A — DEEP FOREST (lifted)                             -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+
+  <div class="option">
+    <div class="section-label" style="color:#6aab8e;">Option A</div>
+    <h3 style="color:#d4e0d8;">Deep Forest</h3>
+    <p class="tagline" style="color:#6a8a78;">Teal-green room. The greens are visible now — not just a tint on black but an actual presence. Cards float on green-tinged surfaces. The amber and gold accents glow warmly against the cool green base.</p>
+
+    <div class="strip">
+      <div style="background:#1a2420;"><span class="lbl" style="color:#d4e0d8;">#1a2420</span></div>
+      <div style="background:#1e2a26;"><span class="lbl" style="color:#d4e0d8;">#1e2a26</span></div>
+      <div style="background:#24322e;"><span class="lbl" style="color:#d4e0d8;">#24322e</span></div>
+      <div style="background:#2c3c38;"><span class="lbl" style="color:#d4e0d8;">#2c3c38</span></div>
+      <div style="background:#3a524c;"><span class="lbl" style="color:#d4e0d8;">#3a524c</span></div>
+      <div style="background:#587870;"><span class="lbl" style="color:#d4e0d8;">#587870</span></div>
+      <div style="background:#7a9e94;"><span class="lbl" style="color:#1a2420;">#7a9e94</span></div>
+      <div style="background:#a4bfb4;"><span class="lbl" style="color:#1a2420;">#a4bfb4</span></div>
+      <div style="background:#d4e0d8;"><span class="lbl" style="color:#1a2420;">#d4e0d8</span></div>
+      <div style="background:#d4874a;"><span class="lbl" style="color:#1a2420;">#d4874a</span></div>
+      <div style="background:#ccb86a;"><span class="lbl" style="color:#1a2420;">#ccb86a</span></div>
+      <div style="background:#c4605a;"><span class="lbl" style="color:#1a2420;">#c4605a</span></div>
+      <div style="background:#8aadcc;"><span class="lbl" style="color:#1a2420;">#8aadcc</span></div>
+      <div style="background:#a898c8;"><span class="lbl" style="color:#1a2420;">#a898c8</span></div>
+    </div>
+    <div class="strip-names">
+      <span>deep</span><span>bg</span><span>card</span><span>border</span><span>subtle</span><span>muted</span><span>secondary</span><span>body</span><span>fg</span><span>ember</span><span>gold</span><span>clay</span><span>slate</span><span>lilac</span>
+    </div>
+
+    <!-- Stream preview -->
+    <div class="frame" style="max-width:680px; margin-top:1rem;">
+      <div class="bar" style="background:#1a2420; color:#3a524c; border-bottom:1px solid #2c3c38;">
+        <div class="dots">
+          <div class="dot" style="background:#2c3c38;"></div>
+          <div class="dot" style="background:#2c3c38;"></div>
+          <div class="dot" style="background:#2c3c38;"></div>
+        </div>
+        jeromelu.com
+      </div>
+      <div style="background:#1e2a26; padding:1.75rem 2rem 2.5rem; font-size:13px; line-height:1.7;">
+
+        <!-- Crew status -->
+        <div style="font-size:11px; color:#587870; margin-bottom:1.25rem; display:flex; flex-wrap:wrap; gap:3px 0;">
+          <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:5px; height:5px; border-radius:50%; background:#6aab8e;"></span><span style="color:#6aab8e; font-weight:500;">Scout</span> scanning</span><span style="margin:0 5px; color:#2c3c38;">&middot;</span>
+          <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:5px; height:5px; border-radius:50%; background:#8aadcc;"></span><span style="color:#8aadcc; font-weight:500;">Analyst</span></span><span style="margin:0 5px; color:#2c3c38;">&middot;</span>
+          <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:5px; height:5px; border-radius:50%; background:#a898c8;"></span><span style="color:#a898c8; font-weight:500;">Bookkeeper</span></span><span style="margin:0 5px; color:#2c3c38;">&middot;</span>
+          <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:5px; height:5px; border-radius:50%; background:#d4874a; box-shadow:0 0 8px rgba(212,135,74,0.3);"></span><span style="color:#d4874a; font-weight:500;">Jeromelu</span></span>
+        </div>
+
+        <!-- Beat -->
+        <div style="text-align:center; padding:0.5rem 0; margin-bottom:1.5rem; background:linear-gradient(to right, transparent, rgba(204,184,106,0.08), transparent); border-radius:6px;">
+          <div style="font-size:10px; font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:0.25em; color:#ccb86a;">Tension Builds</div>
+        </div>
+
+        <!-- Scout — sage surface -->
+        <div style="background:rgba(106,171,142,0.08); border:1px solid rgba(106,171,142,0.16); border-radius:8px; padding:0.8rem 1rem; margin-bottom:0.5rem;">
+          <div style="display:flex; align-items:center; gap:6px; margin-bottom:0.25rem;">
+            <span style="width:6px; height:6px; border-radius:50%; background:#6aab8e;"></span>
+            <span style="font-weight:600; font-size:10px; color:#6aab8e; text-transform:uppercase; letter-spacing:0.06em;">Scout</span>
+            <span style="font-family:'JetBrains Mono',monospace; font-size:9px; color:#3a524c; margin-left:auto;">Mon 10:14 PM</span>
+          </div>
+          <div style="font-size:12px; color:#7a9e94;">4 new episodes. 2 mention <strong style="color:#d4e0d8;">Cleary</strong>, 1 deep-dive on <strong style="color:#d4e0d8;">Munster</strong>.</div>
+        </div>
+
+        <!-- Bookkeeper — lilac surface -->
+        <div style="background:rgba(168,152,200,0.07); border:1px solid rgba(168,152,200,0.14); border-radius:8px; padding:0.8rem 1rem; margin-bottom:0.5rem;">
+          <div style="display:flex; align-items:center; gap:6px; margin-bottom:0.25rem;">
+            <span style="width:6px; height:6px; border-radius:50%; background:#a898c8;"></span>
+            <span style="font-weight:600; font-size:10px; color:#a898c8; text-transform:uppercase; letter-spacing:0.06em;">Bookkeeper</span>
+          </div>
+          <div style="font-size:12px; color:#7a9e94;">Cleary BE: <span style="font-family:'JetBrains Mono',monospace; color:#a898c8; font-weight:500;">42</span>. Last 4: <span style="font-family:'JetBrains Mono',monospace; color:#a898c8;">51, 48, 42, 61</span>. <span style="color:#c4605a;">Trending down.</span></div>
+        </div>
+
+        <!-- Analyst — blue + gold contradiction -->
+        <div style="background:rgba(138,173,204,0.07); border:1px solid rgba(204,184,106,0.22); border-radius:8px; padding:0.8rem 1rem; margin-bottom:0.5rem;">
+          <div style="display:flex; align-items:center; gap:6px; margin-bottom:0.25rem;">
+            <span style="width:6px; height:6px; border-radius:50%; background:#8aadcc;"></span>
+            <span style="font-weight:600; font-size:10px; color:#8aadcc; text-transform:uppercase; letter-spacing:0.06em;">Analyst</span>
+            <span style="font-size:9px; font-weight:600; padding:0.1rem 0.35rem; border-radius:2px; background:rgba(204,184,106,0.15); color:#ccb86a;">Contradiction</span>
+          </div>
+          <div style="font-size:12px; color:#ccb86a;">KingOfSC and NRLBrothers — same data, <strong style="color:#d4e0d8;">opposite conclusions</strong> on Hynes.</div>
+        </div>
+
+        <!-- Archivist — gold surface -->
+        <div style="background:rgba(204,184,106,0.06); border:1px solid rgba(204,184,106,0.14); border-radius:8px; padding:0.8rem 1rem; margin-bottom:0.5rem;">
+          <div style="display:flex; align-items:center; gap:6px; margin-bottom:0.25rem;">
+            <span style="width:6px; height:6px; border-radius:50%; background:#ccb86a;"></span>
+            <span style="font-weight:600; font-size:10px; color:#ccb86a; text-transform:uppercase; letter-spacing:0.06em;">Archivist</span>
+          </div>
+          <div style="font-size:12px; color:#7a9e94;">Last 3+ sell consensus: <strong style="color:#ccb86a;">Rd 4, Gutho</strong>. <span style="color:#6aab8e;">Correct.</span></div>
+        </div>
+
+        <!-- Critic — clay -->
+        <div style="background:rgba(196,96,90,0.07); border-left:2px solid #c4605a; border-radius:0 8px 8px 0; padding:0.8rem 1rem; margin:1rem 0;">
+          <div style="font-weight:600; font-size:10px; color:#c4605a; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.2rem;">Critic</div>
+          <div style="font-size:12px; font-style:italic; color:#7a9e94;">Two sell sources below 50%. Thin evidence.</div>
+          <div style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid rgba(196,96,90,0.1);">
+            <span style="font-weight:600; font-size:10px; color:#d4874a;">Jeromelu:</span>
+            <span style="font-size:12px; font-style:italic; color:#d4e0d8;"> I've watched the tape. The matchup is bad.</span>
+          </div>
+        </div>
+
+        <!-- REMARK -->
+        <div style="background:rgba(212,135,74,0.10); border:1px solid rgba(212,135,74,0.22); border-radius:10px; padding:1.5rem; margin:1rem 0; box-shadow:0 0 24px rgba(212,135,74,0.06);">
+          <div style="font-size:9px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#d4874a; margin-bottom:0.75rem;">Jeromelu's Remark</div>
+          <div style="font-size:18px; line-height:1.55; color:#d4e0d8;">
+            <span style="color:#d4874a; font-weight:600; font-size:24px;">&ldquo;</span>Cleary is overpriced. Melbourne is a trap — last two: <span style="font-family:'JetBrains Mono',monospace; color:#a898c8;">42</span> and <span style="font-family:'JetBrains Mono',monospace; color:#a898c8;">51</span>. I'm selling.<span style="color:#d4874a; font-weight:600; font-size:24px;">&rdquo;</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; margin-top:1rem; flex-wrap:wrap;">
+            <span style="font-size:10px; font-weight:600; padding:0.2rem 0.55rem; border-radius:2px; background:rgba(196,96,90,0.15); color:#c4605a; letter-spacing:0.08em;">SELL</span>
+            <span style="font-size:12px; color:#a4bfb4;">Cleary</span>
+            <span style="color:#2c3c38;">&middot;</span>
+            <span style="font-size:10px; font-weight:600; padding:0.2rem 0.55rem; border-radius:2px; background:rgba(212,135,74,0.15); color:#d4874a; letter-spacing:0.08em;">HIGH CONVICTION</span>
+            <span style="color:#2c3c38;">&middot;</span>
+            <span style="font-size:10px; font-family:'JetBrains Mono',monospace; color:#587870;">3 sources &middot; 5 claims</span>
+          </div>
+        </div>
+
+        <!-- Reactions -->
+        <div style="text-align:center; margin-top:1rem;">
+          <div style="font-size:11px; font-family:'JetBrains Mono',monospace; color:#587870; margin-bottom:0.4rem;">
+            <span style="color:#6aab8e; font-weight:500;">142</span> agreed <span style="margin:0 4px; color:#2c3c38;">&middot;</span> <span style="color:#c4605a; font-weight:500;">89</span> disagreed
+          </div>
+          <div style="display:flex; height:3px; border-radius:2px; overflow:hidden;">
+            <div style="width:62%; background:linear-gradient(to right, #4a8a6e, #6aab8e);"></div>
+            <div style="width:38%; background:linear-gradient(to right, #c4605a, #a04a44);"></div>
+          </div>
+        </div>
+
+        <!-- Receipt -->
+        <div style="text-align:center; margin-top:1.25rem;">
+          <div style="display:inline-block; padding:0.85rem 1.25rem; border:1px solid rgba(204,184,106,0.18); border-radius:8px; background:rgba(204,184,106,0.06);">
+            <div style="font-size:9px; font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:0.2em; color:#ccb86a; margin-bottom:0.3rem;">Receipt</div>
+            <div style="font-size:12px; font-style:italic; color:#7a9e94;">&ldquo;Gutho's a trap.&rdquo;</div>
+            <div style="font-size:11px; font-weight:500; color:#d4e0d8; margin-top:0.2rem;">31 pts &middot; &minus;$22k &middot; <span style="color:#6aab8e;">correct</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="sep">
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- OPTION B — WARM EARTH (lifted)                              -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+
+  <div class="option">
+    <div class="section-label" style="color:#c8935a;">Option B</div>
+    <h3 style="color:#ede4d6;">Warm Earth</h3>
+    <p class="tagline" style="color:#8a7a64;">The warm room. Rich brown surfaces you can feel. The wiki's parchment inverted into a cosy dark — leather chair, amber lamp, old wood. This is the closest sibling to the light wiki theme. Terracotta and ochre are structural, teal and slate are the cool relief.</p>
+
+    <div class="strip">
+      <div style="background:#241e1a;"><span class="lbl" style="color:#ede4d6;">#241e1a</span></div>
+      <div style="background:#2a2420;"><span class="lbl" style="color:#ede4d6;">#2a2420</span></div>
+      <div style="background:#342c26;"><span class="lbl" style="color:#ede4d6;">#342c26</span></div>
+      <div style="background:#3e3630;"><span class="lbl" style="color:#ede4d6;">#3e3630</span></div>
+      <div style="background:#504840;"><span class="lbl" style="color:#ede4d6;">#504840</span></div>
+      <div style="background:#6e6458;"><span class="lbl" style="color:#ede4d6;">#6e6458</span></div>
+      <div style="background:#948878;"><span class="lbl" style="color:#241e1a;">#948878</span></div>
+      <div style="background:#c0b4a0;"><span class="lbl" style="color:#241e1a;">#c0b4a0</span></div>
+      <div style="background:#ede4d6;"><span class="lbl" style="color:#241e1a;">#ede4d6</span></div>
+      <div style="background:#d4874a;"><span class="lbl" style="color:#241e1a;">#d4874a</span></div>
+      <div style="background:#b85c38;"><span class="lbl" style="color:#ede4d6;">#b85c38</span></div>
+      <div style="background:#c4a840;"><span class="lbl" style="color:#241e1a;">#c4a840</span></div>
+      <div style="background:#5a9e8a;"><span class="lbl" style="color:#241e1a;">#5a9e8a</span></div>
+      <div style="background:#8aadcc;"><span class="lbl" style="color:#241e1a;">#8aadcc</span></div>
+      <div style="background:#c45050;"><span class="lbl" style="color:#ede4d6;">#c45050</span></div>
+      <div style="background:#a898c8;"><span class="lbl" style="color:#241e1a;">#a898c8</span></div>
+    </div>
+    <div class="strip-names">
+      <span>deep</span><span>bg</span><span>card</span><span>border</span><span>subtle</span><span>muted</span><span>secondary</span><span>body</span><span>fg</span><span>ember</span><span>terra</span><span>ochre</span><span>teal</span><span>slate</span><span>red</span><span>lilac</span>
+    </div>
+
+    <!-- Stream preview -->
+    <div class="frame" style="max-width:680px; margin-top:1rem;">
+      <div class="bar" style="background:#241e1a; color:#504840; border-bottom:1px solid #3e3630;">
+        <div class="dots">
+          <div class="dot" style="background:#3e3630;"></div>
+          <div class="dot" style="background:#3e3630;"></div>
+          <div class="dot" style="background:#3e3630;"></div>
+        </div>
+        jeromelu.com
+      </div>
+      <div style="background:#2a2420; padding:1.75rem 2rem 2.5rem; font-size:13px; line-height:1.7;">
+
+        <!-- Crew status -->
+        <div style="font-size:11px; color:#6e6458; margin-bottom:1.25rem; display:flex; flex-wrap:wrap; gap:3px 0;">
+          <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:5px; height:5px; border-radius:50%; background:#5a9e8a;"></span><span style="color:#5a9e8a; font-weight:500;">Scout</span> scanning</span><span style="margin:0 5px; color:#3e3630;">&middot;</span>
+          <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:5px; height:5px; border-radius:50%; background:#8aadcc;"></span><span style="color:#8aadcc; font-weight:500;">Analyst</span></span><span style="margin:0 5px; color:#3e3630;">&middot;</span>
+          <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:5px; height:5px; border-radius:50%; background:#a898c8;"></span><span style="color:#a898c8; font-weight:500;">Bookkeeper</span></span><span style="margin:0 5px; color:#3e3630;">&middot;</span>
+          <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:5px; height:5px; border-radius:50%; background:#d4874a; box-shadow:0 0 8px rgba(212,135,74,0.3);"></span><span style="color:#d4874a; font-weight:500;">Jeromelu</span></span>
+        </div>
+
+        <!-- Beat -->
+        <div style="text-align:center; padding:0.5rem 0; margin-bottom:1.5rem; background:linear-gradient(to right, transparent, rgba(196,168,64,0.08), transparent); border-radius:6px;">
+          <div style="font-size:10px; font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:0.25em; color:#c4a840;">Tension Builds</div>
+        </div>
+
+        <!-- Scout — teal surface -->
+        <div style="background:rgba(90,158,138,0.08); border:1px solid rgba(90,158,138,0.16); border-radius:8px; padding:0.8rem 1rem; margin-bottom:0.5rem;">
+          <div style="display:flex; align-items:center; gap:6px; margin-bottom:0.25rem;">
+            <span style="width:6px; height:6px; border-radius:50%; background:#5a9e8a;"></span>
+            <span style="font-weight:600; font-size:10px; color:#5a9e8a; text-transform:uppercase; letter-spacing:0.06em;">Scout</span>
+            <span style="font-family:'JetBrains Mono',monospace; font-size:9px; color:#504840; margin-left:auto;">Mon 10:14 PM</span>
+          </div>
+          <div style="font-size:12px; color:#948878;">4 new episodes. 2 mention <strong style="color:#ede4d6;">Cleary</strong>, 1 deep-dive on <strong style="color:#ede4d6;">Munster</strong>.</div>
+        </div>
+
+        <!-- Bookkeeper — lilac surface -->
+        <div style="background:rgba(168,152,200,0.07); border:1px solid rgba(168,152,200,0.14); border-radius:8px; padding:0.8rem 1rem; margin-bottom:0.5rem;">
+          <div style="display:flex; align-items:center; gap:6px; margin-bottom:0.25rem;">
+            <span style="width:6px; height:6px; border-radius:50%; background:#a898c8;"></span>
+            <span style="font-weight:600; font-size:10px; color:#a898c8; text-transform:uppercase; letter-spacing:0.06em;">Bookkeeper</span>
+          </div>
+          <div style="font-size:12px; color:#948878;">Cleary BE: <span style="font-family:'JetBrains Mono',monospace; color:#a898c8; font-weight:500;">42</span>. Last 4: <span style="font-family:'JetBrains Mono',monospace; color:#a898c8;">51, 48, 42, 61</span>. <span style="color:#c45050;">Trending down.</span></div>
+        </div>
+
+        <!-- Analyst — blue + ochre contradiction -->
+        <div style="background:rgba(138,173,204,0.07); border:1px solid rgba(196,168,64,0.22); border-radius:8px; padding:0.8rem 1rem; margin-bottom:0.5rem;">
+          <div style="display:flex; align-items:center; gap:6px; margin-bottom:0.25rem;">
+            <span style="width:6px; height:6px; border-radius:50%; background:#8aadcc;"></span>
+            <span style="font-weight:600; font-size:10px; color:#8aadcc; text-transform:uppercase; letter-spacing:0.06em;">Analyst</span>
+            <span style="font-size:9px; font-weight:600; padding:0.1rem 0.35rem; border-radius:2px; background:rgba(196,168,64,0.15); color:#c4a840;">Contradiction</span>
+          </div>
+          <div style="font-size:12px; color:#c4a840;">KingOfSC and NRLBrothers — same data, <strong style="color:#ede4d6;">opposite conclusions</strong> on Hynes.</div>
+        </div>
+
+        <!-- Archivist — ochre surface -->
+        <div style="background:rgba(196,168,64,0.07); border:1px solid rgba(196,168,64,0.14); border-radius:8px; padding:0.8rem 1rem; margin-bottom:0.5rem;">
+          <div style="display:flex; align-items:center; gap:6px; margin-bottom:0.25rem;">
+            <span style="width:6px; height:6px; border-radius:50%; background:#c4a840;"></span>
+            <span style="font-weight:600; font-size:10px; color:#c4a840; text-transform:uppercase; letter-spacing:0.06em;">Archivist</span>
+          </div>
+          <div style="font-size:12px; color:#948878;">Last 3+ sell consensus: <strong style="color:#c4a840;">Rd 4, Gutho</strong>. <span style="color:#5a9e8a;">Correct.</span></div>
+        </div>
+
+        <!-- Critic -->
+        <div style="background:rgba(196,80,80,0.07); border-left:2px solid #c45050; border-radius:0 8px 8px 0; padding:0.8rem 1rem; margin:1rem 0;">
+          <div style="font-weight:600; font-size:10px; color:#c45050; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.2rem;">Critic</div>
+          <div style="font-size:12px; font-style:italic; color:#948878;">Two sell sources below 50%. Thin evidence.</div>
+          <div style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid rgba(196,80,80,0.1);">
+            <span style="font-weight:600; font-size:10px; color:#d4874a;">Jeromelu:</span>
+            <span style="font-size:12px; font-style:italic; color:#ede4d6;"> I've watched the tape. The matchup is bad.</span>
+          </div>
+        </div>
+
+        <!-- REMARK — terracotta + ember blend -->
+        <div style="background:linear-gradient(135deg, rgba(184,92,56,0.10), rgba(212,135,74,0.10)); border:1px solid rgba(212,135,74,0.22); border-radius:10px; padding:1.5rem; margin:1rem 0; box-shadow:0 0 24px rgba(184,92,56,0.06);">
+          <div style="font-size:9px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#d4874a; margin-bottom:0.75rem;">Jeromelu's Remark</div>
+          <div style="font-size:18px; line-height:1.55; color:#ede4d6;">
+            <span style="color:#b85c38; font-weight:600; font-size:24px;">&ldquo;</span>Cleary is overpriced. Melbourne is a trap — last two: <span style="font-family:'JetBrains Mono',monospace; color:#a898c8;">42</span> and <span style="font-family:'JetBrains Mono',monospace; color:#a898c8;">51</span>. I'm selling.<span style="color:#b85c38; font-weight:600; font-size:24px;">&rdquo;</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; margin-top:1rem; flex-wrap:wrap;">
+            <span style="font-size:10px; font-weight:600; padding:0.2rem 0.55rem; border-radius:2px; background:rgba(196,80,80,0.15); color:#c45050; letter-spacing:0.08em;">SELL</span>
+            <span style="font-size:12px; color:#c0b4a0;">Cleary</span>
+            <span style="color:#3e3630;">&middot;</span>
+            <span style="font-size:10px; font-weight:600; padding:0.2rem 0.55rem; border-radius:2px; background:rgba(212,135,74,0.15); color:#d4874a; letter-spacing:0.08em;">HIGH CONVICTION</span>
+          </div>
+        </div>
+
+        <!-- Reactions -->
+        <div style="text-align:center; margin-top:1rem;">
+          <div style="font-size:11px; font-family:'JetBrains Mono',monospace; color:#6e6458; margin-bottom:0.4rem;">
+            <span style="color:#5a9e8a; font-weight:500;">142</span> agreed <span style="margin:0 4px; color:#3e3630;">&middot;</span> <span style="color:#c45050; font-weight:500;">89</span> disagreed
+          </div>
+          <div style="display:flex; height:3px; border-radius:2px; overflow:hidden;">
+            <div style="width:62%; background:linear-gradient(to right, #3a7a68, #5a9e8a);"></div>
+            <div style="width:38%; background:linear-gradient(to right, #c45050, #a03838);"></div>
+          </div>
+        </div>
+
+        <!-- Receipt -->
+        <div style="text-align:center; margin-top:1.25rem;">
+          <div style="display:inline-block; padding:0.85rem 1.25rem; border:1px solid rgba(196,168,64,0.18); border-radius:8px; background:rgba(196,168,64,0.06);">
+            <div style="font-size:9px; font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:0.2em; color:#c4a840; margin-bottom:0.3rem;">Receipt</div>
+            <div style="font-size:12px; font-style:italic; color:#948878;">&ldquo;Gutho's a trap.&rdquo;</div>
+            <div style="font-size:11px; font-weight:500; color:#ede4d6; margin-top:0.2rem;">31 pts &middot; &minus;$22k &middot; <span style="color:#5a9e8a;">correct</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="sep">
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- OPTION C — MIDNIGHT STUDIO (lifted)                         -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+
+  <div class="option">
+    <div class="section-label" style="color:#7a9ec4;">Option C</div>
+    <h3 style="color:#d4dce8;">Midnight Studio</h3>
+    <p class="tagline" style="color:#5a7090;">Late-night studio with warm monitors. The navy base is visible now — you see blue in the surfaces, not just darkness. Amber and gold glow against it like studio lights. Teal and coral are sharper signals.</p>
+
+    <div class="strip">
+      <div style="background:#181c28;"><span class="lbl" style="color:#d4dce8;">#181c28</span></div>
+      <div style="background:#1e2230;"><span class="lbl" style="color:#d4dce8;">#1e2230</span></div>
+      <div style="background:#262c3c;"><span class="lbl" style="color:#d4dce8;">#262c3c</span></div>
+      <div style="background:#303848;"><span class="lbl" style="color:#d4dce8;">#303848</span></div>
+      <div style="background:#404c60;"><span class="lbl" style="color:#d4dce8;">#404c60</span></div>
+      <div style="background:#5a6880;"><span class="lbl" style="color:#d4dce8;">#5a6880</span></div>
+      <div style="background:#7a8ca4;"><span class="lbl" style="color:#181c28;">#7a8ca4</span></div>
+      <div style="background:#a0acbc;"><span class="lbl" style="color:#181c28;">#a0acbc</span></div>
+      <div style="background:#d4dce8;"><span class="lbl" style="color:#181c28;">#d4dce8</span></div>
+      <div style="background:#d4974a;"><span class="lbl" style="color:#181c28;">#d4974a</span></div>
+      <div style="background:#c4a840;"><span class="lbl" style="color:#181c28;">#c4a840</span></div>
+      <div style="background:#4aaa8a;"><span class="lbl" style="color:#181c28;">#4aaa8a</span></div>
+      <div style="background:#d06060;"><span class="lbl" style="color:#181c28;">#d06060</span></div>
+      <div style="background:#a898c8;"><span class="lbl" style="color:#181c28;">#a898c8</span></div>
+    </div>
+    <div class="strip-names">
+      <span>deep</span><span>bg</span><span>card</span><span>border</span><span>subtle</span><span>muted</span><span>secondary</span><span>body</span><span>fg</span><span>amber</span><span>gold</span><span>teal</span><span>coral</span><span>lilac</span>
+    </div>
+
+    <!-- Stream preview -->
+    <div class="frame" style="max-width:680px; margin-top:1rem;">
+      <div class="bar" style="background:#181c28; color:#404c60; border-bottom:1px solid #303848;">
+        <div class="dots">
+          <div class="dot" style="background:#303848;"></div>
+          <div class="dot" style="background:#303848;"></div>
+          <div class="dot" style="background:#303848;"></div>
+        </div>
+        jeromelu.com
+      </div>
+      <div style="background:#1e2230; padding:1.75rem 2rem 2.5rem; font-size:13px; line-height:1.7;">
+
+        <!-- Crew status -->
+        <div style="font-size:11px; color:#5a6880; margin-bottom:1.25rem; display:flex; flex-wrap:wrap; gap:3px 0;">
+          <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:5px; height:5px; border-radius:50%; background:#4aaa8a;"></span><span style="color:#4aaa8a; font-weight:500;">Scout</span> scanning</span><span style="margin:0 5px; color:#303848;">&middot;</span>
+          <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:5px; height:5px; border-radius:50%; background:#7a9ec4;"></span><span style="color:#7a9ec4; font-weight:500;">Analyst</span></span><span style="margin:0 5px; color:#303848;">&middot;</span>
+          <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:5px; height:5px; border-radius:50%; background:#a898c8;"></span><span style="color:#a898c8; font-weight:500;">Bookkeeper</span></span><span style="margin:0 5px; color:#303848;">&middot;</span>
+          <span style="display:inline-flex; align-items:center; gap:4px;"><span style="width:5px; height:5px; border-radius:50%; background:#d4974a; box-shadow:0 0 8px rgba(212,151,74,0.3);"></span><span style="color:#d4974a; font-weight:500;">Jeromelu</span></span>
+        </div>
+
+        <!-- Beat -->
+        <div style="text-align:center; padding:0.5rem 0; margin-bottom:1.5rem; background:linear-gradient(to right, transparent, rgba(196,168,64,0.08), transparent); border-radius:6px;">
+          <div style="font-size:10px; font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:0.25em; color:#c4a840;">Tension Builds</div>
+        </div>
+
+        <!-- Scout — teal surface -->
+        <div style="background:rgba(74,170,138,0.08); border:1px solid rgba(74,170,138,0.16); border-radius:8px; padding:0.8rem 1rem; margin-bottom:0.5rem;">
+          <div style="display:flex; align-items:center; gap:6px; margin-bottom:0.25rem;">
+            <span style="width:6px; height:6px; border-radius:50%; background:#4aaa8a;"></span>
+            <span style="font-weight:600; font-size:10px; color:#4aaa8a; text-transform:uppercase; letter-spacing:0.06em;">Scout</span>
+            <span style="font-family:'JetBrains Mono',monospace; font-size:9px; color:#404c60; margin-left:auto;">Mon 10:14 PM</span>
+          </div>
+          <div style="font-size:12px; color:#7a8ca4;">4 new episodes. 2 mention <strong style="color:#d4dce8;">Cleary</strong>, 1 on <strong style="color:#d4dce8;">Munster</strong>.</div>
+        </div>
+
+        <!-- Bookkeeper — lilac surface -->
+        <div style="background:rgba(168,152,200,0.07); border:1px solid rgba(168,152,200,0.14); border-radius:8px; padding:0.8rem 1rem; margin-bottom:0.5rem;">
+          <div style="display:flex; align-items:center; gap:6px; margin-bottom:0.25rem;">
+            <span style="width:6px; height:6px; border-radius:50%; background:#a898c8;"></span>
+            <span style="font-weight:600; font-size:10px; color:#a898c8; text-transform:uppercase; letter-spacing:0.06em;">Bookkeeper</span>
+          </div>
+          <div style="font-size:12px; color:#7a8ca4;">Cleary BE: <span style="font-family:'JetBrains Mono',monospace; color:#a898c8; font-weight:500;">42</span>. Last 4: <span style="font-family:'JetBrains Mono',monospace; color:#a898c8;">51, 48, 42, 61</span>. <span style="color:#d06060;">Trending down.</span></div>
+        </div>
+
+        <!-- Analyst — native blue + gold contradiction -->
+        <div style="background:rgba(122,158,196,0.08); border:1px solid rgba(196,168,64,0.22); border-radius:8px; padding:0.8rem 1rem; margin-bottom:0.5rem;">
+          <div style="display:flex; align-items:center; gap:6px; margin-bottom:0.25rem;">
+            <span style="width:6px; height:6px; border-radius:50%; background:#7a9ec4;"></span>
+            <span style="font-weight:600; font-size:10px; color:#7a9ec4; text-transform:uppercase; letter-spacing:0.06em;">Analyst</span>
+            <span style="font-size:9px; font-weight:600; padding:0.1rem 0.35rem; border-radius:2px; background:rgba(196,168,64,0.15); color:#c4a840;">Contradiction</span>
+          </div>
+          <div style="font-size:12px; color:#c4a840;">Same data, <strong style="color:#d4dce8;">opposite conclusions</strong> on Hynes.</div>
+        </div>
+
+        <!-- Archivist — gold surface -->
+        <div style="background:rgba(196,168,64,0.07); border:1px solid rgba(196,168,64,0.14); border-radius:8px; padding:0.8rem 1rem; margin-bottom:0.5rem;">
+          <div style="display:flex; align-items:center; gap:6px; margin-bottom:0.25rem;">
+            <span style="width:6px; height:6px; border-radius:50%; background:#c4a840;"></span>
+            <span style="font-weight:600; font-size:10px; color:#c4a840; text-transform:uppercase; letter-spacing:0.06em;">Archivist</span>
+          </div>
+          <div style="font-size:12px; color:#7a8ca4;">Last 3+ sell consensus: <strong style="color:#c4a840;">Rd 4, Gutho</strong>. <span style="color:#4aaa8a;">Correct.</span></div>
+        </div>
+
+        <!-- Critic — coral -->
+        <div style="background:rgba(208,96,96,0.07); border-left:2px solid #d06060; border-radius:0 8px 8px 0; padding:0.8rem 1rem; margin:1rem 0;">
+          <div style="font-weight:600; font-size:10px; color:#d06060; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.2rem;">Critic</div>
+          <div style="font-size:12px; font-style:italic; color:#7a8ca4;">Two sell sources below 50%. Thin evidence.</div>
+          <div style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid rgba(208,96,96,0.1);">
+            <span style="font-weight:600; font-size:10px; color:#d4974a;">Jeromelu:</span>
+            <span style="font-size:12px; font-style:italic; color:#d4dce8;"> I've watched the tape.</span>
+          </div>
+        </div>
+
+        <!-- REMARK — amber glow on navy -->
+        <div style="background:linear-gradient(135deg, rgba(212,151,74,0.10), rgba(196,168,64,0.08)); border:1px solid rgba(212,151,74,0.22); border-radius:10px; padding:1.5rem; margin:1rem 0; box-shadow:0 0 24px rgba(212,151,74,0.06);">
+          <div style="font-size:9px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#d4974a; margin-bottom:0.75rem;">Jeromelu's Remark</div>
+          <div style="font-size:18px; line-height:1.55; color:#d4dce8;">
+            <span style="color:#d4974a; font-weight:600; font-size:24px;">&ldquo;</span>Cleary is overpriced. Melbourne is a trap — last two: <span style="font-family:'JetBrains Mono',monospace; color:#a898c8;">42</span> and <span style="font-family:'JetBrains Mono',monospace; color:#a898c8;">51</span>. I'm selling.<span style="color:#d4974a; font-weight:600; font-size:24px;">&rdquo;</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; margin-top:1rem; flex-wrap:wrap;">
+            <span style="font-size:10px; font-weight:600; padding:0.2rem 0.55rem; border-radius:2px; background:rgba(208,96,96,0.15); color:#d06060; letter-spacing:0.08em;">SELL</span>
+            <span style="font-size:12px; color:#a0acbc;">Cleary</span>
+            <span style="color:#303848;">&middot;</span>
+            <span style="font-size:10px; font-weight:600; padding:0.2rem 0.55rem; border-radius:2px; background:rgba(212,151,74,0.15); color:#d4974a; letter-spacing:0.08em;">HIGH CONVICTION</span>
+          </div>
+        </div>
+
+        <!-- Reactions -->
+        <div style="text-align:center; margin-top:1rem;">
+          <div style="font-size:11px; font-family:'JetBrains Mono',monospace; color:#5a6880; margin-bottom:0.4rem;">
+            <span style="color:#4aaa8a; font-weight:500;">142</span> agreed <span style="margin:0 4px; color:#303848;">&middot;</span> <span style="color:#d06060; font-weight:500;">89</span> disagreed
+          </div>
+          <div style="display:flex; height:3px; border-radius:2px; overflow:hidden;">
+            <div style="width:62%; background:linear-gradient(to right, #2a8068, #4aaa8a);"></div>
+            <div style="width:38%; background:linear-gradient(to right, #d06060, #a04040);"></div>
+          </div>
+        </div>
+
+        <!-- Receipt -->
+        <div style="text-align:center; margin-top:1.25rem;">
+          <div style="display:inline-block; padding:0.85rem 1.25rem; border:1px solid rgba(196,168,64,0.18); border-radius:8px; background:rgba(196,168,64,0.06);">
+            <div style="font-size:9px; font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:0.2em; color:#c4a840; margin-bottom:0.3rem;">Receipt</div>
+            <div style="font-size:12px; font-style:italic; color:#7a8ca4;">&ldquo;Gutho's a trap.&rdquo;</div>
+            <div style="font-size:11px; font-weight:500; color:#d4dce8; margin-top:0.2rem;">31 pts &middot; &minus;$22k &middot; <span style="color:#4aaa8a;">correct</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="sep">
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- WIKI PAGES — ALL FOUR THEMES                                -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+
+  <div class="section-label" style="color:#9c9484;">Same Page, Four Themes</div>
+  <h2>Wiki Player Page</h2>
+  <p class="desc">Tom Trbojevic rendered in the current light wiki and each lifted dark option. The same content, four different rooms.</p>
+
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
+
+    <!-- ── CURRENT LIGHT ── -->
+    <div class="frame">
+      <div class="bar" style="background:#f0ebe2; color:#9c9484; border-bottom:1px solid rgba(28,26,20,0.12);">
+        <div class="dots"><div class="dot" style="background:rgba(28,26,20,0.15);"></div><div class="dot" style="background:rgba(28,26,20,0.15);"></div><div class="dot" style="background:rgba(28,26,20,0.15);"></div></div>
+        Current Light Wiki
+      </div>
+      <div style="background:#e8e3d9; padding:0; font-size:12px; line-height:1.6; max-height:660px; overflow:hidden;">
+        <div style="display:flex; background:rgba(232,227,217,0.93); border-bottom:1px solid rgba(28,26,20,0.12); padding:0 1rem;">
+          <a style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#b85c38; text-decoration:none; padding:0.6rem; border-bottom:2px solid #b85c38;">Overview</a>
+          <a style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#9c9484; text-decoration:none; padding:0.6rem; border-bottom:2px solid transparent;">Form</a>
+          <a style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#9c9484; text-decoration:none; padding:0.6rem; border-bottom:2px solid transparent;">Experts</a>
+          <a style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#9c9484; text-decoration:none; padding:0.6rem; border-bottom:2px solid transparent;">Verdict</a>
+        </div>
+        <div style="padding:1.25rem 1.5rem;">
+          <div style="text-align:center; margin-bottom:1rem;">
+            <div style="font-size:10px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#b85c38; margin-bottom:0.3rem;">Player</div>
+            <div style="font-family:'Cormorant Garamond',serif; font-size:1.8rem; font-weight:600; color:#1c1a14; line-height:1.15;">Tom Trbojevic</div>
+            <div style="font-family:'Cormorant Garamond',serif; font-size:0.85rem; font-style:italic; color:#5c5848; margin:0.3rem auto 0; max-width:360px;">Elite ceiling, extensive injury history.</div>
+            <div style="width:40px; height:1px; background:#b85c38; margin:0.85rem auto 0; opacity:0.4;"></div>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:rgba(28,26,20,0.12); border:1px solid rgba(28,26,20,0.12); margin-bottom:0.85rem;">
+            <div style="background:#e8e3d9; padding:0.5rem; text-align:center;"><div style="font-size:8px; font-weight:600; text-transform:uppercase; color:#9c9484;">Avg</div><div style="font-family:'Cormorant Garamond',serif; font-size:1.1rem; font-weight:600; color:#1c1a14;">74.3</div></div>
+            <div style="background:#e8e3d9; padding:0.5rem; text-align:center;"><div style="font-size:8px; font-weight:600; text-transform:uppercase; color:#9c9484;">Price</div><div style="font-family:'Cormorant Garamond',serif; font-size:1.1rem; font-weight:600; color:#1c1a14;">$487k</div></div>
+            <div style="background:#e8e3d9; padding:0.5rem; text-align:center;"><div style="font-size:8px; font-weight:600; text-transform:uppercase; color:#9c9484;">BE</div><div style="font-family:'Cormorant Garamond',serif; font-size:1.1rem; font-weight:600; color:#2d6040;">61</div></div>
+            <div style="background:#e8e3d9; padding:0.5rem; text-align:center;"><div style="font-size:8px; font-weight:600; text-transform:uppercase; color:#9c9484;">Games</div><div style="font-family:'Cormorant Garamond',serif; font-size:1.1rem; font-weight:600; color:#8a6a20;">4/5</div></div>
+          </div>
+          <div style="background:#f0ddd5; border-left:3px solid #b85c38; padding:0.65rem 0.85rem; margin-bottom:0.75rem; font-size:11px; color:#1c1a14; line-height:1.55;">Turbo is the definition of risk-reward. When he plays, he's arguably the best fullback in the game.</div>
+          <div style="background:#f0ebe2; border:1px solid rgba(28,26,20,0.12); border-left:3px solid #2d7d6b; padding:0.65rem 0.85rem; margin-bottom:0.75rem; font-size:11px; color:#5c5848; line-height:1.55;"><strong style="color:#1c1a14;">Mechanism:</strong> Boom-bust cycle driven by availability.</div>
+          <div style="border:1px solid rgba(28,26,20,0.12); margin-bottom:0.75rem;">
+            <div style="display:grid; grid-template-columns:55px 1fr; border-bottom:1px solid rgba(28,26,20,0.12);"><div style="padding:0.4rem; display:flex; align-items:center; justify-content:center; border-right:1px solid rgba(28,26,20,0.12);"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:#d4ead8; color:#2d6040;">BULL</span></div><div style="padding:0.4rem 0.6rem;"><strong style="font-size:10px; color:#b85c38;">SC Playbook</strong><div style="font-size:9px; color:#5c5848;">Buy at $452k.</div></div></div>
+            <div style="display:grid; grid-template-columns:55px 1fr;"><div style="padding:0.4rem; display:flex; align-items:center; justify-content:center; border-right:1px solid rgba(28,26,20,0.12);"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:#f0e5c8; color:#8a6a20;">HOLD</span></div><div style="padding:0.4rem 0.6rem;"><strong style="font-size:10px; color:#b85c38;">SC NRL Pod</strong><div style="font-size:9px; color:#5c5848;">Wait for clean run.</div></div></div>
+          </div>
+          <div style="background:#f5dada; border-left:3px solid #9a2020; padding:0.65rem 0.85rem; margin-bottom:0.75rem; font-size:11px; color:#1c1a14; line-height:1.55;"><strong>Warning:</strong> 3 of 4 seasons: 8+ games missed.</div>
+          <div style="background:#f0ebe2; border:1px solid rgba(28,26,20,0.12); padding:0.85rem; text-align:center;">
+            <div style="font-size:10px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#b85c38; margin-bottom:0.3rem;">Jeromelu's Call</div>
+            <div style="font-family:'Cormorant Garamond',serif; font-size:0.9rem; font-style:italic; color:#1c1a14;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:#d4ead8; color:#2d6040; font-style:normal;">BUY</span> with cover. <span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:#f5dada; color:#9a2020; font-style:normal;">AVOID</span> if you need reliability.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── A. DEEP FOREST WIKI ── -->
+    <div class="frame">
+      <div class="bar" style="background:#1a2420; color:#3a524c; border-bottom:1px solid #2c3c38;">
+        <div class="dots"><div class="dot" style="background:#2c3c38;"></div><div class="dot" style="background:#2c3c38;"></div><div class="dot" style="background:#2c3c38;"></div></div>
+        A. Deep Forest
+      </div>
+      <div style="background:#1e2a26; padding:0; font-size:12px; line-height:1.6; max-height:660px; overflow:hidden;">
+        <div style="display:flex; background:rgba(30,42,38,0.93); border-bottom:1px solid #2c3c38; padding:0 1rem;">
+          <a style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#d4874a; text-decoration:none; padding:0.6rem; border-bottom:2px solid #d4874a;">Overview</a>
+          <a style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#3a524c; text-decoration:none; padding:0.6rem; border-bottom:2px solid transparent;">Form</a>
+          <a style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#3a524c; text-decoration:none; padding:0.6rem; border-bottom:2px solid transparent;">Experts</a>
+          <a style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#3a524c; text-decoration:none; padding:0.6rem; border-bottom:2px solid transparent;">Verdict</a>
+        </div>
+        <div style="padding:1.25rem 1.5rem;">
+          <div style="text-align:center; margin-bottom:1rem;">
+            <div style="font-size:10px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#d4874a; margin-bottom:0.3rem;">Player</div>
+            <div style="font-family:'Cormorant Garamond',serif; font-size:1.8rem; font-weight:600; color:#d4e0d8; line-height:1.15;">Tom Trbojevic</div>
+            <div style="font-family:'Cormorant Garamond',serif; font-size:0.85rem; font-style:italic; color:#7a9e94; margin:0.3rem auto 0; max-width:360px;">Elite ceiling, extensive injury history.</div>
+            <div style="width:40px; height:1px; background:#d4874a; margin:0.85rem auto 0; opacity:0.4;"></div>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:#2c3c38; border:1px solid #2c3c38; margin-bottom:0.85rem;">
+            <div style="background:#1e2a26; padding:0.5rem; text-align:center;"><div style="font-size:8px; font-weight:600; text-transform:uppercase; color:#587870;">Avg</div><div style="font-family:'Cormorant Garamond',serif; font-size:1.1rem; font-weight:600; color:#d4e0d8;">74.3</div></div>
+            <div style="background:#1e2a26; padding:0.5rem; text-align:center;"><div style="font-size:8px; font-weight:600; text-transform:uppercase; color:#587870;">Price</div><div style="font-family:'Cormorant Garamond',serif; font-size:1.1rem; font-weight:600; color:#d4e0d8;">$487k</div></div>
+            <div style="background:#1e2a26; padding:0.5rem; text-align:center;"><div style="font-size:8px; font-weight:600; text-transform:uppercase; color:#587870;">BE</div><div style="font-family:'Cormorant Garamond',serif; font-size:1.1rem; font-weight:600; color:#6aab8e;">61</div></div>
+            <div style="background:#1e2a26; padding:0.5rem; text-align:center;"><div style="font-size:8px; font-weight:600; text-transform:uppercase; color:#587870;">Games</div><div style="font-family:'Cormorant Garamond',serif; font-size:1.1rem; font-weight:600; color:#ccb86a;">4/5</div></div>
+          </div>
+          <div style="background:rgba(212,135,74,0.08); border-left:3px solid #d4874a; padding:0.65rem 0.85rem; margin-bottom:0.75rem; font-size:11px; color:#d4e0d8; line-height:1.55;">Turbo is the definition of risk-reward. When he plays, he's arguably the best fullback in the game.</div>
+          <div style="background:rgba(138,173,204,0.06); border:1px solid #2c3c38; border-left:3px solid #8aadcc; padding:0.65rem 0.85rem; margin-bottom:0.75rem; font-size:11px; color:#7a9e94; line-height:1.55;"><strong style="color:#d4e0d8;">Mechanism:</strong> Boom-bust cycle driven by availability.</div>
+          <div style="border:1px solid #2c3c38; margin-bottom:0.75rem;">
+            <div style="display:grid; grid-template-columns:55px 1fr; border-bottom:1px solid #2c3c38;"><div style="padding:0.4rem; display:flex; align-items:center; justify-content:center; border-right:1px solid #2c3c38;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(106,171,142,0.12); color:#6aab8e;">BULL</span></div><div style="padding:0.4rem 0.6rem;"><strong style="font-size:10px; color:#d4874a;">SC Playbook</strong><div style="font-size:9px; color:#7a9e94;">Buy at $452k.</div></div></div>
+            <div style="display:grid; grid-template-columns:55px 1fr;"><div style="padding:0.4rem; display:flex; align-items:center; justify-content:center; border-right:1px solid #2c3c38;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(204,184,106,0.12); color:#ccb86a;">HOLD</span></div><div style="padding:0.4rem 0.6rem;"><strong style="font-size:10px; color:#d4874a;">SC NRL Pod</strong><div style="font-size:9px; color:#7a9e94;">Wait for clean run.</div></div></div>
+          </div>
+          <div style="background:rgba(196,96,90,0.08); border-left:3px solid #c4605a; padding:0.65rem 0.85rem; margin-bottom:0.75rem; font-size:11px; color:#d4e0d8; line-height:1.55;"><strong>Warning:</strong> 3 of 4 seasons: 8+ games missed.</div>
+          <div style="background:rgba(106,171,142,0.05); border:1px solid #2c3c38; padding:0.85rem; text-align:center;">
+            <div style="font-size:10px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#d4874a; margin-bottom:0.3rem;">Jeromelu's Call</div>
+            <div style="font-family:'Cormorant Garamond',serif; font-size:0.9rem; font-style:italic; color:#d4e0d8;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(106,171,142,0.15); color:#6aab8e; font-style:normal;">BUY</span> with cover. <span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(196,96,90,0.15); color:#c4605a; font-style:normal;">AVOID</span> if you need reliability.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── B. WARM EARTH WIKI ── -->
+    <div class="frame">
+      <div class="bar" style="background:#241e1a; color:#504840; border-bottom:1px solid #3e3630;">
+        <div class="dots"><div class="dot" style="background:#3e3630;"></div><div class="dot" style="background:#3e3630;"></div><div class="dot" style="background:#3e3630;"></div></div>
+        B. Warm Earth
+      </div>
+      <div style="background:#2a2420; padding:0; font-size:12px; line-height:1.6; max-height:660px; overflow:hidden;">
+        <div style="display:flex; background:rgba(42,36,32,0.93); border-bottom:1px solid #3e3630; padding:0 1rem;">
+          <a style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#b85c38; text-decoration:none; padding:0.6rem; border-bottom:2px solid #b85c38;">Overview</a>
+          <a style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#504840; text-decoration:none; padding:0.6rem; border-bottom:2px solid transparent;">Form</a>
+          <a style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#504840; text-decoration:none; padding:0.6rem; border-bottom:2px solid transparent;">Experts</a>
+          <a style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#504840; text-decoration:none; padding:0.6rem; border-bottom:2px solid transparent;">Verdict</a>
+        </div>
+        <div style="padding:1.25rem 1.5rem;">
+          <div style="text-align:center; margin-bottom:1rem;">
+            <div style="font-size:10px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#b85c38; margin-bottom:0.3rem;">Player</div>
+            <div style="font-family:'Cormorant Garamond',serif; font-size:1.8rem; font-weight:600; color:#ede4d6; line-height:1.15;">Tom Trbojevic</div>
+            <div style="font-family:'Cormorant Garamond',serif; font-size:0.85rem; font-style:italic; color:#948878; margin:0.3rem auto 0; max-width:360px;">Elite ceiling, extensive injury history.</div>
+            <div style="width:40px; height:1px; background:#b85c38; margin:0.85rem auto 0; opacity:0.4;"></div>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:#3e3630; border:1px solid #3e3630; margin-bottom:0.85rem;">
+            <div style="background:#2a2420; padding:0.5rem; text-align:center;"><div style="font-size:8px; font-weight:600; text-transform:uppercase; color:#6e6458;">Avg</div><div style="font-family:'Cormorant Garamond',serif; font-size:1.1rem; font-weight:600; color:#ede4d6;">74.3</div></div>
+            <div style="background:#2a2420; padding:0.5rem; text-align:center;"><div style="font-size:8px; font-weight:600; text-transform:uppercase; color:#6e6458;">Price</div><div style="font-family:'Cormorant Garamond',serif; font-size:1.1rem; font-weight:600; color:#ede4d6;">$487k</div></div>
+            <div style="background:#2a2420; padding:0.5rem; text-align:center;"><div style="font-size:8px; font-weight:600; text-transform:uppercase; color:#6e6458;">BE</div><div style="font-family:'Cormorant Garamond',serif; font-size:1.1rem; font-weight:600; color:#5a9e8a;">61</div></div>
+            <div style="background:#2a2420; padding:0.5rem; text-align:center;"><div style="font-size:8px; font-weight:600; text-transform:uppercase; color:#6e6458;">Games</div><div style="font-family:'Cormorant Garamond',serif; font-size:1.1rem; font-weight:600; color:#c4a840;">4/5</div></div>
+          </div>
+          <div style="background:rgba(184,92,56,0.10); border-left:3px solid #b85c38; padding:0.65rem 0.85rem; margin-bottom:0.75rem; font-size:11px; color:#ede4d6; line-height:1.55;">Turbo is the definition of risk-reward. When he plays, he's arguably the best fullback in the game.</div>
+          <div style="background:rgba(90,158,138,0.06); border:1px solid #3e3630; border-left:3px solid #5a9e8a; padding:0.65rem 0.85rem; margin-bottom:0.75rem; font-size:11px; color:#948878; line-height:1.55;"><strong style="color:#ede4d6;">Mechanism:</strong> Boom-bust cycle driven by availability.</div>
+          <div style="border:1px solid #3e3630; margin-bottom:0.75rem;">
+            <div style="display:grid; grid-template-columns:55px 1fr; border-bottom:1px solid #3e3630;"><div style="padding:0.4rem; display:flex; align-items:center; justify-content:center; border-right:1px solid #3e3630;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(90,158,138,0.12); color:#5a9e8a;">BULL</span></div><div style="padding:0.4rem 0.6rem;"><strong style="font-size:10px; color:#b85c38;">SC Playbook</strong><div style="font-size:9px; color:#948878;">Buy at $452k.</div></div></div>
+            <div style="display:grid; grid-template-columns:55px 1fr;"><div style="padding:0.4rem; display:flex; align-items:center; justify-content:center; border-right:1px solid #3e3630;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(196,168,64,0.12); color:#c4a840;">HOLD</span></div><div style="padding:0.4rem 0.6rem;"><strong style="font-size:10px; color:#b85c38;">SC NRL Pod</strong><div style="font-size:9px; color:#948878;">Wait for clean run.</div></div></div>
+          </div>
+          <div style="background:rgba(196,80,80,0.08); border-left:3px solid #c45050; padding:0.65rem 0.85rem; margin-bottom:0.75rem; font-size:11px; color:#ede4d6; line-height:1.55;"><strong>Warning:</strong> 3 of 4 seasons: 8+ games missed.</div>
+          <div style="background:rgba(92,74,56,0.08); border:1px solid #3e3630; padding:0.85rem; text-align:center;">
+            <div style="font-size:10px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#b85c38; margin-bottom:0.3rem;">Jeromelu's Call</div>
+            <div style="font-family:'Cormorant Garamond',serif; font-size:0.9rem; font-style:italic; color:#ede4d6;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(90,158,138,0.15); color:#5a9e8a; font-style:normal;">BUY</span> with cover. <span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(196,80,80,0.15); color:#c45050; font-style:normal;">AVOID</span> if you need reliability.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── C. MIDNIGHT STUDIO WIKI ── -->
+    <div class="frame">
+      <div class="bar" style="background:#181c28; color:#404c60; border-bottom:1px solid #303848;">
+        <div class="dots"><div class="dot" style="background:#303848;"></div><div class="dot" style="background:#303848;"></div><div class="dot" style="background:#303848;"></div></div>
+        C. Midnight Studio
+      </div>
+      <div style="background:#1e2230; padding:0; font-size:12px; line-height:1.6; max-height:660px; overflow:hidden;">
+        <div style="display:flex; background:rgba(30,34,48,0.93); border-bottom:1px solid #303848; padding:0 1rem;">
+          <a style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#d4974a; text-decoration:none; padding:0.6rem; border-bottom:2px solid #d4974a;">Overview</a>
+          <a style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#404c60; text-decoration:none; padding:0.6rem; border-bottom:2px solid transparent;">Form</a>
+          <a style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#404c60; text-decoration:none; padding:0.6rem; border-bottom:2px solid transparent;">Experts</a>
+          <a style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#404c60; text-decoration:none; padding:0.6rem; border-bottom:2px solid transparent;">Verdict</a>
+        </div>
+        <div style="padding:1.25rem 1.5rem;">
+          <div style="text-align:center; margin-bottom:1rem;">
+            <div style="font-size:10px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#d4974a; margin-bottom:0.3rem;">Player</div>
+            <div style="font-family:'Cormorant Garamond',serif; font-size:1.8rem; font-weight:600; color:#d4dce8; line-height:1.15;">Tom Trbojevic</div>
+            <div style="font-family:'Cormorant Garamond',serif; font-size:0.85rem; font-style:italic; color:#7a8ca4; margin:0.3rem auto 0; max-width:360px;">Elite ceiling, extensive injury history.</div>
+            <div style="width:40px; height:1px; background:#d4974a; margin:0.85rem auto 0; opacity:0.4;"></div>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:#303848; border:1px solid #303848; margin-bottom:0.85rem;">
+            <div style="background:#1e2230; padding:0.5rem; text-align:center;"><div style="font-size:8px; font-weight:600; text-transform:uppercase; color:#5a6880;">Avg</div><div style="font-family:'Cormorant Garamond',serif; font-size:1.1rem; font-weight:600; color:#d4dce8;">74.3</div></div>
+            <div style="background:#1e2230; padding:0.5rem; text-align:center;"><div style="font-size:8px; font-weight:600; text-transform:uppercase; color:#5a6880;">Price</div><div style="font-family:'Cormorant Garamond',serif; font-size:1.1rem; font-weight:600; color:#d4dce8;">$487k</div></div>
+            <div style="background:#1e2230; padding:0.5rem; text-align:center;"><div style="font-size:8px; font-weight:600; text-transform:uppercase; color:#5a6880;">BE</div><div style="font-family:'Cormorant Garamond',serif; font-size:1.1rem; font-weight:600; color:#4aaa8a;">61</div></div>
+            <div style="background:#1e2230; padding:0.5rem; text-align:center;"><div style="font-size:8px; font-weight:600; text-transform:uppercase; color:#5a6880;">Games</div><div style="font-family:'Cormorant Garamond',serif; font-size:1.1rem; font-weight:600; color:#c4a840;">4/5</div></div>
+          </div>
+          <div style="background:rgba(212,151,74,0.08); border-left:3px solid #d4974a; padding:0.65rem 0.85rem; margin-bottom:0.75rem; font-size:11px; color:#d4dce8; line-height:1.55;">Turbo is the definition of risk-reward. When he plays, he's arguably the best fullback in the game.</div>
+          <div style="background:rgba(122,158,196,0.06); border:1px solid #303848; border-left:3px solid #7a9ec4; padding:0.65rem 0.85rem; margin-bottom:0.75rem; font-size:11px; color:#7a8ca4; line-height:1.55;"><strong style="color:#d4dce8;">Mechanism:</strong> Boom-bust cycle driven by availability.</div>
+          <div style="border:1px solid #303848; margin-bottom:0.75rem;">
+            <div style="display:grid; grid-template-columns:55px 1fr; border-bottom:1px solid #303848;"><div style="padding:0.4rem; display:flex; align-items:center; justify-content:center; border-right:1px solid #303848;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(74,170,138,0.12); color:#4aaa8a;">BULL</span></div><div style="padding:0.4rem 0.6rem;"><strong style="font-size:10px; color:#d4974a;">SC Playbook</strong><div style="font-size:9px; color:#7a8ca4;">Buy at $452k.</div></div></div>
+            <div style="display:grid; grid-template-columns:55px 1fr;"><div style="padding:0.4rem; display:flex; align-items:center; justify-content:center; border-right:1px solid #303848;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(196,168,64,0.12); color:#c4a840;">HOLD</span></div><div style="padding:0.4rem 0.6rem;"><strong style="font-size:10px; color:#d4974a;">SC NRL Pod</strong><div style="font-size:9px; color:#7a8ca4;">Wait for clean run.</div></div></div>
+          </div>
+          <div style="background:rgba(208,96,96,0.08); border-left:3px solid #d06060; padding:0.65rem 0.85rem; margin-bottom:0.75rem; font-size:11px; color:#d4dce8; line-height:1.55;"><strong>Warning:</strong> 3 of 4 seasons: 8+ games missed.</div>
+          <div style="background:rgba(48,64,96,0.08); border:1px solid #303848; padding:0.85rem; text-align:center;">
+            <div style="font-size:10px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#d4974a; margin-bottom:0.3rem;">Jeromelu's Call</div>
+            <div style="font-family:'Cormorant Garamond',serif; font-size:0.9rem; font-style:italic; color:#d4dce8;"><span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(74,170,138,0.15); color:#4aaa8a; font-style:normal;">BUY</span> with cover. <span style="font-size:8px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(208,96,96,0.15); color:#d06060; font-style:normal;">AVOID</span> if you need reliability.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    <p>Dark Theme Refresh v3 &mdash; Lifted &amp; Warm &mdash; Jeromelu Design Reference</p>
+  </footer>
+
+</div>
+</body>
+</html>

@@ -261,4 +261,21 @@ Internal only:
 - metadata_json
 - created_at
 
+### knowledge_base
+- kb_id
+- kb_type (player_summary, round_brief, decision, opinion, source_digest, article_tips, article_totw, article_trades, article_captains, article_stocks, article_consensus)
+- subject_entity_id (optional FK → entities)
+- title
+- content (markdown)
+- embedding (vector 1536, for RAG retrieval)
+- metadata_json (structured data — player rankings, consensus counts, etc.)
+- effective_round
+- season
+- source_claim_ids (array of claim UUIDs for attribution)
+- created_at
+- updated_at
+- expires_at (optional)
+
+The `article_*` types power the Insights content hub — see `docs/features/insights.md`.
+
 This schema is enough for V1 and does not overcomplicate things.

@@ -1,10 +1,50 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0c0c0f;
-  --foreground: #ededed;
-  --tigers-orange: #F58220;
-  --tigers-orange-glow: rgba(245, 130, 32, 0.4);
+  /* ── Warm Earth palette ── */
+  /* Core surfaces */
+  --background: #2a2420;
+  --background-deep: #241e1a;
+  --surface: #342c26;
+  --surface-hover: #3e3630;
+  --foreground: #ede4d6;
+  --foreground-secondary: #c0b4a0;
+  --foreground-muted: #948878;
+  --foreground-faint: #6e6458;
+  --foreground-ghost: #504840;
+
+  /* Borders */
+  --border: #3e3630;
+  --border-subtle: #504840;
+
+  /* Primary accents */
+  --accent: #d4874a;
+  --accent-glow: rgba(212, 135, 74, 0.35);
+  --accent-bg: rgba(212, 135, 74, 0.10);
+  --accent-border: rgba(212, 135, 74, 0.22);
+  --terracotta: #b85c38;
+  --terracotta-bg: rgba(184, 92, 56, 0.10);
+  --ochre: #c4a840;
+  --ochre-bg: rgba(196, 168, 64, 0.07);
+  --ochre-border: rgba(196, 168, 64, 0.14);
+
+  /* Semantic colours */
+  --teal: #5a9e8a;
+  --teal-bg: rgba(90, 158, 138, 0.08);
+  --teal-border: rgba(90, 158, 138, 0.16);
+  --slate: #8aadcc;
+  --slate-bg: rgba(138, 173, 204, 0.07);
+  --slate-border: rgba(138, 173, 204, 0.14);
+  --lilac: #a898c8;
+  --lilac-bg: rgba(168, 152, 200, 0.07);
+  --lilac-border: rgba(168, 152, 200, 0.14);
+  --red: #c45050;
+  --red-bg: rgba(196, 80, 80, 0.08);
+  --red-border: rgba(196, 80, 80, 0.12);
+
+  /* Legacy aliases (for gradual migration) */
+  --tigers-orange: #d4874a;
+  --tigers-orange-glow: rgba(212, 135, 74, 0.35);
 }
 
 @theme inline {
@@ -29,18 +69,18 @@ body {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--foreground-ghost);
   border-radius: 3px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--foreground-faint);
 }
 
 /* Firefox */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+  scrollbar-color: var(--foreground-ghost) transparent;
 }
 
 /* Light scrollbar for feed */
@@ -66,43 +106,38 @@ body {
   scrollbar-color: rgba(0, 0, 0, 0.12) transparent;
 }
 
-/* ── Wiki typography & component tokens ── */
-.wiki-prose {
-  --wiki-serif: var(--font-serif), Georgia, serif;
-  --wiki-surface: rgba(255, 255, 255, 0.03);
-  --wiki-border: rgba(255, 255, 255, 0.08);
-  --wiki-ink: #ededed;
-  --wiki-ink-muted: #a1a1aa;
-  --wiki-ink-faint: #71717a;
-  /* Domain-color palette (dark-mode adapted from stay-human) */
-  --wiki-teal: #34d399;
-  --wiki-teal-bg: rgba(52, 211, 153, 0.08);
-  --wiki-amber: #fbbf24;
-  --wiki-amber-bg: rgba(251, 191, 36, 0.08);
-  --wiki-purple: #a78bfa;
-  --wiki-purple-bg: rgba(167, 139, 250, 0.08);
-  --wiki-green: #4ade80;
-  --wiki-green-bg: rgba(74, 222, 128, 0.08);
-  --wiki-red: #f87171;
-  --wiki-red-bg: rgba(248, 113, 113, 0.08);
-}
+/* Wiki theme tokens are defined in wiki.css, scoped by data-theme="light"|"dark" */
 
-/* Thought bubble float + breathing glow animation */
+/* Thought bubble float animation — theme-neutral, only animates position */
 @keyframes thought-float {
   0%, 100% {
     transform: translateY(0px);
-    box-shadow: 0 0 0px rgba(245, 130, 32, 0);
-    border-color: rgba(255, 255, 255, 0.18);
   }
   50% {
     transform: translateY(-3px);
-    box-shadow: 0 0 12px rgba(245, 130, 32, 0.15);
-    border-color: rgba(245, 130, 32, 0.2);
   }
+}
+
+/* Timeline thread reveal — items slide down and fade in staggered */
+@keyframes timeline-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Timeline thread line grows downward */
+@keyframes timeline-line-grow {
+  from { height: 0; }
+  to { height: 100%; }
 }
 
 /* Crew status pill pulse */
 @keyframes crew-pill-pulse {
-  0%, 100% { border-color: rgba(245, 130, 32, 0.2); }
-  50% { border-color: rgba(245, 130, 32, 0.4); }
+  0%, 100% { border-color: rgba(212, 135, 74, 0.2); }
+  50% { border-color: rgba(212, 135, 74, 0.4); }
 }

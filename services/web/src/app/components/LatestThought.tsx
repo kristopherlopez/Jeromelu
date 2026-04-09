@@ -31,7 +31,7 @@ export function LatestThought() {
 
   return (
     <Link
-      href="/feed"
+      href="/"
       className="group max-w-md rounded-lg border border-zinc-800/60 bg-zinc-950 px-5 py-4 text-left transition-colors hover:border-zinc-700"
     >
       <p className="text-sm leading-relaxed text-zinc-300 group-hover:text-zinc-100 italic">

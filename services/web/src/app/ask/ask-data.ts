@@ -2,7 +2,7 @@ export type TemperatureMode = "straight" | "sharp" | "roast";
 
 export interface ChatMessage {
   id: string;
-  role: "user" | "jeromelu";
+  role: "user" | "jaromelu";
   text: string;
   sources?: { sourceId: string; title: string; creator?: string }[];
   players?: { entityId: string; name: string }[];

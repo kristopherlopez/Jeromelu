@@ -1,0 +1,1106 @@
+<!--
+  Design snapshot: The Ledger — Prediction Tracker & Scoreboard
+  Captured: 2026-04-09
+  Purpose: Track predictions from ALL sources (Jaromelu, experts, podcasters)
+           with a scoreboard ranking prediction accuracy over time.
+
+  Key sections:
+  1. Scoreboard — ranked leaderboard of predictors by accuracy
+  2. Predictions — filterable list of all predictions with status
+  3. Source profiles — drill into any predictor's track record
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Ledger | Jaromelu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #2a2420;
+    --surface: #342c26;
+    --surface-hover: #3e3630;
+    --surface-alt: #2e2822;
+    --fg: #ede4d6;
+    --fg-secondary: #c0b4a0;
+    --fg-muted: #948878;
+    --fg-faint: #6e6458;
+    --accent: #d4874a;
+    --accent-bg: rgba(212, 135, 74, 0.10);
+    --accent-border: rgba(212, 135, 74, 0.22);
+    --ochre: #c4a840;
+    --ochre-bg: rgba(196, 168, 64, 0.10);
+    --ochre-border: rgba(196, 168, 64, 0.22);
+    --teal: #5a9e8a;
+    --teal-bg: rgba(90, 158, 138, 0.10);
+    --teal-border: rgba(90, 158, 138, 0.22);
+    --slate: #8aadcc;
+    --slate-bg: rgba(138, 173, 204, 0.10);
+    --red: #c45050;
+    --red-bg: rgba(196, 80, 80, 0.10);
+    --red-border: rgba(196, 80, 80, 0.22);
+    --lilac: #a898c8;
+    --lilac-bg: rgba(168, 152, 200, 0.10);
+    --border: rgba(237, 228, 214, 0.08);
+    --border-strong: rgba(237, 228, 214, 0.14);
+    --serif: 'Cormorant Garamond', Georgia, serif;
+    --sans: 'Geist', -apple-system, sans-serif;
+    --mono: 'Geist Mono', monospace;
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    padding-left: 240px;
+  }
+
+  .container { max-width: 960px; margin: 0 auto; padding: 2.5rem 2rem; }
+
+  /* ── Header ── */
+  .header { margin-bottom: 2rem; }
+  .header h1 {
+    font-family: var(--serif);
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--fg);
+    margin-bottom: 0.25rem;
+  }
+  .header .subtitle {
+    font-size: 14px;
+    color: var(--fg-muted);
+    margin-bottom: 1rem;
+  }
+  .header .quote {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 1.05rem;
+    color: var(--accent);
+    padding-left: 1rem;
+    border-left: 2px solid var(--accent-border);
+  }
+
+  /* ── Season Stats Row ── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 2rem;
+  }
+  .stat-card {
+    background: var(--surface);
+    padding: 1.25rem 1rem;
+    text-align: center;
+  }
+  .stat-card:hover { background: var(--surface-hover); }
+  .stat-number {
+    font-family: var(--serif);
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--fg);
+    line-height: 1.1;
+  }
+  .stat-number.accent { color: var(--accent); }
+  .stat-number.teal { color: var(--teal); }
+  .stat-number.ochre { color: var(--ochre); }
+  .stat-number.red { color: var(--red); }
+  .stat-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--fg-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-top: 0.25rem;
+  }
+  .stat-sub {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-faint);
+    margin-top: 0.15rem;
+  }
+
+  /* ── Tabs ── */
+  .tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border-strong);
+    margin-bottom: 1.5rem;
+  }
+  .tab {
+    padding: 0.6rem 1.25rem;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--fg-muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 200ms var(--ease);
+  }
+  .tab:hover { color: var(--fg-secondary); }
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── Scoreboard ── */
+  .scoreboard { margin-bottom: 2rem; }
+  .scoreboard-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .scoreboard-table th {
+    background: var(--surface-alt);
+    padding: 0.75rem 1rem;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--fg-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    text-align: left;
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .scoreboard-table th.right,
+  .scoreboard-table td.right { text-align: right; }
+  .scoreboard-table th.center,
+  .scoreboard-table td.center { text-align: center; }
+  .scoreboard-table td {
+    padding: 0.75rem 1rem;
+    font-size: 14px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .scoreboard-table tr:hover td { background: var(--surface-hover); }
+  .scoreboard-table tr.highlight td { background: var(--accent-bg); }
+
+  .rank {
+    font-family: var(--mono);
+    font-weight: 600;
+    color: var(--fg-muted);
+    font-size: 13px;
+  }
+  .rank.gold { color: var(--ochre); }
+  .rank.silver { color: var(--fg-secondary); }
+  .rank.bronze { color: var(--accent); }
+
+  .predictor-name {
+    font-weight: 500;
+    color: var(--fg);
+  }
+  .predictor-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    margin-left: 0.5rem;
+    vertical-align: middle;
+  }
+  .tag-ai { background: var(--accent-bg); color: var(--accent); border: 1px solid var(--accent-border); }
+  .tag-expert { background: var(--teal-bg); color: var(--teal); border: 1px solid var(--teal-border); }
+  .tag-podcast { background: var(--lilac-bg); color: var(--lilac); border: 1px solid rgba(168,152,200,0.22); }
+  .tag-community { background: var(--slate-bg); color: var(--slate); border: 1px solid rgba(138,173,204,0.22); }
+
+  .accuracy-bar {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .bar-track {
+    width: 80px;
+    height: 6px;
+    background: var(--border-strong);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 300ms var(--ease);
+  }
+  .bar-fill.high { background: var(--teal); }
+  .bar-fill.mid { background: var(--ochre); }
+  .bar-fill.low { background: var(--red); }
+  .accuracy-pct {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    min-width: 3rem;
+  }
+  .accuracy-pct.high { color: var(--teal); }
+  .accuracy-pct.mid { color: var(--ochre); }
+  .accuracy-pct.low { color: var(--red); }
+
+  .streak {
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+  .streak.hot { color: var(--teal); }
+  .streak.cold { color: var(--red); }
+  .streak.neutral { color: var(--fg-muted); }
+
+  .trend-arrow { font-size: 11px; margin-left: 0.25rem; }
+  .trend-up { color: var(--teal); }
+  .trend-down { color: var(--red); }
+  .trend-flat { color: var(--fg-faint); }
+
+  .total-calls {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--fg-secondary);
+  }
+
+  /* ── Filters ── */
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+  }
+  .filter-btn {
+    padding: 0.35rem 0.85rem;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--fg-muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 200ms var(--ease);
+  }
+  .filter-btn:hover {
+    color: var(--fg-secondary);
+    border-color: var(--border-strong);
+  }
+  .filter-btn.active {
+    color: var(--accent);
+    background: var(--accent-bg);
+    border-color: var(--accent-border);
+  }
+  .filter-divider {
+    width: 1px;
+    background: var(--border-strong);
+    align-self: stretch;
+    margin: 0 0.25rem;
+  }
+
+  /* ── Prediction Cards ── */
+  .predictions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .prediction-card {
+    background: var(--surface);
+    padding: 1rem 1.25rem;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 1rem;
+    align-items: start;
+    transition: background 200ms var(--ease);
+  }
+  .prediction-card:hover { background: var(--surface-hover); }
+
+  .prediction-status {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 600;
+    flex-shrink: 0;
+    margin-top: 0.15rem;
+  }
+  .status-correct { background: var(--teal-bg); color: var(--teal); border: 1px solid var(--teal-border); }
+  .status-wrong { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border); }
+  .status-pending { background: var(--ochre-bg); color: var(--ochre); border: 1px solid var(--ochre-border); }
+
+  .prediction-body { min-width: 0; }
+  .prediction-text {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--fg);
+    margin-bottom: 0.3rem;
+    line-height: 1.4;
+  }
+  .prediction-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    font-size: 12px;
+    color: var(--fg-muted);
+  }
+  .meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  .meta-source {
+    font-weight: 500;
+    color: var(--fg-secondary);
+  }
+  .meta-ts {
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .meta-type {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    background: var(--border);
+    color: var(--fg-muted);
+  }
+
+  .prediction-confidence {
+    text-align: right;
+    flex-shrink: 0;
+    min-width: 60px;
+  }
+  .confidence-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--fg-faint);
+    margin-bottom: 0.15rem;
+  }
+  .confidence-value {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .conf-high { color: var(--accent); }
+  .conf-med { color: var(--ochre); }
+  .conf-low { color: var(--fg-muted); }
+
+  /* ── Category Breakdown ── */
+  .category-section { margin-top: 2rem; }
+  .category-section h3 {
+    font-family: var(--serif);
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--fg);
+    margin-bottom: 1rem;
+  }
+  .category-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .category-card {
+    background: var(--surface);
+    padding: 1rem 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .category-card:hover { background: var(--surface-hover); }
+  .category-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--fg);
+  }
+  .category-stats {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+  .cat-stat {
+    text-align: center;
+  }
+  .cat-stat-value {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .cat-stat-label {
+    font-size: 10px;
+    color: var(--fg-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  /* ── Pagination ── */
+  .pagination {
+    display: flex;
+    justify-content: center;
+    gap: 0.25rem;
+    margin-top: 1.5rem;
+  }
+  .page-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--fg-muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 200ms var(--ease);
+  }
+  .page-btn:hover { color: var(--fg-secondary); border-color: var(--border-strong); }
+  .page-btn.active { color: var(--accent); border-color: var(--accent-border); background: var(--accent-bg); }
+
+  /* ── Hot Zones ── */
+  .hotzones { margin-top: 1.75rem; }
+  .hotzones-header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+  .hotzones-header h3 {
+    font-family: var(--serif);
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--fg);
+  }
+  .hotzones-header .hotzones-sub {
+    font-size: 12px;
+    color: var(--fg-faint);
+  }
+  .hotzones-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .hotzone-card {
+    background: var(--surface);
+    padding: 1rem 1.15rem;
+    transition: background 200ms var(--ease);
+    position: relative;
+  }
+  .hotzone-card:hover { background: var(--surface-hover); }
+  .hotzone-who {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--fg-secondary);
+    margin-bottom: 0.35rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .hotzone-scope {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--fg);
+    margin-bottom: 0.5rem;
+    line-height: 1.3;
+  }
+  .hotzone-stats {
+    display: flex;
+    gap: 1rem;
+    align-items: baseline;
+  }
+  .hotzone-accuracy {
+    font-family: var(--mono);
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+  .hotzone-vs-overall {
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .hotzone-sample {
+    font-size: 11px;
+    color: var(--fg-faint);
+  }
+  .hz-glow {
+    position: absolute;
+    top: 0; right: 0;
+    width: 60px;
+    height: 60px;
+    border-radius: 0 8px 0 60px;
+    opacity: 0.06;
+    pointer-events: none;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    body { padding-left: 0; }
+    .container { padding: 1.5rem 1rem; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .category-grid { grid-template-columns: 1fr; }
+    .hotzones-grid { grid-template-columns: 1fr; }
+    .prediction-card { grid-template-columns: auto 1fr; }
+    .prediction-confidence { display: none; }
+    .scoreboard-table { font-size: 13px; }
+    .scoreboard-table th, .scoreboard-table td { padding: 0.5rem 0.6rem; }
+    .bar-track { width: 50px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- ── Header ── -->
+  <div class="header">
+    <h1>The Ledger</h1>
+    <p class="subtitle">Predictions, outcomes, receipts. Every call tracked. Every source ranked.</p>
+    <p class="quote">"Everyone's got an opinion. This is where we keep score."</p>
+  </div>
+
+  <!-- ── Season Summary Stats ── -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-number">847</div>
+      <div class="stat-label">Total Predictions</div>
+      <div class="stat-sub">across 12 sources</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number teal">64.2%</div>
+      <div class="stat-label">Avg Accuracy</div>
+      <div class="stat-sub">+2.1% vs last season</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number ochre">R7</div>
+      <div class="stat-label">Current Round</div>
+      <div class="stat-sub">Season 2026</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number accent">38</div>
+      <div class="stat-label">Pending Calls</div>
+      <div class="stat-sub">awaiting results</div>
+    </div>
+  </div>
+
+  <!-- ── Tabs ── -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('scoreboard')">Scoreboard</div>
+    <div class="tab" onclick="switchTab('predictions')">All Predictions</div>
+    <div class="tab" onclick="switchTab('categories')">By Category</div>
+  </div>
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- TAB 1: SCOREBOARD                           -->
+  <!-- ════════════════════════════════════════════ -->
+  <div id="tab-scoreboard" class="tab-content active">
+
+    <div class="filters">
+      <div class="filter-btn active">Overall</div>
+      <div class="filter-btn">Captain Picks</div>
+      <div class="filter-btn">Trades</div>
+      <div class="filter-btn">Score Tips</div>
+      <div class="filter-btn">Bold Calls</div>
+    </div>
+
+    <div class="scoreboard">
+      <table class="scoreboard-table">
+        <thead>
+          <tr>
+            <th style="width:50px" class="center">#</th>
+            <th>Predictor</th>
+            <th style="width:180px">Accuracy</th>
+            <th class="center" style="width:80px">Streak</th>
+            <th class="right" style="width:70px">Calls</th>
+            <th class="center" style="width:60px">Trend</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="highlight">
+            <td class="center"><span class="rank gold">1</span></td>
+            <td>
+              <span class="predictor-name">Jaromelu</span>
+              <span class="predictor-tag tag-ai">AI</span>
+            </td>
+            <td>
+              <div class="accuracy-bar">
+                <div class="bar-track"><div class="bar-fill high" style="width:72%"></div></div>
+                <span class="accuracy-pct high">72.4%</span>
+              </div>
+            </td>
+            <td class="center"><span class="streak hot">W5</span></td>
+            <td class="right"><span class="total-calls">152</span></td>
+            <td class="center"><span class="trend-arrow trend-up">▲</span></td>
+          </tr>
+          <tr>
+            <td class="center"><span class="rank silver">2</span></td>
+            <td>
+              <span class="predictor-name">KingOfSC</span>
+              <span class="predictor-tag tag-expert">Expert</span>
+            </td>
+            <td>
+              <div class="accuracy-bar">
+                <div class="bar-track"><div class="bar-fill high" style="width:69%"></div></div>
+                <span class="accuracy-pct high">69.1%</span>
+              </div>
+            </td>
+            <td class="center"><span class="streak hot">W3</span></td>
+            <td class="right"><span class="total-calls">186</span></td>
+            <td class="center"><span class="trend-arrow trend-flat">—</span></td>
+          </tr>
+          <tr>
+            <td class="center"><span class="rank bronze">3</span></td>
+            <td>
+              <span class="predictor-name">SC Playbook</span>
+              <span class="predictor-tag tag-podcast">Podcast</span>
+            </td>
+            <td>
+              <div class="accuracy-bar">
+                <div class="bar-track"><div class="bar-fill mid" style="width:65%"></div></div>
+                <span class="accuracy-pct mid">65.8%</span>
+              </div>
+            </td>
+            <td class="center"><span class="streak neutral">—</span></td>
+            <td class="right"><span class="total-calls">134</span></td>
+            <td class="center"><span class="trend-arrow trend-up">▲</span></td>
+          </tr>
+          <tr>
+            <td class="center"><span class="rank">4</span></td>
+            <td>
+              <span class="predictor-name">TomFromMelb</span>
+              <span class="predictor-tag tag-community">Community</span>
+            </td>
+            <td>
+              <div class="accuracy-bar">
+                <div class="bar-track"><div class="bar-fill mid" style="width:62%"></div></div>
+                <span class="accuracy-pct mid">62.0%</span>
+              </div>
+            </td>
+            <td class="center"><span class="streak cold">L2</span></td>
+            <td class="right"><span class="total-calls">89</span></td>
+            <td class="center"><span class="trend-arrow trend-down">▼</span></td>
+          </tr>
+          <tr>
+            <td class="center"><span class="rank">5</span></td>
+            <td>
+              <span class="predictor-name">NRL Mole</span>
+              <span class="predictor-tag tag-podcast">Podcast</span>
+            </td>
+            <td>
+              <div class="accuracy-bar">
+                <div class="bar-track"><div class="bar-fill mid" style="width:58%"></div></div>
+                <span class="accuracy-pct mid">58.3%</span>
+              </div>
+            </td>
+            <td class="center"><span class="streak cold">L4</span></td>
+            <td class="right"><span class="total-calls">96</span></td>
+            <td class="center"><span class="trend-arrow trend-down">▼</span></td>
+          </tr>
+          <tr>
+            <td class="center"><span class="rank">6</span></td>
+            <td>
+              <span class="predictor-name">CoachDave</span>
+              <span class="predictor-tag tag-expert">Expert</span>
+            </td>
+            <td>
+              <div class="accuracy-bar">
+                <div class="bar-track"><div class="bar-fill low" style="width:54%"></div></div>
+                <span class="accuracy-pct low">54.7%</span>
+              </div>
+            </td>
+            <td class="center"><span class="streak cold">L1</span></td>
+            <td class="right"><span class="total-calls">112</span></td>
+            <td class="center"><span class="trend-arrow trend-down">▼</span></td>
+          </tr>
+          <tr>
+            <td class="center"><span class="rank">7</span></td>
+            <td>
+              <span class="predictor-name">TripleMNRL</span>
+              <span class="predictor-tag tag-podcast">Podcast</span>
+            </td>
+            <td>
+              <div class="accuracy-bar">
+                <div class="bar-track"><div class="bar-fill low" style="width:51%"></div></div>
+                <span class="accuracy-pct low">51.2%</span>
+              </div>
+            </td>
+            <td class="center"><span class="streak neutral">—</span></td>
+            <td class="right"><span class="total-calls">78</span></td>
+            <td class="center"><span class="trend-arrow trend-flat">—</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── Hot Zones: niche strengths ── -->
+    <div class="hotzones">
+      <div class="hotzones-header">
+        <h3>Hot Zones</h3>
+        <span class="hotzones-sub">Pockets of unusually strong predictions — even from low-ranked sources</span>
+      </div>
+      <div class="hotzones-grid">
+
+        <div class="hotzone-card">
+          <div class="hz-glow" style="background:var(--teal)"></div>
+          <div class="hotzone-who">
+            CoachDave <span class="predictor-tag tag-expert">Expert</span>
+          </div>
+          <div class="hotzone-scope">Parramatta Eels players</div>
+          <div class="hotzone-stats">
+            <span class="hotzone-accuracy" style="color:var(--teal)">83.3%</span>
+            <span class="hotzone-vs-overall" style="color:var(--teal)">+28.6 vs overall</span>
+          </div>
+          <div class="hotzone-sample">18 calls · 15 correct</div>
+        </div>
+
+        <div class="hotzone-card">
+          <div class="hz-glow" style="background:var(--teal)"></div>
+          <div class="hotzone-who">
+            NRL Mole <span class="predictor-tag tag-podcast">Podcast</span>
+          </div>
+          <div class="hotzone-scope">Captain picks — Round 1–4</div>
+          <div class="hotzone-stats">
+            <span class="hotzone-accuracy" style="color:var(--teal)">87.5%</span>
+            <span class="hotzone-vs-overall" style="color:var(--teal)">+29.2 vs overall</span>
+          </div>
+          <div class="hotzone-sample">8 calls · 7 correct</div>
+        </div>
+
+        <div class="hotzone-card">
+          <div class="hz-glow" style="background:var(--teal)"></div>
+          <div class="hotzone-who">
+            TripleMNRL <span class="predictor-tag tag-podcast">Podcast</span>
+          </div>
+          <div class="hotzone-scope">Fullback trades</div>
+          <div class="hotzone-stats">
+            <span class="hotzone-accuracy" style="color:var(--teal)">80.0%</span>
+            <span class="hotzone-vs-overall" style="color:var(--teal)">+28.8 vs overall</span>
+          </div>
+          <div class="hotzone-sample">10 calls · 8 correct</div>
+        </div>
+
+        <div class="hotzone-card">
+          <div class="hz-glow" style="background:var(--ochre)"></div>
+          <div class="hotzone-who">
+            TomFromMelb <span class="predictor-tag tag-community">Community</span>
+          </div>
+          <div class="hotzone-scope">Melbourne Storm players</div>
+          <div class="hotzone-stats">
+            <span class="hotzone-accuracy" style="color:var(--ochre)">76.9%</span>
+            <span class="hotzone-vs-overall" style="color:var(--ochre)">+14.9 vs overall</span>
+          </div>
+          <div class="hotzone-sample">13 calls · 10 correct</div>
+        </div>
+
+        <div class="hotzone-card">
+          <div class="hz-glow" style="background:var(--ochre)"></div>
+          <div class="hotzone-who">
+            Jaromelu <span class="predictor-tag tag-ai">AI</span>
+          </div>
+          <div class="hotzone-scope">Bold calls — prop forwards</div>
+          <div class="hotzone-stats">
+            <span class="hotzone-accuracy" style="color:var(--ochre)">90.0%</span>
+            <span class="hotzone-vs-overall" style="color:var(--ochre)">+17.6 vs overall</span>
+          </div>
+          <div class="hotzone-sample">10 calls · 9 correct</div>
+        </div>
+
+        <div class="hotzone-card">
+          <div class="hz-glow" style="background:var(--ochre)"></div>
+          <div class="hotzone-who">
+            SC Playbook <span class="predictor-tag tag-podcast">Podcast</span>
+          </div>
+          <div class="hotzone-scope">Score tips — hookers</div>
+          <div class="hotzone-stats">
+            <span class="hotzone-accuracy" style="color:var(--ochre)">78.6%</span>
+            <span class="hotzone-vs-overall" style="color:var(--ochre)">+12.8 vs overall</span>
+          </div>
+          <div class="hotzone-sample">14 calls · 11 correct</div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- TAB 2: ALL PREDICTIONS                      -->
+  <!-- ════════════════════════════════════════════ -->
+  <div id="tab-predictions" class="tab-content">
+
+    <div class="filters">
+      <div class="filter-btn active">All</div>
+      <div class="filter-btn">✓ Correct</div>
+      <div class="filter-btn">✗ Wrong</div>
+      <div class="filter-btn">⏳ Pending</div>
+      <div class="filter-divider"></div>
+      <div class="filter-btn">Captain Picks</div>
+      <div class="filter-btn">Trades</div>
+      <div class="filter-btn">Score Tips</div>
+      <div class="filter-btn">Bold Calls</div>
+      <div class="filter-divider"></div>
+      <div class="filter-btn">Jaromelu</div>
+      <div class="filter-btn">All Sources</div>
+    </div>
+
+    <div class="predictions-list">
+
+      <!-- Pending prediction -->
+      <div class="prediction-card">
+        <div class="prediction-status status-pending">⏳</div>
+        <div class="prediction-body">
+          <div class="prediction-text">Ponga to score 85+ in Round 7 — backs are flying this week</div>
+          <div class="prediction-meta">
+            <span class="meta-item"><span class="meta-source">Jaromelu</span></span>
+            <span class="meta-item"><span class="meta-ts">R7 · 8 Apr 2026</span></span>
+            <span class="meta-type">Captain Pick</span>
+          </div>
+        </div>
+        <div class="prediction-confidence">
+          <div class="confidence-label">Confidence</div>
+          <div class="confidence-value conf-high">HIGH</div>
+        </div>
+      </div>
+
+      <!-- Correct prediction -->
+      <div class="prediction-card">
+        <div class="prediction-status status-correct">✓</div>
+        <div class="prediction-body">
+          <div class="prediction-text">Sell Haas before Round 6 — price peak incoming after soft draw</div>
+          <div class="prediction-meta">
+            <span class="meta-item"><span class="meta-source">KingOfSC</span></span>
+            <span class="meta-item"><span class="meta-ts">R5 · 25 Mar 2026</span></span>
+            <span class="meta-type">Trade</span>
+          </div>
+        </div>
+        <div class="prediction-confidence">
+          <div class="confidence-label">Confidence</div>
+          <div class="confidence-value conf-med">MED</div>
+        </div>
+      </div>
+
+      <!-- Correct prediction -->
+      <div class="prediction-card">
+        <div class="prediction-status status-correct">✓</div>
+        <div class="prediction-body">
+          <div class="prediction-text">Cleary back to 70+ SuperCoach points post-Origin — form is locked in</div>
+          <div class="prediction-meta">
+            <span class="meta-item"><span class="meta-source">Jaromelu</span></span>
+            <span class="meta-item"><span class="meta-ts">R5 · 24 Mar 2026</span></span>
+            <span class="meta-type">Score Tip</span>
+          </div>
+        </div>
+        <div class="prediction-confidence">
+          <div class="confidence-label">Confidence</div>
+          <div class="confidence-value conf-high">HIGH</div>
+        </div>
+      </div>
+
+      <!-- Wrong prediction -->
+      <div class="prediction-card">
+        <div class="prediction-status status-wrong">✗</div>
+        <div class="prediction-body">
+          <div class="prediction-text">Broncos to cover -4.5 against Warriors — they'll blow them off the park</div>
+          <div class="prediction-meta">
+            <span class="meta-item"><span class="meta-source">SC Playbook</span></span>
+            <span class="meta-item"><span class="meta-ts">R4 · 18 Mar 2026</span></span>
+            <span class="meta-type">Bold Call</span>
+          </div>
+        </div>
+        <div class="prediction-confidence">
+          <div class="confidence-label">Confidence</div>
+          <div class="confidence-value conf-high">HIGH</div>
+        </div>
+      </div>
+
+      <!-- Correct prediction -->
+      <div class="prediction-card">
+        <div class="prediction-status status-correct">✓</div>
+        <div class="prediction-body">
+          <div class="prediction-text">Tedesco captain in Round 4 — he feasts on the Tigers every time</div>
+          <div class="prediction-meta">
+            <span class="meta-item"><span class="meta-source">Jaromelu</span></span>
+            <span class="meta-item"><span class="meta-ts">R4 · 17 Mar 2026</span></span>
+            <span class="meta-type">Captain Pick</span>
+          </div>
+        </div>
+        <div class="prediction-confidence">
+          <div class="confidence-label">Confidence</div>
+          <div class="confidence-value conf-med">MED</div>
+        </div>
+      </div>
+
+      <!-- Wrong prediction -->
+      <div class="prediction-card">
+        <div class="prediction-status status-wrong">✗</div>
+        <div class="prediction-body">
+          <div class="prediction-text">Luai to outscore Cleary over the next 3 rounds — watch the minutes</div>
+          <div class="prediction-meta">
+            <span class="meta-item"><span class="meta-source">NRL Mole</span></span>
+            <span class="meta-item"><span class="meta-ts">R3 · 10 Mar 2026</span></span>
+            <span class="meta-type">Bold Call</span>
+          </div>
+        </div>
+        <div class="prediction-confidence">
+          <div class="confidence-label">Confidence</div>
+          <div class="confidence-value conf-low">LOW</div>
+        </div>
+      </div>
+
+      <!-- Pending prediction -->
+      <div class="prediction-card">
+        <div class="prediction-status status-pending">⏳</div>
+        <div class="prediction-body">
+          <div class="prediction-text">Mitchell Moses top-5 halfback by Round 10 — trust the process</div>
+          <div class="prediction-meta">
+            <span class="meta-item"><span class="meta-source">TomFromMelb</span></span>
+            <span class="meta-item"><span class="meta-ts">R6 · 1 Apr 2026</span></span>
+            <span class="meta-type">Bold Call</span>
+          </div>
+        </div>
+        <div class="prediction-confidence">
+          <div class="confidence-label">Confidence</div>
+          <div class="confidence-value conf-med">MED</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="pagination">
+      <div class="page-btn active">1</div>
+      <div class="page-btn">2</div>
+      <div class="page-btn">3</div>
+      <div class="page-btn">…</div>
+      <div class="page-btn">12</div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- TAB 3: BY CATEGORY                          -->
+  <!-- ════════════════════════════════════════════ -->
+  <div id="tab-categories" class="tab-content">
+
+    <div class="category-section">
+      <h3>Accuracy by Category</h3>
+      <div class="category-grid">
+        <div class="category-card">
+          <span class="category-name">Captain Picks</span>
+          <div class="category-stats">
+            <div class="cat-stat">
+              <div class="cat-stat-value" style="color:var(--teal)">68.3%</div>
+              <div class="cat-stat-label">Accuracy</div>
+            </div>
+            <div class="cat-stat">
+              <div class="cat-stat-value">241</div>
+              <div class="cat-stat-label">Calls</div>
+            </div>
+          </div>
+        </div>
+        <div class="category-card">
+          <span class="category-name">Trades</span>
+          <div class="category-stats">
+            <div class="cat-stat">
+              <div class="cat-stat-value" style="color:var(--teal)">71.2%</div>
+              <div class="cat-stat-label">Accuracy</div>
+            </div>
+            <div class="cat-stat">
+              <div class="cat-stat-value">189</div>
+              <div class="cat-stat-label">Calls</div>
+            </div>
+          </div>
+        </div>
+        <div class="category-card">
+          <span class="category-name">Score Tips</span>
+          <div class="category-stats">
+            <div class="cat-stat">
+              <div class="cat-stat-value" style="color:var(--ochre)">59.4%</div>
+              <div class="cat-stat-label">Accuracy</div>
+            </div>
+            <div class="cat-stat">
+              <div class="cat-stat-value">278</div>
+              <div class="cat-stat-label">Calls</div>
+            </div>
+          </div>
+        </div>
+        <div class="category-card">
+          <span class="category-name">Bold Calls</span>
+          <div class="category-stats">
+            <div class="cat-stat">
+              <div class="cat-stat-value" style="color:var(--red)">48.6%</div>
+              <div class="cat-stat-label">Accuracy</div>
+            </div>
+            <div class="cat-stat">
+              <div class="cat-stat-value">139</div>
+              <div class="cat-stat-label">Calls</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="category-section" style="margin-top:2rem;">
+      <h3>Top Predictor by Category</h3>
+      <div class="category-grid">
+        <div class="category-card">
+          <div>
+            <span class="category-name">Captain Picks</span>
+            <div style="font-size:12px;color:var(--fg-muted);margin-top:0.15rem;">Best: Jaromelu (74.1%)</div>
+          </div>
+          <span class="predictor-tag tag-ai">AI</span>
+        </div>
+        <div class="category-card">
+          <div>
+            <span class="category-name">Trades</span>
+            <div style="font-size:12px;color:var(--fg-muted);margin-top:0.15rem;">Best: KingOfSC (76.8%)</div>
+          </div>
+          <span class="predictor-tag tag-expert">Expert</span>
+        </div>
+        <div class="category-card">
+          <div>
+            <span class="category-name">Score Tips</span>
+            <div style="font-size:12px;color:var(--fg-muted);margin-top:0.15rem;">Best: SC Playbook (63.2%)</div>
+          </div>
+          <span class="predictor-tag tag-podcast">Podcast</span>
+        </div>
+        <div class="category-card">
+          <div>
+            <span class="category-name">Bold Calls</span>
+            <div style="font-size:12px;color:var(--fg-muted);margin-top:0.15rem;">Best: Jaromelu (55.0%)</div>
+          </div>
+          <span class="predictor-tag tag-ai">AI</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('tab-' + name).classList.add('active');
+  }
+</script>
+
+</body>
+</html>

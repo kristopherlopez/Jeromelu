@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Clock } from "lucide-react";
+import { Clock, ChevronLeft } from "lucide-react";
 import type {
   WikiPageDetail,
   WikiRevisionItem,
@@ -55,26 +55,29 @@ export default function WikiPageClient({
   const sections = extractSections(page.content);
 
   return (
-    <div className="wiki-page" style={{ backgroundColor: "var(--wiki-bg, #f5f0e8)" }}>
-      {/* ── Sticky section nav ── */}
-      {sections.length > 1 && (
-        <nav className="wiki-nav">
-          {sections.map((sec) => (
-            <a key={sec.id} href={`#${sec.id}`}>
-              {sec.title}
-            </a>
-          ))}
-        </nav>
-      )}
-
-      {/* ── Breadcrumb ── */}
-      <div className="wiki-breadcrumb">
-        <Link href="/wiki">Wiki</Link>
-        <span style={{ margin: "0 0.4rem", opacity: 0.4 }}>›</span>
-        <Link href={`/wiki?type=${page.page_type}`}>{typeLabel(page.page_type)}s</Link>
-        <span style={{ margin: "0 0.4rem", opacity: 0.4 }}>›</span>
-        <span style={{ color: "var(--wiki-ink, #1c1a14)" }}>{page.title}</span>
-      </div>
+    <div data-box-style="top-rule">
+      {/* ── Sticky nav: breadcrumb + section anchors ── */}
+      <nav className="wiki-nav">
+        <div className="wiki-nav-back">
+          <Link href="/wiki" className="wiki-nav-link">
+            <ChevronLeft size={14} className="wiki-nav-icon" />
+            Wiki
+          </Link>
+          <span className="wiki-nav-sep">›</span>
+          <Link href={`/wiki?type=${page.page_type}`} className="wiki-nav-link">
+            {typeLabel(page.page_type)}s
+          </Link>
+        </div>
+        {sections.length > 1 && (
+          <div className="wiki-nav-sections">
+            {sections.map((sec) => (
+              <a key={sec.id} href={`#${sec.id}`}>
+                {sec.title}
+              </a>
+            ))}
+          </div>
+        )}
+      </nav>
 
       {/* ── Hero header ── */}
       <header className="wiki-hero">
@@ -133,7 +136,7 @@ export default function WikiPageClient({
         <p>
           Wiki page maintained by{" "}
           <strong style={{ color: "var(--wiki-ink-muted, #a1a1aa)", fontWeight: 500 }}>
-            Jeromelu
+            Jaromelu
           </strong>{" "}
           — AI NRL SuperCoach Analyst
         </p>

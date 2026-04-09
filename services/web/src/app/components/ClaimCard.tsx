@@ -18,7 +18,7 @@ interface Props {
 
 const ClaimCard = forwardRef<HTMLDivElement, Props>(
   ({ claim, isActive, onSeek }, ref) => {
-    const color = CLAIM_TYPE_COLORS[claim.claim_type] || "#71717a";
+    const color = CLAIM_TYPE_COLORS[claim.claim_type] || "var(--foreground-muted)";
     const earliestTs =
       claim.start_ts ??
       claim.chunks
@@ -31,10 +31,10 @@ const ClaimCard = forwardRef<HTMLDivElement, Props>(
         ref={ref}
         className="rounded-lg border p-3 transition-all duration-200"
         style={{
-          borderColor: isActive ? "var(--tigers-orange)" : "rgba(255,255,255,0.08)",
+          borderColor: isActive ? "var(--accent)" : "var(--border)",
           borderLeftWidth: isActive ? 3 : 1,
           backgroundColor: isActive
-            ? "rgba(245, 130, 32, 0.08)"
+            ? "var(--accent-bg)"
             : "rgba(255,255,255,0.02)",
         }}
       >
@@ -47,13 +47,13 @@ const ClaimCard = forwardRef<HTMLDivElement, Props>(
             {claim.claim_type.replace("_", " ")}
           </span>
           {claim.player_name && (
-            <span className="text-sm font-medium text-zinc-200">
+            <span className="text-sm font-medium" style={{ color: "var(--foreground)" }}>
               {claim.player_name}
             </span>
           )}
           {claim.effective_round != null && (
-            <span className="rounded border border-white/[0.08] bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
-              Rd <span className="font-bold text-zinc-200">{claim.effective_round}</span>
+            <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide" style={{ border: "1px solid var(--border)", backgroundColor: "var(--border)", color: "var(--foreground-secondary)" }}>
+              Rd <span className="font-bold" style={{ color: "var(--foreground)" }}>{claim.effective_round}</span>
               {claim.season != null && <> &middot; {claim.season}</>}
             </span>
           )}
@@ -61,8 +61,8 @@ const ClaimCard = forwardRef<HTMLDivElement, Props>(
           {earliestTs !== undefined && (
             <button
               onClick={() => onSeek(earliestTs)}
-              className="rounded px-1.5 py-0.5 text-xs font-mono cursor-pointer hover:bg-zinc-700"
-              style={{ color: "var(--tigers-orange)" }}
+              className="rounded px-1.5 py-0.5 text-xs font-mono cursor-pointer"
+              style={{ color: "var(--accent)" }}
             >
               {formatTimestamp(earliestTs)} →
             </button>
@@ -71,16 +71,16 @@ const ClaimCard = forwardRef<HTMLDivElement, Props>(
 
         {/* Claim text */}
         {claim.claim_text && (
-          <p className="mb-1.5 text-sm leading-snug text-zinc-400 italic">
+          <p className="mb-1.5 text-sm leading-snug italic" style={{ color: "var(--foreground-secondary)" }}>
             &ldquo;{claim.claim_text}&rdquo;
           </p>
         )}
 
         {/* Strength bar + polarity */}
-        <div className="flex items-center gap-3 text-xs text-zinc-500">
+        <div className="flex items-center gap-3 text-xs" style={{ color: "var(--foreground-ghost)" }}>
           {claim.strength !== null && (
             <div className="flex items-center gap-1.5">
-              <div className="h-1.5 w-16 overflow-hidden rounded-full bg-zinc-800">
+              <div className="h-1.5 w-16 overflow-hidden rounded-full" style={{ backgroundColor: "var(--border)" }}>
                 <div
                   className="h-full rounded-full"
                   style={{
@@ -102,7 +102,7 @@ const ClaimCard = forwardRef<HTMLDivElement, Props>(
                       ? "#22c55e"
                       : claim.polarity < 0
                         ? "#ef4444"
-                        : "#71717a",
+                        : "var(--foreground-muted)",
                 }}
               >
                 {claim.polarity > 0 ? "+" : ""}

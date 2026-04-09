@@ -41,7 +41,7 @@ This is the home of an AI agent, not a SaaS product. Every pixel should reinforc
 
 ### Spacing & Layout
 
-- Content max-width: 720px for text-heavy views (Feed, Dossier). Wider for squad/data views.
+- Content max-width: 720px for text-heavy views (Feed, Dossier, Insights).
 - Generous vertical spacing between Feed items. Each thought should breathe.
 - No grid-heavy layouts. Vertical scroll is the primary interaction pattern.
 - Mobile-first. The Feed is inherently mobile-friendly — a vertical timeline.
@@ -74,7 +74,7 @@ The status line is dynamic. It reflects real system state from the orchestrator/
 | Current Label | New Label | Route |
 |---------------|-----------|-------|
 | Chat | Ask Me | `/ask` |
-| Roster | My Squad | `/squad` |
+| Insights | Insights | `/insights` |
 | On my mind | The Feed | `/feed` |
 | Market | The Dossier | `/dossier` |
 | Leaderboard | The Ledger | `/ledger` |
@@ -164,44 +164,45 @@ Each item has:
 
 ---
 
-### 3. My Squad (`/squad`)
+### 3. Insights (`/insights`)
 
-**Purpose:** Jeromelu presenting his team. First-person, opinionated.
+**Purpose:** Jaromelu's analytical content hub. Editorial pieces published each round.
 
-**Layout:** Two sections stacked vertically.
+**Layout:** Single-column, max-width 720px.
 
-**Section 1: Current Squad**
+**Header:**
+- "Insights" title with subtitle "Analysis, picks, and consensus from Jaromelu."
 
-A clean roster view. Not a table — a presented lineup.
+**Filter bar:**
+- Pill badges for each content type: Tips, Team of the Week, Trade Targets, Captain Picks, Stocks, Consensus
+- Active filter highlighted with type-specific colour
 
-- Grouped by position (CTW, FLB, 5/8, HFB, HKR, 2RF, PRF, FRF, INT)
-- Each player card shows:
-  - Player name
-  - Team badge/abbreviation
-  - Current price
-  - Last round score
-  - Jeromelu's one-line rationale (why they're in the squad)
-- Captain marked with an orange crown/star icon
-- Vice-captain marked subtly
+**Article list:**
+- Grouped by round (descending)
+- Each article card shows:
+  - Type badge (colour-coded)
+  - Title
+  - Round + time ago
+  - Summary preview (first 200 chars, 2-line clamp)
+- Click through to full article view
 
-**Section 2: Recent Moves**
+**Article detail (`/insights/{id}`):**
+- Back link to list
+- Type badge + round/season metadata
+- Full headline (serif font, 28px)
+- Published date
+- Full markdown body (rendered with headings, lists, tables, blockquotes)
+- Source attribution footer: podcast names and creators that informed the article
 
-Trade history as a mini-timeline:
-- "Round 4: Gutho → Mam. *The matchup was too good to ignore.*"
-- "Round 3: Held. *Nothing worth burning a trade on.*"
+**Content types:**
+- SuperCoach Tips — round preview (captain picks, trades, avoids)
+- Team of the Week — best performers per SC position
+- Trade Targets — buy/sell recommendations with price data
+- Captain Picks — ranked top 5 with conviction
+- Stocks Up / Down — rising and falling players
+- Podcast Consensus — cross-source comparison
 
-Each move links back to the Feed item where Jeromelu explained the decision.
-
-**Section 3: What I'm Watching**
-
-A short list of players Jeromelu is monitoring for potential moves. Preview of upcoming thinking.
-- "Watching: Cleary (price drop incoming?), Edwards (breakeven 42, could be a buy)"
-
-**Header area:**
-- Season rank and total points (prominent but not the hero)
-- Week-on-week movement indicator
-
-**Feel:** A coach showing you his whiteboard. Confident presentation with reasoning visible.
+**Feel:** Sports columnist meets data analyst. Opinionated, punchy, backed by data. See `docs/features/insights.md` for full technical spec.
 
 ---
 
@@ -245,34 +246,42 @@ A short list of players Jeromelu is monitoring for potential moves. Preview of u
 
 ### 5. The Ledger (`/ledger`)
 
-**Purpose:** Public accountability. Predictions, outcomes, receipts.
+**Purpose:** Multi-source prediction tracker and accuracy index. Tracks predictions from all sources — Jaromelu, experts, podcasters, community — and ranks them by predictive accuracy.
 
 **Layout:**
 
-**Header:** Season summary stats
-- Total predictions made
-- Accuracy rate (with trend arrow)
-- Current streak (correct/incorrect)
-- A Jeromelu quote: *"I said it publicly. Here's how it landed."*
+**Header:** Season summary stats (4-column grid)
+- Total predictions (across all sources)
+- Average accuracy (with delta vs last season)
+- Current round / season
+- Pending calls awaiting results
+- A Jaromelu quote: *"Everyone's got an opinion. This is where we keep score."*
 
-**Prediction List:**
+**Tab 1 — Scoreboard:**
+Ranked leaderboard of all predictors.
+- Each row: rank, name, kind tag (AI/Expert/Podcast/Community), accuracy bar, win/loss streak, total calls, trend arrow
+- Jaromelu's row highlighted
+- Filterable by prediction category (Overall, Captain Picks, Trades, Score Tips, Bold Calls)
 
-Each prediction card shows:
-- What was predicted (plain text)
-- When it was made (timestamp)
-- Status: ✓ Correct | ✗ Wrong | ⏳ Pending
-- Confidence level (if tracked)
-- Link to original Feed item
+**Hot Zones** (below scoreboard):
+Surfaces niche strengths — pockets where a predictor significantly outperforms their overall accuracy (e.g. "CoachDave: 83.3% on Parramatta Eels players, +28.6 vs their 54.7% overall"). 3-column grid showing predictor, scope, niche accuracy, delta, and sample size.
 
-**Filters:**
-- Status: All | Correct | Wrong | Pending
-- Type: Captain picks | Trades | Score predictions | Bold calls
+**Tab 2 — All Predictions:**
+Chronological list of every prediction across all sources.
+- Each card: status icon (✓/✗/⏳), prediction text, source name, round/date, category tag, confidence level
+- Filters: Status (All/Correct/Wrong/Pending) + Category + Source
 
-**Expert Comparison (sub-section or tab):**
-- Table showing Jeromelu vs tracked experts on accuracy
-- "I'm beating KingOfSC on captain picks" framing — not a neutral leaderboard
+**Tab 3 — By Category:**
+- Accuracy breakdown per prediction type (Captain Picks, Trades, Score Tips, Bold Calls)
+- Top predictor per category with kind tag
 
-**Feel:** A betting slip collection. Transparent, slightly cocky, fully accountable.
+**Predictor Kinds:**
+- AI (Jaromelu) — accent/orange
+- Expert — teal
+- Podcast — lilac
+- Community — slate
+
+**Feel:** A betting slip collection meets sports analytics dashboard. Transparent, competitive, fully accountable. The Hot Zones surface hidden signal — someone with low overall accuracy might be the best source for a specific team or position.
 
 ---
 
@@ -344,7 +353,7 @@ This page already exists and is functional. It should be reachable from:
 | Page | Empty State |
 |------|-------------|
 | Feed | "Nothing yet. I'm watching." |
-| Squad | "Squad not set. Check back before Round 1." |
+| Insights | "No insights yet. Articles will appear once Jaromelu starts publishing analysis." |
 | Dossier (no results) | "Nobody by that name in my files." |
 | Ledger | "No predictions on the board yet. Soon." |
 | Ask Me | Suggested prompts (see above) |
@@ -362,8 +371,7 @@ This page already exists and is functional. It should be reachable from:
 ## Mobile Considerations
 
 - The Feed is the primary mobile experience — it's naturally vertical.
-- Sidebar collapses to a bottom tab bar on mobile (5 tabs: Feed, Squad, Dossier, Ledger, Ask).
-- Squad view stacks vertically (no side-by-side panels).
+- Sidebar collapses to a bottom tab bar on mobile (5 tabs: Feed, Insights, Dossier, Ledger, Ask).
 - Dossier sections collapse into expandable accordions.
 - Source detail page: tabs switch between video/transcript/claims instead of split-panel.
 - Home page: same layout, scales naturally.
@@ -376,7 +384,7 @@ Not everything needs to exist on day one. The UI should handle missing data grac
 
 **Phase 1 (now):** Home + Feed + Source detail. Enough to show Jeromelu is alive and processing intel.
 
-**Phase 2:** My Squad + Dossier (player pages). Requires entity data and scraper output.
+**Phase 2:** Insights + Dossier (player pages). Requires entity data, scraper output, and claims pipeline.
 
 **Phase 3:** The Ledger + Ask Me. Requires predictions tracking and LLM integration.
 
@@ -392,7 +400,7 @@ Each phase adds a nav item. Pages that don't exist yet simply don't appear in na
 |-----------|---------|-------------|
 | `StatusLine` | All pages | Persistent agent status indicator |
 | `FeedItem` | Feed, Home (teaser) | Single Feed entry with type-specific rendering |
-| `PlayerChip` | Feed, Squad, Dossier | Clickable player name → Dossier link |
+| `PlayerChip` | Feed, Insights, Dossier | Clickable player name → Dossier link |
 | `SourceRef` | Feed, Dossier | Clickable source reference → Source detail |
 | `StanceBadge` | Dossier, Feed | Buy/Sell/Hold indicator with colour coding |
 | `SentimentChart` | Feed (inline), Dossier | Mini line chart showing sentiment over time |
@@ -407,8 +415,8 @@ Each phase adds a nav item. Pages that don't exist yet simply don't appear in na
 | `JeromeluLogo` | Home | Interactive logo with nav shortcuts (existing) |
 | `LatestThought` | Home | Single most recent Feed item |
 | `ActivityPulse` | Home | Minimal activity stats line |
-| `RosterCard` | Squad | Player card with rationale |
-| `TradeTimeline` | Squad | Recent trade history |
+| `ArticleCard` | Insights | Article preview card with type badge |
+| `TypeBadge` | Insights | Colour-coded article type indicator |
 | `DossierSearch` | Dossier | Search/browse interface |
 | `PredictionCard` | Ledger | Prediction with resolution status |
 | `ChatInput` | Ask Me | Message input with temperature toggle |

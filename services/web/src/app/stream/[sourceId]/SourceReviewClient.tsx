@@ -67,19 +67,19 @@ export default function SourceReviewClient({ data, allSources }: Props) {
   return (
     <main className="min-h-screen">
       {/* Header */}
-      <div className="flex items-center gap-3 border-b border-zinc-800 px-4 py-3 lg:px-6">
+      <div className="flex items-center gap-3 border-b px-4 py-3 lg:px-6" style={{ borderColor: "var(--border)" }}>
         <Link
           href="/stream"
-          className="flex items-center gap-1 text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
+          className="flex items-center gap-1 text-sm transition-colors" style={{ color: "var(--foreground-secondary)" }}
         >
           <ArrowLeft size={16} />
           Back
         </Link>
-        <h1 className="flex-1 truncate text-sm font-semibold text-zinc-200">
+        <h1 className="flex-1 truncate text-sm font-semibold" style={{ color: "var(--foreground)" }}>
           {source.title}
         </h1>
         {source.published_at && (
-          <span className="hidden text-xs text-zinc-500 sm:block">
+          <span className="hidden text-xs sm:block" style={{ color: "var(--foreground-ghost)" }}>
             {new Date(source.published_at).toLocaleDateString("en-AU", {
               day: "numeric",
               month: "short",
@@ -100,27 +100,27 @@ export default function SourceReviewClient({ data, allSources }: Props) {
               onTimeUpdate={setCurrentTime}
             />
           ) : (
-            <div className="flex aspect-video items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-500">
+            <div className="flex aspect-video items-center justify-center rounded-lg border" style={{ borderColor: "var(--border)", backgroundColor: "var(--background-deep)", color: "var(--foreground-ghost)" }}>
               No video URL available
             </div>
           )}
 
           {/* Source metadata */}
-          <div className="flex items-center gap-4 rounded-lg border border-zinc-800 bg-zinc-900/80 px-4 py-3">
+          <div className="flex items-center gap-4 rounded-lg border px-4 py-3" style={{ borderColor: "var(--border)", backgroundColor: "var(--background-deep)" }}>
             {source.creator_name && (
               <>
-                <div className="flex items-center gap-1.5 text-xs text-zinc-400">
-                  <User size={14} className="text-zinc-500" />
-                  <span className="text-zinc-200">{source.creator_name}</span>
+                <div className="flex items-center gap-1.5 text-xs" style={{ color: "var(--foreground-secondary)" }}>
+                  <User size={14} style={{ color: "var(--foreground-ghost)" }} />
+                  <span style={{ color: "var(--foreground)" }}>{source.creator_name}</span>
                 </div>
-                <div className="h-5 w-px bg-zinc-800" />
+                <div className="h-5 w-px" style={{ backgroundColor: "var(--border)" }} />
               </>
             )}
             {source.published_at && (
               <>
-                <div className="flex items-center gap-1.5 text-xs text-zinc-400">
-                  <Calendar size={14} className="text-zinc-500" />
-                  <span className="text-zinc-200">
+                <div className="flex items-center gap-1.5 text-xs" style={{ color: "var(--foreground-secondary)" }}>
+                  <Calendar size={14} style={{ color: "var(--foreground-ghost)" }} />
+                  <span style={{ color: "var(--foreground)" }}>
                     {new Date(source.published_at).toLocaleDateString("en-AU", {
                       day: "numeric",
                       month: "short",
@@ -128,18 +128,18 @@ export default function SourceReviewClient({ data, allSources }: Props) {
                     })}
                   </span>
                 </div>
-                <div className="h-5 w-px bg-zinc-800" />
+                <div className="h-5 w-px" style={{ backgroundColor: "var(--border)" }} />
               </>
             )}
-            <div className="flex items-center gap-1.5 text-xs text-zinc-400">
-              <Video size={14} className="text-zinc-500" />
-              <span className="text-zinc-200">{sourceTypeLabel}</span>
+            <div className="flex items-center gap-1.5 text-xs" style={{ color: "var(--foreground-secondary)" }}>
+              <Video size={14} style={{ color: "var(--foreground-ghost)" }} />
+              <span style={{ color: "var(--foreground)" }}>{sourceTypeLabel}</span>
             </div>
-            <div className="h-5 w-px bg-zinc-800" />
-            <div className="flex items-center gap-1.5 text-xs text-zinc-400">
-              <PenLine size={14} className="text-zinc-500" />
+            <div className="h-5 w-px" style={{ backgroundColor: "var(--border)" }} />
+            <div className="flex items-center gap-1.5 text-xs" style={{ color: "var(--foreground-secondary)" }}>
+              <PenLine size={14} style={{ color: "var(--foreground-ghost)" }} />
               <span>
-                <span className="text-zinc-200">{claims.length}</span> claims
+                <span style={{ color: "var(--foreground)" }}>{claims.length}</span> claims
               </span>
             </div>
           </div>
@@ -147,22 +147,22 @@ export default function SourceReviewClient({ data, allSources }: Props) {
           {/* Related sources */}
           {relatedSources.length > 0 && (
             <div className="flex flex-col gap-2">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+              <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--foreground-ghost)" }}>
                 {source.creator_name ? `More from ${source.creator_name}` : "Other sources"}
               </h2>
               {relatedSources.map((s) => (
                 <Link
                   key={s.source_id}
                   href={`/stream/${s.source_id}`}
-                  className="group flex items-center justify-between rounded-lg border border-zinc-800 px-3 py-2.5 transition-colors hover:border-zinc-600 hover:bg-zinc-900/50"
+                  className="group flex items-center justify-between rounded-lg border px-3 py-2.5 transition-colors" style={{ borderColor: "var(--border)" }}
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-zinc-300 group-hover:text-white truncate">
+                    <p className="text-xs font-medium group-hover:text-white truncate" style={{ color: "var(--foreground)" }}>
                       {s.title}
                     </p>
                     <div className="flex items-center gap-2 mt-0.5">
                       {s.published_at && (
-                        <span className="text-[10px] text-zinc-500">
+                        <span className="text-[10px]" style={{ color: "var(--foreground-ghost)" }}>
                           {new Date(s.published_at).toLocaleDateString("en-AU", {
                             day: "numeric",
                             month: "short",
@@ -172,7 +172,7 @@ export default function SourceReviewClient({ data, allSources }: Props) {
                       )}
                       <span
                         className="text-[10px] font-medium"
-                        style={{ color: "var(--tigers-orange)" }}
+                        style={{ color: "var(--accent)" }}
                       >
                         {s.claim_count} claims
                       </span>
@@ -180,7 +180,7 @@ export default function SourceReviewClient({ data, allSources }: Props) {
                   </div>
                   <ArrowLeft
                     size={12}
-                    className="rotate-180 text-zinc-600 group-hover:text-zinc-400 ml-2 flex-shrink-0"
+                    className="rotate-180 ml-2 flex-shrink-0" style={{ color: "var(--foreground-ghost)" }}
                   />
                 </Link>
               ))}
@@ -191,24 +191,24 @@ export default function SourceReviewClient({ data, allSources }: Props) {
         {/* Right: Tabbed panel (Transcript + Claims) */}
         <div className="w-full lg:w-[50%] p-4 lg:p-6 lg:pl-0 lg:overflow-hidden flex flex-col">
           {/* Tab bar */}
-          <div className="flex gap-4 border-b border-zinc-800 mb-0">
+          <div className="flex gap-4 border-b mb-0" style={{ borderColor: "var(--border)" }}>
             <button
               onClick={() => setActiveTab("transcript")}
-              className={`pb-2 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
-                activeTab === "transcript"
-                  ? "text-[var(--tigers-orange)] border-b-2 border-[var(--tigers-orange)]"
-                  : "text-[#71717a] hover:text-zinc-300"
-              }`}
+              className="pb-2 text-[11px] font-semibold uppercase tracking-wider transition-colors"
+              style={{
+                color: activeTab === "transcript" ? "var(--accent)" : "var(--foreground-muted)",
+                borderBottom: activeTab === "transcript" ? "2px solid var(--accent)" : "2px solid transparent",
+              }}
             >
               Transcript
             </button>
             <button
               onClick={() => setActiveTab("claims")}
-              className={`pb-2 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
-                activeTab === "claims"
-                  ? "text-[var(--tigers-orange)] border-b-2 border-[var(--tigers-orange)]"
-                  : "text-[#71717a] hover:text-zinc-300"
-              }`}
+              className="pb-2 text-[11px] font-semibold uppercase tracking-wider transition-colors"
+              style={{
+                color: activeTab === "claims" ? "var(--accent)" : "var(--foreground-muted)",
+                borderBottom: activeTab === "claims" ? "2px solid var(--accent)" : "2px solid transparent",
+              }}
             >
               Claims ({claims.length})
             </button>

@@ -646,16 +646,31 @@ python scripts/video/match_clip_frames.py
 
 ## File Locations
 
+### Deployed (served to browsers)
+
 | File | Purpose |
 |------|---------|
-| `services/web/public/avatar/clips/*.mp4` | Processed clip files |
-| `services/web/public/avatar/prompts/*.md` | Kling prompts per clip (source of truth) |
+| `S3: avatar/clips/*.mp4` | Processed clips (served via CloudFront CDN) |
 | `services/web/public/avatar/manifest.json` | Clip metadata and transition graph |
-| `services/web/public/avatar/frames/` | Extracted boundary frames (auto-generated) |
+
+### Dev assets (git-tracked, not deployed)
+
+| File | Purpose |
+|------|---------|
+| `assets/avatar/prompts/*.md` | Kling/Veo prompts per clip (source of truth) |
+| `assets/avatar/frames/` | Extracted boundary frames (auto-generated) |
+| `assets/avatar/raw/` | Raw clips from Kling/Veo before post-processing |
+| `assets/avatar/archive/` | Archived/backup clips |
+
+### Code
+
+| File | Purpose |
+|------|---------|
 | `services/web/src/app/components/AvatarEngine.tsx` | Sequencing state machine |
 | `services/web/src/app/components/JeromeluAvatar.tsx` | Video player with crossfade |
 | `services/web/src/app/components/ConnectedAvatar.tsx` | Connects avatar to engine |
-| `scripts/video/generate_clip.py` | Kling v3 clip generation via Replicate API |
+| `scripts/video/generate_clip.py` | Clip generation via Replicate API (Veo 3.1 / Kling v3) |
 | `scripts/video/trim_clip.py` | Clip preparation script |
 | `scripts/video/match_clip_frames.py` | Frame matching script |
-| `docs/avatar-system.md` | High-level avatar system design |
+| `scripts/video/upload_clips_to_s3.py` | Bulk upload clips to S3 |
+| `docs/features/avatar-system.md` | High-level avatar system design |

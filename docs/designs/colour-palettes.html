@@ -1,0 +1,395 @@
+<!--
+  Colour Palette Reference: Warm Earth (Dark) & Wiki (Light)
+  Shows all design tokens used across both themes.
+  Open in any browser — no dependencies except Google Fonts.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Colour Palettes | Jeromelu Design Reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #241e1a;
+    color: #ede4d6;
+    line-height: 1.5;
+    padding: 3rem 2rem 6rem;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container { max-width: 1100px; margin: 0 auto; }
+
+  header { text-align: center; margin-bottom: 4rem; }
+  header h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: clamp(2rem, 4vw, 3rem); font-weight: 600; margin-bottom: 0.5rem; }
+  header p { color: #948878; font-size: 14px; }
+  header .divider { width: 60px; height: 2px; background: linear-gradient(to right, #d4874a, #5a9e8a); margin: 1.5rem auto 0; opacity: 0.5; }
+
+  .theme-section { margin-bottom: 4rem; }
+  .theme-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.4rem; }
+  .theme-header h2 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 1.8rem; font-weight: 600; }
+  .badge { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.2rem 0.6rem; border-radius: 3px; }
+  .badge-dark { background: rgba(212,135,74,0.12); color: #d4874a; }
+  .badge-light { background: rgba(184,92,56,0.15); color: #b85c38; }
+  .theme-desc { font-size: 14px; color: #6e6458; margin-bottom: 2rem; max-width: 600px; }
+
+  .pg { margin-bottom: 2.5rem; }
+  .pg h3 { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #6e6458; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid #3e3630; }
+
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1px; border-radius: 8px; overflow: hidden; }
+  .sw { padding: 0; display: flex; flex-direction: column; }
+  .sw-color { height: 56px; position: relative; }
+  .sw-info { padding: 0.65rem 0.75rem; }
+  .sw-name { font-size: 13px; font-weight: 600; margin-bottom: 0.1rem; }
+  .sw-hex { font-size: 11px; font-family: 'JetBrains Mono', monospace; opacity: 0.5; margin-bottom: 0.1rem; }
+  .sw-var { font-size: 10px; font-family: 'JetBrains Mono', monospace; opacity: 0.35; }
+  .sw-use { font-size: 11px; opacity: 0.4; margin-top: 0.25rem; }
+
+  /* dark swatch defaults */
+  .sd { background: #241e1a; border: 1px solid #3e3630; }
+  .sd .sw-info { color: #ede4d6; }
+  /* light swatch defaults */
+  .sl { background: #f5f0e8; border: 1px solid rgba(28,26,20,0.1); }
+  .sl .sw-info { color: #1c1a14; }
+  .sl .sw-hex { color: #5c5848; }
+  .sl .sw-var { color: #9c9484; }
+  .sl .sw-use { color: #9c9484; }
+
+  /* comparison cards */
+  .comp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem; }
+  @media (max-width: 700px) { .comp-grid { grid-template-columns: 1fr; } }
+  .comp-card { border-radius: 12px; padding: 2rem; border: 1px solid; }
+  .comp-card h4 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 1.4rem; font-weight: 600; margin-bottom: 0.3rem; }
+  .comp-sub { font-size: 13px; font-style: italic; margin-bottom: 1.25rem; }
+  .comp-strip { display: flex; border-radius: 6px; overflow: hidden; height: 40px; margin-bottom: 0.5rem; }
+  .comp-strip div { flex: 1; }
+  .comp-label { font-size: 11px; font-weight: 500; margin-top: 0.3rem; }
+  .accent-row { display: flex; gap: 1.5rem; align-items: center; margin-top: 1rem; }
+  .accent-dot { width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0; }
+  .accent-info { font-size: 13px; }
+  .accent-info strong { display: block; margin-bottom: 0.1rem; }
+
+  /* tag samples */
+  .tag-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+  .tag { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; padding: 0.2rem 0.55rem; border-radius: 2px; display: inline-block; }
+
+  /* preview frame */
+  .frame { border-radius: 10px; overflow: hidden; border: 1px solid #3e3630; }
+  .frame .bar { display: flex; align-items: center; gap: 5px; padding: 8px 12px; font-size: 10px; font-family: 'JetBrains Mono', monospace; }
+  .frame .bar .dots { display: flex; gap: 4px; margin-right: 8px; }
+  .frame .bar .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  hr.sep { border: none; height: 1px; background: #3e3630; margin: 3rem 0; }
+  footer { text-align: center; padding-top: 2rem; border-top: 1px solid #3e3630; font-size: 12px; color: #504840; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>Colour Palettes</h1>
+    <p>Jeromelu Design Reference — Warm Earth (Dark) &amp; Wiki (Light)</p>
+    <div class="divider"></div>
+  </header>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- SIDE-BY-SIDE COMPARISON                    -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="comp-grid">
+    <div class="comp-card" style="background:#2a2420; border-color:#3e3630;">
+      <h4 style="color:#ede4d6;">Warm Earth</h4>
+      <p class="comp-sub" style="color:#6e6458;">Warm room, lights dimmed — brown-charcoal base, multiple coloured accents</p>
+      <div class="comp-strip">
+        <div style="background:#241e1a;"></div>
+        <div style="background:#2a2420;"></div>
+        <div style="background:#342c26;"></div>
+        <div style="background:#3e3630;"></div>
+        <div style="background:#6e6458;"></div>
+        <div style="background:#948878;"></div>
+        <div style="background:#ede4d6;"></div>
+        <div style="background:#d4874a;"></div>
+        <div style="background:#5a9e8a;"></div>
+        <div style="background:#8aadcc;"></div>
+      </div>
+      <p class="comp-label" style="color:#948878;">Deep &rarr; Stone scale &rarr; Cream &rarr; Accents</p>
+      <div class="accent-row">
+        <div class="accent-dot" style="background:#d4874a; box-shadow:0 0 16px rgba(212,135,74,0.35);"></div>
+        <div class="accent-info" style="color:#948878;"><strong style="color:#d4874a;">Ember</strong>#d4874a — warm, burnished, Jeromelu's voice</div>
+      </div>
+    </div>
+    <div class="comp-card" style="background:#e8e3d9; border-color:rgba(28,26,20,0.12);">
+      <h4 style="color:#1c1a14;">Wiki Light</h4>
+      <p class="comp-sub" style="color:#5c5848; font-family:'Cormorant Garamond',Georgia,serif;">Editorial reference — warm parchment, serif, muted accent</p>
+      <div class="comp-strip">
+        <div style="background:#e8e3d9;"></div>
+        <div style="background:#f0ebe2;"></div>
+        <div style="background:#f0ddd5;"></div>
+        <div style="background:#9c9484;"></div>
+        <div style="background:#5c5848;"></div>
+        <div style="background:#1c1a14;"></div>
+        <div style="background:#b85c38;"></div>
+        <div style="background:#2d7d6b;"></div>
+        <div style="background:#8a6a20;"></div>
+      </div>
+      <p class="comp-label" style="color:#9c9484;">Parchment &rarr; Ink scale &rarr; Accent &rarr; Semantic</p>
+      <div class="accent-row">
+        <div class="accent-dot" style="background:#b85c38;"></div>
+        <div class="accent-info" style="color:#5c5848;"><strong style="color:#b85c38;">Burnt Orange</strong>#b85c38 — same hue family as Ember</div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="sep">
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- WARM EARTH (DARK)                          -->
+  <!-- ══════════════════════════════════════════ -->
+  <section class="theme-section">
+    <div class="theme-header">
+      <h2>Warm Earth</h2>
+      <span class="badge badge-dark">Dark</span>
+    </div>
+    <p class="theme-desc">The main app — stream, squad, crew, landing page. Lifted warm brown-charcoal base with a brown-tinted stone grey scale and multiple coloured accents per crew member.</p>
+
+    <div class="pg">
+      <h3>Core Surfaces</h3>
+      <div class="swatches" style="background:#3e3630; border:1px solid #3e3630;">
+        <div class="sw sd"><div class="sw-color" style="background:#241e1a;"></div><div class="sw-info"><div class="sw-name">Deep</div><div class="sw-hex">#241e1a</div><div class="sw-var">--background-deep</div><div class="sw-use">Sidebar, wells</div></div></div>
+        <div class="sw sd"><div class="sw-color" style="background:#2a2420;"></div><div class="sw-info"><div class="sw-name">Background</div><div class="sw-hex">#2a2420</div><div class="sw-var">--background</div><div class="sw-use">Main canvas</div></div></div>
+        <div class="sw sd"><div class="sw-color" style="background:#342c26;"></div><div class="sw-info"><div class="sw-name">Surface</div><div class="sw-hex">#342c26</div><div class="sw-var">--surface</div><div class="sw-use">Cards, panels</div></div></div>
+        <div class="sw sd"><div class="sw-color" style="background:#3e3630;"></div><div class="sw-info"><div class="sw-name">Surface Hover</div><div class="sw-hex">#3e3630</div><div class="sw-var">--surface-hover</div><div class="sw-use">Hovered cards</div></div></div>
+      </div>
+    </div>
+
+    <div class="pg">
+      <h3>Foreground Scale (Warm Stone)</h3>
+      <div class="swatches" style="background:#3e3630; border:1px solid #3e3630;">
+        <div class="sw sd"><div class="sw-color" style="background:#ede4d6;"></div><div class="sw-info"><div class="sw-name">Foreground</div><div class="sw-hex">#ede4d6</div><div class="sw-var">--foreground</div><div class="sw-use">Primary text</div></div></div>
+        <div class="sw sd"><div class="sw-color" style="background:#c0b4a0;"></div><div class="sw-info"><div class="sw-name">Secondary</div><div class="sw-hex">#c0b4a0</div><div class="sw-var">--foreground-secondary</div><div class="sw-use">Descriptions</div></div></div>
+        <div class="sw sd"><div class="sw-color" style="background:#948878;"></div><div class="sw-info"><div class="sw-name">Muted</div><div class="sw-hex">#948878</div><div class="sw-var">--foreground-muted</div><div class="sw-use">Timestamps, metadata</div></div></div>
+        <div class="sw sd"><div class="sw-color" style="background:#6e6458;"></div><div class="sw-info"><div class="sw-name">Faint</div><div class="sw-hex">#6e6458</div><div class="sw-var">--foreground-faint</div><div class="sw-use">Disabled text</div></div></div>
+        <div class="sw sd"><div class="sw-color" style="background:#504840;"></div><div class="sw-info"><div class="sw-name">Ghost</div><div class="sw-hex">#504840</div><div class="sw-var">--foreground-ghost</div><div class="sw-use">Scrollbar thumbs</div></div></div>
+      </div>
+    </div>
+
+    <div class="pg">
+      <h3>Borders</h3>
+      <div class="swatches" style="background:#3e3630; border:1px solid #3e3630;">
+        <div class="sw sd"><div class="sw-color" style="background:#3e3630;"></div><div class="sw-info"><div class="sw-name">Border</div><div class="sw-hex">#3e3630</div><div class="sw-var">--border</div><div class="sw-use">Default borders</div></div></div>
+        <div class="sw sd"><div class="sw-color" style="background:#504840;"></div><div class="sw-info"><div class="sw-name">Border Subtle</div><div class="sw-hex">#504840</div><div class="sw-var">--border-subtle</div><div class="sw-use">Input borders</div></div></div>
+      </div>
+    </div>
+
+    <div class="pg">
+      <h3>Primary Accents</h3>
+      <div class="swatches" style="background:#3e3630; border:1px solid #3e3630;">
+        <div class="sw sd"><div class="sw-color" style="background:#d4874a;"></div><div class="sw-info"><div class="sw-name">Accent (Ember)</div><div class="sw-hex">#d4874a</div><div class="sw-var">--accent</div><div class="sw-use">Jeromelu's voice, CTAs</div></div></div>
+        <div class="sw sd"><div class="sw-color" style="background:rgba(212,135,74,0.35);"></div><div class="sw-info"><div class="sw-name">Accent Glow</div><div class="sw-hex">rgba(212,135,74,0.35)</div><div class="sw-var">--accent-glow</div><div class="sw-use">Hover halos</div></div></div>
+        <div class="sw sd"><div class="sw-color" style="background:#b85c38;"></div><div class="sw-info"><div class="sw-name">Terracotta</div><div class="sw-hex">#b85c38</div><div class="sw-var">--terracotta</div><div class="sw-use">Secondary warm accent</div></div></div>
+        <div class="sw sd"><div class="sw-color" style="background:#c4a840;"></div><div class="sw-info"><div class="sw-name">Ochre</div><div class="sw-hex">#c4a840</div><div class="sw-var">--ochre</div><div class="sw-use">Archivist, receipts, gold</div></div></div>
+      </div>
+    </div>
+
+    <div class="pg">
+      <h3>Semantic / Crew Colours</h3>
+      <div class="swatches" style="background:#3e3630; border:1px solid #3e3630;">
+        <div class="sw sd"><div class="sw-color" style="background:#5a9e8a;"></div><div class="sw-info"><div class="sw-name">Teal (Scout)</div><div class="sw-hex">#5a9e8a</div><div class="sw-var">--teal</div><div class="sw-use">Success, buy signals</div></div></div>
+        <div class="sw sd"><div class="sw-color" style="background:rgba(90,158,138,0.08);"></div><div class="sw-info"><div class="sw-name">Teal BG</div><div class="sw-hex">rgba(90,158,138,0.08)</div><div class="sw-var">--teal-bg</div><div class="sw-use">Scout card surface</div></div></div>
+        <div class="sw sd"><div class="sw-color" style="background:#8aadcc;"></div><div class="sw-info"><div class="sw-name">Slate (Analyst)</div><div class="sw-hex">#8aadcc</div><div class="sw-var">--slate</div><div class="sw-use">Context, mechanisms</div></div></div>
+        <div class="sw sd"><div class="sw-color" style="background:rgba(138,173,204,0.07);"></div><div class="sw-info"><div class="sw-name">Slate BG</div><div class="sw-hex">rgba(138,173,204,0.07)</div><div class="sw-var">--slate-bg</div><div class="sw-use">Analyst card surface</div></div></div>
+        <div class="sw sd"><div class="sw-color" style="background:#a898c8;"></div><div class="sw-info"><div class="sw-name">Lilac (Bookkeeper)</div><div class="sw-hex">#a898c8</div><div class="sw-var">--lilac</div><div class="sw-use">Numbers, stats, captain</div></div></div>
+        <div class="sw sd"><div class="sw-color" style="background:rgba(168,152,200,0.07);"></div><div class="sw-info"><div class="sw-name">Lilac BG</div><div class="sw-hex">rgba(168,152,200,0.07)</div><div class="sw-var">--lilac-bg</div><div class="sw-use">Bookkeeper card surface</div></div></div>
+        <div class="sw sd"><div class="sw-color" style="background:#c45050;"></div><div class="sw-info"><div class="sw-name">Clay Red (Critic)</div><div class="sw-hex">#c45050</div><div class="sw-var">--red</div><div class="sw-use">Sell, warnings, injuries</div></div></div>
+        <div class="sw sd"><div class="sw-color" style="background:rgba(196,80,80,0.08);"></div><div class="sw-info"><div class="sw-name">Red BG</div><div class="sw-hex">rgba(196,80,80,0.08)</div><div class="sw-var">--red-bg</div><div class="sw-use">Critic card surface</div></div></div>
+      </div>
+    </div>
+
+    <div class="pg">
+      <h3>Tags on Dark Background</h3>
+      <div style="background:#2a2420; padding:1.25rem; border-radius:8px; border:1px solid #3e3630;">
+        <div class="tag-row">
+          <span class="tag" style="background:rgba(90,158,138,0.12); color:#5a9e8a;">BUY</span>
+          <span class="tag" style="background:rgba(90,158,138,0.12); color:#5a9e8a;">SOLID</span>
+          <span class="tag" style="background:rgba(90,158,138,0.12); color:#5a9e8a;">BULLISH</span>
+          <span class="tag" style="background:rgba(196,168,64,0.12); color:#c4a840;">HOLD</span>
+          <span class="tag" style="background:rgba(196,168,64,0.12); color:#c4a840;">NEUTRAL</span>
+          <span class="tag" style="background:rgba(196,80,80,0.12); color:#c45050;">SELL</span>
+          <span class="tag" style="background:rgba(196,80,80,0.12); color:#c45050;">AVOID</span>
+          <span class="tag" style="background:rgba(196,80,80,0.12); color:#c45050;">BEARISH</span>
+          <span class="tag" style="background:rgba(168,152,200,0.12); color:#a898c8;">CAPTAIN</span>
+          <span class="tag" style="background:rgba(138,173,204,0.12); color:#8aadcc;">BREAKOUT</span>
+          <span class="tag" style="background:rgba(196,168,64,0.12); color:#c4a840;">PREMIUM</span>
+          <span class="tag" style="background:rgba(212,135,74,0.12); color:#d4874a;">HOT TAKE</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pg">
+      <h3>Box Variants</h3>
+      <div style="display:flex; flex-direction:column; gap:0.75rem;">
+        <div style="background:rgba(212,135,74,0.10); border-left:3px solid #d4874a; padding:0.85rem 1rem; border-radius:0 6px 6px 0;"><div style="font-size:11px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:#d4874a; margin-bottom:0.25rem;">Jeromelu's Take</div><div style="font-size:13px; color:#ede4d6;">Agent's strong opinion, recommendation, conviction.</div></div>
+        <div style="background:rgba(138,173,204,0.07); border-left:3px solid #8aadcc; padding:0.85rem 1rem; border-radius:0 6px 6px 0;"><div style="font-size:11px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:#8aadcc; margin-bottom:0.25rem;">Analyst Context</div><div style="font-size:13px; color:#948878;">Factual context, game mechanics, mechanisms.</div></div>
+        <div style="background:rgba(196,168,64,0.07); border-left:3px solid #c4a840; padding:0.85rem 1rem; border-radius:0 6px 6px 0;"><div style="font-size:11px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:#c4a840; margin-bottom:0.25rem;">Archivist Record</div><div style="font-size:13px; color:#948878;">Historical data, receipts, records.</div></div>
+        <div style="background:rgba(168,152,200,0.07); border-left:3px solid #a898c8; padding:0.85rem 1rem; border-radius:0 6px 6px 0;"><div style="font-size:11px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:#a898c8; margin-bottom:0.25rem;">Bookkeeper Numbers</div><div style="font-size:13px; color:#948878;">Price data, breakevens, projections.</div></div>
+        <div style="background:rgba(196,80,80,0.08); border-left:3px solid #c45050; padding:0.85rem 1rem; border-radius:0 6px 6px 0;"><div style="font-size:11px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:#c45050; margin-bottom:0.25rem;">Warning</div><div style="font-size:13px; color:#ede4d6;">Risk flag — injury concern, price trap.</div></div>
+        <div style="background:rgba(90,158,138,0.08); border-left:3px solid #5a9e8a; padding:0.85rem 1rem; border-radius:0 6px 6px 0;"><div style="font-size:11px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:#5a9e8a; margin-bottom:0.25rem;">Verified</div><div style="font-size:13px; color:#948878;">Scout confirmed — named in 17.</div></div>
+      </div>
+    </div>
+
+    <!-- Dark stream example -->
+    <div class="pg">
+      <h3>Example — The Stream</h3>
+      <div class="frame">
+        <div class="bar" style="background:#241e1a; color:#504840; border-bottom:1px solid #3e3630;">
+          <div class="dots"><div class="dot" style="background:#3e3630;"></div><div class="dot" style="background:#3e3630;"></div><div class="dot" style="background:#3e3630;"></div></div>
+          jeromelu.com
+        </div>
+        <div style="background:#2a2420; padding:1.5rem 1.75rem 2rem; font-size:12px; line-height:1.65;">
+          <div style="font-size:11px; color:#6e6458; margin-bottom:1rem;">
+            <span style="color:#5a9e8a; font-weight:500;">Scout</span> scanning<span style="margin:0 5px; color:#3e3630;">&middot;</span><span style="color:#8aadcc; font-weight:500;">Analyst</span> cross-ref<span style="margin:0 5px; color:#3e3630;">&middot;</span><span style="color:#d4874a; font-weight:500;">Jeromelu</span> reviewing
+          </div>
+          <div style="background:rgba(90,158,138,0.08); border:1px solid rgba(90,158,138,0.16); border-radius:6px; padding:0.65rem 0.85rem; margin-bottom:0.4rem;">
+            <div style="display:flex; align-items:center; gap:5px; margin-bottom:0.2rem;"><span style="width:5px; height:5px; border-radius:50%; background:#5a9e8a;"></span><span style="font-weight:600; font-size:9px; color:#5a9e8a; text-transform:uppercase; letter-spacing:0.06em;">Scout</span></div>
+            <div style="color:#948878;">4 new episodes. 2 mention <strong style="color:#ede4d6;">Cleary</strong>.</div>
+          </div>
+          <div style="background:rgba(168,152,200,0.07); border:1px solid rgba(168,152,200,0.14); border-radius:6px; padding:0.65rem 0.85rem; margin-bottom:0.4rem;">
+            <div style="display:flex; align-items:center; gap:5px; margin-bottom:0.2rem;"><span style="width:5px; height:5px; border-radius:50%; background:#a898c8;"></span><span style="font-weight:600; font-size:9px; color:#a898c8; text-transform:uppercase; letter-spacing:0.06em;">Bookkeeper</span></div>
+            <div style="color:#948878;">BE: <span style="font-family:'JetBrains Mono',monospace; color:#a898c8;">42</span>. Last 4: <span style="font-family:'JetBrains Mono',monospace; color:#a898c8;">51, 48, 42, 61</span>. <span style="color:#c45050;">Down.</span></div>
+          </div>
+          <div style="background:rgba(212,135,74,0.10); border:1px solid rgba(212,135,74,0.22); border-radius:8px; padding:1rem; margin:0.8rem 0; box-shadow:0 0 20px rgba(212,135,74,0.06);">
+            <div style="font-size:8px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#d4874a; margin-bottom:0.5rem;">Jeromelu's Remark</div>
+            <div style="font-size:15px; line-height:1.5; color:#ede4d6;"><span style="color:#b85c38; font-weight:600; font-size:18px;">&ldquo;</span>Cleary is overpriced. Melbourne is a trap.<span style="color:#b85c38; font-weight:600; font-size:18px;">&rdquo;</span></div>
+            <div style="display:flex; gap:6px; margin-top:0.6rem; flex-wrap:wrap;">
+              <span class="tag" style="background:rgba(196,80,80,0.15); color:#c45050;">SELL</span>
+              <span style="font-size:11px; color:#c0b4a0;">Cleary</span>
+              <span style="color:#3e3630;">&middot;</span>
+              <span class="tag" style="background:rgba(212,135,74,0.15); color:#d4874a;">HIGH CONVICTION</span>
+            </div>
+          </div>
+          <div style="text-align:center; margin-top:0.8rem;">
+            <span style="font-size:10px; font-family:'JetBrains Mono',monospace; color:#6e6458;"><span style="color:#5a9e8a;">142</span> agreed &middot; <span style="color:#c45050;">89</span> disagreed</span>
+            <div style="display:flex; height:3px; border-radius:2px; overflow:hidden; margin-top:0.3rem;"><div style="width:62%; background:linear-gradient(to right, #3a7a68, #5a9e8a);"></div><div style="width:38%; background:linear-gradient(to right, #c45050, #a03838);"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="sep">
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- WIKI LIGHT THEME                           -->
+  <!-- ══════════════════════════════════════════ -->
+  <section class="theme-section">
+    <div class="theme-header">
+      <h2>Wiki Theme</h2>
+      <span class="badge badge-light">Light</span>
+    </div>
+    <p class="theme-desc">The knowledge base — player dossiers, team pages, advisor profiles. Warm parchment with serif typography and burnt-orange editorial accents.</p>
+
+    <div class="pg">
+      <h3>Core</h3>
+      <div class="swatches" style="background:rgba(28,26,20,0.08); border:1px solid rgba(28,26,20,0.1);">
+        <div class="sw sl"><div class="sw-color" style="background:#e8e3d9;"></div><div class="sw-info"><div class="sw-name">Background</div><div class="sw-hex">#e8e3d9</div><div class="sw-var">--wiki-bg</div><div class="sw-use">Parchment canvas</div></div></div>
+        <div class="sw sl"><div class="sw-color" style="background:#f0ebe2;"></div><div class="sw-info"><div class="sw-name">Surface</div><div class="sw-hex">#f0ebe2</div><div class="sw-var">--wiki-surface</div><div class="sw-use">Cards, meta boxes</div></div></div>
+        <div class="sw sl"><div class="sw-color" style="background:#b85c38;"></div><div class="sw-info"><div class="sw-name">Accent</div><div class="sw-hex">#b85c38</div><div class="sw-var">--wiki-accent</div><div class="sw-use">Links, kickers</div></div></div>
+        <div class="sw sl"><div class="sw-color" style="background:#f0ddd5;"></div><div class="sw-info"><div class="sw-name">Accent BG</div><div class="sw-hex">#f0ddd5</div><div class="sw-var">--wiki-accent-bg</div><div class="sw-use">Callout boxes</div></div></div>
+      </div>
+    </div>
+
+    <div class="pg">
+      <h3>Ink Scale</h3>
+      <div class="swatches" style="background:rgba(28,26,20,0.08); border:1px solid rgba(28,26,20,0.1);">
+        <div class="sw sl"><div class="sw-color" style="background:#1c1a14;"></div><div class="sw-info"><div class="sw-name">Ink</div><div class="sw-hex">#1c1a14</div><div class="sw-var">--wiki-ink</div><div class="sw-use">Headings</div></div></div>
+        <div class="sw sl"><div class="sw-color" style="background:#5c5848;"></div><div class="sw-info"><div class="sw-name">Ink Muted</div><div class="sw-hex">#5c5848</div><div class="sw-var">--wiki-ink-muted</div><div class="sw-use">Body text</div></div></div>
+        <div class="sw sl"><div class="sw-color" style="background:#9c9484;"></div><div class="sw-info"><div class="sw-name">Ink Faint</div><div class="sw-hex">#9c9484</div><div class="sw-var">--wiki-ink-faint</div><div class="sw-use">Metadata</div></div></div>
+      </div>
+    </div>
+
+    <div class="pg">
+      <h3>Semantic Colours</h3>
+      <div class="swatches" style="background:rgba(28,26,20,0.08); border:1px solid rgba(28,26,20,0.1);">
+        <div class="sw sl"><div class="sw-color" style="background:#2d7d6b;"></div><div class="sw-info"><div class="sw-name">Teal</div><div class="sw-hex">#2d7d6b</div><div class="sw-var">--wiki-teal</div><div class="sw-use">Mechanism boxes</div></div></div>
+        <div class="sw sl"><div class="sw-color" style="background:#d4ede8;"></div><div class="sw-info"><div class="sw-name">Teal BG</div><div class="sw-hex">#d4ede8</div><div class="sw-var">--wiki-teal-bg</div></div></div>
+        <div class="sw sl"><div class="sw-color" style="background:#8a6a20;"></div><div class="sw-info"><div class="sw-name">Amber</div><div class="sw-hex">#8a6a20</div><div class="sw-var">--wiki-amber</div><div class="sw-use">Verdict, HOLD</div></div></div>
+        <div class="sw sl"><div class="sw-color" style="background:#f0e5c8;"></div><div class="sw-info"><div class="sw-name">Amber BG</div><div class="sw-hex">#f0e5c8</div><div class="sw-var">--wiki-amber-bg</div></div></div>
+        <div class="sw sl"><div class="sw-color" style="background:#5a3d8a;"></div><div class="sw-info"><div class="sw-name">Purple</div><div class="sw-hex">#5a3d8a</div><div class="sw-var">--wiki-purple</div><div class="sw-use">CAPTAIN</div></div></div>
+        <div class="sw sl"><div class="sw-color" style="background:#e8e0f5;"></div><div class="sw-info"><div class="sw-name">Purple BG</div><div class="sw-hex">#e8e0f5</div><div class="sw-var">--wiki-purple-bg</div></div></div>
+        <div class="sw sl"><div class="sw-color" style="background:#2d6040;"></div><div class="sw-info"><div class="sw-name">Green</div><div class="sw-hex">#2d6040</div><div class="sw-var">--wiki-green</div><div class="sw-use">BUY, SOLID</div></div></div>
+        <div class="sw sl"><div class="sw-color" style="background:#d4ead8;"></div><div class="sw-info"><div class="sw-name">Green BG</div><div class="sw-hex">#d4ead8</div><div class="sw-var">--wiki-green-bg</div></div></div>
+        <div class="sw sl"><div class="sw-color" style="background:#9a2020;"></div><div class="sw-info"><div class="sw-name">Red</div><div class="sw-hex">#9a2020</div><div class="sw-var">--wiki-red</div><div class="sw-use">Warnings, SELL</div></div></div>
+        <div class="sw sl"><div class="sw-color" style="background:#f5dada;"></div><div class="sw-info"><div class="sw-name">Red BG</div><div class="sw-hex">#f5dada</div><div class="sw-var">--wiki-red-bg</div></div></div>
+      </div>
+    </div>
+
+    <div class="pg">
+      <h3>Tags on Parchment</h3>
+      <div style="background:#e8e3d9; padding:1.25rem; border-radius:8px; border:1px solid rgba(28,26,20,0.12);">
+        <div class="tag-row">
+          <span class="tag" style="background:#d4ead8; color:#2d6040;">BUY</span>
+          <span class="tag" style="background:#d4ead8; color:#2d6040;">SOLID</span>
+          <span class="tag" style="background:#d4ead8; color:#2d6040;">BULLISH</span>
+          <span class="tag" style="background:#f0e5c8; color:#8a6a20;">HOLD</span>
+          <span class="tag" style="background:#f0e5c8; color:#8a6a20;">NEUTRAL</span>
+          <span class="tag" style="background:#f5dada; color:#9a2020;">SELL</span>
+          <span class="tag" style="background:#f5dada; color:#9a2020;">AVOID</span>
+          <span class="tag" style="background:#e8e0f5; color:#5a3d8a;">CAPTAIN</span>
+          <span class="tag" style="background:#d4ede8; color:#2d7d6b;">BREAKOUT</span>
+          <span class="tag" style="background:#f0ddd5; color:#b85c38;">ACCENT</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pg">
+      <h3>Box Variants</h3>
+      <div style="display:flex; flex-direction:column; gap:0.75rem;">
+        <div style="background:#f0ddd5; border-left:3px solid #b85c38; padding:0.85rem 1rem; border-radius:0 6px 6px 0;"><div style="font-size:11px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:#b85c38; margin-bottom:0.25rem;">Callout</div><div style="font-size:13px; color:#1c1a14;">Agent's strong take.</div></div>
+        <div style="background:#f0ebe2; border-left:3px solid #2d7d6b; padding:0.85rem 1rem; border-radius:0 6px 6px 0;"><div style="font-size:11px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:#2d7d6b; margin-bottom:0.25rem;">Mechanism</div><div style="font-size:13px; color:#5c5848;">Factual context.</div></div>
+        <div style="background:#f0ebe2; border-left:3px solid #8a6a20; padding:0.85rem 1rem; border-radius:0 6px 6px 0;"><div style="font-size:11px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:#8a6a20; margin-bottom:0.25rem;">Verdict</div><div style="font-size:13px; color:#5c5848;">Summary judgement.</div></div>
+        <div style="background:#f5dada; border-left:3px solid #9a2020; padding:0.85rem 1rem; border-radius:0 6px 6px 0;"><div style="font-size:11px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:#9a2020; margin-bottom:0.25rem;">Warning</div><div style="font-size:13px; color:#1c1a14;">Risk flag.</div></div>
+      </div>
+    </div>
+
+    <!-- Light wiki example -->
+    <div class="pg">
+      <h3>Example — Wiki Player Page</h3>
+      <div class="frame" style="border-color:rgba(28,26,20,0.12);">
+        <div class="bar" style="background:#f0ebe2; color:#9c9484; border-bottom:1px solid rgba(28,26,20,0.12);">
+          <div class="dots"><div class="dot" style="background:rgba(28,26,20,0.15);"></div><div class="dot" style="background:rgba(28,26,20,0.15);"></div><div class="dot" style="background:rgba(28,26,20,0.15);"></div></div>
+          jeromelu.com/wiki/player/tom-trbojevic
+        </div>
+        <div style="background:#e8e3d9; padding:1.25rem 1.5rem; font-size:12px; line-height:1.6;">
+          <div style="text-align:center; margin-bottom:1rem;">
+            <div style="font-size:10px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#b85c38; margin-bottom:0.3rem;">Player</div>
+            <div style="font-family:'Cormorant Garamond',serif; font-size:1.8rem; font-weight:600; color:#1c1a14; line-height:1.15;">Tom Trbojevic</div>
+            <div style="font-family:'Cormorant Garamond',serif; font-size:0.85rem; font-style:italic; color:#5c5848; margin:0.3rem auto; max-width:360px;">Elite ceiling, extensive injury history.</div>
+            <div style="width:40px; height:1px; background:#b85c38; margin:0.75rem auto 0; opacity:0.4;"></div>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:rgba(28,26,20,0.12); border:1px solid rgba(28,26,20,0.12); margin-bottom:0.75rem;">
+            <div style="background:#e8e3d9; padding:0.4rem; text-align:center;"><div style="font-size:8px; font-weight:600; text-transform:uppercase; color:#9c9484;">Avg</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#1c1a14;">74.3</div></div>
+            <div style="background:#e8e3d9; padding:0.4rem; text-align:center;"><div style="font-size:8px; font-weight:600; text-transform:uppercase; color:#9c9484;">Price</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#1c1a14;">$487k</div></div>
+            <div style="background:#e8e3d9; padding:0.4rem; text-align:center;"><div style="font-size:8px; font-weight:600; text-transform:uppercase; color:#9c9484;">BE</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#2d6040;">61</div></div>
+            <div style="background:#e8e3d9; padding:0.4rem; text-align:center;"><div style="font-size:8px; font-weight:600; text-transform:uppercase; color:#9c9484;">Games</div><div style="font-family:'Cormorant Garamond',serif; font-size:1rem; font-weight:600; color:#8a6a20;">4/5</div></div>
+          </div>
+          <div style="background:#f0ddd5; border-left:3px solid #b85c38; padding:0.6rem 0.75rem; margin-bottom:0.65rem; font-size:11px; color:#1c1a14; line-height:1.5;">Turbo is the definition of risk-reward.</div>
+          <div style="background:#f0ebe2; border:1px solid rgba(28,26,20,0.12); border-left:3px solid #2d7d6b; padding:0.6rem 0.75rem; margin-bottom:0.65rem; font-size:11px; color:#5c5848; line-height:1.5;"><strong style="color:#1c1a14;">Mechanism:</strong> Boom-bust cycle driven by availability.</div>
+          <div style="background:#f5dada; border-left:3px solid #9a2020; padding:0.6rem 0.75rem; margin-bottom:0.65rem; font-size:11px; color:#1c1a14; line-height:1.5;"><strong>Warning:</strong> 3 of 4 seasons: 8+ games missed.</div>
+          <div style="background:#f0ebe2; border:1px solid rgba(28,26,20,0.12); padding:0.75rem; text-align:center;">
+            <div style="font-size:10px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#b85c38; margin-bottom:0.25rem;">Jeromelu's Call</div>
+            <div style="font-family:'Cormorant Garamond',serif; font-size:0.85rem; font-style:italic; color:#1c1a14;"><span class="tag" style="background:#d4ead8; color:#2d6040; font-style:normal;">BUY</span> with cover. <span class="tag" style="background:#f5dada; color:#9a2020; font-style:normal;">AVOID</span> if you need reliability.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>Jeromelu Design Reference &mdash; generated from <code style="font-size:11px; padding:0.15rem 0.4rem; background:#342c26; border-radius:3px; color:#948878;">docs/uiux/pages/00-theme-and-style.md</code></p>
+  </footer>
+
+</div>
+</body>
+</html>

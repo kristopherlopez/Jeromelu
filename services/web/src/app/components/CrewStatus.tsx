@@ -44,12 +44,12 @@ function AgentPill({ agent }: { agent: LocalAgent }) {
       style={{
         borderColor:
           agent.status === "active"
-            ? "rgba(245, 130, 32, 0.3)"
-            : "var(--color-zinc-800, #27272a)",
+            ? "var(--accent-glow)"
+            : "var(--border)",
         background:
           agent.status === "active"
-            ? "rgba(245, 130, 32, 0.04)"
-            : "rgba(255, 255, 255, 0.02)",
+            ? "var(--accent-bg)"
+            : "var(--foreground-ghost)",
         animation:
           agent.status === "active"
             ? "crew-pill-pulse 4s ease-in-out infinite"
@@ -60,11 +60,11 @@ function AgentPill({ agent }: { agent: LocalAgent }) {
       <div
         className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm"
         style={{
-          background: "rgba(245, 130, 32, 0.12)",
-          border: "1.5px solid rgba(245, 130, 32, 0.3)",
+          background: "var(--accent-bg)",
+          border: "1.5px solid var(--accent-glow)",
           boxShadow:
             agent.status === "active"
-              ? "0 0 12px rgba(245, 130, 32, 0.4)"
+              ? "0 0 12px var(--accent-glow)"
               : "none",
         }}
       >
@@ -116,16 +116,16 @@ function DormantAgent({ agent }: { agent: LocalAgent }) {
         className="flex h-8 w-8 items-center justify-center rounded-full text-sm transition-all duration-300"
         style={{
           background: hovered
-            ? "rgba(245, 130, 32, 0.12)"
-            : "rgba(255, 255, 255, 0.04)",
+            ? "var(--accent-bg)"
+            : "var(--foreground-ghost)",
           border: hovered
-            ? "1.5px solid rgba(245, 130, 32, 0.3)"
-            : "1.5px solid rgba(255, 255, 255, 0.08)",
+            ? "1.5px solid var(--accent-glow)"
+            : "1.5px solid var(--border)",
           opacity: hovered ? 1 : 0.4,
           filter: hovered ? "grayscale(0)" : "grayscale(0.5)",
           transform: hovered ? "scale(1.15)" : "scale(1)",
           boxShadow: hovered
-            ? "0 0 12px rgba(245, 130, 32, 0.2)"
+            ? "0 0 12px var(--accent-border)"
             : "none",
         }}
       >
@@ -145,21 +145,21 @@ function DormantAgent({ agent }: { agent: LocalAgent }) {
         <div
           className="absolute left-1/2 top-11 z-10 -translate-x-1/2 rounded-lg border px-3 py-2"
           style={{
-            background: "#18181b",
-            borderColor: "#27272a",
+            background: "var(--background-deep)",
+            borderColor: "var(--border)",
             minWidth: 180,
           }}
         >
           <div
             className="text-[10px] font-medium uppercase tracking-wider"
-            style={{ color: "#71717a", marginBottom: 4 }}
+            style={{ color: "var(--foreground-muted)", marginBottom: 4 }}
           >
             {agent.status === "queued" ? "Queued" : "Dormant"}
           </div>
           {agent.lastAction && (
             <div
               className="text-[11px] leading-relaxed"
-              style={{ color: "rgba(255,255,255,0.6)" }}
+              style={{ color: "var(--foreground-secondary)" }}
             >
               {agent.lastAction}
             </div>
@@ -167,9 +167,9 @@ function DormantAgent({ agent }: { agent: LocalAgent }) {
           {agent.nextRun && (
             <div
               className="mt-1 text-[10px]"
-              style={{ color: "#3f3f46" }}
+              style={{ color: "var(--border-subtle)" }}
             >
-              Next: <span style={{ color: "#71717a" }}>{agent.nextRun}</span>
+              Next: <span style={{ color: "var(--foreground-muted)" }}>{agent.nextRun}</span>
             </div>
           )}
         </div>
@@ -219,15 +219,15 @@ export function CrewStatus() {
         <div
           className="flex items-center gap-2.5 rounded-full border px-1.5 py-1.5 pr-4 text-sm"
           style={{
-            borderColor: "#27272a",
-            background: "rgba(255, 255, 255, 0.02)",
+            borderColor: "var(--border)",
+            background: "var(--foreground-ghost)",
           }}
         >
           <div
             className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm"
             style={{
-              background: "rgba(245, 130, 32, 0.12)",
-              border: "1.5px solid rgba(245, 130, 32, 0.3)",
+              background: "var(--accent-bg)",
+              border: "1.5px solid var(--accent-glow)",
             }}
           >
             <span className="absolute -right-0.5 -top-0.5 flex h-2 w-2">
@@ -248,7 +248,7 @@ export function CrewStatus() {
               {i > 0 && (
                 <div
                   className="h-[3px] w-[3px] rounded-full"
-                  style={{ background: "rgba(255, 255, 255, 0.08)" }}
+                  style={{ background: "var(--border)" }}
                 />
               )}
               <DormantAgent agent={agent} />
@@ -260,8 +260,8 @@ export function CrewStatus() {
       {/* Round badge — links to round overview */}
       <Link
         href={`/round/${currentRound || 2}`}
-        className="mt-1 rounded-md border px-2.5 py-1 font-mono text-[10px] tracking-wider transition-colors hover:border-[rgba(245,130,32,0.3)] hover:bg-[rgba(245,130,32,0.06)]"
-        style={{ borderColor: "#27272a", color: "#52525b" }}
+        className="mt-1 rounded-md border px-2.5 py-1 font-mono text-[10px] tracking-wider transition-colors hover:border-[var(--accent-glow)] hover:bg-[var(--accent-bg)]"
+        style={{ borderColor: "var(--border)", color: "var(--foreground-ghost)" }}
       >
         Round <span style={{ color: "var(--tigers-orange)", fontWeight: 600 }}>{currentRound || 2}</span>
         {" "}&middot; Season {currentSeason}

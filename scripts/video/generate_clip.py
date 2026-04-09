@@ -269,6 +269,7 @@ def main():
     parser.add_argument("--raw-only", action="store_true", help="Download raw file only, skip post-processing")
     parser.add_argument("--keep-audio", action="store_true", help="Keep audio track (for talking clips)")
     parser.add_argument("--no-manifest", action="store_true", help="Skip manifest update")
+    parser.add_argument("--no-upload", action="store_true", help="Skip S3 upload")
     parser.add_argument("--generate-audio", action="store_true", default=None, help="Enable native audio generation")
     parser.add_argument("--no-audio", action="store_true", help="Disable native audio generation")
     parser.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility")
@@ -352,6 +353,19 @@ def main():
     # Post-process
     output_path = CLIPS_DIR / f"{args.clip_id}.mp4"
     post_process(raw_path, output_path, keep_audio=args.keep_audio)
+
+    # Upload to S3
+    if not args.no_upload:
+        try:
+            sys.path.insert(0, str(REPO_ROOT / "packages" / "shared"))
+            from jeromelu_shared.s3 import upload_asset, get_asset_url
+
+            s3_key = f"avatar/clips/{args.clip_id}.mp4"
+            upload_asset(s3_key, str(output_path))
+            asset_url = get_asset_url(s3_key)
+            print(f"  Uploaded to S3: {asset_url}")
+        except Exception as e:
+            print(f"  S3 upload skipped: {e}", file=sys.stderr)
 
     # Update manifest
     if not args.no_manifest:

@@ -5,7 +5,7 @@ Usage:
 
 Reads:  services/web/public/avatar/manifest.json
 Writes: services/web/public/avatar/manifest.json (updates transitions_to)
-        services/web/public/avatar/frames/ (extracted boundary frames)
+        assets/avatar/frames/ (extracted boundary frames)
 
 Requires: pip install imagehash Pillow
 """
@@ -25,7 +25,7 @@ except ImportError:
 
 AVATAR_DIR = Path("services/web/public/avatar")
 MANIFEST_PATH = AVATAR_DIR / "manifest.json"
-FRAMES_DIR = AVATAR_DIR / "frames"
+FRAMES_DIR = Path("assets/avatar/frames")
 
 # Maximum perceptual hash distance to consider a match.
 # Lower = stricter matching. 8 is a reasonable default.

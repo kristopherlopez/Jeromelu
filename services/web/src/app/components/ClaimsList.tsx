@@ -39,15 +39,15 @@ export default function ClaimsList({ claims, activeClaimId, onSeek }: Props) {
           onClick={() => setFilter(null)}
           className="rounded-full px-2.5 py-1 text-xs font-medium cursor-pointer transition-colors"
           style={{
-            backgroundColor: !filter ? "rgba(245,130,32,0.2)" : "rgba(255,255,255,0.05)",
-            color: !filter ? "var(--tigers-orange)" : "#a1a1aa",
-            border: `1px solid ${!filter ? "rgba(245,130,32,0.3)" : "transparent"}`,
+            backgroundColor: !filter ? "var(--accent-border)" : "rgba(255,255,255,0.05)",
+            color: !filter ? "var(--accent)" : "var(--foreground-secondary)",
+            border: `1px solid ${!filter ? "var(--accent-glow)" : "transparent"}`,
           }}
         >
           All ({claims.length})
         </button>
         {types.map((t) => {
-          const color = CLAIM_TYPE_COLORS[t] || "#71717a";
+          const color = CLAIM_TYPE_COLORS[t] || "var(--foreground-muted)";
           const active = filter === t;
           const count = claims.filter((c) => c.claim_type === t).length;
           return (
@@ -57,7 +57,7 @@ export default function ClaimsList({ claims, activeClaimId, onSeek }: Props) {
               className="rounded-full px-2.5 py-1 text-xs font-medium uppercase cursor-pointer transition-colors"
               style={{
                 backgroundColor: active ? color + "33" : "rgba(255,255,255,0.05)",
-                color: active ? color : "#a1a1aa",
+                color: active ? color : "var(--foreground-secondary)",
                 border: `1px solid ${active ? color + "55" : "transparent"}`,
               }}
             >
@@ -83,13 +83,13 @@ export default function ClaimsList({ claims, activeClaimId, onSeek }: Props) {
         ))}
         {filtered.length === 0 && (
           <div className="py-12 text-center">
-            <p className="text-sm text-zinc-500">
+            <p className="text-sm" style={{ color: "var(--foreground-ghost)" }}>
               {filter
                 ? `No claims of type "${filter.replace("_", " ")}"`
                 : "No claims extracted yet"}
             </p>
             {!filter && (
-              <p className="mt-1 text-xs text-zinc-600">
+              <p className="mt-1 text-xs" style={{ color: "var(--foreground-ghost)" }}>
                 Claims will appear here once this source is processed.
               </p>
             )}

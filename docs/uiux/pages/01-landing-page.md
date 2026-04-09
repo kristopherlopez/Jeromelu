@@ -1,12 +1,24 @@
 # Landing Page
 
-Status: **Implemented — refinement ongoing**
+Status: **Archived — moved to `/landing` route, no longer the default entry point**
 
 ---
 
-## Purpose
+## Decision (2026-04-09)
 
-The landing page is the front door. The audience arrives and sees Jeromelu mid-thought — avatar centred on screen, thought bubbles orbiting, the logo animating in. It establishes the character and offers navigation into the product.
+The landing page was removed as the default `/` route. Visitors now land directly on the feed (`/feed`), aligning with the design principle: *"You never land on a homepage. You land in the middle of the show."*
+
+The old landing page is preserved at `/landing` for potential future use (first-visit experience, marketing, brand moments). The avatar, nav bubbles, and crew status all live on inner pages already — nothing was lost.
+
+**Why:** The landing page was a click tax between the user and the content. Repeat visitors (the core audience) clicked straight through every time. It contradicted the "arrive mid-episode" principle by acting as a lobby.
+
+**What's preserved at `/landing`:** Avatar hero mode (180px, centred), orbital thought bubbles with entrance animation, animated logo, tagline, crew status, activity pulse.
+
+---
+
+## Original Purpose
+
+The landing page was the front door. The audience arrived and saw Jeromelu mid-thought — avatar centred on screen, thought bubbles orbiting, the logo animating in. It established the character and offered navigation into the product.
 
 ---
 

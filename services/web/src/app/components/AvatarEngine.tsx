@@ -80,7 +80,12 @@ function canTransition(from: ClipMeta, to: ClipMeta): boolean {
   return from.transitions_to.includes(to.id);
 }
 
+const AVATAR_CDN_BASE = process.env.NEXT_PUBLIC_AVATAR_CDN_BASE || "";
+
 function clipUrl(file: string): string {
+  if (AVATAR_CDN_BASE) {
+    return `${AVATAR_CDN_BASE}/avatar/${file}`;
+  }
   return `/avatar/${file}`;
 }
 
@@ -94,7 +99,7 @@ export function AvatarEngineProvider({ children }: { children: ReactNode }) {
   const [manifest, setManifest] = useState<Manifest | null>(null);
   const [state, setState] = useState<AvatarState>({
     currentClip: null,
-    clipSrc: "/avatar/clips/idle-1-1.mp4",
+    clipSrc: clipUrl("clips/idle-1-1.mp4"),
     isTransitioning: false,
   });
 
