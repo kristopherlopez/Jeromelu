@@ -1,6 +1,6 @@
 # Data Catalogue
 
-Personal reference for the JeromeLu data model. Source of truth: `packages/shared/jeromelu_shared/db/models.py`
+Personal reference for the Jaromelu data model. Source of truth: `packages/shared/jeromelu_shared/db/models.py`
 
 ---
 
@@ -24,15 +24,22 @@ SourceDocument (full transcript / text, stored in S3 + raw_text)
    │       └──▶ Claim (extracted buy/sell/hold assertion about a player Entity)
    │
    ▼
-Entity (player, team, expert, matchup)
+Entity (player, team, expert/advisor, matchup, round)
    │
    ├──▶ ConsensusSnapshot (aggregated sentiment per time bucket)
    ├──▶ Prediction (forecast about an entity, links to evidence claims)
    │       └──▶ Outcome (scored result)
-   └──▶ Decision (trade, captain pick, etc.)
-           ├──▶ Outcome (scored result)
-           └──▶ Event (immutable audit log entry)
+   ├──▶ Decision (trade, captain pick, etc.)
+   │       ├──▶ Outcome (scored result)
+   │       └──▶ Event (immutable audit log entry)
+   ├──▶ Remark (voiced, opinionated public position with open→locked→resolved lifecycle)
+   │       └──▶ RemarkReaction (audience agree/disagree)
+   ├──▶ AlignmentScore (per-entity prediction accuracy over time)
+   └──▶ WikiPage (prose, agent-maintained page)
+           └──▶ WikiRevision (edit log per section)
 
+Derived / downstream:
+KnowledgeBase (distilled entries embedded for RAG; includes analysis articles)
 PlayerRound ─── standalone scraped stats per player/round/season
 PlayerTeamHistory ─── SCD Type 2 player-team assignments
 Plan ─── standalone strategy documents per round
@@ -473,17 +480,172 @@ SCD Type 2 table tracking which team a player belongs to over time.
 
 ---
 
+### knowledge_base
+
+Distilled, structured knowledge chunks embedded for RAG retrieval. Also stores Analysis articles.
+
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| kb_id | UUID | PK | uuid4 | |
+| kb_type | text | no | | `player_summary`, `round_brief`, `decision`, `opinion`, `source_digest`, `article_tips`, `article_totw`, `article_trades`, `article_captains`, `article_stocks`, `article_consensus` |
+| subject_entity_id | UUID | yes | | FK → entities (optional) |
+| title | text | yes | | |
+| content | text | no | | Markdown body |
+| embedding | vector(1536) | yes | | For RAG retrieval |
+| metadata_json | jsonb | no | {} | Player rankings, consensus counts, etc. |
+| effective_round | int | yes | | |
+| season | int | yes | | |
+| source_claim_ids | UUID[] | no | [] | Attribution — claim UUIDs used |
+| created_at | timestamptz | no | now() | |
+| updated_at | timestamptz | no | now() | |
+| expires_at | timestamptz | yes | | Optional TTL |
+
+**Indexes:** kb_type, (effective_round, season), subject_entity_id, embedding (HNSW / IVFFlat)
+**FK:** subject_entity_id → entities
+
+Powers [Ask Me](../pages/ask-me/overview.md) (RAG) and [The Analysis](../pages/analysis/overview.md) (`article_*` types).
+
+---
+
+### wiki_pages
+
+Prose per-entity knowledge pages, written and maintained by a managed agent.
+
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| page_id | UUID | PK | uuid4 | |
+| entity_id | UUID | no | | FK → entities (one page per entity) |
+| page_type | text | no | | `player`, `team`, `advisor`, `round` |
+| slug | text | no | | URL slug, unique |
+| title | text | no | | Display name |
+| content | text | no | | Markdown with `[[slug]]` wiki-links |
+| summary | text | yes | | One-liner for listings |
+| metadata_json | jsonb | no | {} | Tags, sidebar data |
+| status | text | no | `stub` | `stub`, `draft`, `published` |
+| created_at | timestamptz | no | now() | |
+| updated_at | timestamptz | no | now() | Auto-updates |
+
+**Unique:** slug
+**FK:** entity_id → entities
+
+Powers [The Wiki](../pages/wiki/overview.md).
+
+---
+
+### wiki_revisions
+
+Per-section edit log for wiki pages.
+
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| revision_id | UUID | PK | uuid4 | |
+| page_id | UUID | no | | FK → wiki_pages (CASCADE) |
+| section_heading | text | yes | | Null = full page |
+| summary | text | no | | Agent-written change description |
+| content_snapshot | text | yes | | Optional snapshot of the section |
+| source_trigger | text | yes | | e.g. `managed-agent/claims-upload` |
+| source_id | UUID | yes | | FK → sources (optional) |
+| metadata_json | jsonb | no | {} | |
+| created_at | timestamptz | no | now() | |
+
+**Indexes:** page_id, created_at
+**FK:** page_id → wiki_pages (CASCADE); source_id → sources
+
+Powers the wiki activity feed (`GET /api/wiki/recent-changes`).
+
+---
+
+### remarks
+
+The atomic output unit: an opinionated, voiced analytical piece with an open → locked → resolved lifecycle.
+
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| remark_id | UUID | PK | uuid4 | |
+| voice_text | text | no | | Jaromelu's voiced output |
+| subject_entity_ids | UUID[] | no | [] | Players/teams/matchups referenced |
+| position | text | yes | | `buy`, `sell`, `hold`, `captain`, `avoid` |
+| conviction | text | yes | | `low`, `medium`, `high` |
+| status | text | no | `open` | `open`, `locked`, `resolved` |
+| evidence_claim_ids | UUID[] | no | [] | Upstream claims backing this |
+| decision_id | UUID | yes | | FK → decisions |
+| resolution_json | jsonb | yes | | Outcome data once resolved |
+| resolved_at | timestamptz | yes | | |
+| round | int | yes | | |
+| season | int | yes | | |
+| created_at | timestamptz | no | now() | |
+| immutable_hash | text | yes | | SHA256 of remark payload |
+
+**Indexes:** status, (round, season)
+**FK:** decision_id → decisions
+
+---
+
+### remark_reactions
+
+Audience reactions to open/locked Remarks.
+
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| reaction_id | UUID | PK | uuid4 | |
+| remark_id | UUID | no | | FK → remarks |
+| user_id | UUID | yes | | |
+| reaction_type | text | no | | `agree`, `disagree` |
+| created_at | timestamptz | no | now() | |
+
+**FK:** remark_id → remarks
+
+---
+
+### alignment_scores
+
+Prediction accuracy tracking per entity (expert, user, or system). Powers [The Ledger](../pages/ledger/overview.md)'s Alignment Index.
+
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| score_id | UUID | PK | uuid4 | |
+| entity_id | UUID | no | | FK → entities |
+| entity_type | text | no | | `expert`, `user`, `system` |
+| score_type | text | no | | `overall`, `captain_picks`, `buy_sell`, `matchup` |
+| period | text | no | | `round`, `month`, `season` |
+| period_value | text | yes | | e.g. round number or season year |
+| total_predictions | int | no | 0 | |
+| correct_predictions | int | no | 0 | |
+| alignment_pct | float | yes | | |
+| updated_at | timestamptz | no | now() | |
+
+**Indexes:** (entity_id, score_type, period, period_value)
+**FK:** entity_id → entities
+
+---
+
+### squad_slots, squad_trades (deprecated)
+
+Originally designed for the retired "My Squad" page. Tables remain in the schema but are not actively written or read by the live app. See [architecture/04-information-architecture.md](../architecture/04-information-architecture.md).
+
+---
+
 ## Enums
 
 | Enum | Values |
 |------|--------|
 | channel.platform | `youtube`, `podcast`, `website`, `twitter`, `instagram` |
 | source.source_type | `youtube`, `podcast`, `web`, `radio`, `manual` |
-| entity.entity_type | `player`, `team`, `expert`, `matchup` |
+| entity.entity_type | `player`, `team`, `expert`, `advisor`, `matchup`, `round` |
 | claim.claim_type | `buy`, `sell`, `hold`, `captain`, `avoid`, `breakout`, `matchup_edge` |
 | decision.decision_type | `trade`, `captain`, `start_sit`, `squad_structure`, `article_topic`, `reply` |
-| event.display_mode | `thought`, `action`, `system`, `prediction`, `review` |
+| event.display_mode | `thought`, `action`, `system`, `prediction`, `review`, `wiki_update` |
 | event.visibility | `public`, `private` |
+| remark.status | `open`, `locked`, `resolved` |
+| remark.position | `buy`, `sell`, `hold`, `captain`, `avoid` |
+| remark.conviction | `low`, `medium`, `high` |
+| remark_reaction.reaction_type | `agree`, `disagree` |
+| wiki_page.page_type | `player`, `team`, `advisor`, `round` |
+| wiki_page.status | `stub`, `draft`, `published` |
+| kb.kb_type | `player_summary`, `round_brief`, `decision`, `opinion`, `source_digest`, `article_tips`, `article_totw`, `article_trades`, `article_captains`, `article_stocks`, `article_consensus` |
+| alignment_scores.entity_type | `expert`, `user`, `system` |
+| alignment_scores.score_type | `overall`, `captain_picks`, `buy_sell`, `matchup` |
+| alignment_scores.period | `round`, `month`, `season` |
 
 ---
 
@@ -500,3 +662,7 @@ SCD Type 2 table tracking which team a player belongs to over time.
 | 007 | `007_enrich_player_rounds.sql` | Add derived stats, averages, percentages, price tracking, context columns to player_rounds |
 | 008 | `008_add_claim_timestamps.sql` | Add start_ts/end_ts to claims |
 | 009 | `009_chunk_raw_clean_text.sql` | Rename text → raw_text, add clean_text to source_chunks |
+| 010+ | (verify actual migration filenames) | knowledge_base table, remarks + remark_reactions, alignment_scores, squad_slots + squad_trades (now deprecated) |
+| 015 | `015_wiki.sql` | wiki_pages + wiki_revisions tables |
+
+> The migrations list above drifts — verify against `packages/db/migrations/` for authoritative state. Whenever a new migration lands, update this table + the relevant table section + the lineage diagram.

@@ -25,14 +25,14 @@ Used for:
 
 ### 3. Characterisation Models
 Used for:
-- converting internal state into Jeromelu voice
+- converting internal state into Jaromelu voice
 - generating live feed thoughts
 - generating chat replies
 
 **Implementation: Feed Generation** (`services/worker-publishing/app/activities/generate_events.py`)
-- Converts structured claims into opinionated feed events in JeromeLu's voice
+- Converts structured claims into opinionated feed events in Jaromelu's voice
 - Uses `chat_json()` from `packages/shared/jeromelu_shared/llm.py` (gpt-4o, temp 0.2, JSON mode)
-- Full details: `docs/workflow/feed-generation.md` → LLM Infrastructure section
+- Full details: `docs/pages/feed/generation.md` → LLM Infrastructure section
 
 ### 4. Review Models
 Used for:
@@ -69,7 +69,7 @@ Orchestrator (Sonnet)
 ### Implementation
 
 - Skill: `/analyse-transcript` (`.claude/skills/analyse-transcript/skill.md`)
-- Full pipeline docs: `docs/workflow/analyse-transcript.md`
+- Full pipeline docs: `docs/agents/skills/analyse-transcript.md`
 
 ## Retrieval Pattern
 For public Q&A and public thought generation:

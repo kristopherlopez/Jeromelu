@@ -1,4 +1,4 @@
-# Jeromelu — AWS Resource Inventory
+# Jaromelu — AWS Resource Inventory
 
 Track all created AWS resources here. Updated as infrastructure is provisioned.
 

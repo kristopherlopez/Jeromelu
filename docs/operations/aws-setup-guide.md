@@ -1,8 +1,8 @@
-# Jeromelu — AWS Infrastructure Setup Guide
+# Jaromelu — AWS Infrastructure Setup Guide
 
-**Purpose:** Step-by-step instructions for setting up all AWS resources needed for Jeromelu V1. Designed to be followed sequentially via the AWS Console.
+**Purpose:** Step-by-step instructions for setting up all AWS resources needed for Jaromelu V1. Designed to be followed sequentially via the AWS Console.
 
-**Project:** Jeromelu — Autonomous AI NRL SuperCoach character
+**Project:** Jaromelu — Autonomous AI NRL SuperCoach character
 **Region:** ap-southeast-2 (Sydney)
 **Domain:** jeromelu.ai (currently registered with Namecheap)
 
@@ -270,7 +270,7 @@ Navigate to: **IAM Console > Roles > Create role**
 
 **Role: `jeromelu-ecs-execution-role`**
 
-- Description: `ECS task execution role for Jeromelu services. Allows ECS to pull container images, write logs, and read secrets/parameters at container startup.`
+- Description: `ECS task execution role for Jaromelu services. Allows ECS to pull container images, write logs, and read secrets/parameters at container startup.`
 - Trusted entity type: **AWS service**
 - Use case: **Elastic Container Service**
 - Then select: **Elastic Container Service Task**
@@ -304,7 +304,7 @@ Navigate to: **IAM Console > Roles > Create role**
 
 **Role: `jeromelu-app-task-role`**
 
-- Description: `Runtime task role for Jeromelu application containers. Grants access to S3 buckets, Secrets Manager, Parameter Store, and CloudWatch Logs.`
+- Description: `Runtime task role for Jaromelu application containers. Grants access to S3 buckets, Secrets Manager, Parameter Store, and CloudWatch Logs.`
 - Trusted entity type: **AWS service**
 - Use case: **Elastic Container Service**
 - Then select: **Elastic Container Service Task**
@@ -605,7 +605,7 @@ Navigate to: **CloudFront Console > Create distribution**
 ### Wizard Step 2 — Get started
 
 - **Distribution name:** `jeromelu`
-- **Description:** `Jeromelu public experience`
+- **Description:** `Jaromelu public experience`
 - **Distribution type:** Website
 - **Route 53 domain:** Select `jeromelu.ai` (links hosted zone to the free plan — includes Route 53 costs)
 

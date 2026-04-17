@@ -1,21 +1,22 @@
 # C4-Style System Blueprint
 
-This section describes Jeromelu using a C4-style structure: system context, containers, components, and cross-cutting concerns.
+This section describes Jaromelu using a C4-style structure: system context, containers, components, and cross-cutting concerns.
 
 ## Level 1 — System Context
 
 ### Primary System
-**Jeromelu Platform**
+**Jaromelu Platform**
 
 A public AI-driven NRL SuperCoach experience that ingests ecosystem content, extracts structured intelligence, makes autonomous decisions, and publishes them through a character-led interface.
 
 ### Primary Actors
 
 **Visitor / Fan**
-- watches Jeromelu's feed
-- explores team, predictions, and knowledge base
-- asks SuperCoach questions
-- compares their views against Jeromelu and the ecosystem
+- watches The Feed (live crew activity and Remarks)
+- browses The Wiki (per-entity prose pages) and The Analysis (editorial articles)
+- checks The Ledger (predictions, outcomes, Alignment Index)
+- asks SuperCoach questions via Ask Me
+- compares their views against Jaromelu and the ecosystem
 
 **Operator / Admin**
 - approves and manages sources
@@ -49,27 +50,27 @@ A public AI-driven NRL SuperCoach experience that ingests ecosystem content, ext
 
 ```text
 [Visitor / Fan]
-    -> uses -> [Jeromelu Platform]
+    -> uses -> [Jaromelu Platform]
 
 [Operator / Admin]
-    -> manages -> [Jeromelu Platform]
+    -> manages -> [Jaromelu Platform]
 
 [Content Sources]
-    -> provide raw content to -> [Jeromelu Platform]
+    -> provide raw content to -> [Jaromelu Platform]
 
 [Match / SuperCoach Context Sources]
-    -> provide context to -> [Jeromelu Platform]
+    -> provide context to -> [Jaromelu Platform]
 
 [LLM / AI Providers]
-    -> provide model capabilities to -> [Jeromelu Platform]
+    -> provide model capabilities to -> [Jaromelu Platform]
 
 [Scheduling / Workflow Infrastructure]
-    -> triggers and runs jobs for -> [Jeromelu Platform]
+    -> triggers and runs jobs for -> [Jaromelu Platform]
 ```
 
 ## Level 2 — Container Diagram
 
-The Jeromelu Platform should be split into a small number of high-value containers.
+The Jaromelu Platform should be split into a small number of high-value containers.
 
 ### 1. Web App / Public Experience
 **Responsibilities**
@@ -244,44 +245,46 @@ The Jeromelu Platform should be split into a small number of high-value containe
 
 ### A. Web App / Public Experience Components
 
-#### Feed UI
-- renders rewindable event stream
+The live app is organised into **five canonical pages**. Crew activity (previously "War Room") is shown inside The Feed rather than as a separate surface. Per-page specs live in [`docs/pages/`](../pages/).
+
+#### The Feed (`/`)
+- renders rewindable event stream: crew activity, Remarks, audience interaction
 - groups thoughts, actions, predictions, reviews
 - supports timeline browsing
+- integrates Ask Me as Twitch-style inline chat
 
-#### War Room UI
-- shows currently processed sources
-- shows rising narratives and consensus movement
-- shows candidate plans and active workflows in a user-friendly way
+#### The Wiki (`/wiki`)
+- prose, agent-maintained per-entity pages: players, teams, advisors, rounds
+- `[[slug]]` wiki-link cross-references
+- revision history per section
+- recent-changes feed
 
-#### Team Dashboard UI
-- public team
-- trade history
-- captain decisions
-- round scores
-- season progress
+#### The Ledger (`/ledger`)
+- prediction ledger with resolution status (open / locked / resolved)
+- Alignment Index (expert/source leaderboard, Jaromelu's record, audience scores)
+- shareable receipt cards
+- accuracy stats by type, round, season
 
-#### Knowledge Explorer UI
-- player pages
-- expert pages
-- matchup pages
-- quote evidence views
-- prediction history views
+#### The Analysis (`/insights`)
+- editorial articles per round: tips, team of the week, trade targets, captain picks, stocks, consensus
+- article reader with source attribution
+- structured sidebar data (player rankings, consensus counts)
 
-#### Chat UI
-- text-based advice entry
-- team question input
-- response thread rendering
+#### Ask Me (`/ask`)
+- standalone chat surface (also embedded in Feed)
+- RAG over KnowledgeBase entries
+- voice/temperature modes (straight / sharp / roast)
+- answers persist as feed events when asked via Feed
 
 #### Public Read Models
-The frontend should consume denormalised read models, not raw relational joins.
+The frontend consumes denormalised read models, not raw relational joins.
 
 Examples:
 - feed_view
-- team_dashboard_view
-- expert_profile_view
+- wiki_page_view
+- ledger_entry_view
+- analysis_article_view
 - player_profile_view
-- prediction_ledger_view
 
 ### B. API / Experience Backend Components
 
@@ -296,7 +299,7 @@ Examples:
 - returns pages for players, experts, matchups, source evidence
 
 #### Prediction Query API
-- returns Jeromelu and expert prediction histories and leaderboards
+- returns Jaromelu and expert prediction histories and leaderboards
 
 #### Chat Orchestrator
 - accepts user questions
@@ -398,7 +401,7 @@ Examples:
 - turns internal state changes into immutable public events
 
 #### Voice Renderer
-- converts structured rationale into Jeromelu voice
+- converts structured rationale into Jaromelu voice
 
 #### Feed Publisher
 - writes visible feed records and display payloads
@@ -460,7 +463,7 @@ Scheduler
 ```
 
 Outcome:
-A new source is ingested, claims are extracted, consensus shifts are detected, and Jeromelu publishes a new thought to the feed.
+A new source is ingested, claims are extracted, consensus shifts are detected, and Jaromelu publishes a new thought to the feed.
 
 ### Flow 2 — Weekly Decision Workflow
 
@@ -478,7 +481,7 @@ Scheduler
 ```
 
 Outcome:
-Jeromelu evaluates options, chooses a move, updates his public team, and logs the action immutably.
+Jaromelu evaluates options, chooses a move, updates his public team, and logs the action immutably.
 
 ### Flow 3 — Expert Prediction Tracking
 
@@ -507,7 +510,7 @@ Visitor
 ```
 
 Outcome:
-Jeromelu answers using structured knowledge and source-backed retrieval rather than freeform guessing.
+Jaromelu answers using structured knowledge and source-backed retrieval rather than freeform guessing.
 
 ### Flow 5 — Manual Breaking News Injection
 
@@ -561,7 +564,7 @@ Private:
 - workflow/debug internals
 
 ### 4. Bounded Character Layer
-Jeromelu's voice should sit at the publishing edge, not inside core decisioning.
+Jaromelu's voice should sit at the publishing edge, not inside core decisioning.
 
 Reason:
 You do not want persona to contaminate extraction quality or decision logic.
@@ -611,7 +614,7 @@ A sensible V1 deployment shape:
 
 ## Architecture Summary
 
-In C4 terms, Jeromelu is:
+In C4 terms, Jaromelu is:
 - a **public-facing media intelligence platform** at system context level
 - composed of **web, API, ingestion, extraction, consensus/decision, publishing, admin, and storage containers**
 - built from **workflow-driven components** that transform raw media into structured intelligence and then into public events

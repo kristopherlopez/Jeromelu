@@ -1,0 +1,218 @@
+<!--
+  Font Exploration — Heading Font Options
+  2026-04-10
+
+  Same content rendered with different heading fonts.
+  Body stays Inter. Each option shows a wiki page fragment
+  on both dark and light backgrounds.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Font Exploration | Jaromelu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bitter:ital,wght@0,400;0,600;1,400&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=DM+Serif+Display&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,600;1,400&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Noto+Serif+Display:wght@400;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --sans: 'Inter', -apple-system, sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+    --bg: #2a2420; --surface: #342c26; --border: #3e3630;
+    --fg: #ede4d6; --fg2: #c0b4a0; --fgm: #948878; --fgf: #6e6458;
+    --accent: #d4874a; --terra: #b85c38;
+    --teal: #5a9e8a; --ochre: #c4a840; --red: #c45050; --lilac: #a898c8;
+    --lbg: #FAF9F5; --lsurface: #FFF; --link: #1c1a14; --lmuted: #5c5848; --lfaint: #9c9484;
+  }
+  body { font-family: var(--sans); background: var(--bg); color: var(--fg); line-height: 1.6; padding: 2.5rem 2rem 5rem; -webkit-font-smoothing: antialiased; }
+  .container { max-width: 1280px; margin: 0 auto; }
+
+  header { text-align: center; margin-bottom: 2.5rem; }
+  header h1 { font-family: var(--sans); font-size: 1.6rem; font-weight: 600; margin-bottom: 0.3rem; }
+  header p { color: var(--fgm); font-size: 14px; max-width: 560px; margin: 0 auto; }
+  header .div { width: 60px; height: 2px; background: var(--accent); margin: 1.25rem auto 0; opacity: 0.4; }
+
+  hr.sep { border: none; height: 1px; background: var(--border); margin: 2.5rem 0; }
+
+  /* Option block */
+  .option { margin-bottom: 3rem; }
+  .option-head { display: flex; align-items: baseline; gap: 0.75rem; margin-bottom: 0.2rem; }
+  .option-head .num { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: var(--accent); }
+  .option-head h2 { font-family: var(--sans); font-size: 1.1rem; font-weight: 600; }
+  .option-meta { font-size: 12px; color: var(--fgf); margin-bottom: 1rem; font-family: var(--mono); }
+
+  /* Side by side */
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media (max-width: 800px) { .duo { grid-template-columns: 1fr; } }
+
+  .card { border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
+  .card .bar { display: flex; align-items: center; gap: 5px; padding: 6px 10px; font-size: 9px; font-family: var(--mono); border-bottom: 1px solid; }
+  .card .bar .dots { display: flex; gap: 3px; margin-right: 6px; }
+  .card .bar .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .card-body { padding: 1.25rem 1.5rem; line-height: 1.6; }
+
+  /* Dark card */
+  .dark .bar { background: #241e1a; color: #504840; border-color: var(--border); }
+  .dark .bar .dot { background: var(--border); }
+  .dark .card-body { background: var(--bg); }
+
+  /* Light card */
+  .light { border-color: rgba(28,26,20,0.08); }
+  .light .bar { background: var(--lsurface); color: var(--lfaint); border-color: rgba(28,26,20,0.08); }
+  .light .bar .dot { background: rgba(28,26,20,0.12); }
+  .light .card-body { background: var(--lbg); }
+
+  /* Shared page content inside cards */
+  .pg-kicker { font-family: var(--sans); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 0.25rem; }
+  .pg-title { font-weight: 600; line-height: 1.15; margin-bottom: 0.25rem; }
+  .pg-sub { font-style: italic; margin-bottom: 0.3rem; }
+  .pg-meta { font-size: 11px; margin-bottom: 0.75rem; }
+  .pg-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 1px; margin-bottom: 0.75rem; }
+  .pg-stat { padding: 0.35rem; text-align: center; }
+  .pg-stat-label { font-size: 7px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; }
+  .pg-stat-value { font-weight: 600; line-height: 1.2; }
+  .pg-body { font-family: var(--sans); font-size: 14px; line-height: 1.7; margin-bottom: 0.6rem; }
+  .pg-h2 { font-weight: 600; line-height: 1.2; margin-bottom: 0.5rem; margin-top: 0.75rem; }
+  .pg-box { padding-top: 0.5rem; border-top: 2px solid; margin: 0.6rem 0; }
+  .pg-box-label { font-family: var(--sans); font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 0.1rem; }
+  .pg-box-text { font-family: var(--sans); font-size: 13px; }
+  .pg-verdict { padding: 0.6rem; text-align: center; margin-top: 0.5rem; }
+  .pg-verdict-kicker { font-family: var(--sans); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 0.2rem; }
+  .pg-verdict-text { font-style: italic; font-size: 0.85rem; }
+
+  /* Also sans-only option */
+  .sans-heading { font-family: var(--sans) !important; }
+
+  footer { text-align: center; font-size: 12px; color: #504840; margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 2rem; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>Heading Font Exploration</h1>
+    <p>Same wiki page content, 12 different heading fonts. Body always Inter. Dark and light side by side.</p>
+    <div class="div"></div>
+  </header>
+
+  <script>
+    const FONTS = [
+      { name: "Playfair Display", family: "'Playfair Display', Georgia, serif", vibe: "High-contrast, dramatic, editorial. Think magazine covers.", category: "Modern Editorial" },
+      { name: "Libre Baskerville", family: "'Libre Baskerville', Georgia, serif", vibe: "Classic, dignified, optimised for screen reading.", category: "Modern Editorial" },
+      { name: "Source Serif 4", family: "'Source Serif 4', Georgia, serif", vibe: "Adobe's workhorse serif. Clean, professional, great x-height.", category: "Modern Editorial" },
+      { name: "DM Serif Display", family: "'DM Serif Display', Georgia, serif", vibe: "Display only — bold, confident, geometric. No italic.", category: "Clean / Geometric" },
+      { name: "Lora", family: "'Lora', Georgia, serif", vibe: "Contemporary serif with brush-drawn curves. Warm, readable.", category: "Clean / Geometric" },
+      { name: "Merriweather", family: "'Merriweather', Georgia, serif", vibe: "Designed for screens. Generous x-height, sturdy.", category: "Warm / Humanist" },
+      { name: "Bitter", family: "'Bitter', Georgia, serif", vibe: "Slab-ish serif. Friendly, readable, slightly informal.", category: "Warm / Humanist" },
+      { name: "Crimson Text", family: "'Crimson Text', Georgia, serif", vibe: "Old-style serif. Elegant, book-like, traditional.", category: "Warm / Humanist" },
+      { name: "EB Garamond", family: "'EB Garamond', Georgia, serif", vibe: "The refined Garamond. More delicate than Cormorant.", category: "High-end" },
+      { name: "Spectral", family: "'Spectral', Georgia, serif", vibe: "Google's editorial serif. Sharp, modern, excellent for long reads.", category: "High-end" },
+      { name: "Noto Serif Display", family: "'Noto Serif Display', Georgia, serif", vibe: "Display weight of Noto. Universal, clean, authoritative.", category: "High-end" },
+      { name: "Inter (Sans Only)", family: "'Inter', -apple-system, sans-serif", vibe: "No serif at all. Just Inter at different weights. Like Linear, Claude, Vercel.", category: "Sans-only" },
+    ];
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const container = document.querySelector('.font-options');
+      let lastCategory = '';
+
+      FONTS.forEach((font, i) => {
+        if (font.category !== lastCategory) {
+          lastCategory = font.category;
+          const catDiv = document.createElement('div');
+          catDiv.style.cssText = 'font-size:10px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:#6e6458; margin: 2rem 0 0.75rem; padding-bottom:0.4rem; border-bottom:1px solid #3e3630;';
+          catDiv.textContent = font.category;
+          container.appendChild(catDiv);
+        }
+
+        const isSans = font.name.includes('Inter');
+        const titleSize = isSans ? '1.8rem' : '1.8rem';
+        const titleWeight = isSans ? '700' : '600';
+        const h2Size = isSans ? '1.3rem' : '1.4rem';
+        const h2Weight = isSans ? '600' : '600';
+        const statSize = isSans ? '1.3rem' : '1.4rem';
+        const subSize = '0.85rem';
+
+        const html = `
+          <div class="option">
+            <div class="option-head">
+              <span class="num">${String(i+1).padStart(2,'0')}</span>
+              <h2>${font.name}</h2>
+            </div>
+            <div class="option-meta">${font.vibe}</div>
+            <div class="duo">
+              <!-- Dark -->
+              <div class="card dark">
+                <div class="bar"><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>Dark</div>
+                <div class="card-body">
+                  <div class="pg-kicker" style="color:var(--accent);">Player</div>
+                  <div class="pg-title" style="font-family:${font.family}; font-size:${titleSize}; font-weight:${titleWeight}; color:var(--fg);">Tom Trbojevic</div>
+                  <div class="pg-sub" style="font-family:${font.family}; font-size:${subSize}; color:var(--fg2);">Elite ceiling, extensive injury history.</div>
+                  <div class="pg-meta" style="color:var(--fgm);">Updated 5m ago · 12 revisions</div>
+                  <div class="pg-stats" style="background:var(--border); border:1px solid var(--border);">
+                    <div class="pg-stat" style="background:var(--bg);"><div class="pg-stat-label" style="color:var(--fgf);">Avg</div><div class="pg-stat-value" style="font-family:${font.family}; font-size:${statSize}; color:var(--fg);">74.3</div></div>
+                    <div class="pg-stat" style="background:var(--bg);"><div class="pg-stat-label" style="color:var(--fgf);">Price</div><div class="pg-stat-value" style="font-family:${font.family}; font-size:${statSize}; color:var(--fg);">$487k</div></div>
+                    <div class="pg-stat" style="background:var(--bg);"><div class="pg-stat-label" style="color:var(--fgf);">BE</div><div class="pg-stat-value" style="font-family:${font.family}; font-size:${statSize}; color:var(--teal);">61</div></div>
+                    <div class="pg-stat" style="background:var(--bg);"><div class="pg-stat-label" style="color:var(--fgf);">Games</div><div class="pg-stat-value" style="font-family:${font.family}; font-size:${statSize}; color:var(--ochre);">4/5</div></div>
+                  </div>
+                  <div class="pg-h2" style="font-family:${font.family}; font-size:${h2Size}; font-weight:${h2Weight}; color:var(--fg);">Expert Opinions</div>
+                  <div class="pg-body" style="color:var(--fg2);">The advisory community is split on Turbo this season. His ceiling is undeniable but the hamstring makes everyone nervous.</div>
+                  <div class="pg-box" style="border-color:var(--accent);">
+                    <div class="pg-box-label" style="color:var(--accent);">Jaromelu's Take</div>
+                    <div class="pg-box-text" style="color:var(--fg);">Turbo is the definition of risk-reward.</div>
+                  </div>
+                  <div class="pg-verdict" style="background:var(--surface); border:1px solid var(--border);">
+                    <div class="pg-verdict-kicker" style="color:var(--accent);">Jaromelu's Call</div>
+                    <div class="pg-verdict-text" style="font-family:${font.family}; color:var(--fg);">
+                      <span style="font-size:9px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:rgba(90,158,138,0.12); color:var(--teal); font-style:normal; letter-spacing:0.06em;">BUY</span>
+                      with bench cover.
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- Light -->
+              <div class="card light">
+                <div class="bar"><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>Light</div>
+                <div class="card-body">
+                  <div class="pg-kicker" style="color:var(--terra);">Player</div>
+                  <div class="pg-title" style="font-family:${font.family}; font-size:${titleSize}; font-weight:${titleWeight}; color:var(--link);">Tom Trbojevic</div>
+                  <div class="pg-sub" style="font-family:${font.family}; font-size:${subSize}; color:var(--lmuted);">Elite ceiling, extensive injury history.</div>
+                  <div class="pg-meta" style="color:var(--lfaint);">Updated 5m ago · 12 revisions</div>
+                  <div class="pg-stats" style="background:rgba(28,26,20,0.08); border:1px solid rgba(28,26,20,0.08);">
+                    <div class="pg-stat" style="background:var(--lbg);"><div class="pg-stat-label" style="color:var(--lfaint);">Avg</div><div class="pg-stat-value" style="font-family:${font.family}; font-size:${statSize}; color:var(--link);">74.3</div></div>
+                    <div class="pg-stat" style="background:var(--lbg);"><div class="pg-stat-label" style="color:var(--lfaint);">Price</div><div class="pg-stat-value" style="font-family:${font.family}; font-size:${statSize}; color:var(--link);">$487k</div></div>
+                    <div class="pg-stat" style="background:var(--lbg);"><div class="pg-stat-label" style="color:var(--lfaint);">BE</div><div class="pg-stat-value" style="font-family:${font.family}; font-size:${statSize}; color:#2d6040;">61</div></div>
+                    <div class="pg-stat" style="background:var(--lbg);"><div class="pg-stat-label" style="color:var(--lfaint);">Games</div><div class="pg-stat-value" style="font-family:${font.family}; font-size:${statSize}; color:#8a6a20;">4/5</div></div>
+                  </div>
+                  <div class="pg-h2" style="font-family:${font.family}; font-size:${h2Size}; font-weight:${h2Weight}; color:var(--link);">Expert Opinions</div>
+                  <div class="pg-body" style="color:var(--lmuted);">The advisory community is split on Turbo this season. His ceiling is undeniable but the hamstring makes everyone nervous.</div>
+                  <div class="pg-box" style="border-color:var(--terra);">
+                    <div class="pg-box-label" style="color:var(--terra);">Jaromelu's Take</div>
+                    <div class="pg-box-text" style="color:var(--link);">Turbo is the definition of risk-reward.</div>
+                  </div>
+                  <div class="pg-verdict" style="background:var(--lsurface); border:1px solid rgba(28,26,20,0.08);">
+                    <div class="pg-verdict-kicker" style="color:var(--terra);">Jaromelu's Call</div>
+                    <div class="pg-verdict-text" style="font-family:${font.family}; color:var(--link);">
+                      <span style="font-size:9px; font-weight:600; padding:0.1rem 0.3rem; border-radius:2px; background:#e4f2e6; color:#2d6040; font-style:normal; letter-spacing:0.06em;">BUY</span>
+                      with bench cover.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
+      });
+    });
+  </script>
+
+  <div class="font-options"></div>
+
+  <footer>
+    <p>Font Exploration &mdash; Jaromelu Design Reference</p>
+  </footer>
+
+</div>
+</body>
+</html>

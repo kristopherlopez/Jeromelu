@@ -47,9 +47,12 @@
 - `worker-extraction` — entities, quotes, claims, predictions, embeddings
 - `worker-decision` — consensus, planning, decisioning
 - `worker-publishing` — feed events, voice rendering, public state updates
+- `worker-scraper` — SuperCoach stats, prices, team lists
 - `temporal` — orchestration layer
 - `postgres` — core data store
 - `object-store` — transcript and artefact storage
+
+For what each worker actually does today (including status and workflow inventory), see [`docs/agents/system/`](../agents/system/README.md).
 
 ## Key Technical Principle
 Keep the **public experience** and the **intelligence engine** separate, but keep the **data layer unified**.

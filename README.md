@@ -1,34 +1,61 @@
-# Jeromelu
+# Jaromelu
 
 Watch an AI crew break down the NRL week, make public calls, and get held accountable — live, every round. Entertainment spectacle first, utility second.
 
-## Documentation
+## Pages
+
+The app has five canonical pages. Docs for each live under [`docs/pages/<page>/`](docs/pages/).
+
+| Page | Route | Docs |
+|------|-------|------|
+| **The Feed** | `/` | [docs/pages/feed/](docs/pages/feed/overview.md) |
+| **The Wiki** | `/wiki` | [docs/pages/wiki/](docs/pages/wiki/overview.md) |
+| **The Ledger** | `/ledger` | [docs/pages/ledger/](docs/pages/ledger/overview.md) |
+| **The Analysis** | `/insights` | [docs/pages/analysis/](docs/pages/analysis/overview.md) |
+| **Ask Me** | `/ask` | [docs/pages/ask-me/](docs/pages/ask-me/overview.md) |
+
+## Agents
+
+Jaromelu is an agent-first product. Three kinds of agents, one folder per kind — see [`docs/agents/`](docs/agents/README.md).
+
+| Kind | What | Docs |
+|------|------|------|
+| **Crew** | User-facing personas — Jaromelu, Scout, Analyst, Critic, Bookkeeper, Archivist | [agents/crew/](docs/agents/crew/README.md) |
+| **System** | Backend Temporal workflows + LLM activities | [agents/system/](docs/agents/system/README.md) |
+| **Skills** | Claude Code dev-time skill agents | [agents/skills/](docs/agents/skills/README.md) |
+
+## Architecture
 
 | Doc | Contents |
 |-----|----------|
-| [01 — Venture Thesis & Strategy](docs/01-venture-thesis.md) | What Jeromelu is, audience, core job, return triggers |
-| [02 — Character Architecture](docs/02-character-architecture.md) | The Crew (Jeromelu, Scout, Analyst), traits, behavioural rules, voice |
-| [03 — Experience Architecture](docs/03-experience-architecture.md) | The show: crew, episode arc, remarks, surfaces, alignment index, audience participation |
-| [04 — Information Architecture & Data Model](docs/04-information-architecture.md) | Core objects, lineage principle, recommended schema |
-| [05 — Runtime Architecture](docs/05-runtime-architecture.md) | System topology: discovery, ingestion, extraction, decision, publishing |
-| [06 — LLM Architecture](docs/06-llm-architecture.md) | Role-specific LLM tasks, retrieval pattern |
-| [07 — Workflow Architecture](docs/07-workflow-architecture.md) | Scheduled and event-triggered workflows |
-| [08 — Explainability & Governance](docs/08-explainability-and-governance.md) | Public reasoning rules, truthfulness, risk management |
-| [09 — V1 Scope & Roadmap](docs/09-v1-scope-and-roadmap.md) | Must-haves, phased roadmap, architectural principles, success criteria |
-| [10 — C4 System Blueprint](docs/10-c4-system-blueprint.md) | Full C4 breakdown: context, containers, components, flows, cross-cutting concerns |
-| [11 — Technology Stack](docs/11-technology-stack.md) | Next.js, FastAPI, Temporal, PostgreSQL, service split |
-| [12 — AWS Architecture](docs/12-aws-architecture.md) | VPC, ECS/Fargate, RDS, S3, CloudFront, full AWS inventory |
-| [13 — Agent Inventory](docs/architecture/13-agent-inventory.md) | Complete inventory of all agents: Temporal workflows, LLM activities, Claude Code skill agents |
+| [01 — Venture Thesis & Strategy](docs/architecture/01-venture-thesis.md) | What Jaromelu is, audience, core job, return triggers |
+| [03 — Experience Architecture](docs/architecture/03-experience-architecture.md) | The show: crew, episode arc, remarks, surfaces, alignment index, audience participation |
+| [04 — Information Architecture & Data Model](docs/architecture/04-information-architecture.md) | Core objects, lineage principle, recommended schema |
+| [05 — Runtime Architecture](docs/architecture/05-runtime-architecture.md) | System topology: discovery, ingestion, extraction, decision, publishing |
+| [06 — LLM Architecture](docs/architecture/06-llm-architecture.md) | Role-specific LLM tasks, retrieval pattern |
+| [07 — Workflow Architecture](docs/architecture/07-workflow-architecture.md) | Scheduled and event-triggered workflows |
+| [08 — Explainability & Governance](docs/architecture/08-explainability-and-governance.md) | Public reasoning rules, truthfulness, risk management |
+| [09 — V1 Scope & Roadmap](docs/architecture/09-v1-scope-and-roadmap.md) | Must-haves, phased roadmap, architectural principles, success criteria |
+| [10 — C4 System Blueprint](docs/architecture/10-c4-system-blueprint.md) | Full C4 breakdown: context, containers, components, flows, cross-cutting concerns |
+| [11 — Technology Stack](docs/architecture/11-technology-stack.md) | Next.js, FastAPI, Temporal, PostgreSQL, service split |
+| [12 — AWS Architecture](docs/architecture/12-aws-architecture.md) | VPC, ECS/Fargate, RDS, S3, CloudFront, full AWS inventory |
 
-### UI/UX
+> The numbering has gaps: 02 (Character Architecture) moved to [`agents/crew/`](docs/agents/crew/README.md); 13 (Agent Inventory) moved to [`agents/`](docs/agents/README.md).
 
-| Doc | Contents |
-|-----|----------|
-| [00 — Design Principles](docs/uiux/00-design-principles.md) | Visual language of a show, not a dashboard |
-| [01 — The Stream](docs/uiux/01-the-stream.md) | The single screen: crew bar, stream, interaction bar |
-| [02 — Remarks](docs/uiux/02-remarks.md) | The atomic unit: anatomy, states, interaction patterns |
-| [03 — Episode Beats](docs/uiux/03-episode-beats.md) | How the stream changes across the weekly arc |
-| [04 — Drill-Downs](docs/uiux/04-drill-downs.md) | Contextual panels: squad, dossier, ledger, alignment index |
-| [05 — Crew Presence](docs/uiux/05-crew-presence.md) | How crew members appear across the experience |
-| [06 — Audience](docs/uiux/06-audience.md) | Reactions, challenges, receipts, personal alignment |
-| [07 — First Run](docs/uiux/07-first-run.md) | First visit experience and return loops |
+## Design Language & Concepts
+
+Not page-specific — see [docs/concepts/](docs/concepts/README.md) for design principles, the Stream concept, Remarks, drill-downs, crew presence, audience interaction, first-run, and stitch requirements.
+
+## Design System
+
+Global tokens, typography, and component conventions: [docs/design-system/](docs/design-system/). Frozen HTML mockups (colour palettes, typography demos, theme variants) live in [design-artifacts/design-system/](design-artifacts/design-system/).
+
+## Other Docs
+
+- [docs/avatar/](docs/avatar/README.md) — the Jaromelu avatar as the site's persistent, interactive presence layer
+- [docs/sources/](docs/sources/README.md) — source system: originals, cleaning workbench, correction patterns, attribution
+- [docs/operations/](docs/operations/) — infra, AWS, local dev
+- [docs/todo/](docs/todo/TODO.md) — outstanding work, organised by phase
+- [docs/content-production-pipeline.md](docs/content-production-pipeline.md) — post-V1 strategic direction
+- [docs/temporal-notes.md](docs/temporal-notes.md) — personal learning notes on Temporal
+- [docs/archive/](docs/archive/) — retired / superseded docs

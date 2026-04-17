@@ -5,11 +5,11 @@ The system revolves around structured entities:
 - Source
 - Episode / article / transcript
 - Quote
-- Expert
+- Claim
+- Expert / Advisor
 - Player
 - Team
 - Matchup
-- Opinion
 - Prediction
 - Decision
 - Event
@@ -17,6 +17,8 @@ The system revolves around structured entities:
 - Plan
 - Outcome
 - **Alignment Score** — per-entity prediction accuracy tracking for the Alignment Index
+- **WikiPage / WikiRevision** — prose per-entity knowledge pages and their edit history (power [The Wiki](../pages/wiki/overview.md))
+- **KnowledgeBase entry** — distilled, embedded content chunks for RAG; also stores Analysis articles (power [Ask Me](../pages/ask-me/overview.md) and [The Analysis](../pages/analysis/overview.md))
 
 ## Lineage Principle
 Every meaningful opinion or claim should trace back to the exact source words.
@@ -33,16 +35,14 @@ Nothing important should exist without provenance.
 
 ## Public State
 Visible to users:
-- team and roster state
-- trade history
-- decision rationale
-- predictions
-- expert tracking
+- wiki pages (per-entity prose, continuously maintained by the agent)
+- analysis articles (editorial content by round and type)
+- predictions, decisions, outcomes, remarks (open / locked / resolved)
+- expert and source tracking
 - consensus tracking
-- event timeline
-- remarks (open, locked, and resolved)
-- alignment index (expert leaderboard, user scores, Jeromelu's record)
-- crew activity (Scout/Analyst/Jeromelu status and recent actions)
+- event timeline (The Feed)
+- alignment index (expert leaderboard, user scores, Jaromelu's record)
+- crew activity — status and recent actions from all six crew members (Jaromelu, Scout, Analyst, Critic, Bookkeeper, Archivist; see [agents/crew/](../agents/crew/README.md))
 
 ## Private State
 Internal only:
@@ -179,32 +179,12 @@ Internal only:
 - result_label
 - scored_at
 
-### squad_slots
-- slot_id
-- position (CTW, 5/8, HFB, HOK, FRF, 2RF, LOCK, FLX)
-- slot_index (1-17: 1-13 starting, 14-17 bench)
-- player_entity_id
-- player_name
-- is_captain
-- is_vice_captain
-- rationale
-- conviction (low, medium, high)
-- added_round
-- season
-- active
-
-### squad_trades
-- trade_id
-- decision_id
-- round
-- season
-- player_out_entity_id / player_out_name
-- player_in_entity_id / player_in_name
-- rationale
+### squad_slots, squad_trades (deprecated)
+These tables were designed for the retired "My Squad" page — a personal SuperCoach roster surface. They remain in the schema but are not actively written or read by the live app. Retained for historical records and potential future use; not part of the current V1 feature set. See [pages/analysis/overview.md § History](../pages/analysis/overview.md).
 
 ### remarks
 - remark_id
-- voice_text (Jeromelu's voiced output)
+- voice_text (Jaromelu's voiced output)
 - subject_entity_ids (players, teams, matchups referenced)
 - position (buy, sell, hold, captain, avoid)
 - conviction (low, medium, high)
@@ -227,7 +207,7 @@ Internal only:
 
 ### alignment_scores
 - score_id
-- entity_id (expert, user, or Jeromelu)
+- entity_id (expert, user, or Jaromelu)
 - entity_type (expert, user, system)
 - score_type (overall, captain_picks, buy_sell, matchup)
 - period (round, month, season)
@@ -276,6 +256,6 @@ Internal only:
 - updated_at
 - expires_at (optional)
 
-The `article_*` types power the Insights content hub — see `docs/features/insights.md`.
+The `article_*` types power **The Analysis** content hub — see `docs/pages/analysis/overview.md`.
 
 This schema is enough for V1 and does not overcomplicate things.

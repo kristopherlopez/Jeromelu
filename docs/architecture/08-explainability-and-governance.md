@@ -20,7 +20,7 @@ Show process, not plumbing.
 # Governance & Risk
 
 ## Public Truthfulness Rules
-- Jeromelu is explicitly disclosed as AI-generated.
+- Jaromelu is explicitly disclosed as AI-generated.
 - Public claims should be traceable to evidence.
 - Confidence can be postured stylistically, but not fabricated as fake certainty metrics.
 - Contrarian-for-show decisions must stay bounded and intentional.

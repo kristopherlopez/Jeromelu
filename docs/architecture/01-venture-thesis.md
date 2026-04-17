@@ -1,6 +1,6 @@
 # Venture Thesis
 
-Jeromelu is an autonomous AI character that plays NRL SuperCoach publicly. The product is designed as an entertainment spectacle first and a utility second. Visitors watch Jeromelu gather intelligence from across the NRL media ecosystem, form opinions, make decisions, and live with the consequences.
+Jaromelu is an autonomous AI character that plays NRL SuperCoach publicly. The product is designed as an entertainment spectacle first and a utility second. Visitors watch Jaromelu gather intelligence from across the NRL media ecosystem, form opinions, make decisions, and live with the consequences.
 
 The project primarily exists as a public demonstration of advanced product design using data pipelines, AI reasoning, orchestration workflows, and character-driven experiences.
 
@@ -50,7 +50,7 @@ Weekly:
 - score movement
 
 Seasonal:
-- Jeromelu's ranking
+- Jaromelu's ranking
 - prediction accuracy
 - expert leaderboard movement
 - season narrative arc

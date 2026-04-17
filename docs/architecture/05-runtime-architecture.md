@@ -75,7 +75,7 @@ Inputs:
 - consensus signals
 - matchup narratives
 - public stats / fixture context later
-- prior Jeromelu plans
+- prior Jaromelu plans
 - current squad state
 
 Outputs:

@@ -1,84 +1,71 @@
 # V1 Scope
 
-## Must Exist
-- approved source registry
-- full transcript storage
-- structured extraction pipeline
-- expert / player / matchup tracking
-- source-to-quote lineage
-- consensus snapshots
-- rule-based decision engine
-- rewindable live feed
-- public team dashboard
-- prediction ledger
-- expert leaderboard
-- chat interface with text squad input
-- admin controls
-- immutable event log
+## Delivered
 
-## Should Wait
-- avatar
-- voice
-- live game commentary
-- uploaded squad parsing
-- advanced simulation engine
-- price movement modelling
-- expected points distributions
-- broad NRL commentary outside SuperCoach
+- ✅ Approved source registry (whitelisted channels, admin add endpoint)
+- ✅ Full transcript storage (S3 raw + DB-indexed `source_documents`)
+- ✅ Rewindable live feed (The Feed, `/`)
+- ✅ Agent-maintained knowledge base (The Wiki, `/wiki`)
+- ✅ Prediction/outcomes surface (The Ledger scaffolding, `/ledger` — scoring WIP)
+- ✅ Editorial content hub (The Analysis, `/insights`)
+- ✅ Chat with the agent (Ask Me, `/ask` + inline in Feed)
+- ✅ Admin controls (source approval, pipeline view, sync status, manual ingest)
+- ✅ Immutable event log (`events` table with SHA256 dedup)
+- ✅ Crew characters (Jaromelu, Scout, Analyst, Critic, Bookkeeper, Archivist)
 
-## Smallest Alive Version
-The smallest version that still feels alive is:
-- ingestion from 50+ approved sources
-- visible thought/action feed
-- public team and decisions
-- prediction ledger
-- chat
-- no avatar
+## Outstanding
+
+- Structured extraction pipeline (local experimentation — see [`todo/extraction-worker.md`](../todo/extraction-worker.md))
+- Consensus snapshots + contrarian/consensus scoring
+- Source-to-quote lineage surfaced in UI
+- Rule-based decision engine (`worker-decision` not yet built)
+- Alignment Index scoring (tables exist; scoring loop TBD)
+- Expert/advisor accuracy leaderboard
+- Speaker diarisation and attribution (post-MVP)
+
+## Deferred
+
+- Avatar video library (Kling generation)
+- Voice (TTS / fine-tuned voice)
+- Live game commentary
+- Advanced simulation engine
+- Price movement modelling
+- Expected points distributions
+- Broad NRL commentary outside SuperCoach
+
+## Smallest Alive Version (historical — exceeded)
+
+The original "smallest alive" bar was ingestion from 50+ approved sources, a visible thought/action feed, prediction ledger, and chat with no avatar. The live app exceeds this on most axes (five pages, multiple content surfaces) but source count and prediction scoring are still short of the bar.
 
 ---
 
 # Recommended Build Roadmap
 
-## Phase 1 — Prove the Brain
-Build first:
-- source ingestion
-- transcript storage
-- entity / quote / claim extraction
-- consensus computation
-- source lineage explorer
+See [`todo/TODO.md`](../todo/TODO.md) for the detailed phase breakdown.
 
-Goal:
-Make the intelligence layer real.
+## Phase 1 — Prove the Brain (mostly done)
 
-## Phase 2 — Prove the Character
-Build next:
-- live feed
-- Jeromelu voice layer
-- rewindable timeline
-- public plans and predictions
+Built: source ingestion, transcript storage, consensus seed data, lineage groundwork. **Outstanding**: production extraction worker, consensus engine scoring.
 
-Goal:
-Make it feel alive.
+Goal: make the intelligence layer real.
 
-## Phase 3 — Prove the Operator
-Build next:
-- team dashboard
-- decision engine
-- decision workflows
-- event logging
-- match reviews
+## Phase 2 — Prove the Character (mostly done)
 
-Goal:
-Make autonomy believable.
+Built: live feed, Jaromelu voice layer, rewindable timeline, public remarks. **Outstanding**: match review scoring loop, systematic prediction resolution.
 
-## Phase 4 — Prove Utility
-Build next:
-- personalised Q&A
-- team comparison
-- premium advice pathways
+Goal: make it feel alive.
 
-Goal:
-Create monetisable value.
+## Phase 3 — Prove the Operator (in progress)
+
+Built: admin interface skeleton, event logging. **Outstanding**: decision engine, Weekly Decision workflow, autonomous trade/captain calls.
+
+Goal: make autonomy believable.
+
+## Phase 4 — Prove Utility (not started)
+
+To build: personalised Q&A, team comparison, premium advice pathways.
+
+Goal: create monetisable value.
 
 ---
 
@@ -107,7 +94,7 @@ Qualitative success signals:
 - social media sharing
 - mentions in SuperCoach communities
 - references in podcasts or YouTube channels
-- people citing Jeromelu's takes unprompted
+- people citing Jaromelu's takes unprompted
 
 Failure signal:
 Silence. No mentions means the architecture is not producing enough spectacle or value.

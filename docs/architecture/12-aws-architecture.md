@@ -1,6 +1,6 @@
 # AWS Artefacts Needed
 
-This is the practical AWS shape for Jeromelu V1.
+This is the practical AWS shape for Jaromelu V1.
 
 ## Networking / Foundation
 
@@ -218,7 +218,7 @@ If you want the shortest realistic list, it is this:
 - WAF web ACL
 - KMS keys
 
-## AWS Mapping By Jeromelu Container
+## AWS Mapping By Jaromelu Container
 
 ### `web`
 - ECS service on Fargate
@@ -264,7 +264,7 @@ If you want the shortest realistic list, it is this:
 
 ## Practical Recommendation
 
-For Jeromelu V1 on AWS, I would deploy:
+For Jaromelu V1 on AWS, I would deploy:
 - Next.js and FastAPI as containers on ECS Fargate
 - worker services on ECS Fargate
 - PostgreSQL on RDS
