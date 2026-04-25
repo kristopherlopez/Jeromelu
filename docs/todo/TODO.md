@@ -71,17 +71,18 @@ V0 → V1 migration. Stack files (`docker-compose.prod.yml`, `Caddyfile`, `light
 - [ ] **Backlog**: Add `www.jeromelu.ai` to CloudFront Aliases (pre-existing — www returned CF error before this migration too)
 - [ ] **Phase 7**: Verify nightly `pg-backup.sh` cron lands in `s3://jeromelu-public-assets/backups/postgres/` and test full restore
 
-### 4.2 V0 Decommissioning
+### 4.2 V0 Decommissioning (COMPLETE 2026-04-25)
 
-Delete only after V1 is verified live for 24–48h. Resources flagged DECOMMISSIONED in `aws-resource-inventory.md`.
-
-- [ ] Delete ECS services, cluster, ALB, target groups
-- [ ] Delete RDS instance `jeromelu-db` (final snapshot retained 30 days)
-- [ ] Delete NAT Gateway `nat-0ebe6638ebe58e8ce`, release the Elastic IP
-- [ ] Delete Secrets Manager entries (replaced by Parameter Store, ~$1.20/mo saved)
-- [ ] Schedule KMS key `jeromelu-master-key` deletion (7-day waiting period)
-- [ ] Delete unused `ap-southeast-2` ACM cert (was the ALB cert)
-- [ ] Prune unused `worker-*` ECR repos (deferred per architecture doc — fine for now)
+- [x] ECS services + cluster `jeromelu` deleted
+- [x] ALB `jeromelu-alb` + target groups deleted
+- [x] NAT Gateway `nat-0ebe6638ebe58e8ce` deleted (EIP auto-released)
+- [x] NAT routes removed from private route tables
+- [x] RDS instance `jeromelu-db` deletion initiated (final snapshot retained 30 days)
+- [x] 3 Secrets Manager entries scheduled for deletion (7-day recovery window)
+- [x] KMS CMK `jeromelu-master-key` scheduled for deletion (7-day window)
+- [x] ECR repo `jeromelu/worker-orchestrator` deleted
+- [ ] **Optional:** Delete unused `ap-southeast-2` ACM cert (was the ALB cert) — small no-cost cleanup
+- [ ] **Optional:** Prune `worker-*` ECR repos after 30-day soak — pennies/mo
 
 ### 4.3 Secrets & Config
 

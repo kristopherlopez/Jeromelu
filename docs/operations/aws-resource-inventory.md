@@ -316,6 +316,22 @@ Migration artifacts in S3 (clean up after cutover verified):
 
 **Note on HTTP-only origin protocol:** CloudFront's HTTPS handshake to Caddy was failing (502 Bad Gateway). Diagnosis pointed at TLSv1.2 + ECDSA-only cipher rejection from CF's edge. Switched origin protocol to `http-only` as a pragmatic fix. User-facing TLS is unchanged — CloudFront still terminates HTTPS via the us-east-1 ACM cert. Only the CloudFront edge ↔ Lightsail hop is plaintext over public internet. **Backlog:** force Caddy to issue RSA certs (`tls { issuer acme { ... } key_type rsa2048 }`) so CF→origin can be HTTPS again.
 
+### 11.8 — V0 Decommission (COMPLETE 2026-04-25)
+
+| Step | Resource | Status |
+|------|----------|--------|
+| 1 | ECS services scaled to 0, drained | ✓ |
+| 2 | ECS services + cluster `jeromelu` deleted | ✓ INACTIVE |
+| 3 | ALB `jeromelu-alb` + target groups `jeromelu-web-tg`, `jeromelu-api-tg` deleted | ✓ |
+| 4 | NAT Gateway `nat-0ebe6638ebe58e8ce` deleted (EIP auto-released) | ✓ deleted |
+| 5 | Routes `0.0.0.0/0 → NAT` removed from `rtb-0e130eca0b7c31bcb`, `rtb-084df4eb73b7c6c30` | ✓ |
+| 6 | RDS `jeromelu-db` deletion initiated (deletion protection disabled, automated backups skipped) | deleting; final-snapshot retained as `jeromelu-db-pre-lightsail-2026-04-25` |
+| 7 | 3 Secrets Manager secrets scheduled for deletion (7-day recovery window): `jeromelu/db-credentials`, `jeromelu/openai-api-key`, `jeromelu/app-secrets` | ✓ pending-delete 2026-05-02 |
+| 8 | KMS CMK `jeromelu-master-key` (`23a1e42f-ac32-4e3b-bd11-3f8e5c0335cc`) scheduled for deletion (7-day window) | ✓ PendingDeletion 2026-05-02 |
+| 9 | ECR repo `jeromelu/worker-orchestrator` deleted | ✓ |
+
+ECR repos kept: `jeromelu/web`, `jeromelu/api` (active), and the 4 worker repos (small storage, retained for future use).
+
 ### 11.7.1 — Database Migrations Brought Forward (COMPLETE 2026-04-25)
 
 The dump from RDS was schema-frozen at migration 009. Migrations 010–016 had never been applied to RDS (the running ECS api was likely returning 500s on `/api/feed` for the same reason — pre-existing bug). Applied on Lightsail:

@@ -1,11 +1,8 @@
 name: Build & Deploy
 
-# Auto-deploy on push is disabled until Lightsail Phase 1 lands.
-# Re-enable by uncommenting the `push:` trigger once LIGHTSAIL_HOST/USER/SSH_KEY
-# secrets are configured in GitHub.
 on:
-  # push:
-  #   branches: [master]
+  push:
+    branches: [master]
   workflow_dispatch:
 
 env:
