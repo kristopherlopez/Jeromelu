@@ -6,7 +6,7 @@
 
 # Web app (CloudFront sits in front for jeromelu.ai/www, but Caddy still
 # terminates TLS so CloudFront-to-origin is encrypted).
-jeromelu.ai, www.jeromelu.ai {
+jeromelu.ai, www.jeromelu.ai, origin.jeromelu.ai {
 	encode zstd gzip
 	reverse_proxy web:3000
 	log {
