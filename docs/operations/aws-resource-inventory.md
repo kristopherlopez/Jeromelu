@@ -225,22 +225,47 @@ V0 architecture replaced by a single Lightsail VM running Docker Compose. See `d
 | Swap | 1 GB at `/swapfile` (persisted in `/etc/fstab`) |
 | SSH alias | `jeromelu-prod` (configured in operator's `~/.ssh/config`) |
 
-### 11.2 — IAM (PENDING)
+### 11.2 — IAM (COMPLETE 2026-04-25)
 
-| Resource | Value |
-|----------|-------|
-| User | `jeromelu-cicd` — keys stored in GitHub Actions secrets |
-| Permissions | ECR push/pull (web, api), CloudFront create-invalidation on `E2G6FL11A3JP8F`, S3 read/write on the 3 jeromelu buckets, SSM `GetParameter*` on `/jeromelu/*` |
+| Resource | ARN | Permissions |
+|----------|-----|-------------|
+| User `jeromelu-cicd` | `arn:aws:iam::111424988703:user/jeromelu-cicd` | ECR push/pull on `jeromelu/web` + `jeromelu/api`, CloudFront `CreateInvalidation`/`GetInvalidation` on `E2G6FL11A3JP8F`. Inline policy: `jeromelu-cicd-permissions`. Access keys stored in GitHub Actions secrets. |
+| User `jeromelu-instance` | `arn:aws:iam::111424988703:user/jeromelu-instance` | ECR pull on `jeromelu/web` + `jeromelu/api`, S3 read/write on the 3 jeromelu buckets, SSM `GetParameter*` on `/jeromelu/*`. Inline policy: `jeromelu-instance-permissions`. Access keys live in `/opt/jeromelu/.env` and `~/.aws/credentials` on the Lightsail box. |
 
-### 11.3 — Parameter Store (PENDING — replaces Secrets Manager)
+### 11.2.1 — GitHub Actions Secrets (COMPLETE 2026-04-25)
 
-| Parameter | Type |
-|-----------|------|
-| `/jeromelu/postgres-password` | SecureString |
-| `/jeromelu/openai-api-key` | SecureString |
-| `/jeromelu/admin-key` | SecureString |
-| `/jeromelu/instance-aws-access-key-id` | SecureString |
-| `/jeromelu/instance-aws-secret-access-key` | SecureString |
+Set on `kristopherlopez/Jeromelu`:
+
+| Secret | Value |
+|--------|-------|
+| `LIGHTSAIL_HOST` | `52.65.91.199` |
+| `LIGHTSAIL_USER` | `ubuntu` |
+| `LIGHTSAIL_SSH_KEY` | private half of the `jeromelu-prod` ED25519 keypair |
+| `AWS_ACCESS_KEY_ID` | `jeromelu-cicd` access key |
+| `AWS_SECRET_ACCESS_KEY` | `jeromelu-cicd` secret |
+
+### 11.2.2 — GitHub Deploy Key (COMPLETE 2026-04-25)
+
+| Field | Value |
+|-------|-------|
+| Title | `lightsail-prod` |
+| Type | read-only |
+| Key | `~/.ssh/github_deploy` on Lightsail (ED25519) |
+| Repo | `kristopherlopez/Jeromelu` |
+| ID | `149626439` |
+
+### 11.3 — Parameter Store SecureStrings (COMPLETE 2026-04-25 — replaces Secrets Manager)
+
+| Parameter | Source |
+|-----------|--------|
+| `/jeromelu/postgres-password` | from `jeromelu/db-credentials` |
+| `/jeromelu/openai-api-key` | from `jeromelu/openai-api-key` (still placeholder — replace before LLM use) |
+| `/jeromelu/admin-key` | from `jeromelu/app-secrets.ADMIN_API_KEY` |
+| `/jeromelu/session-secret` | from `jeromelu/app-secrets.SESSION_SECRET` |
+| `/jeromelu/instance-aws-access-key-id` | new — `jeromelu-instance` user access key |
+| `/jeromelu/instance-aws-secret-access-key` | new — `jeromelu-instance` user secret |
+
+Pre-existing non-secret parameters from V0 retained: `/jeromelu/env`, `/jeromelu/region`, `/jeromelu/db-name`, `/jeromelu/s3-{raw,clean,assets}-bucket`, `/jeromelu/feature/{chat-enabled,contrarian-mode,publishing-paused}`.
 
 ### 11.4 — RDS Final Snapshot (COMPLETE 2026-04-25)
 

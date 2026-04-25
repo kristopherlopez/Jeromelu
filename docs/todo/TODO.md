@@ -58,9 +58,11 @@ V0 → V1 migration. Stack files (`docker-compose.prod.yml`, `Caddyfile`, `light
 - [x] **Phase 1**: Bootstrap (Docker 29.4.1, Compose, AWS CLI v2, Git, 1 GB swap)
 - [x] **Phase 2**: Final RDS snapshot `jeromelu-db-pre-lightsail-2026-04-25` (available, retain until 2026-05-25)
 - [x] **Phase 2**: pg_dump from RDS → restore into Postgres container on Lightsail; row counts match (sources=215, source_documents=215, source_chunks=221,634)
-- [ ] **Phase 3**: Create IAM user `jeromelu-cicd`, store keys in GitHub Actions secrets
-- [ ] **Phase 3**: Create instance access key for SSM/S3 from the box (Lightsail can't use EC2 instance roles directly)
-- [ ] **Phase 3**: Populate Parameter Store under `/jeromelu/`: `openai-api-key`, `admin-key`, instance AWS keys (Postgres password reused from RDS to keep app config unchanged)
+- [x] **Phase 3**: IAM user `jeromelu-cicd` (GH Actions: ECR + CloudFront invalidate); GitHub Actions secrets set
+- [x] **Phase 3**: IAM user `jeromelu-instance` (Lightsail box: ECR pull, S3, SSM); keys in `/opt/jeromelu/.env` and `~/.aws/credentials`
+- [x] **Phase 3**: 6 SecureStrings in Parameter Store under `/jeromelu/`: `postgres-password`, `openai-api-key` (still placeholder), `admin-key`, `session-secret`, instance AWS keypair
+- [x] **Phase 3**: GitHub deploy key registered for read-only repo access from Lightsail
+- [x] **Phase 3**: Repo cloned to `/opt/jeromelu` via SSH
 - [ ] **Phase 4**: Run `scripts/lightsail-deploy.sh` — Caddy + web + api + postgres on the box
 - [ ] **Phase 5**: Repoint CloudFront `E2G6FL11A3JP8F` origin from ALB DNS to Lightsail static IP
 - [ ] **Phase 5**: Repoint Route 53 `api.jeromelu.ai` A record to Lightsail static IP
