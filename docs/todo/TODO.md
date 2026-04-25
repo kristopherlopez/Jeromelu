@@ -1,30 +1,15 @@
 # Jaromelu — Master To-Do
 
-Substantive architecture docs with completed work are split out (linked below). Everything else lives inline here.
+Component-level work has its own file under `docs/todo/`. Cross-cutting items (infra, testing, security, launch prep) stay inline below.
 
 ---
 
 ## Phase 1 — Prove the Brain (Intelligence Layer)
 
-### 1.1 Temporal Orchestration Setup
-
-Architecture and implementation: [temporal-orchestration.md](temporal-orchestration.md).
-
-### 1.2 Ingestion Worker
-
-Architecture, S3 format, and MVP task list: [ingestion-worker.md](ingestion-worker.md).
-
-### 1.3 Extraction Worker
-
-Design decisions and the local-first validation plan: [extraction-worker.md](extraction-worker.md).
-
-### 1.4 Consensus Engine
-
-- [ ] Aggregate claims into per-player consensus snapshots (buy/sell/hold counts)
-- [ ] Time-bucketed snapshots (daily, weekly)
-- [ ] Compute `contrarian_score` and `consensus_score`
-- [ ] Track consensus shifts over time
-- [ ] Expert accuracy tracking — score experts on prediction outcomes
+- **1.1 Temporal Orchestration Setup** → [temporal-orchestration.md](temporal-orchestration.md)
+- **1.2 Ingestion Worker** → [ingestion-worker.md](ingestion-worker.md)
+- **1.3 Extraction Worker** → [extraction-worker.md](extraction-worker.md)
+- **1.4 Consensus Engine** → [consensus-engine.md](consensus-engine.md)
 
 ### 1.5 Database Layer
 
@@ -37,59 +22,16 @@ Design decisions and the local-first validation plan: [extraction-worker.md](ext
 
 ## Phase 2 — Prove the Character (Personality + Experience)
 
-### 2.1 Decision Worker (`services/worker-decision`)
-
-- [ ] Rule-based decision engine — transparent heuristics, no black box
-- [ ] Candidate move generator — enumerate viable trades, captain picks, structure changes
-- [ ] Move scoring via heuristics (consensus signals, matchup data, squad constraints)
-- [ ] Move ranking and selection
-- [ ] Rationale generation — explain why each decision was made
-- [ ] Policy-bounded contrarian override system
-- [ ] Squad state management — track current team, trades remaining, budget
-- [ ] Strategic planning — round-by-round plans with scenario modeling
-- [ ] Assumption invalidation detection — detect when plans need rebuilding
-- [ ] Temporal workflows: `WeeklyDecisionWorkflow`, `StrategyRefreshWorkflow`
-
-### 2.2 Publishing Worker (`services/worker-publishing`)
-
-- [ ] Live feed event generation — convert system state changes into feed events
-- [ ] Event types: `source_ingested`, `opinion_extracted`, `narrative_shift`, `prediction`, `trade_decision`, `match_review`
-- [ ] Jaromelu voice layer — LLM characterisation to write in Jaromelu's voice
-- [ ] Tone/temperature control (straight, sharp, lightly roasting)
-- [ ] Display modes: thought, action, system, prediction, review
-- [ ] Immutable event hashing for audit trail
-- [ ] Temporal workflow: `PublishingWorkflow`
-
-### 2.3 Match Review System
-
-- [ ] Collect actual match outcomes (scores, player points) — data source TBD
-- [ ] Compare predictions vs actuals
-- [ ] Score prediction accuracy (hits/misses)
-- [ ] Update expert accuracy leaderboard
-- [ ] Publish match review events to feed
-- [ ] Temporal workflow: `MatchReviewWorkflow`
+- **2.1 Decision Worker** → [decision-worker.md](decision-worker.md)
+- **2.2 Publishing Worker** → [publishing-worker.md](publishing-worker.md)
+- **2.3 Match Review System** → [match-review.md](match-review.md)
 
 ---
 
 ## Phase 3 — API & Frontend
 
-### 3.1 API Endpoints (`services/api`)
-
-- [ ] `GET /feed` — paginated live feed events
-- [ ] `GET /feed/latest` — latest events (polling/SSE)
-- [ ] `GET /team` — current squad state
-- [ ] `GET /team/history` — trade history, captain choices
-- [ ] `GET /predictions` — prediction ledger
-- [ ] `GET /predictions/{id}` — prediction detail with evidence
-- [ ] `GET /consensus/{player_id}` — player consensus data
-- [ ] `GET /entities/players` — player list with search
-- [ ] `GET /entities/players/{id}` — player profile with claims, predictions
-- [ ] `GET /entities/experts` — expert list with accuracy scores
-- [ ] `GET /sources` — source list
-- [ ] `POST /chat` — Ask Jaromelu (chat interface)
-- [ ] Authentication / API key middleware
-- [ ] Rate limiting
-- [ ] Error handling and validation
+- **3.1 API Endpoints** → [api.md](api.md)
+- **3.3 Admin Interface** → [admin-interface.md](admin-interface.md)
 
 ### 3.2 Frontend Pages (`services/web`)
 
@@ -100,14 +42,6 @@ Design decisions and the local-first validation plan: [extraction-worker.md](ext
 - [x] **Ask Me** — merged into Feed as Twitch-style chat; Q&A persisted as feed events with temperature control
 - [ ] Responsive design / mobile-friendly pass across all pages
 - [ ] SEO metadata for public pages
-
-### 3.3 Admin Interface
-
-- [ ] Source approval queue
-- [ ] Manual event injection (breaking news, corrections)
-- [ ] Pause/resume decision and publishing engines
-- [ ] Entity correction/merge tools
-- [ ] Emergency kill switch + system prompt controls
 
 ---
 
