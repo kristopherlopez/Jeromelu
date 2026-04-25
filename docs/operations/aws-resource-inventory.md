@@ -242,13 +242,37 @@ V0 architecture replaced by a single Lightsail VM running Docker Compose. See `d
 | `/jeromelu/instance-aws-access-key-id` | SecureString |
 | `/jeromelu/instance-aws-secret-access-key` | SecureString |
 
-### 11.4 — RDS Final Snapshot (PENDING)
+### 11.4 — RDS Final Snapshot (COMPLETE 2026-04-25)
 
 | Resource | Value |
 |----------|-------|
 | Snapshot ID | `jeromelu-db-pre-lightsail-2026-04-25` |
 | Source instance | `jeromelu-db` |
+| Status | available, 100% progress, 20 GB |
+| Tags | `purpose=pre-lightsail-cutover`, `retain_until=2026-05-25` |
 | Retain until | 2026-05-25 (30 days post-cutover) |
+
+### 11.4.1 — DB Migration Verification (COMPLETE 2026-04-25)
+
+Approach: pg_dump 17.9 ran from inside the live `jeromelu-api` ECS task (already in VPC, has DB credentials), streamed via gzip to `s3://jeromelu-public-assets/migration/jeromelu-pre-lightsail-2026-04-25.sql.gz` (15.5 MiB compressed). Lightsail pulled it via presigned URL, restored into `pgvector/pgvector:pg16` container with the same `jeromelu_admin` password as RDS.
+
+Row count parity verified across all 16 tables:
+
+| Table | RDS | Lightsail |
+|---|---|---|
+| sources | 215 | 215 |
+| source_documents | 215 | 215 |
+| source_chunks | 221,634 | 221,634 |
+| (13 other tables) | 0 | 0 |
+
+Extensions: `plpgsql`, `uuid-ossp`, `vector 0.8.2` (pgvector) — restored intact.
+
+Single benign error during restore: `unrecognized configuration parameter "transaction_timeout"` — RDS-only `SET` at the head of the dump, ignored by open-source pg16; not data-related.
+
+Migration artifacts in S3 (clean up after cutover verified):
+- `s3://jeromelu-public-assets/migration/jeromelu-pre-lightsail-2026-04-25.sql.gz`
+- `s3://jeromelu-public-assets/migration/rowcounts.sql`
+- `s3://jeromelu-public-assets/migration/rds-rowcount.sh`
 
 ### 11.5 — DNS Cutover (PENDING)
 

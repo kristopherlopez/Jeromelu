@@ -47,28 +47,54 @@ Component-level work has its own file under `docs/todo/`. Cross-cutting items (i
 
 ## Phase 4 — Infrastructure & Operations
 
-### 4.1 AWS Deferred Tasks
+V1 architecture is single-instance Lightsail + Docker Compose. See `docs/architecture/12-aws-architecture.md` and Phase 11 of `docs/operations/aws-resource-inventory.md` for live state.
 
-- [ ] CloudWatch dashboard — key metrics for all 6 services
-- [ ] CloudWatch alarms — error rates, latency, task failures
-- [ ] Scale up worker ECS services (currently `desired=0`)
-- [ ] CI/CD IAM role (replace personal access key)
+### 4.1 Lightsail V1 Cutover
 
-### 4.2 Secrets & Config
+V0 → V1 migration. Stack files (`docker-compose.prod.yml`, `Caddyfile`, `lightsail-deploy.sh`, `pg-backup.sh`, `.github/workflows/deploy.yml`, Makefile prod targets) committed in Phase 0.
 
-- [ ] Replace OpenAI API key placeholder in Secrets Manager
-- [ ] Add YouTube Data API key to Secrets Manager
-- [ ] Add other API keys (Deepgram, data providers)
-- [ ] Wire ECS task definitions to pull secrets from Secrets Manager
+- [x] **Phase 1**: Provision Lightsail instance `jeromelu` (`micro_3_2` $7/mo — Sydney has no $5 plan with 1 GB RAM; ap-southeast-2a, Ubuntu 22.04)
+- [x] **Phase 1**: Attach static IP `52.65.91.199`; firewall TCP 22 from `112.213.139.221/32`, 80/443 from `0.0.0.0/0`
+- [x] **Phase 1**: Bootstrap (Docker 29.4.1, Compose, AWS CLI v2, Git, 1 GB swap)
+- [x] **Phase 2**: Final RDS snapshot `jeromelu-db-pre-lightsail-2026-04-25` (available, retain until 2026-05-25)
+- [x] **Phase 2**: pg_dump from RDS → restore into Postgres container on Lightsail; row counts match (sources=215, source_documents=215, source_chunks=221,634)
+- [ ] **Phase 3**: Create IAM user `jeromelu-cicd`, store keys in GitHub Actions secrets
+- [ ] **Phase 3**: Create instance access key for SSM/S3 from the box (Lightsail can't use EC2 instance roles directly)
+- [ ] **Phase 3**: Populate Parameter Store under `/jeromelu/`: `openai-api-key`, `admin-key`, instance AWS keys (Postgres password reused from RDS to keep app config unchanged)
+- [ ] **Phase 4**: Run `scripts/lightsail-deploy.sh` — Caddy + web + api + postgres on the box
+- [ ] **Phase 5**: Repoint CloudFront `E2G6FL11A3JP8F` origin from ALB DNS to Lightsail static IP
+- [ ] **Phase 5**: Repoint Route 53 `api.jeromelu.ai` A record to Lightsail static IP
+- [ ] **Phase 7**: Verify nightly `pg-backup.sh` cron lands in `s3://jeromelu-public-assets/backups/postgres/` and test full restore
 
-### 4.3 Observability
+### 4.2 V0 Decommissioning
 
-- [ ] Structured logging across all services
+Delete only after V1 is verified live for 24–48h. Resources flagged DECOMMISSIONED in `aws-resource-inventory.md`.
+
+- [ ] Delete ECS services, cluster, ALB, target groups
+- [ ] Delete RDS instance `jeromelu-db` (final snapshot retained 30 days)
+- [ ] Delete NAT Gateway `nat-0ebe6638ebe58e8ce`, release the Elastic IP
+- [ ] Delete Secrets Manager entries (replaced by Parameter Store, ~$1.20/mo saved)
+- [ ] Schedule KMS key `jeromelu-master-key` deletion (7-day waiting period)
+- [ ] Delete unused `ap-southeast-2` ACM cert (was the ALB cert)
+- [ ] Prune unused `worker-*` ECR repos (deferred per architecture doc — fine for now)
+
+### 4.3 Secrets & Config
+
+- [ ] Replace OpenAI API key placeholder in Parameter Store (`/jeromelu/openai-api-key`)
+- [ ] Add YouTube Data API key to Parameter Store
+- [ ] Add other API keys (Deepgram, data providers) to Parameter Store
+- [ ] Verify `aws ssm get-parameters-by-path /jeromelu/` populates `/opt/jeromelu/.env` on deploy
+
+### 4.4 Observability
+
+V1 deliberately skips CloudWatch agent + alarms — rely on Lightsail's instance metrics dashboard and `journald`. App-level instrumentation is still wanted.
+
+- [ ] Structured logging across all services (JSON → stdout → `journald`, tail via `make prod-logs`)
 - [ ] Health check endpoints that verify DB connectivity
 - [ ] Request tracing (correlation IDs)
 - [ ] Metrics: ingestion rate, extraction accuracy, decision cadence
 
-### 4.4 Data Sources
+### 4.5 Data Sources
 
 - [ ] Curate initial list of 50+ NRL SuperCoach content sources
 - [ ] Categorise by type (YouTube, podcast, web, radio)
