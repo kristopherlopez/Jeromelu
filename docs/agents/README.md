@@ -4,24 +4,26 @@ Jaromelu is an agent-first product. "Agent" here spans three different things:
 
 | Kind | What | Folder |
 |------|------|--------|
-| **Crew** | User-facing personas with voice, persona, and presence in the show | [crew/](crew/README.md) |
+| **Crew** | Internal reasoning architecture composing Jaromelu — the only on-screen character | [crew/](crew/README.md) |
 | **System** | Backend workers — Temporal workflows, LLM activities, scrapers | [system/](system/README.md) |
 | **Skills** | Claude Code dev-time skill agents | [skills/README.md](skills/README.md) |
 
 ## Roster at a Glance
 
-### Crew (6)
+### Crew
 
-| Member | Role |
-|--------|------|
-| [Jaromelu](crew/jaromelu.md) | The front man — makes the call |
-| [Scout](crew/scout.md) | Intelligence gatherer |
-| [Analyst](crew/analyst.md) | Cross-references claims, finds contradictions |
-| [Critic](crew/critic.md) | Challenges Jaromelu before the call |
-| [Bookkeeper](crew/bookkeeper.md) | The numbers — breakevens, cap space, prices |
-| [Archivist](crew/archivist.md) | The long memory — patterns, history |
+Internal reasoning architecture for Jaromelu — not separate visible characters. Users only see Jaromelu; the "crew" is how he thinks (research, analysis, skepticism, math, memory).
 
-See also: [Crew Dynamics](crew/dynamics.md) — how they hand off, face-offs.
+| Internal function | What it does |
+|---|---|
+| [Jaromelu](crew/jaromelu.md) | The on-screen character — integrates everything below |
+| [Scout](crew/scout.md) | Research / intelligence gathering mode |
+| [Analyst](crew/analyst.md) | Cross-reference / contradiction-detection mode |
+| [Critic](crew/critic.md) | Self-doubt / pre-call challenge mode |
+| [Bookkeeper](crew/bookkeeper.md) | Math / numbers mode |
+| [Archivist](crew/archivist.md) | Long-memory / pattern-matching mode |
+
+See also: [Crew Dynamics](crew/dynamics.md) — internal reasoning patterns (handoffs are engineering flow, not on-screen interactions).
 
 ### System
 
@@ -45,4 +47,4 @@ See also: [Crew Dynamics](crew/dynamics.md) — how they hand off, face-offs.
 
 ## How crew vs system relate
 
-Crew agents are narrative — they are what the user sees. System agents are operational — they are what actually runs. Some map cleanly (e.g. the `FeedGenerationWorkflow` produces what the crew "says"), but they are not 1:1. Treat them as separate concerns that reference each other, not duplicates.
+Crew is **how Jaromelu thinks** — internal reasoning architecture (research, analysis, skepticism, math, memory). System is **what actually runs** — Temporal workflows, LLM activities, scrapers. They map but are not 1:1: a single internal mode (e.g. Scout = research) can span multiple system workers (ingestion + source discovery), and conversely the publishing agent wraps every internal-mode output in Jaromelu's single on-screen voice. Treat them as separate concerns that reference each other, not duplicates.

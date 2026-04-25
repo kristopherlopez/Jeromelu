@@ -1,277 +1,148 @@
-# Crew Presence
+# Jaromelu Presence
 
-The crew is always present. Even when nothing is happening, the audience can see who's dormant, who last acted, and who's about to wake up. The crew *is* the interface.
+Jaromelu is the only on-screen character. There is no multi-character "crew bar" — the user-facing surface shows one face, one voice, one presence. The internal "crew" (see [`../agents/crew/README.md`](../agents/crew/README.md)) describes Jaromelu's internal reasoning architecture, not separate visible characters.
 
----
-
-## The Crew Bar
-
-The Crew Bar is the only persistent UI element besides the Interaction Bar. It replaces the traditional site header. There is no logo, no nav, no hamburger menu.
-
-### Anatomy
-
-A horizontal strip of crew member **avatar portraits**, fixed to the top of the viewport. Each slot is a 32px circular portrait with name and optional status.
-
-```
-[👤 Scout — Scanning 4 new episodes]   [👤 Analyst]   [👤 Critic]   [👤 Bookkeeper]   [👤 Archivist]   [👤 Jaromelu — Reviewing]
-```
-
-### Avatar States
-
-**Active**
-- Avatar is full colour, playing an idle animation loop (breathing, slight movement, eyes scanning)
-- Pulsing orange ring around the portrait
-- Name + status text visible
-- Example: Scout's avatar is animated, head turning as if scanning. Status: "Scanning 4 new episodes"
-
-**Dormant**
-- Avatar is desaturated/dimmed. Static image (no animation). Slightly smaller or recessed.
-- Name only on desktop. Hidden on mobile (collapsed into overflow).
-- Tap/hover reveals a personality card tooltip:
-  ```
-  ┌─────────────────────────────┐
-  │ [👤 Analyst portrait]      │
-  │ Knowledge Resolver          │
-  │                             │
-  │ Last: Cross-referenced      │
-  │ Round 6 claims · 2h ago    │
-  │                             │
-  │ Next: Activates when Scout │
-  │ delivers Round 7 intel     │
-  └─────────────────────────────┘
-  ```
-
-**Waking Up** (transition: dormant → active)
-- The avatar plays a brief "wake" animation (1-2 seconds): colour returning, eyes opening, head turning to face camera
-- The orange ring fades in
-- Status text appears alongside
-
-**Completing** (transition: active → dormant)
-- Avatar plays a brief completion animation: satisfied nod, checkmark gesture
-- Status text briefly shows completion: "Done. 4 episodes collected."
-- Colour desaturates. Animation stops. Fades to dormant.
-
-### Mobile Behaviour
-
-Only show active crew members + Jaromelu. Dormant members collapse into a "+3" overflow showing stacked, tiny, greyed-out avatar faces. Tap to expand.
-
-```
-[👤 Scout — Scanning...]   [👤 Jaromelu — Reviewing]   [👤👤👤 +4]
-```
-
-### All Dormant State
-
-When the crew is idle between episodes:
-
-All crew avatars are desaturated and static except Jaromelu. His avatar plays a slow idle loop — thinking at his desk, occasionally glancing at camera, reviewing something on a screen. Status: "Squad locked. Watching the market."
-
-Jaromelu is never fully dormant. His avatar is always animated. This maintains the "someone's home" feeling. The audience sees a character, not a status string.
+This doc covers Jaromelu's on-screen presence: avatar states, animation library, attribution, and how internal-mode shifts surface in the UI.
 
 ---
 
-## Crew Members
+## Always-Present Avatar
 
-### Visual Identity
+Jaromelu is never absent from the UI. His avatar is the persistent character anchor — replaces logo / nav / hamburger menu in the header. Tap returns to home.
 
-Each crew member is a **character with a face**, not an emoji with a label. They have a generated character portrait (static image for base, animated loops via Kling for active states), a visual style, and a personality expressed through micro-animations.
+### States
 
-| Crew Member | Role | Visual Style | Character Energy |
-|-------------|------|-------------|-----------------|
-| Scout | Intelligence | Field operative. Alert eyes. Collar up. Always looking at something off-screen. | Efficient, watchful. Head on a swivel. |
-| Analyst | Knowledge | Clean, precise. Glasses optional. Surrounded by data. Thoughtful expression. | Measured, focused. Slight furrowed brow when processing. |
-| Critic | Challenge | Arms often crossed. Sceptical eyebrow. Direct eye contact. | Challenging, sharp. Not hostile — rigorous. |
-| Bookkeeper | Numbers | Neat, orderly. Calculator energy. Neutral expression. | Precise, unemotional. The numbers are the numbers. |
-| Archivist | History | Slightly older feel. Surrounded by records. Knowing look. | Patient, long-memory. Has seen this before. |
-| Jaromelu | The Call | The front man. Confident posture. Leans toward camera. Orange accent in his visual design. | Cocky, self-aware. The star of the show. |
+**Idle**
+- Slow looped animation: thinking at desk, occasionally glancing at camera
+- Subtle orange accent (his signature colour)
+- Status text: "Squad locked. Watching the market."
 
-### Avatar Sizes
+**Active (working)**
+- Idle loop continues, status text shifts to reflect current internal mode:
+  - "Investigating new sources" — Scout mode (recon / source discovery)
+  - "Reading this week's pods" — Scout mode (transcript ingestion)
+  - "Cross-referencing claims" — Analyst mode (extraction)
+  - "Doing the math on Cleary" — Bookkeeper mode (scraper math)
+  - "Sleeping on a call" — Critic mode (pre-publish review)
+  - "Preparing the call" — final voice synthesis
+- Pulsing orange ring around avatar
+
+**Decision moment (publishing a Remark)**
+- "Confident call" animation plays (3-5s)
+- Status: "On the call: SELL Cleary"
+- Avatar transitions to lean-toward-camera pose
+
+**Postmortem**
+- Animation matches outcome: smirk/lean back (correct), grimace/shrug (wrong), head in hands (spectacular miss)
+
+The status string is always written in Jaromelu's first person, even when reporting internal-function activity. The audience sees one character doing many things — never separate workers.
+
+---
+
+## Avatar Sizes
 
 | Context | Size | Format |
-|---------|------|--------|
-| Crew Bar pill | 32px circle | Static (dormant) or 2-3s idle animation loop (active) |
+|---|---|---|
+| Header pill | 32px circle | Idle loop |
 | Stream card attribution | 24px circle | Static |
-| Remark card (Jaromelu) | 48px circle | Idle animation loop |
+| Remark card | 48px circle | Idle / decision animation |
 | Drill-down panel header | 64px circle | Static or idle loop |
 | Receipt card | 80px | Static, expression matches result |
 | Video clip (inline) | Full width, 16:9 | 3-8 second Kling video |
 
-### Avatar Animation Library
+---
 
-Each crew member has a set of **pre-generated animation clips** stored as short loops or one-shot clips. These are produced once using Kling (or equivalent) and reused across the experience.
+## Animation Library
 
-**Per crew member (~5-8 clips each):**
-- Idle loop (2-3s, looping) — default active state
-- Wake up (1-2s, one-shot) — transitioning from dormant to active
-- Complete/nod (1-2s, one-shot) — finished their task
-- Reaction: positive (2-3s) — something confirmed their work
-- Reaction: negative (2-3s) — something contradicted their work
+Jaromelu has a focused library of ~15-20 clips covering the full emotional range:
 
-**Jaromelu gets an expanded library (~15-20 clips):**
+**Idle / ambient**
+- Idle loop (2-3s, looping) — default state
+- Thinking/reviewing (3-5s, looping) — active analysis
+- Yawn/glance (3-5s) — long-idle easter egg
+
+**Decision moments**
 - Confident call (3-5s) — making The Call
-- Smirk/lean back (3-5s) — correct call resolution
-- Grimace/shrug (3-5s) — wrong call resolution
-- Head in hands (5-8s) — spectacular miss
-- Thinking/reviewing (3-5s, looping) — idle during analysis
 - Pointing at camera (2-3s) — crowd callout
-- Looking at Critic (2-3s) — confrontation scene
-- Dismissive wave (2-3s) — overriding the Critic
-- Yawn/glance (3-5s) — long idle easter egg
+- Dismissive wave (2-3s) — overriding self-doubt
 
-**Cost estimate:** ~$1/8s on Kling. Full library of ~60 clips averaging 3s each = ~$23. One-time production cost.
+**Outcomes**
+- Smirk / lean back (3-5s) — correct call
+- Grimace / shrug (3-5s) — wrong call
+- Head in hands (5-8s) — spectacular miss
+
+**Self-aware moments**
+- Looking off-camera (2-3s) — internal Critic moment ("I almost talked myself out of it")
+- Slight nod (1-2s) — agreeing with the numbers
+- Browsing / scrolling (3-5s, looping) — Scout mode visible (the recon segment)
+
+**Cost estimate:** ~$1/8s on Kling. Library of ~20 clips averaging 3s each ≈ ~$8. One-time production cost.
 
 ### Fallback: Static Portraits
 
-Before video clips are produced, the system works with **static portraits with expression variants**. Each crew member has 3-5 portrait images showing different expressions (neutral, positive, negative, focused, idle). These swap based on context — no animation, but the expression changes create character.
-
-Only Jaromelu gets the orange accent. The crew supports; Jaromelu stars. This visual hierarchy reinforces who the front man is.
+Before video is produced, the system uses static portrait variants (neutral, confident, smirk, grimace, head-in-hands, thinking). These swap based on context — no animation, but expression changes carry character.
 
 ---
 
-## Crew Attribution in the Stream
+## Attribution in the Stream
 
-Every card in the Stream is attributed to a crew member. The attribution is compact: icon + name + timestamp, top-left of the card.
-
-```
-🔍 Scout · 3h ago
-Picked up 4 new episodes overnight.
-```
-
-```
-🧠 Analyst · 1h ago
-Cross-referencing complete: 2 sources bullish on Munster, 1 bearish.
-```
-
-```
-⚖️ Critic · 45m ago
-You're selling Cleary on thin evidence. Two of those sources are below 50% accuracy.
-```
+Every card is authored by Jaromelu. Attribution is compact: avatar + name + timestamp, top-left of the card.
 
 ```
 🎤 Jaromelu · 20m ago
 "I've seen enough. Selling."
 ```
 
-### Attribution Hierarchy
+For internal-process narration (research updates, analysis snapshots, pre-call reasoning), the same Jaromelu attribution applies — voiced in the appropriate internal mode.
 
-Jaromelu's cards are visually distinct from crew cards:
-- **Crew cards**: Compact. Zinc left border. Standard text weight. Supporting content.
-- **Jaromelu's cards (Remarks)**: Large. Orange left border. Bold voice text. Hero content.
+```
+🎤 Jaromelu · 3h ago
+"Found three new takes on Cleary this week. Two say sell."
+```
 
-The visual weight tells the audience instantly: crew card = process, Jaromelu card = the call.
+```
+🎤 Jaromelu · 1h ago
+"Breakeven 42. Last four: 51, 48, 42, 61. Trend's down."
+```
+
+```
+🎤 Jaromelu · 45m ago
+"Two of those sell sources have a 50% accuracy record. I'm not blindly trusting them."
+```
+
+The voice shifts mode (research / numbers / skepticism) but the attribution and the face stay constant — one character expressing different facets of his reasoning.
 
 ---
 
-## Crew Personality in Copy
+## Hierarchy
 
-Voice, tone, and example lines per crew member live in [`agents/crew/`](../agents/crew/README.md) — one file per character. This doc focuses on *presence* (visual identity, avatar library, attribution in the Stream), not what the crew says.
+There is no second character to compare against. The visual hierarchy is **Remark cards (the call) > everything else (process narration)** — both authored by Jaromelu, but Remark cards are larger, with the orange accent more prominent.
 
-Quick links: [Jaromelu](../agents/crew/jaromelu.md) · [Scout](../agents/crew/scout.md) · [Analyst](../agents/crew/analyst.md) · [Critic](../agents/crew/critic.md) · [Bookkeeper](../agents/crew/bookkeeper.md) · [Archivist](../agents/crew/archivist.md)
-
----
-
-## The Handoff
-
-The most compelling crew moment is the **handoff** — when one crew member's work feeds into another's, visually connected in the Stream.
-
-### How It Looks
-
-A handoff is shown as a sequence of crew cards with avatars and visual connectors:
-
-```
-[👤] Scout · Mon 10:14 PM
-Picked up 3 new takes on Cleary from this week's pods.
-KingOfSC (SELL), NRLBrothers (SELL), PodcastNRL (BUY).
-        │
-        ▼
-[👤] Analyst · Tue 8:30 AM
-Cross-referencing the Cleary claims.
-2 selling on matchup data. 1 buying on form.
-Contradiction: same data, opposite reads.
-        │
-        ▼
-[👤] Bookkeeper · Tue 10:15 AM
-Cleary breakeven: 42. Last 4 scores: 51, 48, 42, 61.
-Needs 55+ to justify the hold. Trend is down.
-        │
-        ▼
-[👤] Critic · Thu 9:00 AM
-Thin evidence. Two sell sources below 50% accuracy.
-The Bookkeeper's numbers are more convincing than the pods.
-        │
-        ▼
-[👤] Jaromelu · Thu 11:00 AM
-[REMARK CARD — SELL Cleary]
-```
-
-Each crew member's **avatar** (24px) appears alongside their contribution. The vertical connector between entries animates subtly — data flowing downward, a visual representation of information passing between characters.
-
-### When to Show Handoffs
-
-Not every Remark needs the full handoff chain visible. By default, the handoff is collapsed inside the Remark's evidence trail. But during The Call beat, the most important Remark of the round can show the handoff expanded — making the process visible as the climax of the episode.
+| Card type | Author | Visual weight |
+|---|---|---|
+| Remark (the call) | Jaromelu | Large. Orange left border. Bold voice text. Hero. |
+| Process narration | Jaromelu | Compact. Zinc left border. Standard text weight. Supporting. |
 
 ---
 
-## The Face-Off
+## Recon: Jaromelu Visibly Browsing
 
-When the Critic challenges Jaromelu, the Stream shows a **face-off layout** — two characters visually confronting each other.
+When Jaromelu is in active source-discovery mode, the UI surfaces this as a visible activity:
 
-### Layout
+- Avatar status: "Investigating new sources"
+- Browsing / scrolling animation plays
+- A live activity stream shows what he's looking at: current search query, page being fetched, candidate just spotted
+- Each judgement publishes as a Jaromelu-authored card ("Found a new pod — 'Tackles and Tinnies' — three episodes deep, mentions Munster a lot")
 
-```
-┌─────────────────────────────────────────────────┐
-│                                                 │
-│  [👤 Critic]              vs       [👤 Jaromelu]│
-│                                                 │
-│  "Two of your three        "I've watched the    │
-│   sell sources are below    tape. The matchup    │
-│   50% accuracy. You         is bad. I don't care │
-│   sure about this?"         what the accuracy    │
-│                              says."              │
-│                                                 │
-└─────────────────────────────────────────────────┘
-```
-
-- Critic's avatar on the left, Jaromelu's on the right. Both at ~48px.
-- Critic's text on the left side, Jaromelu's response on the right.
-- A "vs" divider between them — subtle but clear.
-- The Critic's expression is sceptical (arms crossed, raised eyebrow). Jaromelu's is unflinching (direct eye contact, slight lean forward).
-
-### Video Version
-
-For the most important confrontations, a short video clip (5-8 seconds) plays inline before the text face-off:
-- Split screen: Critic on the left, Jaromelu on the right
-- Critic shakes head, crosses arms
-- Jaromelu dismisses with a hand wave or leans in defiantly
-- This is a reusable template — same visual setup, different context each time
-
-### When No Objection
-
-When the Critic has no objection (rare), the face-off format isn't used. Instead, a simple card:
-
-```
-[👤] Critic · "The numbers support this. No objection."
-```
-
-The Critic's avatar shows a brief nod — the rarest and most notable gesture in the experience. The audience learns: when the Critic agrees, pay attention.
+This is the only place the *process* of recon is rendered visibly. Internally it's the Scout function (see [agents/crew/scout.md](../agents/crew/scout.md)), but on screen it's always Jaromelu.
 
 ---
 
-## Crew Status Updates
+## Implementation
 
-The Crew Bar shows real-time status through avatar animations, but the Stream also shows crew **transition moments** — when a crew member activates, completes, or hands off.
+The canonical implementation is `services/web/src/app/components/JeromeluPresence.tsx` (single-character presence with avatar, live status pill, expandable activity timeline). Status data comes from `GET /api/jaromelu/status` (single-Jaromelu shape — aggregates internal-mode telemetry into one status). Round overview at `GET /api/round/{n}` no longer includes per-internal-mode breakdowns; activity log is rendered as a single Jaromelu-authored timeline.
 
-These are compact cards with the crew member's avatar:
+## Related
 
-```
-[👤 Scout waking up] Scout activated · Scanning the ecosystem for Round 7 intel
-```
-
-```
-[👤 Analyst, focused] Analyst activated · Cross-referencing Scout's findings
-```
-
-```
-[👤 Critic, arms crossed] Critic activated · Reviewing Jaromelu's proposed calls
-```
-
-These act as **stage directions** — they tell the audience the scene is changing. The avatar expression previews the crew member's role: Scout looks alert, Analyst looks focused, Critic looks sceptical.
+- [`../agents/crew/jaromelu.md`](../agents/crew/jaromelu.md) — voice, behavioural rules, persona
+- [`../agents/crew/dynamics.md`](../agents/crew/dynamics.md) — internal reasoning patterns

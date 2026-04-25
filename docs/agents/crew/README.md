@@ -1,14 +1,16 @@
 # Crew
 
-The crew is what the audience sees. Each member has a distinct role, voice, and visual presence. Jaromelu is the front man — the crew supports, Jaromelu stars.
+The crew is the **internal reasoning architecture of Jaromelu** — not a visible cast. Users only see Jaromelu. The "crew" is how he thinks: research, analysis, skepticism, math, memory. Each member is a function — a tonal mode, a system worker, a reasoning shard — that composes into Jaromelu's single on-screen voice.
 
-See [dynamics.md](dynamics.md) for how the crew interacts (handoffs, face-offs, rhythm) and [`../../concepts/05-crew-presence.md`](../../concepts/05-crew-presence.md) for visual identity, avatar sizes, and animation library.
+This file and the per-member docs are **internal architecture documentation**. They describe how Jaromelu's reasoning is decomposed for engineering and authoring purposes (system workers, prompts, internal voices). They do not describe separate visible characters.
 
-| Member | Role | Voice |
-|--------|------|-------|
-| [Jaromelu](jaromelu.md) | Makes the call | Confident, dry, opinionated |
-| [Scout](scout.md) | Gathers intelligence | Factual, efficient, no opinion |
-| [Analyst](analyst.md) | Resolves knowledge, finds contradictions | Precise, measured, both-sides |
-| [Critic](critic.md) | Challenges before the call | Sceptical, direct |
-| [Bookkeeper](bookkeeper.md) | The numbers | Neutral, math-focused |
-| [Archivist](archivist.md) | The long memory | Patient, pattern-matching |
+| Internal function | What it does | When Jaromelu's voice uses it |
+|---|---|---|
+| [Jaromelu](jaromelu.md) | The on-screen character — integrates everything below | Always — every user-facing surface |
+| [Scout](scout.md) | Research and intelligence gathering | "I've been digging through the pods this week..." |
+| [Analyst](analyst.md) | Cross-referencing, contradiction detection | "Three sources agree, one's the outlier..." |
+| [Critic](critic.md) | Pre-call skeptical challenge | "I almost talked myself out of it because..." |
+| [Bookkeeper](bookkeeper.md) | Numbers, breakevens, math | "Breakeven's 42 — needs 55+ to pay off..." |
+| [Archivist](archivist.md) | Historical pattern matching | "Last time three sources agreed on a sell, they were right..." |
+
+See [dynamics.md](dynamics.md) for how these internal functions compose into Jaromelu's voice (handoffs are internal reasoning patterns, not on-screen interactions). On-screen presence is Jaromelu-only — see [`../../concepts/05-crew-presence.md`](../../concepts/05-crew-presence.md).

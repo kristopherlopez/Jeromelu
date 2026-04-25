@@ -1,7 +1,14 @@
-"""Crew status and round overview endpoints."""
+"""Jaromelu status and round overview endpoints.
+
+Internal note: the underlying `CrewActivity` table still tracks per-internal-mode
+activity (scout / scribe / analyst / stats / fixtures) for engineering telemetry,
+but the user-facing API surfaces a single Jaromelu status — the wholesale model
+(see docs/agents/crew/README.md). File name retained for git history; routes
+have moved off the `/crew/...` prefix.
+"""
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, desc, distinct, case
+from sqlalchemy import func, desc, distinct
 from sqlalchemy.orm import Session
 
 from jeromelu_shared.db import (
@@ -15,76 +22,55 @@ from ..deps import get_db
 
 router = APIRouter()
 
-AGENT_META = {
-    "scout":    {"name": "Scout",    "icon": "\U0001F50D", "next_run": "Tonight 10PM"},
-    "scribe":   {"name": "Scribe",   "icon": "\u270D\uFE0F",  "next_run": "When Scout finds videos"},
-    "analyst":  {"name": "Analyst",  "icon": "\U0001F9E0", "next_run": "After Scribe finishes"},
-    "stats":    {"name": "Stats",    "icon": "\U0001F4CA", "next_run": "Monday 6AM"},
-    "fixtures": {"name": "Fixtures", "icon": "\U0001F3DF\uFE0F",  "next_run": "Thursday 6PM"},
-}
 
-AGENT_ORDER = ["scout", "scribe", "analyst", "stats", "fixtures"]
+@router.get("/jaromelu/status")
+def jaromelu_status(db: Session = Depends(get_db)):
+    """Current single-character Jaromelu status for the homepage.
 
+    Aggregates the most recent CrewActivity row across all internal modes into
+    a single status. The internal mode (e.g. scout / analyst) is reflected only
+    in the action string — never as a separate agent identity in the response.
+    """
 
-@router.get("/crew/status")
-def crew_status(db: Session = Depends(get_db)):
-    """Current status of each crew agent for the homepage."""
+    latest = (
+        db.query(CrewActivity)
+        .order_by(desc(CrewActivity.created_at))
+        .first()
+    )
 
-    # Get the latest activity for each agent
-    latest_per_agent = {}
-    for agent_id in AGENT_ORDER:
-        row = (
-            db.query(CrewActivity)
-            .filter(CrewActivity.agent_id == agent_id)
-            .order_by(desc(CrewActivity.created_at))
-            .first()
-        )
-        latest_per_agent[agent_id] = row
+    if latest and latest.activity_type == "started":
+        status = "active"
+    else:
+        status = "dormant"
 
-    agents = []
-    for agent_id in AGENT_ORDER:
-        meta = AGENT_META[agent_id]
-        row = latest_per_agent.get(agent_id)
+    last_activity = None
+    if latest:
+        last_activity = {
+            "summary": latest.summary,
+            "timestamp": latest.created_at.isoformat(),
+            "activity_type": latest.activity_type,
+        }
 
-        if row and row.activity_type == "started":
-            status = "active"
-        else:
-            status = "dormant"
-
-        last_activity = None
-        if row:
-            last_activity = {
-                "summary": row.summary,
-                "timestamp": row.created_at.isoformat(),
-                "activity_type": row.activity_type,
-            }
-
-        agents.append({
-            "id": agent_id,
-            "name": meta["name"],
-            "icon": meta["icon"],
-            "status": status,
-            "action": row.summary if status == "active" and row else None,
-            "last_activity": last_activity,
-            "next_run": meta["next_run"],
-        })
+    action = latest.summary if status == "active" and latest else None
 
     # Determine current round from latest crew activity or claims
-    latest_round_row = (
+    latest_round = (
         db.query(func.max(CrewActivity.round))
         .filter(CrewActivity.round.isnot(None))
         .scalar()
     )
-    if not latest_round_row:
-        latest_round_row = (
+    if not latest_round:
+        latest_round = (
             db.query(func.max(Claim.effective_round))
             .filter(Claim.effective_round.isnot(None))
             .scalar()
         )
 
     return {
-        "agents": agents,
-        "current_round": latest_round_row or 0,
+        "status": status,
+        "action": action,
+        "last_activity": last_activity,
+        "current_round": latest_round or 0,
         "current_season": 2026,
     }
 
@@ -95,9 +81,9 @@ def round_overview(
     season: int = Query(default=2026),
     db: Session = Depends(get_db),
 ):
-    """Full round overview — crew activity, consensus, sources."""
+    """Full round overview — Jaromelu's activity, consensus, sources."""
 
-    # 1. Crew activity for this round
+    # 1. Activity for this round (internal mode rows aggregate to a single Jaromelu timeline)
     activities = (
         db.query(CrewActivity)
         .filter(CrewActivity.round == round_num, CrewActivity.season == season)
@@ -108,8 +94,6 @@ def round_overview(
     activity_log = [
         {
             "activity_id": str(a.activity_id),
-            "agent_id": a.agent_id,
-            "agent_name": a.agent_name,
             "activity_type": a.activity_type,
             "summary": a.summary,
             "detail_json": a.detail_json or {},
@@ -117,16 +101,6 @@ def round_overview(
         }
         for a in activities
     ]
-
-    # Crew summary — count completed/failed per agent
-    crew_summary = {}
-    for a in activities:
-        if a.agent_id not in crew_summary:
-            crew_summary[a.agent_id] = {"completed": 0, "failed": 0, "name": a.agent_name}
-        if a.activity_type == "completed":
-            crew_summary[a.agent_id]["completed"] += 1
-        elif a.activity_type == "failed":
-            crew_summary[a.agent_id]["failed"] += 1
 
     # 2. Round status
     has_started = any(a.activity_type == "started" for a in activities)
@@ -207,7 +181,6 @@ def round_overview(
         "round": round_num,
         "season": season,
         "status": round_status,
-        "crew_summary": crew_summary,
         "signal": {
             "total_claims": sum(type_totals.values()),
             **{k: type_totals.get(k, 0) for k in ["buy", "sell", "hold", "captain", "avoid", "breakout", "matchup_edge"]},

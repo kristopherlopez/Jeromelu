@@ -9,7 +9,6 @@ import type { FeedItem, FeedResponse } from "../feed/feed-data";
 import { ConnectedAvatar } from "./ConnectedAvatar";
 import { useAvatarEngine } from "./AvatarEngine";
 import JeromeluLogo, { LETTERS } from "./JeromeluLogo";
-import { CrewStatus } from "./CrewStatus";
 import { LatestThought } from "./LatestThought";
 import { ActivityPulse } from "./ActivityPulse";
 import { usePageTransition, TRANSITION_DURATION_MS, CONTENT_DELAY_MS, CONTENT_FADE_MS } from "./TransitionContext";
@@ -585,8 +584,7 @@ export function JeromeluPresence() {
           }}
         >
           <JeromeluLogo key={logoKey} />
-          <div className="mt-6"><CrewStatus /></div>
-          <div className="mt-4"><LatestThought /></div>
+          <div className="mt-6"><LatestThought /></div>
           <div className="mt-3"><ActivityPulse /></div>
         </div>
       </div>

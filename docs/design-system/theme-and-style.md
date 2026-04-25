@@ -159,14 +159,13 @@ No neutral box shadows. If it glows, it glows ember.
 |----------|-------|
 | 200ms | Hover states, opacity, scale |
 | 300ms | Colour transitions, box-shadow, border |
-| 3s | Breathing/float loops (thought-float, crew-pill-pulse) |
+| 3s | Breathing/float loops (thought-float) |
 
 ### Keyframe Animations
 
 | Name | Effect | Used by |
 |------|--------|---------|
 | `thought-float` | Vertical bob (±3px) + ember border/shadow breathe | Nav bubbles on landing page |
-| `crew-pill-pulse` | Border colour pulse (ember 0.2 → 0.4) | Crew status pill |
 | `ping` | Scale + fade pulse (Tailwind built-in) | Online indicator dot |
 
 ### Entrance Choreography

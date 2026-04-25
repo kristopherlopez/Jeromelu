@@ -135,9 +135,3 @@ body {
   from { height: 0; }
   to { height: 100%; }
 }
-
-/* Crew status pill pulse */
-@keyframes crew-pill-pulse {
-  0%, 100% { border-color: rgba(212, 135, 74, 0.2); }
-  50% { border-color: rgba(212, 135, 74, 0.4); }
-}

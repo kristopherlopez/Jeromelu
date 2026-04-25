@@ -7,14 +7,6 @@ import type {
   ActivityLogEntry,
 } from "../round-data";
 
-const AGENT_ICONS: Record<string, string> = {
-  scout: "\u{1F50D}",
-  scribe: "\u270D\uFE0F",
-  analyst: "\u{1F9E0}",
-  stats: "\u{1F4CA}",
-  fixtures: "\u{1F3DF}\uFE0F",
-};
-
 function StatusBadge({ status }: { status: string }) {
   if (status === "complete") {
     return (
@@ -36,35 +28,6 @@ function StatusBadge({ status }: { status: string }) {
     <span className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium uppercase tracking-wider" style={{ color: "var(--foreground-ghost)", background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)" }}>
       Pending
     </span>
-  );
-}
-
-function CrewChips({ crew }: { crew: RoundOverviewResponse["crew_summary"] }) {
-  const chipOrder = ["fixtures", "scout", "scribe", "analyst", "stats"];
-  const labels: Record<string, string> = {
-    fixtures: "Team Lists",
-    scout: "Sources",
-    scribe: "Cleaned",
-    analyst: "Analysed",
-    stats: "Scored",
-  };
-
-  return (
-    <div className="flex flex-wrap gap-2">
-      {chipOrder.map((agentId) => {
-        const data = crew[agentId];
-        const done = data && data.completed > 0;
-        return (
-          <div key={agentId}
-            className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px]"
-            style={{ color: "var(--foreground-ghost)", background: "rgba(255,255,255,0.03)", borderColor: "var(--border)" }}>
-            <span className="text-[13px]">{AGENT_ICONS[agentId]}</span>
-            <span>{labels[agentId] || data?.name || agentId}</span>
-            {done && <span style={{ color: "rgb(80, 200, 120)", fontSize: 10 }}>&#x2713;</span>}
-          </div>
-        );
-      })}
-    </div>
   );
 }
 
@@ -171,7 +134,7 @@ function SourcesList({ sources }: { sources: RoundOverviewResponse["sources"] })
 
 function ActivityLog({ entries }: { entries: ActivityLogEntry[] }) {
   if (entries.length === 0) {
-    return <p className="text-sm" style={{ color: "var(--foreground-ghost)" }}>No crew activity for this round yet.</p>;
+    return <p className="text-sm" style={{ color: "var(--foreground-ghost)" }}>Nothing from Jaromelu for this round yet.</p>;
   }
 
   function formatTime(iso: string) {
@@ -188,12 +151,7 @@ function ActivityLog({ entries }: { entries: ActivityLogEntry[] }) {
           <span className="w-[60px] shrink-0 pt-0.5 font-mono text-[10px]" style={{ color: "var(--foreground-ghost)" }}>
             {formatTime(e.created_at)}
           </span>
-          <div className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md text-[11px]"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)" }}>
-            {AGENT_ICONS[e.agent_id] || "?"}
-          </div>
-          <div className="text-[12px]" style={{ color: "var(--foreground-ghost)" }}>
-            <strong className="font-medium" style={{ color: "var(--foreground-secondary)" }}>{e.agent_name}</strong>{" "}
+          <div className="text-[12px]" style={{ color: "var(--foreground-secondary)" }}>
             {e.summary}
           </div>
         </div>
@@ -228,7 +186,7 @@ export default function RoundClient({ data }: { data: RoundOverviewResponse }) {
           &#x2190;
         </button>
         <div>
-          <h1 style={{ fontFamily: "var(--font-serif), Georgia, serif", fontSize: "1.8rem", fontWeight: 600, color: "var(--foreground)" }}>
+          <h1 style={{ fontFamily: "var(--font-serif), Georgia, serif", fontSize: "1.8rem", fontWeight: 700, color: "var(--foreground)" }}>
             Round <span style={{ color: "var(--accent)" }}>{data.round}</span>
           </h1>
           <p className="text-[13px]" style={{ color: "var(--foreground-ghost)" }}>Season {data.season}</p>
@@ -236,11 +194,6 @@ export default function RoundClient({ data }: { data: RoundOverviewResponse }) {
         <div className="ml-auto">
           <StatusBadge status={data.status} />
         </div>
-      </div>
-
-      {/* Crew chips */}
-      <div className="mb-8">
-        <CrewChips crew={data.crew_summary} />
       </div>
 
       {/* Signal card */}
@@ -262,7 +215,7 @@ export default function RoundClient({ data }: { data: RoundOverviewResponse }) {
 
       {/* Activity log */}
       <div className="mb-8">
-        <SectionHeader icon="&#x1F4DD;" title="Crew Activity" detail="this round" />
+        <SectionHeader icon="&#x1F4DD;" title="Jaromelu's Activity" detail="this round" />
         <ActivityLog entries={data.activity_log} />
       </div>
     </div>

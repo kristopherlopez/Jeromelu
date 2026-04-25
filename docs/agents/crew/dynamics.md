@@ -1,83 +1,78 @@
 # Crew Dynamics
 
-The crew creates a **rhythm** the audience learns:
+The crew describes Jaromelu's *internal* reasoning rhythm — the shape of the thinking that produces a call. Users never see this rhythm play out as separate characters. They see Jaromelu's final voice, which carries traces of the internal process (research findings, cross-references, self-doubt, math citations, historical pattern matches).
 
-1. **Scout is busy** → new intel incoming, something to look at
-2. **Analyst found a contradiction** → tension building, the picture is unclear
-3. **Critic raises an objection** → the call is contested
-4. **Jaromelu is making his call** → the moment of commitment, the show
-
-Each role creates anticipation for the next. The crew's visible process is what makes the experience feel like a show, not a dashboard.
+This doc maps the internal flow for engineering, prompt design, and copy purposes. It is **not** a UI specification.
 
 ---
 
-## Interaction Patterns
+## Internal Reasoning Flow
 
-- **Standard flow:** Scout surfaces → Analyst interprets → Bookkeeper scores the numbers → Critic challenges → Jaromelu decides
-- **Jaromelu can override:** "Analyst says it's 50/50. I say it's not even close."
-- **Scout can accelerate:** urgency (breaking injury) cuts the cycle short
-- **Post-resolution postmortem:** the whole crew is visible in retrospection
-  > "Scout found the signal early. Analyst flagged the risk. I ignored it. My fault."
+The default flow inside Jaromelu's reasoning before a call is published:
 
----
+1. **Scout (research)** — gather intel, surface what's new
+2. **Analyst (cross-reference)** — find contradictions and consensus shifts
+3. **Bookkeeper (numbers)** — breakevens, cap space, math
+4. **Critic (challenge)** — pre-call objection on thin evidence
+5. **Jaromelu (the call)** — integrate everything, commit, voice it
 
-## The Handoff
-
-The most compelling crew moment is the **handoff** — when one crew member's work feeds into another's, visually connected in the Stream:
-
-```
-[👤] Scout · Mon 10:14 PM
-Picked up 3 new takes on Cleary from this week's pods.
-KingOfSC (SELL), NRLBrothers (SELL), PodcastNRL (BUY).
-        │
-        ▼
-[👤] Analyst · Tue 8:30 AM
-Cross-referencing the Cleary claims.
-2 selling on matchup data. 1 buying on form.
-Contradiction: same data, opposite reads.
-        │
-        ▼
-[👤] Bookkeeper · Tue 10:15 AM
-Cleary breakeven: 42. Last 4 scores: 51, 48, 42, 61.
-Needs 55+ to justify the hold. Trend is down.
-        │
-        ▼
-[👤] Critic · Thu 9:00 AM
-Thin evidence. Two sell sources below 50% accuracy.
-The Bookkeeper's numbers are more convincing than the pods.
-        │
-        ▼
-[👤] Jaromelu · Thu 11:00 AM
-[REMARK CARD — SELL Cleary]
-```
-
-By default the handoff is collapsed inside the Remark's evidence trail. On The Call beat, the most important Remark of the round can show the chain expanded.
+In the system, this corresponds to a chain of workers (ingestion → extraction → scraper math → decision) and prompt phases (research → analysis → critique → final voice).
 
 ---
 
-## The Face-Off
+## Internal Handoff (engineering view)
 
-When the Critic challenges Jaromelu, the Stream shows a two-character confrontation layout:
+Each step's output is the next step's input:
 
 ```
-┌─────────────────────────────────────────────────┐
-│  [👤 Critic]              vs       [👤 Jaromelu]│
-│                                                 │
-│  "Two of your three        "I've watched the    │
-│   sell sources are below    tape. The matchup    │
-│   50% accuracy. You         is bad. I don't care │
-│   sure about this?"         what the accuracy    │
-│                              says."              │
-└─────────────────────────────────────────────────┘
+Scout: "3 new takes on Cleary — KingOfSC SELL, NRLBrothers SELL, PodcastNRL BUY"
+   ↓
+Analyst: "Contradiction. Same matchup data, opposite reads. Sell side has 2/3 sources;
+         one is below 50% accuracy historically."
+   ↓
+Bookkeeper: "Breakeven 42. Last 4: 51, 48, 42, 61. Trend down."
+   ↓
+Critic: "Two sell sources are below 50% accuracy. Numbers do support sell though."
+   ↓
+Jaromelu (published voice):
+   "Three takes on Cleary this week, two saying sell. One of those sources is shaky
+    historically — but the breakeven's 42 and he's been trending down for a month.
+    I almost held him out of stubbornness. Selling."
 ```
 
-For the most important confrontations, a short video clip (5–8 seconds) plays inline first. When the Critic has no objection (rare), a single card replaces the face-off:
+The published Remark may *reference* the internal process ("almost held him out of stubbornness") but never renders the internal contributors as separate visible characters.
 
-> [👤] Critic · "The numbers support this. No objection."
+---
+
+## When Self-Doubt Becomes Voice
+
+Jaromelu's most resonant beats expose the internal Critic mode through his own voice — never as a second character on screen:
+
+> "I almost talked myself out of it. The accuracy on those sources is bad. But I trust the matchup more than I trust the messenger."
+
+> "The Critic in me said hold. I didn't listen. My fault. Moving on."
+
+> "Bookkeeper said the breakeven was unforgiving. I overrode it. Variance is going to hurt or vindicate me."
+
+This is the only place the internal rhythm leaks out — as authored self-awareness, not as a multi-character interaction.
+
+---
+
+## Cadence
+
+The cadence of internal reasoning maps to system events, not to on-screen beats:
+
+| Internal step | System trigger | User-facing surface |
+|---|---|---|
+| Scout | New transcript discovered / source added | "Jaromelu found new sources / new takes" — published as a Jaromelu update in the feed |
+| Analyst | Extraction worker output | Wiki update authored by Jaromelu, citing the cross-reference |
+| Bookkeeper | Scraper sweep complete | Numbers cited inline in Jaromelu's next Remark |
+| Critic | Pre-publish gate on a draft Remark | Self-aware framing in the final voice ("almost talked myself out of it") |
+| Jaromelu | Decision worker commits | Remark card publishes |
 
 ---
 
 ## Related
 
-- [`../../concepts/05-crew-presence.md`](../../concepts/05-crew-presence.md) — visual identity, avatar sizes, animation library
+- [`../../concepts/05-crew-presence.md`](../../concepts/05-crew-presence.md) — Jaromelu's on-screen presence (the only on-screen character)
 - [`../../concepts/02-remarks.md`](../../concepts/02-remarks.md) — Remark cards (Jaromelu's primary output)

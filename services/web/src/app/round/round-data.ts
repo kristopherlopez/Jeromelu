@@ -1,7 +1,4 @@
-export interface CrewAgent {
-  id: string;
-  name: string;
-  icon: string;
+export interface JaromeluStatusResponse {
   status: "active" | "dormant";
   action: string | null;
   last_activity: {
@@ -9,17 +6,12 @@ export interface CrewAgent {
     timestamp: string;
     activity_type: string;
   } | null;
-  next_run: string;
-}
-
-export interface CrewStatusResponse {
-  agents: CrewAgent[];
+  current_round: number;
+  current_season: number;
 }
 
 export interface ActivityLogEntry {
   activity_id: string;
-  agent_id: string;
-  agent_name: string;
   activity_type: string;
   summary: string;
   detail_json: Record<string, unknown>;
@@ -60,7 +52,6 @@ export interface RoundOverviewResponse {
   round: number;
   season: number;
   status: "pending" | "in_progress" | "complete";
-  crew_summary: Record<string, { completed: number; failed: number; name: string }>;
   signal: RoundSignal;
   consensus: ConsensusPlayer[];
   sources: RoundSource[];
