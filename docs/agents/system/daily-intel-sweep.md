@@ -200,7 +200,7 @@ For local development, the same operations run directly against the local databa
 | `/api/admin/ingest` | POST | `X-Admin-Key` header | Full ingestion from S3 (transcript + claims -> DB) |
 | `/api/admin/update-clean-text` | POST | `X-Admin-Key` header | Backfill `clean_text` on existing chunks from S3 |
 
-Both require the admin API key from Secrets Manager (`jeromelu/app-secrets`).
+Both require the admin API key from Parameter Store (`/jeromelu/admin-key`, SecureString).
 
 ### End-to-End Example
 
