@@ -1,0 +1,83 @@
+# Production compose for Lightsail. Layout:
+#   caddy (TLS, :80/:443)  -->  web (Next.js :3000)
+#                          \--> api  (FastAPI :8000)
+#   postgres (pgvector/pg16, local volume, not exposed publicly)
+#
+# Required environment (sourced from /opt/jeromelu/.env on the host):
+#   POSTGRES_PASSWORD       — db password (rotate from current RDS password on cutover)
+#   OPENAI_API_KEY
+#   ADMIN_KEY               — protects /api/admin/*
+#   AWS_ACCESS_KEY_ID       — for S3 access from api / pg-backup cron
+#   AWS_SECRET_ACCESS_KEY
+#   IMAGE_TAG               — git sha pushed by CI; defaults to latest
+#
+# Bring up:    docker compose -f docker-compose.prod.yml up -d
+# Tear down:   docker compose -f docker-compose.prod.yml down
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: jeromelu-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: jeromelu
+      POSTGRES_USER: jeromelu_admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../packages/db/migrations:/migrations:ro
+      - ../packages/db/docker-entrypoint-initdb.sh:/docker-entrypoint-initdb.d/00_migrate.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jeromelu_admin -d jeromelu"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    image: ${ECR_REGISTRY:-111424988703.dkr.ecr.ap-southeast-2.amazonaws.com}/jeromelu/api:${IMAGE_TAG:-latest}
+    container_name: jeromelu-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://jeromelu_admin:${POSTGRES_PASSWORD}@postgres:5432/jeromelu
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ADMIN_KEY: ${ADMIN_KEY}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ap-southeast-2
+      S3_RAW_BUCKET: jeromelu-raw-transcripts
+      S3_CLEAN_BUCKET: jeromelu-clean-documents
+      S3_ASSETS_BUCKET: jeromelu-public-assets
+      ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    image: ${ECR_REGISTRY:-111424988703.dkr.ecr.ap-southeast-2.amazonaws.com}/jeromelu/web:${IMAGE_TAG:-latest}
+    container_name: jeromelu-web
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: https://api.jeromelu.ai
+      NODE_ENV: production
+    depends_on:
+      - api
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: jeromelu-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+      - api
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

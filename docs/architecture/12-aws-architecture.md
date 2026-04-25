@@ -1,279 +1,162 @@
-# AWS Artefacts Needed
+# AWS Architecture — Jeromelu V1
 
-This is the practical AWS shape for Jaromelu V1.
+This is the practical AWS shape for Jeromelu V1. We deliberately picked the cheapest realistic AWS deployment that keeps the site online: a single Lightsail VM running everything via Docker Compose, with CloudFront/Route 53/S3 around it. Target run-rate is ~$5.50/mo.
 
-## Networking / Foundation
+If load grows past what one Lightsail instance can serve, the migration target is ECS Fargate behind an ALB — see "Future scale path" at the bottom.
 
-### VPC
-Create one VPC with:
-- 2 or 3 Availability Zones
-- public subnets for edge-facing load balancers only
-- private subnets for app services, workers, Temporal, and databases
-- route tables and NAT where needed
+## Why Lightsail (not Fargate) for V1
 
-### Security Groups
-Create separate security groups for:
-- load balancer
-- web/api services
-- worker services
-- database
-- cache if added later
+The previous V0 architecture used VPC + NAT Gateway + ALB + ECS Fargate + RDS. That setup ran ~$140/mo even at zero traffic, because NAT ($53), ALB ($18), Fargate 24/7 ($32), and RDS 24/7 ($21) are all fixed idle costs.
 
-### IAM Roles
-At minimum:
-- ECS task execution role
-- ECS task role(s) for app/worker permissions
-- CI/CD deploy role
-- operator/admin access roles
+Lightsail collapses all of those into a single $5/mo VM with a free static IP and 2 TB egress included. We give up multi-AZ, auto-scaling, and managed Postgres backups in exchange for a 25× cost reduction. Backups are handled by a nightly `pg_dump` to S3.
 
-## Compute / Containers
+## Topology
 
-### Amazon ECS
-Use Amazon ECS as the container orchestration layer. Amazon ECS is a fully managed container orchestration service, and AWS documents Fargate as the serverless option so you do not need to manage EC2 clusters.
+```
+Internet
+  │
+  ▼
+Route 53 (jeromelu.ai zone)
+  │
+  ├── jeromelu.ai, www.jeromelu.ai → CloudFront → Lightsail static IP (HTTPS)
+  └── api.jeromelu.ai             → Lightsail static IP (HTTPS, direct)
 
-Artifacts:
-- ECS cluster
-- ECS services for `web` and `api`
-- ECS services or scheduled tasks for workers
-- ECS task definitions for each service
-- capacity provider / Fargate configuration
+Lightsail instance ($5/mo, 1 GB RAM, 2 vCPU burst, 40 GB SSD, 2 TB egress)
+  ├── caddy           (reverse proxy + auto Let's Encrypt TLS)
+  ├── web             (Next.js, port 3000, image from ECR)
+  ├── api             (FastAPI, port 8000, image from ECR)
+  └── postgres        (pgvector/pg16, local Docker volume)
 
-### AWS Fargate
-Use Fargate for V1 so you avoid server management overhead. AWS documents that Fargate runs containers without managing EC2 instances.
+S3 buckets
+  ├── jeromelu-raw-transcripts    (raw YouTube transcripts)
+  ├── jeromelu-clean-documents    (cleaned + processed)
+  └── jeromelu-public-assets      (+ /backups/postgres for nightly pg_dump)
 
-## Container Registry
+ECR
+  ├── jeromelu/web
+  └── jeromelu/api
+```
 
-### Amazon ECR
-Store Docker images for:
-- web
-- api
-- worker-ingestion
-- worker-extraction
-- worker-decision
-- worker-publishing
+## Components
 
-Artifacts:
-- one ECR repository per service, or a small shared repo strategy
-- lifecycle policies to clean old images
+### Compute — Amazon Lightsail
+- Single instance, ap-southeast-2a, Ubuntu 22.04, $5/mo plan.
+- Static public IP attached (free while attached).
+- Firewall: 22 (SSH from operator IP), 80, 443 from `0.0.0.0/0`.
+- Runs `docker compose -f docker/docker-compose.prod.yml up -d`.
+- Snapshots: weekly manual snapshot, $0.05/GB-mo.
 
-## Edge / Delivery
+### Edge — Amazon CloudFront
+- Free plan (1 TB egress + 10M requests/mo always-free).
+- Distribution `E2G6FL11A3JP8F`, custom origin = Lightsail static IP over HTTPS.
+- Origin certificate: Let's Encrypt via Caddy on the instance.
+- Sits in front of `jeromelu.ai` and `www.jeromelu.ai` only. `api.jeromelu.ai` skips CloudFront (low value for a stateful API).
+- WAF included via the free plan.
 
-### Application Load Balancer
-Use an ALB in public subnets for:
-- Next.js app
-- FastAPI backend
-- routing by host/path if you keep them separate
+### DNS — Route 53
+- Hosted zone `jeromelu.ai` ($0.50/mo).
+- A-records: `jeromelu.ai` and `www.jeromelu.ai` alias to CloudFront; `api.jeromelu.ai` alias/A to Lightsail static IP.
+- TTL 60s on production records to allow fast failover.
 
-### Amazon CloudFront
-Use CloudFront in front of the public experience for caching and lower-latency delivery. AWS documents that CloudFront distributes static and dynamic content and can use S3 buckets or load balancers as origins.
+### TLS — Caddy + ACM
+- Caddy on the Lightsail box auto-provisions Let's Encrypt certs for `jeromelu.ai`, `www.jeromelu.ai`, and `api.jeromelu.ai` via HTTP-01.
+- ACM certificate in `us-east-1` is still required by CloudFront for the `jeromelu.ai`/`*.jeromelu.ai` viewer cert (kept).
+- The `ap-southeast-2` ACM cert (originally for the ALB) is no longer in use — slated for deletion.
 
-Artifacts:
-- CloudFront distribution
-- origin for ALB
-- optional origin for static assets bucket
-- cache policies
-- response headers policies
+### Database — Postgres on Lightsail
+- `pgvector/pgvector:pg16` container with a named Docker volume on the instance's local SSD.
+- Migrations run on container init via `packages/db/docker-entrypoint-initdb.sh`.
+- **Backups:** `scripts/pg-backup.sh` runs via cron at 02:30 Sydney → `s3://jeromelu-public-assets/backups/postgres/jeromelu-<ts>.sql.gz`. S3 lifecycle deletes after 30 days.
+- **DR:** restore = pull most recent dump from S3 → `gunzip | psql` into the container. Tested as part of cutover (Phase 2).
 
-### Route 53
-Artifacts:
-- hosted zone
-- DNS records for root domain and subdomains
+### Object Storage — S3 (unchanged from V0)
+- `jeromelu-raw-transcripts`, `jeromelu-clean-documents`, `jeromelu-public-assets`.
+- All `ap-southeast-2`, public access blocked, SSE-S3.
 
-### ACM (AWS Certificate Manager)
-Artifacts:
-- TLS certificates for domain and subdomains
+### Container Registry — ECR
+- Two repos in V1: `jeromelu/web`, `jeromelu/api`.
+- `worker-*` repos kept for now but unused; pruned in Phase 5.
+- Lifecycle: keep last 10 tagged images, delete untagged after 14 days.
 
-## Data Layer
+### Secrets — Parameter Store SecureString
+- DB password, OpenAI key, admin key, AWS access keys for the instance role.
+- Migrated from Secrets Manager (~$1.20/mo saved).
+- The Lightsail box pulls these at deploy time into `/opt/jeromelu/.env` via `aws ssm get-parameters-by-path`.
 
-### Amazon RDS for PostgreSQL
-Use RDS for PostgreSQL as the canonical database. AWS documents that RDS for PostgreSQL supports backups, point-in-time restore, Multi-AZ deployments, read replicas, and VPC deployment.
+### CI/CD — GitHub Actions
+- `.github/workflows/deploy.yml`:
+  1. Detect changed paths.
+  2. Build + push `web` / `api` images to ECR (tagged with git SHA + `latest`).
+  3. SSH into Lightsail, run `scripts/lightsail-deploy.sh` with the new SHA.
+  4. Invalidate CloudFront if `web` changed.
+- Secrets needed: `LIGHTSAIL_HOST`, `LIGHTSAIL_USER`, `LIGHTSAIL_SSH_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`.
 
-Artifacts:
-- PostgreSQL instance or cluster
-- parameter group
-- subnet group
-- automated backups
-- secrets for credentials
+### IAM
+- One IAM user (`jeromelu-cicd`) with: `ECR push/pull`, `CloudFront create-invalidation`, `S3 read/write` on the three buckets, `SSM GetParameter*`.
+- One instance role attached to the Lightsail box: same S3 + SSM permissions, no ECR (instance pulls via long-lived access key in `.env`, since Lightsail doesn't support EC2 instance roles directly).
 
-Notes:
-- confirm pgvector support for the chosen engine/version in your build plan
-- start simple unless load proves otherwise
+### Observability
+- Container logs to `journald` via Docker's `journald` log driver.
+- Operator tails via `make prod-logs`.
+- No CloudWatch agent in V1 — rely on Lightsail's built-in instance metrics dashboard.
+- Alarms: skipped for V1; revisit when there are real users.
 
-### Object Storage — Amazon S3
-Use S3 for raw transcripts, cleaned documents, and artefacts. AWS documents S3 as object storage with buckets as the unit of storage.
+## What we do NOT run on AWS in V1
 
-Artifacts:
-- `jeromelu-raw-transcripts`
-- `jeromelu-clean-documents`
-- `jeromelu-public-assets`
-- lifecycle policies for archival / cleanup
-- bucket policies
-- versioning where appropriate
+| Component | V0 plan | V1 reality |
+|---|---|---|
+| ALB | Fronted ECS services | Removed. Caddy on Lightsail is the proxy. |
+| NAT Gateway | For private subnets | Removed. Single instance lives in a Lightsail-managed network with public IP. |
+| RDS | Managed Postgres | Replaced by Postgres container + S3 backups. |
+| ECS Fargate | All services | Replaced by Docker Compose on Lightsail. |
+| Worker services | 4 workers on Fargate | Not running. When needed, run as compose profiles or cron jobs on the same instance, or revive on Lambda/Fargate per-job. |
+| Temporal | Workflow orchestration | Not running in V1. Local dev only. |
+| Secrets Manager | Secrets store | Replaced by Parameter Store SecureString. |
+| KMS CMK | Customer-managed key | Removed. AWS-managed keys used everywhere. |
+| WAF (standalone) | Web ACL on ALB | Replaced by CloudFront free-plan WAF. |
+| X-Ray / CloudTrail | Tracing & audit | Skipped for V1. |
 
-## Secrets / Configuration
+## Cost estimate
 
-### AWS Secrets Manager
-Artifacts:
-- database credentials
-- OpenAI API key
-- third-party source credentials if needed
-- session/auth secrets
+| Line item | $/mo |
+|---|---|
+| Lightsail instance ($5 plan, 2 TB egress included) | 5.00 |
+| Lightsail static IP (free while attached) | 0.00 |
+| Lightsail snapshots (1 weekly × ~5 GB) | ~0.25 |
+| Route 53 hosted zone | 0.50 |
+| S3 storage (3 buckets, low GB) | <0.20 |
+| S3 lifecycle backups (30 d × ~5 MB/d) | ~0.01 |
+| ECR storage (2 repos × ~500 MB) | ~0.10 |
+| CloudFront | 0.00 (free plan) |
+| ACM | 0.00 |
+| Parameter Store (Standard) | 0.00 |
+| CloudWatch Logs (none in V1) | 0.00 |
+| **Total** | **~$5.50–6.00/mo** |
 
-### AWS Systems Manager Parameter Store
-Artifacts:
-- non-secret config values
-- feature flags
-- environment settings
+Tax (~10% AU GST) brings the bill to ~$6.50/mo all-in. Egress beyond the 2 TB included in the Lightsail plan is $0.09/GB, which would matter only with substantial real traffic.
 
-## Queues / Async Support
+## Future scale path (when V1 outgrows Lightsail)
 
-### Amazon SQS
-Even if Temporal is your primary workflow engine, SQS is useful for decoupled asynchronous events and dead-letter handling.
+Trigger to migrate: sustained CPU/RAM > 70% on the $5 plan after upgrading to $10, OR clear need for multi-AZ HA.
 
-Artifacts:
-- optional ingestion queue
-- optional publish queue
-- dead-letter queues for failed jobs
+Migration target:
+1. Move Postgres back to RDS or Aurora Serverless v2 (min 0 ACU).
+2. Move web + api back to ECS Fargate behind an ALB.
+3. Reintroduce VPC private subnets + NAT (or VPC endpoints to keep cost down).
+4. Reintroduce Secrets Manager if rotation matters.
+5. Restore worker services on Fargate or run as Lambda.
 
-## Observability / Operations
+The image format, ECR repos, GitHub Actions structure, and CloudFront distribution all carry over — only the deploy target changes. Estimated rebuild cost: 2–3 days.
 
-### Amazon CloudWatch
-Artifacts:
-- log groups for each ECS service
-- metrics dashboards
-- alarms on task failures, high latency, and DB stress
+## File map
 
-### AWS X-Ray or OpenTelemetry-compatible tracing path
-If you want native AWS tracing, X-Ray is the obvious option. If not, send traces to your preferred platform.
-
-### CloudTrail
-Artifacts:
-- account-level audit logging for AWS control-plane actions
-
-## Access / Security
-
-### AWS WAF
-Recommended in front of CloudFront or ALB for basic protection.
-
-Artifacts:
-- web ACL
-- managed rules
-- rate limiting rules
-
-### KMS
-Artifacts:
-- keys for encrypting S3, Secrets Manager, and possibly RDS
-
-## CI/CD
-
-### GitHub Actions or AWS-native pipeline
-For AWS-native, the likely artefacts are:
-- CodeBuild
-- CodePipeline
-
-But if you already prefer GitHub Actions, use that and deploy into ECS/ECR.
-
-## Temporal Deployment Choices
-
-### Option A — Temporal Cloud
-Best if you want less operational drag.
-
-AWS artefacts still needed:
-- worker services on ECS
-- outbound connectivity
-- secrets for Temporal connection
-
-### Option B — Self-hosted Temporal on AWS
-Only do this if you actually want the operational burden.
-
-Extra artefacts needed:
-- Temporal server services
-- persistence database(s)
-- internal networking and service discovery
-- monitoring and backups
-
-For V1, Option A is cleaner.
-
-## Recommended Minimum AWS Inventory
-
-If you want the shortest realistic list, it is this:
-
-- VPC
-- public and private subnets
-- security groups
-- IAM roles
-- ECR repositories
-- ECS cluster
-- ECS services and task definitions
-- Fargate configuration
-- ALB
-- CloudFront distribution
-- Route 53 records
-- ACM certificates
-- RDS for PostgreSQL
-- S3 buckets
-- Secrets Manager secrets
-- Parameter Store entries
-- CloudWatch log groups and alarms
-- WAF web ACL
-- KMS keys
-
-## AWS Mapping By Jaromelu Container
-
-### `web`
-- ECS service on Fargate
-- ALB target group
-- CloudFront origin
-- CloudWatch logs
-
-### `api`
-- ECS service on Fargate
-- ALB target group
-- Secrets Manager access
-- RDS access
-- S3 access
-- CloudWatch logs
-
-### `worker-ingestion`
-- ECS service or scheduled ECS task on Fargate
-- S3 write access
-- RDS write access
-- outbound internet/NAT access
-
-### `worker-extraction`
-- ECS service or worker task on Fargate
-- RDS access
-- S3 access
-- outbound LLM API access
-
-### `worker-decision`
-- ECS service or worker task on Fargate
-- RDS access
-- Parameter Store / feature flag access
-
-### `worker-publishing`
-- ECS service or worker task on Fargate
-- RDS access
-- S3 access if publishing derived artefacts
-
-### `postgres`
-- Amazon RDS for PostgreSQL in private subnets
-
-### `object-store`
-- Amazon S3 buckets
-
-## Practical Recommendation
-
-For Jaromelu V1 on AWS, I would deploy:
-- Next.js and FastAPI as containers on ECS Fargate
-- worker services on ECS Fargate
-- PostgreSQL on RDS
-- transcript/artifact storage on S3
-- CloudFront in front of the public app
-- Route 53 + ACM for domain/TLS
-- Secrets Manager for secrets
-- CloudWatch for logs/alarms
-- WAF for basic protection
-- Temporal Cloud instead of self-hosting Temporal
-
-That is the cleanest AWS shape for this project.
+| File | Purpose |
+|---|---|
+| `docker/docker-compose.prod.yml` | Production stack (postgres, caddy, web, api). |
+| `docker/Caddyfile` | TLS + reverse proxy config. |
+| `scripts/lightsail-deploy.sh` | Pull images and restart on the Lightsail box. |
+| `scripts/pg-backup.sh` | Cron'd nightly Postgres dump → S3. |
+| `.github/workflows/deploy.yml` | CI: build → push to ECR → SSH deploy. |
+| `Makefile` | `deploy-prod`, `prod-shell`, `prod-logs`. |
+| `docs/operations/aws-setup-guide.md` | One-time provisioning runbook. |
+| `docs/operations/aws-resource-inventory.md` | Live inventory of provisioned AWS resources. |

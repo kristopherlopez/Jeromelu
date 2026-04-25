@@ -1,4 +1,4 @@
-.PHONY: up down db-shell migrate migrate-status api web logs clean prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all
+.PHONY: up down db-shell migrate migrate-status api web logs clean prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all deploy-prod prod-shell prod-logs
 
 # Start local infrastructure
 up:
@@ -120,3 +120,20 @@ prod-sync-all:
 		fi; \
 	done
 	@echo "\nSync complete."
+
+# --- Lightsail Production ---
+
+LIGHTSAIL_HOST ?= jeromelu-prod
+
+# Trigger a deploy of the latest master to Lightsail (pulls images and restarts).
+# Usage: make deploy-prod IMAGE_TAG=<git-sha>   (omit IMAGE_TAG to use :latest)
+deploy-prod:
+	ssh $(LIGHTSAIL_HOST) 'IMAGE_TAG=$(IMAGE_TAG) /opt/jeromelu/scripts/lightsail-deploy.sh'
+
+# Open a shell on the Lightsail box.
+prod-shell:
+	ssh $(LIGHTSAIL_HOST)
+
+# Tail compose logs on the Lightsail box.
+prod-logs:
+	ssh $(LIGHTSAIL_HOST) 'cd /opt/jeromelu/docker && docker compose -f docker-compose.prod.yml logs -f --tail=200'

@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Pull latest images and restart the prod compose stack on Lightsail.
+#
+# Runs on the Lightsail box itself. Invoked locally via:
+#   ssh jeromelu-prod 'IMAGE_TAG=<sha> /opt/jeromelu/scripts/lightsail-deploy.sh'
+# or by GitHub Actions over SSH.
+#
+# Expects:
+#   - /opt/jeromelu          checkout of this repo (or just docker/ + scripts/)
+#   - /opt/jeromelu/.env     runtime secrets (POSTGRES_PASSWORD, OPENAI_API_KEY, ...)
+#   - aws CLI authenticated  for `aws ecr get-login-password`
+#   - IMAGE_TAG              git sha to deploy (defaults to latest)
+
+set -euo pipefail
+
+cd /opt/jeromelu/docker
+
+export IMAGE_TAG="${IMAGE_TAG:-latest}"
+export ECR_REGISTRY="111424988703.dkr.ecr.ap-southeast-2.amazonaws.com"
+
+# Authenticate Docker with ECR (cred valid 12h)
+aws ecr get-login-password --region ap-southeast-2 \
+	| docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
+# Pull only the app images (postgres + caddy use public registry)
+docker compose -f docker-compose.prod.yml --env-file /opt/jeromelu/.env pull web api
+
+# Recreate web + api with new image; postgres + caddy stay running
+docker compose -f docker-compose.prod.yml --env-file /opt/jeromelu/.env up -d web api
+
+# Prune old images to free disk (keeps the current ones — they're tagged in compose)
+docker image prune -f
+
+echo "deployed IMAGE_TAG=$IMAGE_TAG at $(date -u +%FT%TZ)"

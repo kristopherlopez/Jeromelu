@@ -2,6 +2,8 @@
 
 Track all created AWS resources here. Updated as infrastructure is provisioned.
 
+> **2026-04-25 — V1 architecture switched from ECS/Fargate to Lightsail.** Phases 1–9 below reflect the original V0 build. Resources marked **DECOMMISSIONED 2026-04-25** are slated for deletion as part of the cutover (see Phase 11). Phase 11 lists the live V1 resources.
+
 ---
 
 ## Phase 1 — Networking Foundation
@@ -16,7 +18,7 @@ Track all created AWS resources here. Updated as infrastructure is provisioned.
 | Private subnet 1 | ap-southeast-2a |
 | Private subnet 2 | ap-southeast-2b |
 | Internet Gateway | `igw-0927b99dac1731a77` |
-| NAT Gateway | `nat-0ebe6638ebe58e8ce` (1 AZ) |
+| NAT Gateway | `nat-0ebe6638ebe58e8ce` (1 AZ) — **DECOMMISSIONED 2026-04-25** (Phase 11) |
 | S3 Gateway Endpoint | `vpce-0cf3ea6da9fdf4300` |
 
 ### Step 1.2 — Security Groups (COMPLETE)
@@ -63,7 +65,10 @@ Domains: `jeromelu.ai`, `*.jeromelu.ai` — DNS validated via Route 53.
 
 ## Phase 3 — Data Layer
 
-### Step 3.1 — RDS PostgreSQL (COMPLETE)
+### Step 3.1 — RDS PostgreSQL (COMPLETE — **DECOMMISSIONED 2026-04-25**)
+
+> Replaced by `pgvector/pg16` container on Lightsail. Final snapshot retained for 30 days (see Phase 11).
+
 
 | Resource | Value |
 |----------|-------|
@@ -94,7 +99,10 @@ All buckets: public access blocked, ap-southeast-2.
 
 ## Phase 4 — Secrets & Configuration
 
-### Step 4.1 — Secrets Manager (COMPLETE)
+### Step 4.1 — Secrets Manager (COMPLETE — **DECOMMISSIONED 2026-04-25**)
+
+> Migrated to Parameter Store SecureString (Phase 11). Saves ~$1.20/mo.
+
 
 | Secret | ARN |
 |--------|-----|
@@ -145,7 +153,10 @@ Tag immutability enabled, scan on push enabled.
 
 ---
 
-## Phase 7 — ECS Cluster & Services (COMPLETE)
+## Phase 7 — ECS Cluster & Services (COMPLETE — **DECOMMISSIONED 2026-04-25**)
+
+> All ECS services + cluster + ALB + target groups deleted as part of Lightsail cutover. ECR images retained.
+
 
 | Resource | Value |
 |----------|-------|
@@ -180,7 +191,7 @@ Tag immutability enabled, scan on push enabled.
 | Resource | Value |
 |----------|-------|
 | WAF Web ACL | Enabled via CloudFront free plan (Phase 8) |
-| KMS Key | Alias: `jeromelu-master-key`, Key ID: `23a1e42f-ac32-4e3b-bd11-3f8e5c0335cc` |
+| KMS Key | Alias: `jeromelu-master-key`, Key ID: `23a1e42f-ac32-4e3b-bd11-3f8e5c0335cc` — **DECOMMISSIONED 2026-04-25** (scheduled for deletion, 7-day waiting period) |
 
 ---
 
@@ -190,4 +201,60 @@ Tag immutability enabled, scan on push enabled.
 |--------|------|--------|
 | `jeromelu.ai` | A (Alias) | `d2rchevv847e7k.cloudfront.net` |
 | `www.jeromelu.ai` | A (Alias) | `d2rchevv847e7k.cloudfront.net` |
-| `api.jeromelu.ai` | A (Alias) | `dualstack.jeromelu-alb-943756887.ap-southeast-2.elb.amazonaws.com` |
+| `api.jeromelu.ai` | A (Alias) | `dualstack.jeromelu-alb-943756887.ap-southeast-2.elb.amazonaws.com` — **REPOINTED 2026-04-25** to Lightsail static IP (Phase 11) |
+
+---
+
+## Phase 11 — Lightsail Migration (V1 — 2026-04-25)
+
+V0 architecture replaced by a single Lightsail VM running Docker Compose. See `docs/architecture/12-aws-architecture.md` for the rationale and topology.
+
+### 11.1 — Lightsail Instance (PENDING)
+
+| Resource | Value |
+|----------|-------|
+| Instance name | `jeromelu-prod` |
+| Plan | $5/mo (1 GB RAM, 2 vCPU burst, 40 GB SSD, 2 TB egress) |
+| Blueprint | Ubuntu 22.04 LTS |
+| Region / AZ | ap-southeast-2a |
+| Static IP | `___` (attach after launch) |
+| SSH key pair | `jeromelu-prod` (ED25519, fingerprint `___`) |
+| Firewall | TCP 22 from operator IP, TCP 80 + 443 from 0.0.0.0/0 |
+
+### 11.2 — IAM (PENDING)
+
+| Resource | Value |
+|----------|-------|
+| User | `jeromelu-cicd` — keys stored in GitHub Actions secrets |
+| Permissions | ECR push/pull (web, api), CloudFront create-invalidation on `E2G6FL11A3JP8F`, S3 read/write on the 3 jeromelu buckets, SSM `GetParameter*` on `/jeromelu/*` |
+
+### 11.3 — Parameter Store (PENDING — replaces Secrets Manager)
+
+| Parameter | Type |
+|-----------|------|
+| `/jeromelu/postgres-password` | SecureString |
+| `/jeromelu/openai-api-key` | SecureString |
+| `/jeromelu/admin-key` | SecureString |
+| `/jeromelu/instance-aws-access-key-id` | SecureString |
+| `/jeromelu/instance-aws-secret-access-key` | SecureString |
+
+### 11.4 — RDS Final Snapshot (PENDING)
+
+| Resource | Value |
+|----------|-------|
+| Snapshot ID | `jeromelu-db-pre-lightsail-2026-04-25` |
+| Source instance | `jeromelu-db` |
+| Retain until | 2026-05-25 (30 days post-cutover) |
+
+### 11.5 — DNS Cutover (PENDING)
+
+| Record | Was | Will be |
+|--------|-----|---------|
+| `jeromelu.ai`, `www.jeromelu.ai` | CloudFront alias | CloudFront alias (origin updated to Lightsail static IP) |
+| `api.jeromelu.ai` | ALB alias | A record → Lightsail static IP |
+
+### 11.6 — CloudFront Origin Update (PENDING)
+
+| Distribution | Origin was | Origin will be |
+|--------------|-----------|----------------|
+| `E2G6FL11A3JP8F` | `jeromelu-alb-943756887.ap-southeast-2.elb.amazonaws.com` (HTTPS) | Lightsail static IP (HTTPS, custom origin) |

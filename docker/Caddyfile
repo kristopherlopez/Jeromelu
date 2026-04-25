@@ -1,0 +1,26 @@
+# Caddy auto-provisions Let's Encrypt certs for these hostnames via HTTP-01.
+# Requires:
+#   - DNS A record for each hostname pointing at this Lightsail static IP
+#   - Lightsail firewall: 80, 443 open to 0.0.0.0/0
+# Cert renewal: automatic, every ~60 days.
+
+# Web app (CloudFront sits in front for jeromelu.ai/www, but Caddy still
+# terminates TLS so CloudFront-to-origin is encrypted).
+jeromelu.ai, www.jeromelu.ai {
+	encode zstd gzip
+	reverse_proxy web:3000
+	log {
+		output stdout
+		format console
+	}
+}
+
+# API — direct to Caddy (no CloudFront in front).
+api.jeromelu.ai {
+	encode zstd gzip
+	reverse_proxy api:8000
+	log {
+		output stdout
+		format console
+	}
+}

@@ -38,7 +38,7 @@ Jaromelu is an agent-first product. Three kinds of agents, one folder per kind �
 | [09 — V1 Scope & Roadmap](docs/architecture/09-v1-scope-and-roadmap.md) | Must-haves, phased roadmap, architectural principles, success criteria |
 | [10 — C4 System Blueprint](docs/architecture/10-c4-system-blueprint.md) | Full C4 breakdown: context, containers, components, flows, cross-cutting concerns |
 | [11 — Technology Stack](docs/architecture/11-technology-stack.md) | Next.js, FastAPI, Temporal, PostgreSQL, service split |
-| [12 — AWS Architecture](docs/architecture/12-aws-architecture.md) | VPC, ECS/Fargate, RDS, S3, CloudFront, full AWS inventory |
+| [12 — AWS Architecture](docs/architecture/12-aws-architecture.md) | Lightsail single-VM deployment, CloudFront, S3, ECR, cost ~$5.50/mo |
 
 > The numbering has gaps: 02 (Character Architecture) moved to [`agents/crew/`](docs/agents/crew/README.md); 13 (Agent Inventory) moved to [`agents/`](docs/agents/README.md).
 
@@ -49,6 +49,16 @@ Not page-specific — see [docs/concepts/](docs/concepts/README.md) for design p
 ## Design System
 
 Global tokens, typography, and component conventions: [docs/design-system/](docs/design-system/). Frozen HTML mockups (colour palettes, typography demos, theme variants) live in [design-artifacts/design-system/](design-artifacts/design-system/).
+
+## Deployment
+
+Production runs on a single AWS Lightsail instance ($5/mo) at `jeromelu.ai` and `api.jeromelu.ai`. Push to `master` builds via GitHub Actions, pushes to ECR, and SSHes to the Lightsail box to restart the compose stack. See [docs/architecture/12-aws-architecture.md](docs/architecture/12-aws-architecture.md) and [docs/operations/aws-setup-guide.md](docs/operations/aws-setup-guide.md).
+
+```bash
+make deploy-prod IMAGE_TAG=<sha>   # manual deploy
+make prod-logs                     # tail compose logs
+make prod-shell                    # ssh in
+```
 
 ## Other Docs
 

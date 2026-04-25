@@ -8,7 +8,6 @@ on:
 env:
   AWS_REGION: ap-southeast-2
   ECR_REGISTRY: 111424988703.dkr.ecr.ap-southeast-2.amazonaws.com
-  ECS_CLUSTER: jeromelu
 
 permissions:
   id-token: write
@@ -20,10 +19,6 @@ jobs:
     outputs:
       api: ${{ steps.changes.outputs.api }}
       web: ${{ steps.changes.outputs.web }}
-      worker-ingestion: ${{ steps.changes.outputs.worker-ingestion }}
-      worker-extraction: ${{ steps.changes.outputs.worker-extraction }}
-      worker-decision: ${{ steps.changes.outputs.worker-decision }}
-      worker-publishing: ${{ steps.changes.outputs.worker-publishing }}
       db: ${{ steps.changes.outputs.db }}
     steps:
       - uses: actions/checkout@v4
@@ -36,22 +31,10 @@ jobs:
               - 'packages/shared/**'
             web:
               - 'services/web/**'
-            worker-ingestion:
-              - 'services/worker-ingestion/**'
-              - 'packages/shared/**'
-            worker-extraction:
-              - 'services/worker-extraction/**'
-              - 'packages/shared/**'
-            worker-decision:
-              - 'services/worker-decision/**'
-              - 'packages/shared/**'
-            worker-publishing:
-              - 'services/worker-publishing/**'
-              - 'packages/shared/**'
             db:
               - 'packages/db/**'
 
-  build-and-deploy:
+  build-and-push:
     needs: detect-changes
     runs-on: ubuntu-latest
     strategy:
@@ -61,33 +44,11 @@ jobs:
           - service: api
             path: services/api
             ecr_repo: jeromelu/api
-            ecs_service: jeromelu-api
             changed: ${{ needs.detect-changes.outputs.api }}
           - service: web
             path: services/web
             ecr_repo: jeromelu/web
-            ecs_service: jeromelu-web
             changed: ${{ needs.detect-changes.outputs.web }}
-          - service: worker-ingestion
-            path: services/worker-ingestion
-            ecr_repo: jeromelu/worker-ingestion
-            ecs_service: jeromelu-worker-ingestion
-            changed: ${{ needs.detect-changes.outputs.worker-ingestion }}
-          - service: worker-extraction
-            path: services/worker-extraction
-            ecr_repo: jeromelu/worker-extraction
-            ecs_service: jeromelu-worker-extraction
-            changed: ${{ needs.detect-changes.outputs.worker-extraction }}
-          - service: worker-decision
-            path: services/worker-decision
-            ecr_repo: jeromelu/worker-decision
-            ecs_service: jeromelu-worker-decision
-            changed: ${{ needs.detect-changes.outputs.worker-decision }}
-          - service: worker-publishing
-            path: services/worker-publishing
-            ecr_repo: jeromelu/worker-publishing
-            ecs_service: jeromelu-worker-publishing
-            changed: ${{ needs.detect-changes.outputs.worker-publishing }}
     steps:
       - name: Skip if unchanged
         if: matrix.changed != 'true'
@@ -116,47 +77,24 @@ jobs:
           docker push $IMAGE:${{ github.sha }}
           docker push $IMAGE:latest
 
-      - name: Update task definition and deploy
-        if: matrix.changed == 'true'
-        run: |
-          IMAGE="${{ env.ECR_REGISTRY }}/${{ matrix.ecr_repo }}:${{ github.sha }}"
-          FAMILY="${{ matrix.ecs_service }}"
-
-          # Get current task definition (preserves env vars, secrets, etc.)
-          CURRENT=$(aws ecs describe-task-definition \
-            --task-definition "$FAMILY" \
-            --region ${{ env.AWS_REGION }} \
-            --query 'taskDefinition')
-
-          # Update the container image in the existing definition
-          UPDATED=$(echo "$CURRENT" | jq \
-            --arg image "$IMAGE" \
-            '.containerDefinitions[0].image = $image')
-
-          # Strip fields that can't be passed to register-task-definition
-          CLEANED=$(echo "$UPDATED" | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)')
-
-          # Register new revision (keeps all env vars, log config, etc.)
-          NEW_ARN=$(aws ecs register-task-definition \
-            --cli-input-json "$CLEANED" \
-            --region ${{ env.AWS_REGION }} \
-            --query 'taskDefinition.taskDefinitionArn' \
-            --output text)
-
-          echo "Registered task definition: $NEW_ARN"
-
-          # Deploy with the new revision
-          aws ecs update-service \
-            --cluster ${{ env.ECS_CLUSTER }} \
-            --service ${{ matrix.ecs_service }} \
-            --task-definition "$NEW_ARN" \
-            --force-new-deployment \
-            --region ${{ env.AWS_REGION }}
-
-          echo "Deployed ${{ matrix.service }} with image $IMAGE"
+  deploy-lightsail:
+    needs: [detect-changes, build-and-push]
+    if: needs.detect-changes.outputs.api == 'true' || needs.detect-changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          script: |
+            cd /opt/jeromelu
+            git pull --ff-only
+            IMAGE_TAG=${{ github.sha }} /opt/jeromelu/scripts/lightsail-deploy.sh
 
   invalidate-cdn:
-    needs: [detect-changes, build-and-deploy]
+    needs: [detect-changes, deploy-lightsail]
     if: needs.detect-changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -178,17 +116,8 @@ jobs:
     if: needs.detect-changes.outputs.db == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Run database migration
+      - name: Notify migration needed
         run: |
-          echo "Database migration detected. Review and run manually:"
-          echo "  aws ecs run-task --cluster jeromelu --task-definition jeromelu-migrate ..."
-          echo "Automated migration disabled for safety. Approve via workflow_dispatch."
+          echo "Database migration detected. Run manually on Lightsail:"
+          echo "  ssh jeromelu-prod 'cd /opt/jeromelu && bash packages/db/migrate.sh'"
+          echo "Automated migration disabled for safety. Trigger via workflow_dispatch when reviewed."

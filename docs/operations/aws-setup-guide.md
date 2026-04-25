@@ -1,21 +1,167 @@
 # Jaromelu — AWS Infrastructure Setup Guide
 
-**Purpose:** Step-by-step instructions for setting up all AWS resources needed for Jaromelu V1. Designed to be followed sequentially via the AWS Console.
-
 **Project:** Jaromelu — Autonomous AI NRL SuperCoach character
 **Region:** ap-southeast-2 (Sydney)
-**Domain:** jeromelu.ai (currently registered with Namecheap)
+**Domain:** jeromelu.ai (registered with Namecheap, DNS via Route 53)
+
+> **Active V1 setup is the Lightsail Production Setup section below.** The V0 ECS/Fargate phases that follow it are kept for history but **superseded as of 2026-04-25** — do not follow them for new setups. See `docs/architecture/12-aws-architecture.md` for the rationale.
 
 ---
 
-## Pre-Flight Checklist
+# Lightsail Production Setup (V1 — active)
 
-Before starting, confirm:
+The V1 architecture is one Lightsail VM running Docker Compose, fronted by CloudFront/Route 53. Target run-rate ~$5.50/mo. Follow these phases in order.
 
-- [ ] Logged into the correct AWS account
-- [ ] Region is set to **ap-southeast-2 (Sydney)** in the top-right corner
-- [ ] You have admin-level IAM permissions
-- [ ] The domain `jeromelu.ai` is accessible in your Namecheap account
+## Pre-flight
+
+- [ ] AWS account `111424988703`, region `ap-southeast-2`
+- [ ] Admin IAM access for the operator
+- [ ] Local: AWS CLI v2 configured, Docker, an SSH client
+- [ ] Route 53 hosted zone `jeromelu.ai` exists (it does — V0 Phase 2)
+- [ ] CloudFront distribution `E2G6FL11A3JP8F` exists (it does — V0 Phase 8)
+
+## Phase L1 — Provision Lightsail instance
+
+1. **Lightsail Console → Create instance**
+   - Region: `Sydney (ap-southeast-2a)`
+   - Platform: Linux/Unix
+   - Blueprint: OS Only → Ubuntu 22.04 LTS
+   - Plan: **$5/mo** (1 GB RAM, 2 vCPU burst, 40 GB SSD, 2 TB transfer)
+   - Identifier: `jeromelu-prod`
+   - SSH key: create a new ED25519 key named `jeromelu-prod`. Download both halves; save private key in 1Password and copy the public key.
+2. **Networking → Static IP → Create static IP** named `jeromelu-prod-ip`, attach to the instance.
+3. **Networking → Firewall** on the instance:
+   - SSH (22): set source to operator's IP only.
+   - HTTP (80): 0.0.0.0/0.
+   - HTTPS (443): 0.0.0.0/0.
+4. **SSH in** and bootstrap:
+   ```bash
+   ssh -i ~/.ssh/jeromelu-prod ubuntu@<static-ip>
+   sudo apt update && sudo apt upgrade -y
+   sudo apt install -y docker.io docker-compose-v2 git awscli unzip
+   sudo usermod -aG docker ubuntu
+   exit  # log out + back in for group change
+   ```
+5. **Clone repo + create env file:**
+   ```bash
+   sudo mkdir -p /opt/jeromelu && sudo chown ubuntu:ubuntu /opt/jeromelu
+   git clone https://github.com/<owner>/Jeromelu.git /opt/jeromelu
+   touch /opt/jeromelu/.env && chmod 600 /opt/jeromelu/.env
+   ```
+
+## Phase L2 — IAM & Parameter Store
+
+1. **Create IAM user `jeromelu-cicd`** (programmatic access only). Attach inline policy `jeromelu-cicd-permissions` covering: `ecr:*` on the 2 repos, `cloudfront:CreateInvalidation` on `E2G6FL11A3JP8F`, `s3:GetObject*/PutObject*/ListBucket` on the 3 buckets, `ssm:GetParameter*` on `/jeromelu/*`. Save access key + secret to GitHub Actions secrets.
+2. **Create IAM user `jeromelu-instance`** (for the Lightsail box). Same S3 + SSM permissions, no ECR. Save keys; store as Parameter Store entries below.
+3. **Parameter Store** (`Systems Manager → Parameter Store → Create parameter`), all `SecureString`:
+   - `/jeromelu/postgres-password` — strong random
+   - `/jeromelu/openai-api-key` — copy from old Secrets Manager
+   - `/jeromelu/admin-key` — copy from old `jeromelu/app-secrets`
+   - `/jeromelu/instance-aws-access-key-id` — `jeromelu-instance` access key
+   - `/jeromelu/instance-aws-secret-access-key` — `jeromelu-instance` secret
+
+## Phase L3 — Migrate database from RDS
+
+1. **Take a final RDS snapshot** named `jeromelu-db-pre-lightsail-2026-04-25` (RDS Console → Snapshots → Take snapshot).
+2. **Dump from RDS to local, then to Lightsail:**
+   ```bash
+   # On a workstation with RDS network access (e.g. SSM port-forward through old VPC):
+   PGPASSWORD=<rds-password> pg_dump \
+     -h jeromelu-db.cul8lqlvhn3c.ap-southeast-2.rds.amazonaws.com \
+     -U jeromelu_admin -d jeromelu \
+     --format=plain --no-owner | gzip > jeromelu.sql.gz
+
+   # Upload to Lightsail
+   scp jeromelu.sql.gz ubuntu@<static-ip>:/tmp/
+   ```
+3. **Bring up the prod stack on Lightsail (postgres only first):**
+   ```bash
+   cd /opt/jeromelu/docker
+   # Populate /opt/jeromelu/.env with values from Parameter Store first
+   docker compose -f docker-compose.prod.yml up -d postgres
+   # Wait for healthy
+   docker compose -f docker-compose.prod.yml ps
+   ```
+4. **Restore:**
+   ```bash
+   gunzip -c /tmp/jeromelu.sql.gz \
+     | docker exec -i jeromelu-postgres psql -U jeromelu_admin -d jeromelu
+   ```
+5. **Verify:** spot-check row counts vs RDS for key tables (`sources`, `claims`, `articles`).
+
+## Phase L4 — Deploy app + smoke test
+
+1. **Configure ECR auth** on the box (uses `jeromelu-instance` keys from `.env`):
+   ```bash
+   aws ecr get-login-password --region ap-southeast-2 \
+     | docker login --username AWS --password-stdin \
+       111424988703.dkr.ecr.ap-southeast-2.amazonaws.com
+   ```
+2. **Pull and start everything:**
+   ```bash
+   cd /opt/jeromelu/docker
+   docker compose -f docker-compose.prod.yml --env-file /opt/jeromelu/.env up -d
+   ```
+3. **Verify Caddy got Let's Encrypt certs** (only works once DNS points at the box):
+   ```bash
+   docker compose -f docker-compose.prod.yml logs caddy | grep -i "obtain"
+   ```
+4. **Smoke test via Host header before DNS cutover:**
+   ```bash
+   curl -k --resolve api.jeromelu.ai:443:<static-ip> https://api.jeromelu.ai/healthz
+   curl -k --resolve jeromelu.ai:443:<static-ip>     https://jeromelu.ai/
+   ```
+
+## Phase L5 — DNS cutover
+
+1. **Lower TTLs** on `jeromelu.ai`, `www.jeromelu.ai`, `api.jeromelu.ai` to 60s. Wait 1 hour.
+2. **Update CloudFront origin** for `E2G6FL11A3JP8F`: change origin domain from `jeromelu-alb-943756887...` to `<static-ip>`. Origin protocol HTTPS, origin SSL protocols TLSv1.2. Wait for distribution to deploy (~5 min).
+3. **Update Route 53** `api.jeromelu.ai` A record from ALB alias to a plain A pointing at the Lightsail static IP. TTL 60s.
+4. **Watch CloudWatch ALB metrics** — request count should drop to ~0 within 5–10 minutes. Hold on Phase L6 until you see this.
+
+## Phase L6 — Decommission V0 resources
+
+Each step is **destructive and requires explicit operator confirmation**.
+
+1. ECS — set desired counts to 0, wait for drain, delete services + cluster.
+2. ALB — delete listeners, target groups, then ALB.
+3. NAT Gateway `nat-0ebe6638ebe58e8ce` — delete; release the EIP.
+4. Update private subnet route table — remove 0.0.0.0/0 → NAT route.
+5. RDS — confirm final snapshot exists, then delete `jeromelu-db` (no auto-backup retention since snapshot is manual).
+6. Secrets Manager — delete the 3 secrets (7-day waiting period).
+7. RDS Performance Insights — moot (instance gone).
+8. KMS CMK `jeromelu-master-key` — schedule for deletion (7-day waiting period).
+9. ECR — delete `jeromelu/worker-orchestrator` (unreferenced).
+10. Optionally delete `jeromelu/worker-*` repos after 30-day soak.
+
+## Phase L7 — Cron + backups
+
+On the Lightsail box:
+
+```bash
+chmod +x /opt/jeromelu/scripts/pg-backup.sh
+echo '30 16 * * * /opt/jeromelu/scripts/pg-backup.sh >> /var/log/jeromelu-backup.log 2>&1' \
+  | sudo tee /etc/cron.d/jeromelu-pg-backup
+```
+
+Add a S3 lifecycle rule on `jeromelu-public-assets` prefix `backups/postgres/` → expire after 30 days.
+
+## Phase L8 — CI/CD
+
+Add these GitHub Actions secrets (Settings → Secrets and variables → Actions):
+
+- `LIGHTSAIL_HOST` — the static IP
+- `LIGHTSAIL_USER` — `ubuntu`
+- `LIGHTSAIL_SSH_KEY` — private half of the Lightsail SSH key
+- `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` — `jeromelu-cicd` keys
+
+Push a no-op commit to confirm the pipeline runs end-to-end.
+
+---
+
+# V0 Setup (Legacy — superseded 2026-04-25)
+
+> **Do not follow these phases for new setups.** They reflect the original ECS/Fargate/RDS architecture which was decommissioned on 2026-04-25 in favour of the Lightsail setup above. Kept for historical reference and rollback context only.
 
 ---
 
