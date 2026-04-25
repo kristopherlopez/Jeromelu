@@ -63,7 +63,7 @@ V0 → V1 migration. Stack files (`docker-compose.prod.yml`, `Caddyfile`, `light
 - [x] **Phase 3**: 6 SecureStrings in Parameter Store under `/jeromelu/`: `postgres-password`, `openai-api-key` (still placeholder), `admin-key`, `session-secret`, instance AWS keypair
 - [x] **Phase 3**: GitHub deploy key registered for read-only repo access from Lightsail
 - [x] **Phase 3**: Repo cloned to `/opt/jeromelu` via SSH
-- [ ] **Phase 4**: Run `scripts/lightsail-deploy.sh` — Caddy + web + api + postgres on the box
+- [x] **Phase 4**: Stack up — Caddy + web + api + postgres on the box. API `/docs` → 200, web `/` → 200. Caddy ACME pending DNS cutover (expected).
 - [ ] **Phase 5**: Repoint CloudFront `E2G6FL11A3JP8F` origin from ALB DNS to Lightsail static IP
 - [ ] **Phase 5**: Repoint Route 53 `api.jeromelu.ai` A record to Lightsail static IP
 - [ ] **Phase 7**: Verify nightly `pg-backup.sh` cron lands in `s3://jeromelu-public-assets/backups/postgres/` and test full restore

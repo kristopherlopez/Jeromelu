@@ -311,3 +311,16 @@ Migration artifacts in S3 (clean up after cutover verified):
 | Distribution | Origin was | Origin will be |
 |--------------|-----------|----------------|
 | `E2G6FL11A3JP8F` | `jeromelu-alb-943756887.ap-southeast-2.elb.amazonaws.com` (HTTPS) | Lightsail static IP (HTTPS, custom origin) |
+
+### 11.7 — App Stack on Lightsail (COMPLETE 2026-04-25)
+
+| Container | Image | Status |
+|-----------|-------|--------|
+| `jeromelu-postgres` | `pgvector/pgvector:pg16` | healthy, attached to `jeromelu_postgres_data` |
+| `jeromelu-api` | `111424988703.dkr.ecr.ap-southeast-2.amazonaws.com/jeromelu/api:latest` | running (uvicorn :8000, `/docs` → 200) |
+| `jeromelu-web` | `111424988703.dkr.ecr.ap-southeast-2.amazonaws.com/jeromelu/web:latest` | running (Next.js 16.1.6 :3000, `/` → 200) |
+| `jeromelu-caddy` | `caddy:2-alpine` | running (:80, :443) |
+
+Caddy is in ACME retry loop until DNS cuts over (Phase 5) — `jeromelu.ai` and `api.jeromelu.ai` still resolve to CloudFront/ALB. No traffic impact yet; the existing ECS stack still serves users.
+
+Volumes pinned: `jeromelu_postgres_data`, `jeromelu_caddy_data`, `jeromelu_caddy_config`.
