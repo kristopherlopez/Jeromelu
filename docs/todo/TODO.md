@@ -64,8 +64,11 @@ V0 → V1 migration. Stack files (`docker-compose.prod.yml`, `Caddyfile`, `light
 - [x] **Phase 3**: GitHub deploy key registered for read-only repo access from Lightsail
 - [x] **Phase 3**: Repo cloned to `/opt/jeromelu` via SSH
 - [x] **Phase 4**: Stack up — Caddy + web + api + postgres on the box. API `/docs` → 200, web `/` → 200. Caddy ACME pending DNS cutover (expected).
-- [ ] **Phase 5**: Repoint CloudFront `E2G6FL11A3JP8F` origin from ALB DNS to Lightsail static IP
-- [ ] **Phase 5**: Repoint Route 53 `api.jeromelu.ai` A record to Lightsail static IP
+- [x] **Phase 5**: CloudFront `E2G6FL11A3JP8F` origin → `origin.jeromelu.ai` (HTTP-only, see backlog item below for HTTPS)
+- [x] **Phase 5**: Route 53 `api.jeromelu.ai` → A 52.65.91.199 (TTL 60); new `origin.jeromelu.ai` A record added
+- [x] **Phase 5**: Migrations 010–016 applied to Lightsail postgres (RDS was schema-frozen at 009)
+- [ ] **Backlog**: Force Caddy to issue RSA certs so CloudFront ↔ origin can use HTTPS again (currently plaintext over public internet)
+- [ ] **Backlog**: Add `www.jeromelu.ai` to CloudFront Aliases (pre-existing — www returned CF error before this migration too)
 - [ ] **Phase 7**: Verify nightly `pg-backup.sh` cron lands in `s3://jeromelu-public-assets/backups/postgres/` and test full restore
 
 ### 4.2 V0 Decommissioning

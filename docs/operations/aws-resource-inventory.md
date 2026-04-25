@@ -299,18 +299,36 @@ Migration artifacts in S3 (clean up after cutover verified):
 - `s3://jeromelu-public-assets/migration/rowcounts.sql`
 - `s3://jeromelu-public-assets/migration/rds-rowcount.sh`
 
-### 11.5 — DNS Cutover (PENDING)
+### 11.5 — DNS Cutover (COMPLETE 2026-04-25)
 
-| Record | Was | Will be |
-|--------|-----|---------|
-| `jeromelu.ai`, `www.jeromelu.ai` | CloudFront alias | CloudFront alias (origin updated to Lightsail static IP) |
-| `api.jeromelu.ai` | ALB alias | A record → Lightsail static IP |
+| Record | Before | After |
+|--------|--------|-------|
+| `jeromelu.ai` | CloudFront alias (CloudFront → ALB) | CloudFront alias (CloudFront → `origin.jeromelu.ai` → Lightsail) |
+| `www.jeromelu.ai` | CloudFront alias | unchanged — but CloudFront has only `jeromelu.ai` in Aliases, so www returns CF error. Pre-existing, separate fix |
+| `api.jeromelu.ai` | ALB alias (Z1GM3OXH4ZPM65) | A → 52.65.91.199 (TTL 60) |
+| `origin.jeromelu.ai` | (did not exist) | A → 52.65.91.199 (TTL 60) — used by CloudFront origin |
 
-### 11.6 — CloudFront Origin Update (PENDING)
+### 11.6 — CloudFront Origin Update (COMPLETE 2026-04-25)
 
-| Distribution | Origin was | Origin will be |
-|--------------|-----------|----------------|
-| `E2G6FL11A3JP8F` | `jeromelu-alb-943756887.ap-southeast-2.elb.amazonaws.com` (HTTPS) | Lightsail static IP (HTTPS, custom origin) |
+| Distribution | Origin before | Origin after |
+|--------------|---------------|--------------|
+| `E2G6FL11A3JP8F` | `jeromelu-alb-943756887.ap-southeast-2.elb.amazonaws.com` (HTTPS-only) | `origin.jeromelu.ai` (**HTTP-only**, see note) |
+
+**Note on HTTP-only origin protocol:** CloudFront's HTTPS handshake to Caddy was failing (502 Bad Gateway). Diagnosis pointed at TLSv1.2 + ECDSA-only cipher rejection from CF's edge. Switched origin protocol to `http-only` as a pragmatic fix. User-facing TLS is unchanged — CloudFront still terminates HTTPS via the us-east-1 ACM cert. Only the CloudFront edge ↔ Lightsail hop is plaintext over public internet. **Backlog:** force Caddy to issue RSA certs (`tls { issuer acme { ... } key_type rsa2048 }`) so CF→origin can be HTTPS again.
+
+### 11.7.1 — Database Migrations Brought Forward (COMPLETE 2026-04-25)
+
+The dump from RDS was schema-frozen at migration 009. Migrations 010–016 had never been applied to RDS (the running ECS api was likely returning 500s on `/api/feed` for the same reason — pre-existing bug). Applied on Lightsail:
+
+- `010_event_feed_rework.sql`
+- `011_knowledge_base.sql`
+- `012_qa_event_types.sql`
+- `013_crew_activity.sql`
+- `014_squad.sql`
+- `015_wiki.sql`
+- `016_insights_kb_types.sql`
+
+`schema_migrations` table populated with all 16 versions.
 
 ### 11.7 — App Stack on Lightsail (COMPLETE 2026-04-25)
 
