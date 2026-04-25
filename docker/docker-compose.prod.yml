@@ -79,5 +79,8 @@ services:
 
 volumes:
   postgres_data:
+    name: jeromelu_postgres_data
   caddy_data:
+    name: jeromelu_caddy_data
   caddy_config:
+    name: jeromelu_caddy_config
