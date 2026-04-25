@@ -209,17 +209,21 @@ Tag immutability enabled, scan on push enabled.
 
 V0 architecture replaced by a single Lightsail VM running Docker Compose. See `docs/architecture/12-aws-architecture.md` for the rationale and topology.
 
-### 11.1 — Lightsail Instance (PENDING)
+### 11.1 — Lightsail Instance (COMPLETE 2026-04-25)
 
 | Resource | Value |
 |----------|-------|
-| Instance name | `jeromelu-prod` |
-| Plan | $5/mo (1 GB RAM, 2 vCPU burst, 40 GB SSD, 2 TB egress) |
-| Blueprint | Ubuntu 22.04 LTS |
+| Instance name | `jeromelu` (note: Lightsail keypair `jeromelu-prod` already used the `-prod` suffix) |
+| Bundle | `micro_3_2` — $7/mo (1 GB RAM, 2 vCPU, 40 GB SSD, 1 TB egress) |
+| Blueprint | `ubuntu_22_04` |
 | Region / AZ | ap-southeast-2a |
-| Static IP | `___` (attach after launch) |
-| SSH key pair | `jeromelu-prod` (ED25519, fingerprint `___`) |
-| Firewall | TCP 22 from operator IP, TCP 80 + 443 from 0.0.0.0/0 |
+| Static IP | `52.65.91.199` (`jeromelu-ip`, attached) |
+| SSH key pair | `jeromelu-prod` (ED25519, fingerprint `SHA256:SC5vIKcmU0jNXOwEU9ywmXTejOTOIhkKea5lV5sSTb4`) |
+| Private key location | `~/.ssh/jeromelu-prod` on operator workstation |
+| Firewall | TCP 22 from `112.213.139.221/32`, TCP 80 + 443 from `0.0.0.0/0` |
+| Bootstrap | Docker 29.4.1, Compose v5.1.3, AWS CLI v2, Git installed via cloud-init |
+| Swap | 1 GB at `/swapfile` (persisted in `/etc/fstab`) |
+| SSH alias | `jeromelu-prod` (configured in operator's `~/.ssh/config`) |
 
 ### 11.2 — IAM (PENDING)
 

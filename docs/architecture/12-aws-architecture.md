@@ -1,6 +1,6 @@
 # AWS Architecture — Jeromelu V1
 
-This is the practical AWS shape for Jeromelu V1. We deliberately picked the cheapest realistic AWS deployment that keeps the site online: a single Lightsail VM running everything via Docker Compose, with CloudFront/Route 53/S3 around it. Target run-rate is ~$5.50/mo.
+This is the practical AWS shape for Jeromelu V1. We deliberately picked the cheapest realistic AWS deployment that keeps the site online: a single Lightsail VM running everything via Docker Compose, with CloudFront/Route 53/S3 around it. Target run-rate is ~$7.50/mo (Sydney pricing — $5 nano in US is unavailable in `ap-southeast-2`; the $7 `micro_3_2` is the smallest viable bundle).
 
 If load grows past what one Lightsail instance can serve, the migration target is ECS Fargate behind an ALB — see "Future scale path" at the bottom.
 
@@ -8,7 +8,7 @@ If load grows past what one Lightsail instance can serve, the migration target i
 
 The previous V0 architecture used VPC + NAT Gateway + ALB + ECS Fargate + RDS. That setup ran ~$140/mo even at zero traffic, because NAT ($53), ALB ($18), Fargate 24/7 ($32), and RDS 24/7 ($21) are all fixed idle costs.
 
-Lightsail collapses all of those into a single $5/mo VM with a free static IP and 2 TB egress included. We give up multi-AZ, auto-scaling, and managed Postgres backups in exchange for a 25× cost reduction. Backups are handled by a nightly `pg_dump` to S3.
+Lightsail collapses all of those into a single $7/mo VM with a free static IP and 2 TB egress included. We give up multi-AZ, auto-scaling, and managed Postgres backups in exchange for a 25× cost reduction. Backups are handled by a nightly `pg_dump` to S3.
 
 ## Topology
 
@@ -21,7 +21,7 @@ Route 53 (jeromelu.ai zone)
   ├── jeromelu.ai, www.jeromelu.ai → CloudFront → Lightsail static IP (HTTPS)
   └── api.jeromelu.ai             → Lightsail static IP (HTTPS, direct)
 
-Lightsail instance ($5/mo, 1 GB RAM, 2 vCPU burst, 40 GB SSD, 2 TB egress)
+Lightsail instance ($7/mo, 1 GB RAM, 2 vCPU burst, 40 GB SSD, 2 TB egress)
   ├── caddy           (reverse proxy + auto Let's Encrypt TLS)
   ├── web             (Next.js, port 3000, image from ECR)
   ├── api             (FastAPI, port 8000, image from ECR)
@@ -40,7 +40,7 @@ ECR
 ## Components
 
 ### Compute — Amazon Lightsail
-- Single instance, ap-southeast-2a, Ubuntu 22.04, $5/mo plan.
+- Single instance, ap-southeast-2a, Ubuntu 22.04, $7/mo plan.
 - Static public IP attached (free while attached).
 - Firewall: 22 (SSH from operator IP), 80, 443 from `0.0.0.0/0`.
 - Runs `docker compose -f docker/docker-compose.prod.yml up -d`.
@@ -120,7 +120,7 @@ ECR
 
 | Line item | $/mo |
 |---|---|
-| Lightsail instance ($5 plan, 2 TB egress included) | 5.00 |
+| Lightsail instance (`micro_3_2`: 1 GB RAM, 1 TB egress included) | 7.00 |
 | Lightsail static IP (free while attached) | 0.00 |
 | Lightsail snapshots (1 weekly × ~5 GB) | ~0.25 |
 | Route 53 hosted zone | 0.50 |
@@ -131,9 +131,9 @@ ECR
 | ACM | 0.00 |
 | Parameter Store (Standard) | 0.00 |
 | CloudWatch Logs (none in V1) | 0.00 |
-| **Total** | **~$5.50–6.00/mo** |
+| **Total** | **~$7.50–8.00/mo** |
 
-Tax (~10% AU GST) brings the bill to ~$6.50/mo all-in. Egress beyond the 2 TB included in the Lightsail plan is $0.09/GB, which would matter only with substantial real traffic.
+Tax (~10% AU GST) brings the bill to ~$8.50/mo all-in. Egress beyond the 1 TB included in the Lightsail plan is $0.09/GB, which would matter only with substantial real traffic.
 
 ## Future scale path (when V1 outgrows Lightsail)
 
