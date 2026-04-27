@@ -130,8 +130,8 @@ export default function AskClient() {
   if (isEmpty) {
     return (
       <div className="mx-auto flex h-[calc(100vh-3.5rem)] max-w-5xl flex-col px-6">
-        {/* Greeting — centered in the available space above the input */}
-        <div className="flex flex-1 flex-col items-center justify-center">
+        {/* Greeting + pills + input as a single hero unit, slightly above optical center */}
+        <div className="flex flex-1 flex-col items-center justify-center pb-[12vh]">
           <h1
             className="mb-2 text-center text-4xl font-light tracking-tight sm:text-5xl"
             style={{
@@ -172,10 +172,10 @@ export default function AskClient() {
               </button>
             ))}
           </div>
-        </div>
 
-        {/* Input pinned to bottom — same position as feed */}
-        <div className="pb-4 pt-3">{inputBar}</div>
+          {/* Input — directly under the pills, part of the same hero unit */}
+          <div className="mt-8 w-full max-w-2xl">{inputBar}</div>
+        </div>
       </div>
     );
   }

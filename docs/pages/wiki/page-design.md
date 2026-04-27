@@ -86,30 +86,67 @@ Designed to scale to 17 teams, 450+ players, and 50+ advisors. Each tab has a la
 
 **Design reference:** [../../../design-artifacts/wiki/wiki-index-at-scale.html](../../../design-artifacts/wiki/wiki-index-at-scale.html)
 
-#### "All" tab — Dashboard summary
+#### "All" tab — Editorial dashboard
+
+The default landing view is editorial: an opinionated entry point rather than a directory. The top-level filter row + 4-tile counts grid that previously sat at the head of the index has been replaced by a sectioned dashboard. The literal `Players / Teams / Advisors / Rounds` sub-bar (with secondary search) only re-appears once the user navigates into a specific tab or starts a search.
+
+**Design reference:** [../../../design-artifacts/openai-design/wiki-a1.png](../../../design-artifacts/openai-design/wiki-a1.png)
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│  Knowledge Base                                      │
-│  Players, teams, advisors, rounds.                   │
+│                       THE WIKI                       │  ← accent kicker
+│                  Knowledge Base                      │  ← serif h1, centered
+│   Players, teams, advisors and rounds — written      │  ← italic serif subtitle
+│           and maintained by Jaromelu.                │
 │                                                      │
-│  [Search...] [ALL] [Players] [Teams] [Advisors] ...  │
+│  EXPLORE TOPICS                                      │  ← section kicker
+│  Pick a place to start.                              │  ← serif h2
+│  Four directions through the knowledge base.         │  ← italic subtitle
 │                                                      │
 │  ┌──────────┬──────────┬──────────┬──────────┐       │
-│  │   452    │    17    │    54    │     6    │       │  ← clickable summary cards
-│  │ PLAYERS  │  TEAMS   │ ADVISORS │  ROUNDS  │       │     navigate to that tab
+│  │ □ Players│ ◯ Teams  │ ⌘ Advis. │ ☰ Rounds │       │  ← topic tab cards
+│  │ Profiles,│ Squads,  │ The      │ Matchups,│       │     icon · serif title
+│  │ form,... │ struc... │ voices.. │ recaps...│       │     description · count
+│  │ N PLAYRS │ N TEAMS  │ N ADVIS. │ N ROUNDS │       │     navigates to that tab
 │  └──────────┴──────────┴──────────┴──────────┘       │
+│  [ Or search pages... ]                              │  ← inline secondary search
 │                                                      │
-│  RECENTLY UPDATED (10)                               │
-│  ┌─────────────────────┬─────────────────────┐       │
-│  │ [P] Tom Trbojevic   │ [P] Nathan Cleary   │       │  ← 2-col recent changes
-│  │     Injury update   │     Round 6 analysis │       │     from /api/wiki/recent-changes
-│  ├─────────────────────┼─────────────────────┤       │
-│  │ [T] Penrith Panthers│ [A] SC Playbook     │       │
-│  │     Roster update   │     New episode      │       │
-│  └─────────────────────┴─────────────────────┘       │
+│  ─────────────────────────────────────────────       │
+│  RECENTLY UPDATED                                    │
+│  What Jaromelu touched lately.                       │
+│  Live revisions across the wiki, freshest first.     │
+│                                                      │
+│  ┌─────────────────────────────────────────────┐     │
+│  │ [P] Tom Trbojevic            [NEW]   2h ago │     │  ← single-col ranked list
+│  │     Initial page created with full content  │     │     letter circle + title
+│  ├─────────────────────────────────────────────┤     │     NEW badge if <72h old
+│  │ [P] Nathan Cleary                    1d ago │     │     summary + timestamp
+│  ├─────────────────────────────────────────────┤     │     up to 6 items
+│  │ [T] Penrith Panthers                 3d ago │     │
+│  └─────────────────────────────────────────────┘     │
+│                                                      │
+│  ─────────────────────────────────────────────       │
+│  HOW THIS CONNECTS                                   │
+│  The map of NRL knowledge.                           │
+│  Soon: hover to explore relations between...         │
+│                                                      │
+│  ┌─────────────────────────────────────────────┐     │
+│  │              ( Tactic )                     │     │
+│  │  ( Player )      |       ( Team )           │     │  ← static teaser
+│  │            \     |     /                    │     │     accent-emphasised
+│  │            [ Edge Attack ]                  │     │     central node
+│  │            /     |     \                    │     │     5 satellite chips
+│  │  ( Advisor )            ( Round )           │     │     SVG hairline edges
+│  │                                             │     │
+│  │            GRAPH VIEW COMING SOON           │     │  ← uppercase caption
+│  └─────────────────────────────────────────────┘     │
+│                                                      │
+│  ─────────────────────────────────────────────       │
+│            Updated continuously by Scout.            │  ← centred footer caption
 └──────────────────────────────────────────────────────┘
 ```
+
+Notes on the static teaser: it is a deliberate placeholder for a future `wiki_relations`-backed node graph. Until the relations table exists, no real edges are computed — the teaser exists to claim the slot and signal direction. See [overview.md](overview.md) Phase 2 entity types.
 
 #### "Players" tab — Grouped, collapsible, with A-Z nav
 
@@ -306,7 +343,7 @@ Renders as a centered bordered box with "Jaromelu's Call" kicker and serif itali
 
 | Route | Page | Content |
 |-------|------|---------|
-| `/wiki` | Index | Grouped page grid + recent changes sidebar |
+| `/wiki` | Index | Editorial dashboard (Explore topics, Recently Updated, How this connects) — sub-bar with `Players / Teams / Advisors / Rounds` filter + search appears once a tab is selected or a search is typed |
 | `/wiki/player/[slug]` | Player page | Full editorial page |
 | `/wiki/team/[slug]` | Team page | Full editorial page |
 | `/wiki/advisor/[slug]` | Advisor page | Full editorial page + track record |
@@ -324,3 +361,4 @@ Renders as a centered bordered box with "Jaromelu's Call" kicker and serif itali
 | `services/web/src/app/wiki/WikiIndexClient.tsx` | Index page — dashboard, grouped players, pagination |
 | `design-artifacts/wiki/wiki-player.html` | Standalone HTML design reference (player page) |
 | `design-artifacts/wiki/wiki-index-at-scale.html` | Standalone HTML design reference (index at 500+ pages) |
+| `design-artifacts/openai-design/wiki-a1.png` | Design reference for the editorial `/wiki` index landing |

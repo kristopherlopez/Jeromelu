@@ -138,68 +138,107 @@ export default function WikiIndexClient({
     return c;
   }, [pages]);
 
+  const isDashboard = activeFilter === "all" && !search;
+
   return (
     <div className="min-h-screen">
-      <div className="max-w-5xl mx-auto px-6 py-10">
-        {/* Header */}
-        <div className="mb-6">
+      <div className="max-w-5xl mx-auto px-6 py-12">
+        {/* Editorial header */}
+        <header
+          style={{
+            maxWidth: 640,
+            margin: "0 auto 3rem",
+            textAlign: "center",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "11px",
+              fontWeight: 600,
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              color: v.accent,
+              marginBottom: "0.85rem",
+            }}
+          >
+            The Wiki
+          </div>
           <h1
             style={{
               fontFamily: v.serif,
-              fontSize: "1.8rem",
+              fontSize: "clamp(2.2rem, 5vw, 3rem)",
               fontWeight: 700,
               color: v.ink,
-              marginBottom: "0.15rem",
+              lineHeight: 1.1,
+              marginBottom: "0.6rem",
             }}
           >
             Knowledge Base
           </h1>
-          <p style={{ fontSize: "14px", color: v.inkFaint }}>
-            Players, teams, advisors, rounds.
-          </p>
-        </div>
-
-        {/* Search + Filters */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
-          <input
-            type="text"
-            placeholder="Search pages..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full sm:w-64 px-3 py-2 text-sm rounded-lg border focus:outline-none"
+          <p
             style={{
-              borderColor: v.border,
-              background: v.surface,
-              color: v.ink,
+              fontFamily: v.serif,
+              fontSize: "1.05rem",
+              fontStyle: "italic",
+              color: v.inkMuted,
+              lineHeight: 1.5,
             }}
-          />
-          <div className="flex gap-1">
-            {FILTER_TABS.map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveFilter(tab.key)}
-                className="px-3 py-1.5 text-xs font-semibold rounded-md transition-colors"
-                style={{
-                  letterSpacing: "0.06em",
-                  textTransform: "uppercase",
-                  backgroundColor:
-                    activeFilter === tab.key ? v.accentBg : "transparent",
-                  color: activeFilter === tab.key ? v.accent : v.inkFaint,
-                }}
-              >
-                {tab.label}
-              </button>
-            ))}
+          >
+            Players, teams, advisors and rounds — written and maintained by
+            Jaromelu.
+          </p>
+        </header>
+
+        {/* Sub-bar (filter + search) only on filtered/search views */}
+        {!isDashboard && (
+          <div
+            className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-8"
+            style={{
+              paddingBottom: "1rem",
+              borderBottom: `1px solid ${v.border}`,
+            }}
+          >
+            <div className="flex flex-wrap gap-1">
+              {FILTER_TABS.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveFilter(tab.key)}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-md transition-colors"
+                  style={{
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    backgroundColor:
+                      activeFilter === tab.key ? v.accentBg : "transparent",
+                    color: activeFilter === tab.key ? v.accent : v.inkFaint,
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <input
+              type="text"
+              placeholder="Search pages..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full sm:w-64 sm:ml-auto px-3 py-2 text-sm rounded-lg border focus:outline-none"
+              style={{
+                borderColor: v.border,
+                background: v.surface,
+                color: v.ink,
+              }}
+            />
           </div>
-        </div>
+        )}
 
         {/* ── Tab content ── */}
-        {activeFilter === "all" && !search ? (
-          <AllDashboard
+        {isDashboard ? (
+          <Dashboard
             counts={counts}
-            totalPages={pages.length}
             recentChanges={recentChanges}
             onNavigate={setActiveFilter}
+            search={search}
+            onSearch={setSearch}
           />
         ) : activeFilter === "player" ? (
           <PlayersTab pages={filtered} search={search} />
@@ -230,121 +269,74 @@ export default function WikiIndexClient({
 }
 
 /* ══════════════════════════════════════════════════════
-   "All" Dashboard — summary cards + recent changes
+   Dashboard — Explore topics + Recently Updated +
+   How this connects (static teaser) + footer
    ══════════════════════════════════════════════════════ */
 
-function AllDashboard({
+const NEW_BADGE_HOURS = 72;
+
+function isNew(iso: string): boolean {
+  const hours = (Date.now() - new Date(iso).getTime()) / 3600000;
+  return hours < NEW_BADGE_HOURS;
+}
+
+function Dashboard({
   counts,
-  totalPages,
   recentChanges,
   onNavigate,
+  search,
+  onSearch,
 }: {
   counts: Record<string, number>;
-  totalPages: number;
   recentChanges: WikiChangeItem[];
   onNavigate: (tab: string) => void;
+  search: string;
+  onSearch: (s: string) => void;
 }) {
-  const cards: { key: WikiPageType; count: number; label: string }[] = [
-    { key: "player", count: counts.player, label: "Players" },
-    { key: "team", count: counts.team, label: "Teams" },
-    { key: "advisor", count: counts.advisor, label: "Advisors" },
-    { key: "round", count: counts.round, label: "Rounds" },
-  ];
+  const topicOrder: WikiPageType[] = ["player", "team", "advisor", "round"];
+  const topicCopy: Record<WikiPageType, string> = {
+    player: "Profiles, form, value calls.",
+    team: "Squads, structures, edges.",
+    advisor: "The voices Jaromelu trusts.",
+    round: "Matchups, recaps, predictions.",
+  };
 
   return (
     <>
-      {/* Summary cards */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
-          gap: "1px",
-          background: v.border,
-          border: `1px solid ${v.border}`,
-          marginBottom: "2rem",
-        }}
-      >
-        {cards.map((c) => {
-          const Icon = TYPE_CONFIG[c.key].icon;
-          return (
-            <button
-              key={c.key}
-              onClick={() => onNavigate(c.key)}
-              className="transition-colors"
-              style={{
-                background: v.surface,
-                padding: "1.8rem 1.4rem",
-                textAlign: "center",
-                cursor: "pointer",
-                border: "none",
-                fontFamily: "inherit",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = v.bg;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = v.surface;
-              }}
-            >
-              <Icon
-                size={18}
-                style={{
-                  color: v.accent,
-                  marginBottom: "0.5rem",
-                  display: "inline-block",
-                }}
-              />
-              <div
-                style={{
-                  fontFamily: v.serif,
-                  fontSize: "2.8rem",
-                  fontWeight: 700,
-                  color: v.ink,
-                  lineHeight: 1,
-                  marginBottom: "0.4rem",
-                }}
-              >
-                {c.count}
-              </div>
-              <div
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase",
-                  color: v.inkFaint,
-                }}
-              >
-                {c.label}
-              </div>
-            </button>
-          );
-        })}
-      </div>
+      {/* ── Section: Explore topics ── */}
+      <section style={{ paddingBottom: "3rem" }}>
+        <SectionLabel>Explore topics</SectionLabel>
+        <SectionTitle>Pick a place to start.</SectionTitle>
+        <SectionSubtitle>
+          Four directions through the knowledge base. Tap any to dive in.
+        </SectionSubtitle>
 
-      {/* Recent changes */}
-      {recentChanges.length > 0 && (
-        <div>
-          <SectionHeading
-            icon={Clock}
-            label="Recently Updated"
-            count={recentChanges.length}
-          />
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(2, 1fr)",
-              gap: "1px",
-              background: v.border,
-              border: `1px solid ${v.border}`,
-            }}
-          >
-            {recentChanges.map((c) => (
-              <Link
-                key={c.revision_id}
-                href={changeHref(c)}
-                className="group block transition-colors"
-                style={{ background: v.surface, padding: "1rem 1.2rem" }}
+        <div
+          style={{
+            display: "grid",
+            gap: "1px",
+            background: v.border,
+            border: `1px solid ${v.border}`,
+            marginTop: "1.5rem",
+          }}
+          className="grid-cols-2 md:grid-cols-4"
+        >
+          {topicOrder.map((key) => {
+            const cfg = TYPE_CONFIG[key];
+            const Icon = cfg.icon;
+            return (
+              <button
+                key={key}
+                onClick={() => onNavigate(key)}
+                style={{
+                  background: v.surface,
+                  padding: "1.6rem 1.2rem",
+                  textAlign: "left",
+                  cursor: "pointer",
+                  border: "none",
+                  fontFamily: "inherit",
+                  transition: "background 0.15s",
+                }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = v.bg;
                 }}
@@ -352,46 +344,384 @@ function AllDashboard({
                   e.currentTarget.style.background = v.surface;
                 }}
               >
-                <div className="flex items-start gap-3">
-                  <RecentTypeIcon type={c.page_type} />
-                  <div>
-                    <div
-                      className="group-hover:underline"
-                      style={{
-                        fontSize: "14px",
-                        fontWeight: 500,
-                        color: v.ink,
-                        marginBottom: "0.1rem",
-                      }}
-                    >
-                      {c.page_title}
-                    </div>
-                    <div style={{ fontSize: "12px", color: v.inkFaint }}>
-                      {c.summary || c.section_heading || "Updated"} &middot;{" "}
-                      {formatRelative(c.created_at)}
-                    </div>
-                  </div>
+                <Icon
+                  size={18}
+                  style={{ color: v.accent, marginBottom: "0.6rem" }}
+                />
+                <div
+                  style={{
+                    fontFamily: v.serif,
+                    fontSize: "1.4rem",
+                    fontWeight: 700,
+                    color: v.ink,
+                    lineHeight: 1.1,
+                  }}
+                >
+                  {cfg.label}
                 </div>
-              </Link>
-            ))}
-          </div>
+                <div
+                  style={{
+                    fontSize: "12px",
+                    color: v.inkMuted,
+                    marginTop: "0.25rem",
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {topicCopy[key]}
+                </div>
+                <div
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 600,
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                    color: v.inkFaint,
+                    marginTop: "0.85rem",
+                  }}
+                >
+                  {counts[key] ?? 0}{" "}
+                  {(counts[key] ?? 0) === 1
+                    ? cfg.label.slice(0, -1)
+                    : cfg.label}
+                </div>
+              </button>
+            );
+          })}
         </div>
-      )}
 
-      {/* Fallback if no recent changes */}
-      {recentChanges.length === 0 && totalPages > 0 && (
-        <p
+        {/* Inline search — secondary affordance, after the tabs */}
+        <div style={{ marginTop: "1.5rem", maxWidth: 360 }}>
+          <input
+            type="text"
+            placeholder="Or search pages..."
+            value={search}
+            onChange={(e) => onSearch(e.target.value)}
+            className="w-full px-3 py-2 text-sm rounded-lg border focus:outline-none"
+            style={{
+              borderColor: v.border,
+              background: v.surface,
+              color: v.ink,
+            }}
+          />
+        </div>
+      </section>
+
+      {/* ── Section: Recently Updated ── */}
+      {recentChanges.length > 0 && (
+        <section
           style={{
-            fontSize: "14px",
-            color: v.inkFaint,
-            textAlign: "center",
-            padding: "2rem 0",
+            paddingTop: "2.5rem",
+            paddingBottom: "3rem",
+            borderTop: `1px solid ${v.border}`,
           }}
         >
-          {totalPages} pages in the knowledge base.
-        </p>
+          <SectionLabel>Recently Updated</SectionLabel>
+          <SectionTitle>What Jaromelu touched lately.</SectionTitle>
+          <SectionSubtitle>
+            Live revisions across the wiki, freshest first.
+          </SectionSubtitle>
+
+          <RecentList items={recentChanges} />
+        </section>
       )}
+
+      {/* ── Section: How this connects (static teaser) ── */}
+      <section
+        style={{
+          paddingTop: "2.5rem",
+          paddingBottom: "3rem",
+          borderTop: `1px solid ${v.border}`,
+        }}
+      >
+        <SectionLabel>How this connects</SectionLabel>
+        <SectionTitle>The map of NRL knowledge.</SectionTitle>
+        <SectionSubtitle>
+          Soon: hover to explore the relations between players, teams, rounds
+          and the advisors talking about them.
+        </SectionSubtitle>
+
+        <ConnectsTeaser />
+      </section>
+
+      {/* ── Footer ── */}
+      <footer
+        style={{
+          marginTop: "1rem",
+          paddingTop: "2rem",
+          borderTop: `1px solid ${v.border}`,
+          textAlign: "center",
+          fontSize: "12px",
+          color: v.inkFaint,
+          letterSpacing: "0.04em",
+        }}
+      >
+        Updated continuously by{" "}
+        <Link
+          href="/feed"
+          style={{
+            color: v.accent,
+            fontWeight: 500,
+            textDecoration: "none",
+          }}
+        >
+          Scout
+        </Link>
+        .
+      </footer>
     </>
+  );
+}
+
+/* ── Recently Updated list ── */
+
+function RecentList({ items }: { items: WikiChangeItem[] }) {
+  return (
+    <ol
+      style={{
+        listStyle: "none",
+        padding: 0,
+        margin: "1.5rem 0 0",
+        background: v.surface,
+        border: `1px solid ${v.border}`,
+      }}
+    >
+      {items.slice(0, 6).map((c, i) => (
+        <li
+          key={c.revision_id}
+          style={{
+            borderTop: i === 0 ? "none" : `1px solid ${v.border}`,
+          }}
+        >
+          <Link
+            href={changeHref(c)}
+            className="group block transition-colors"
+            style={{
+              padding: "1rem 1.2rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.85rem",
+              textDecoration: "none",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = v.bg;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+            }}
+          >
+            <RecentTypeIcon type={c.page_type} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                className="flex items-center gap-2"
+                style={{ marginBottom: "0.15rem" }}
+              >
+                <span
+                  className="group-hover:underline"
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    color: v.ink,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {c.page_title}
+                </span>
+                {isNew(c.created_at) && <NewBadge />}
+              </div>
+              <div
+                style={{
+                  fontSize: "12px",
+                  color: v.inkFaint,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {c.summary || c.section_heading || "Updated"}
+              </div>
+            </div>
+            <span
+              style={{
+                fontSize: "11px",
+                color: v.inkFaint,
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+              }}
+            >
+              {formatRelative(c.created_at)}
+            </span>
+          </Link>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function NewBadge() {
+  return (
+    <span
+      style={{
+        fontSize: "9px",
+        fontWeight: 700,
+        letterSpacing: "0.1em",
+        textTransform: "uppercase",
+        padding: "0.15rem 0.4rem",
+        borderRadius: "2px",
+        background: v.greenBg,
+        color: v.green,
+        flexShrink: 0,
+      }}
+    >
+      New
+    </span>
+  );
+}
+
+/* ── How this connects — static teaser ── */
+
+function ConnectsTeaser() {
+  return (
+    <div
+      style={{
+        position: "relative",
+        marginTop: "1.5rem",
+        background: v.surface,
+        border: `1px solid ${v.border}`,
+        padding: "3rem 1.5rem",
+        minHeight: 260,
+        overflow: "hidden",
+      }}
+    >
+      <svg
+        viewBox="0 0 600 240"
+        preserveAspectRatio="xMidYMid meet"
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          opacity: 0.6,
+        }}
+      >
+        <line x1="300" y1="110" x2="108" y2="53" stroke="var(--wiki-border)" strokeWidth="1" />
+        <line x1="300" y1="110" x2="492" y2="53" stroke="var(--wiki-border)" strokeWidth="1" />
+        <line x1="300" y1="110" x2="108" y2="173" stroke="var(--wiki-border)" strokeWidth="1" />
+        <line x1="300" y1="110" x2="492" y2="173" stroke="var(--wiki-border)" strokeWidth="1" />
+        <line x1="300" y1="110" x2="300" y2="34" stroke="var(--wiki-border)" strokeWidth="1" />
+      </svg>
+
+      <NodeChip x="50%" y="46%" emphasis>Edge Attack</NodeChip>
+      <NodeChip x="18%" y="22%">Player</NodeChip>
+      <NodeChip x="82%" y="22%">Team</NodeChip>
+      <NodeChip x="18%" y="72%">Advisor</NodeChip>
+      <NodeChip x="82%" y="72%">Round</NodeChip>
+      <NodeChip x="50%" y="14%">Tactic</NodeChip>
+
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 14,
+          textAlign: "center",
+          fontSize: "11px",
+          fontWeight: 600,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: v.inkFaint,
+        }}
+      >
+        Graph view coming soon
+      </div>
+    </div>
+  );
+}
+
+function NodeChip({
+  x,
+  y,
+  children,
+  emphasis,
+}: {
+  x: string;
+  y: string;
+  children: React.ReactNode;
+  emphasis?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: x,
+        top: y,
+        transform: "translate(-50%, -50%)",
+        padding: emphasis ? "0.45rem 0.85rem" : "0.3rem 0.65rem",
+        background: emphasis ? v.accentBg : v.bg,
+        color: emphasis ? v.accent : v.inkMuted,
+        border: emphasis ? `1px solid ${v.accent}` : `1px solid ${v.border}`,
+        borderRadius: 999,
+        fontSize: emphasis ? "13px" : "11px",
+        fontWeight: emphasis ? 600 : 500,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/* ── Editorial section primitives ── */
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        fontSize: "11px",
+        fontWeight: 600,
+        letterSpacing: "0.14em",
+        textTransform: "uppercase",
+        color: v.accent,
+        marginBottom: "0.5rem",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h2
+      style={{
+        fontFamily: v.serif,
+        fontSize: "clamp(1.5rem, 3vw, 2rem)",
+        fontWeight: 700,
+        color: v.ink,
+        lineHeight: 1.2,
+        marginBottom: "0.4rem",
+      }}
+    >
+      {children}
+    </h2>
+  );
+}
+
+function SectionSubtitle({ children }: { children: React.ReactNode }) {
+  return (
+    <p
+      style={{
+        fontFamily: v.serif,
+        fontStyle: "italic",
+        fontSize: "1rem",
+        color: v.inkMuted,
+        lineHeight: 1.5,
+        maxWidth: 540,
+      }}
+    >
+      {children}
+    </p>
   );
 }
 
