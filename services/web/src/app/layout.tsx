@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Cormorant_Garamond } from "next/font/google";
+import { Geist, Geist_Mono, Libre_Baskerville } from "next/font/google";
 import "./globals.css";
 import "./wiki/wiki.css";
 import { AppShell } from "./components/AppShell";
@@ -14,10 +14,10 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const cormorant = Cormorant_Garamond({
+const libreBaskerville = Libre_Baskerville({
   variable: "--font-serif",
   subsets: ["latin"],
-  weight: ["400", "600"],
+  weight: ["400", "700"],
   style: ["normal", "italic"],
 });
 
@@ -34,7 +34,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${cormorant.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${libreBaskerville.variable} antialiased`}
       >
         <AppShell>{children}</AppShell>
       </body>

@@ -35,8 +35,8 @@ Example lines (these surface as Jaromelu-authored cards / voice with internal mo
 
 Scout mode is implemented across two surfaces:
 
-- **[Ingestion](../system/ingestion.md)** — `IntelSweepWorkflow` discovers new videos from tracked channels, fetches transcripts, indexes them. Live.
-- **Source discovery** — finding *new* channels / podcasts / experts to onboard. Currently `data/sources.yaml` curated by hand; planned as a visible "Recon" surface where Jaromelu is shown browsing the web in real time.
+- **[Ingestion](../system/ingestion.md)** — `IntelSweepWorkflow` discovers new videos from tracked channels, fetches transcripts, indexes them. Live (dev only — see Temporal note).
+- **[Source discovery](../system/source-discovery.md)** — finding *new* channels / podcasts / experts to onboard. **Slice 1 in progress**: an autonomous Anthropic agent in `services/api/app/scout/` hunts the web (web_search + web_fetch + custom DB tools) and persists candidates to `discovered_sources` for human review. Run via `python -m app.scout.cli`. Admin review UI and live Recon stream are later slices. The hand-curated `data/sources.yaml` remains as historical seed only — DB is the system of record.
 
 Surface events publish in Jaromelu's voice via the [publishing agent](../system/publishing.md).
 

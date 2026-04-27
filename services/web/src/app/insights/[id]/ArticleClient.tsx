@@ -165,7 +165,7 @@ export default function ArticleClient({ article }: ArticleClientProps) {
                   style={{
                     fontFamily: "var(--font-serif), Georgia, serif",
                     fontSize: "1.35rem",
-                    fontWeight: 600,
+                    fontWeight: 700,
                     color: "var(--foreground)",
                     marginTop: "2rem",
                     marginBottom: "0.75rem",
@@ -181,7 +181,7 @@ export default function ArticleClient({ article }: ArticleClientProps) {
                   style={{
                     fontFamily: "var(--font-serif), Georgia, serif",
                     fontSize: "1.15rem",
-                    fontWeight: 600,
+                    fontWeight: 700,
                     color: "var(--foreground)",
                     marginTop: "1.5rem",
                     marginBottom: "0.5rem",

@@ -618,3 +618,41 @@ class Outcome(Base):
     actual_value_json: Mapped[dict | None] = mapped_column(JSONB)
     result_label: Mapped[str | None] = mapped_column(Text)
     scored_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+
+class DiscoveredSource(Base):
+    __tablename__ = "discovered_sources"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    kind: Mapped[str] = mapped_column(Text, nullable=False)
+    platform: Mapped[str] = mapped_column(Text, nullable=False, default="youtube")
+    external_id: Mapped[str] = mapped_column(Text, nullable=False)
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    channel_external_id: Mapped[str | None] = mapped_column(Text)
+    content_categories: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
+    score: Mapped[float | None] = mapped_column(Float)
+    score_reasons: Mapped[list] = mapped_column(JSONB, default=list)
+    metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
+    discovered_via: Mapped[str] = mapped_column(Text, nullable=False)
+    discovered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="pending")
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reviewed_by: Mapped[str | None] = mapped_column(Text)
+    reviewed_note: Mapped[str | None] = mapped_column(Text)
+    promoted_channel_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("channels.channel_id"))
+    run_id: Mapped[str | None] = mapped_column(Text)
+
+    __table_args__ = (
+        CheckConstraint("kind IN ('channel', 'video')", name="ck_discovered_kind"),
+        CheckConstraint(
+            "status IN ('pending', 'approved', 'rejected', 'snoozed', 'duplicate')",
+            name="ck_discovered_status",
+        ),
+        UniqueConstraint("platform", "kind", "external_id", name="uq_discovered_platform_kind_external"),
+        Index("idx_discovered_status", "status"),
+        Index("idx_discovered_kind", "kind"),
+        Index("idx_discovered_run", "run_id"),
+        Index("idx_discovered_at", "discovered_at"),
+    )

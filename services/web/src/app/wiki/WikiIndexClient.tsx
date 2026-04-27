@@ -147,7 +147,7 @@ export default function WikiIndexClient({
             style={{
               fontFamily: v.serif,
               fontSize: "1.8rem",
-              fontWeight: 600,
+              fontWeight: 700,
               color: v.ink,
               marginBottom: "0.15rem",
             }}
@@ -298,7 +298,7 @@ function AllDashboard({
                 style={{
                   fontFamily: v.serif,
                   fontSize: "2.8rem",
-                  fontWeight: 600,
+                  fontWeight: 700,
                   color: v.ink,
                   lineHeight: 1,
                   marginBottom: "0.4rem",
@@ -618,7 +618,7 @@ function PlayersTab({
                 style={{
                   fontFamily: v.serif,
                   fontSize: "1rem",
-                  fontWeight: 600,
+                  fontWeight: 700,
                   color: v.ink,
                 }}
               >
@@ -959,7 +959,7 @@ function PageGrid({ pages }: { pages: WikiPageSummary[] }) {
             style={{
               fontFamily: v.serif,
               fontSize: "1.1rem",
-              fontWeight: 600,
+              fontWeight: 700,
               color: v.ink,
               marginBottom: "0.3rem",
             }}

@@ -151,7 +151,7 @@ function ScoreboardTab({ scoreboard, hotZones }: { scoreboard: ScoreboardEntry[]
       {/* Hot Zones */}
       <div className="mt-7">
         <div className="flex items-baseline gap-3 mb-3">
-          <h3 style={{ fontFamily: "var(--font-serif), Georgia, serif", fontSize: "1.15rem", fontWeight: 600, color: "var(--foreground)" }}>
+          <h3 style={{ fontFamily: "var(--font-serif), Georgia, serif", fontSize: "1.15rem", fontWeight: 700, color: "var(--foreground)" }}>
             Hot Zones
           </h3>
           <span style={{ fontSize: 12, color: "var(--foreground-faint)" }}>
@@ -295,7 +295,7 @@ function PredictionsTab({ predictions }: { predictions: Prediction[] }) {
 function CategoriesTab({ categories }: { categories: CategoryBreakdown[] }) {
   return (
     <div>
-      <h3 style={{ fontFamily: "var(--font-serif), Georgia, serif", fontSize: "1.2rem", fontWeight: 600, color: "var(--foreground)", marginBottom: "1rem" }}>
+      <h3 style={{ fontFamily: "var(--font-serif), Georgia, serif", fontSize: "1.2rem", fontWeight: 700, color: "var(--foreground)", marginBottom: "1rem" }}>
         Accuracy by Category
       </h3>
       <div
@@ -324,7 +324,7 @@ function CategoriesTab({ categories }: { categories: CategoryBreakdown[] }) {
         })}
       </div>
 
-      <h3 style={{ fontFamily: "var(--font-serif), Georgia, serif", fontSize: "1.2rem", fontWeight: 600, color: "var(--foreground)", marginTop: "2rem", marginBottom: "1rem" }}>
+      <h3 style={{ fontFamily: "var(--font-serif), Georgia, serif", fontSize: "1.2rem", fontWeight: 700, color: "var(--foreground)", marginTop: "2rem", marginBottom: "1rem" }}>
         Top Predictor by Category
       </h3>
       <div
@@ -361,7 +361,7 @@ export default function LedgerClient({ data }: { data: LedgerResponse }) {
       <div className="mx-auto max-w-5xl px-6">
         {/* Header */}
         <div className="pt-10 pb-6">
-          <h1 style={{ fontFamily: "var(--font-serif), Georgia, serif", fontSize: "1.8rem", fontWeight: 600, color: "var(--wiki-ink)", marginBottom: "0.15rem" }}>
+          <h1 style={{ fontFamily: "var(--font-serif), Georgia, serif", fontSize: "1.8rem", fontWeight: 700, color: "var(--wiki-ink)", marginBottom: "0.15rem" }}>
             The Ledger
           </h1>
           <p style={{ fontSize: 14, color: "var(--wiki-ink-faint)", marginBottom: "1rem" }}>

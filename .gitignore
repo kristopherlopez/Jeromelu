@@ -38,3 +38,4 @@ data/
 docs/aws-resource-inventory.md
 *.egg-info
 commits/
+design-artifacts/

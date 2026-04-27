@@ -14,6 +14,12 @@ The app has five canonical pages. Docs for each live under [`docs/pages/<page>/`
 | **The Analysis** | `/insights` | [docs/pages/analysis/](docs/pages/analysis/overview.md) |
 | **Ask Me** | `/ask` | [docs/pages/ask-me/](docs/pages/ask-me/overview.md) |
 
+Experimental surface (stub data):
+
+| Page | Route | Docs |
+|------|-------|------|
+| **Live Pulse** | `/pulse` | [docs/pages/pulse/](docs/pages/pulse/overview.md) |
+
 ## Agents
 
 Jaromelu is an agent-first product. Three kinds of agents, one folder per kind — see [`docs/agents/`](docs/agents/README.md).

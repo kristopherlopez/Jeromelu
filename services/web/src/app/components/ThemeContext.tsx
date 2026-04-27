@@ -1,9 +1,8 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
-import { usePathname } from "next/navigation";
 
-type ThemeMode = "auto" | "light" | "dark";
+type ThemeMode = "light" | "dark";
 
 interface ThemeState {
   mode: ThemeMode;
@@ -13,25 +12,21 @@ interface ThemeState {
 }
 
 const STORAGE_KEY = "jaromelu-theme";
-
-/** Routes that default to light theme when mode is 'auto' */
-const LIGHT_PREFIX_ROUTES = ["/wiki", "/feed"];
+const DEFAULT_MODE: ThemeMode = "dark";
 
 const ThemeContext = createContext<ThemeState>({
-  mode: "auto",
+  mode: DEFAULT_MODE,
   setMode: () => {},
   isLight: false,
 });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
-  const [mode, setModeState] = useState<ThemeMode>("auto");
+  const [mode, setModeState] = useState<ThemeMode>(DEFAULT_MODE);
 
-  // Read persisted preference on mount
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY) as ThemeMode | null;
-      if (stored === "light" || stored === "dark" || stored === "auto") {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored === "light" || stored === "dark") {
         setModeState(stored);
       }
     } catch {}
@@ -42,16 +37,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem(STORAGE_KEY, next); } catch {}
   };
 
-  // Resolve final isLight
-  let isLight: boolean;
-  if (mode === "light") {
-    isLight = true;
-  } else if (mode === "dark") {
-    isLight = false;
-  } else {
-    // auto — route-based
-    isLight = pathname === "/" || LIGHT_PREFIX_ROUTES.some((r) => pathname.startsWith(r));
-  }
+  const isLight = mode === "light";
 
   return (
     <ThemeContext.Provider value={{ mode, setMode, isLight }}>

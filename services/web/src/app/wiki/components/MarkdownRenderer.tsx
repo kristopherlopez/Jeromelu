@@ -358,7 +358,7 @@ function MarkdownSegment({ content }: { content: string }) {
           return (
             <code style={{
               fontSize: "14px", padding: "0.1rem 0.4rem", borderRadius: "2px",
-              background: "rgba(28,26,20,0.06)", color: "var(--wiki-ink-muted)",
+              background: "var(--wiki-gray-bg)", color: "var(--wiki-ink-muted)",
             }}>
               {children}
             </code>

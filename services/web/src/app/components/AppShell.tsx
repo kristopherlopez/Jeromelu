@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { AvatarEngineProvider } from "./AvatarEngine";
 import { JeromeluPresence } from "./JeromeluPresence";
+import { JeromeluTopBar, TOPBAR_HEIGHT } from "./JeromeluTopBar";
 import { ThemeProvider, useTheme } from "./ThemeContext";
 import { TransitionProvider, CONTENT_DELAY_MS, CONTENT_FADE_MS } from "./TransitionContext";
 
@@ -47,6 +48,13 @@ function PageContent({ children }: { children: ReactNode }) {
 
   const { isLight } = useTheme();
 
+  // Reserve room for the top bar on every page where JeromeluTopBar renders.
+  // Mirrors the exclusion list in JeromeluTopBar.
+  const hasTopBar =
+    pathname !== "/landing" &&
+    !pathname.startsWith("/admin") &&
+    !pathname.startsWith("/stream");
+
   return (
     <div
       className="wiki-page"
@@ -55,6 +63,7 @@ function PageContent({ children }: { children: ReactNode }) {
         opacity,
         transition,
         minHeight: "100vh",
+        paddingTop: hasTopBar ? TOPBAR_HEIGHT : 0,
         backgroundColor: isLight ? "var(--wiki-bg, #FAF9F5)" : "var(--background)",
         color: isLight ? "var(--wiki-ink, #1c1a14)" : "var(--foreground)",
       }}
@@ -70,6 +79,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <AvatarEngineProvider>
         <TransitionProvider>
           <JeromeluPresence />
+          <JeromeluTopBar />
           <PageContent>{children}</PageContent>
         </TransitionProvider>
       </AvatarEngineProvider>

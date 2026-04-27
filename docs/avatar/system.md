@@ -187,7 +187,7 @@ Floats in the corner while scrolling. Always visible. The avatar reacts as you s
 Replace or augment the "JEROMELU is online" banner with the avatar on the left. More integrated, less floating.
 
 **Option C: Global — persistent across all pages.**
-Small avatar in the sidebar or top-right corner. Shows on every page. Reacts to system state regardless of which page you're on.
+Small avatar in the global `JeromeluTopBar` (top-right). Shows on every inner page. Reacts to system state regardless of which page you're on. (This is the path currently shipped.)
 
 **Recommendation:** Start with Option B (in the agent state banner on the feed page). It's the most natural home. Expand to Option C later if it feels right.
 

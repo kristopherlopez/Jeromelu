@@ -160,7 +160,7 @@ export default function FeedClient({ items: serverItems }: { items: FeedItem[] }
         {/* Header — compact, no redundant title */}
         <div className="pt-10 pb-6">
           <div>
-            <h1 style={{ fontFamily: "var(--font-serif), Georgia, serif", fontSize: "1.8rem", fontWeight: 600, color: "var(--wiki-ink)", marginBottom: "0.15rem" }}>
+            <h1 style={{ fontFamily: "var(--font-serif), Georgia, serif", fontSize: "1.8rem", fontWeight: 700, color: "var(--wiki-ink)", marginBottom: "0.15rem" }}>
               Live Stream
             </h1>
             <p style={{ fontSize: "14px", color: "var(--wiki-ink-faint)" }}>

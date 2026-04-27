@@ -19,7 +19,7 @@ The dark theme uses a lifted, warm brown base with multiple coloured accents. Th
 | Token | Value | CSS Variable | Usage |
 |-------|-------|-------------|-------|
 | Background | `#2a2420` | `--background` | Main canvas — warm brown-charcoal |
-| Background Deep | `#241e1a` | `--background-deep` | Sidebar, deeper wells |
+| Background Deep | `#241e1a` | `--background-deep` | Top bar, deeper wells |
 | Surface | `#342c26` | `--surface` | Cards, elevated containers |
 | Surface Hover | `#3e3630` | `--surface-hover` | Hovered cards and panels |
 
@@ -104,7 +104,7 @@ Surfaces use warm solid backgrounds, not transparency on black. Each crew member
 | Level | Background | Border | Usage |
 |-------|-----------|--------|-------|
 | Canvas | `--background` `#2a2420` | — | Page background |
-| Deep | `--background-deep` `#241e1a` | — | Sidebar, wells |
+| Deep | `--background-deep` `#241e1a` | — | Top bar, wells |
 | Card | `--surface` `#342c26` | `--border` | Cards, panels, elevated containers |
 | Card (hover) | `--surface-hover` `#3e3630` | `--border` | Hovered cards |
 | Crew card (Scout) | `var(--teal-bg)` | `var(--teal-border)` | Scout content cards |
@@ -412,7 +412,7 @@ Wiki links use `[[slug]]` syntax, resolved against linked pages at render time.
 
 ### Sticky Navigation
 
-Section nav extracted from `## Heading` markers. Sticky at top with frosted glass effect (`rgba(232,227,217,0.93)` + `backdrop-filter: blur(8px)`). Links are 11px uppercase with accent underline on hover.
+Section nav extracted from `## Heading` markers. Sticky just below the global `JeromeluTopBar` (`top: 56px`) with frosted glass effect (`rgba(232,227,217,0.93)` + `backdrop-filter: blur(8px)`). Links are 11px uppercase with accent underline on hover.
 
 ### Animation
 
@@ -421,8 +421,8 @@ Minimal compared to the main app. Single `wikiFadeUp` entrance animation (0.6s h
 ### Layout
 
 - **Max content width:** 820px, centred
-- **Desktop offset:** 240px left padding (clears the main app sidebar)
-- **Mobile:** Full width, no offset
+- **Top offset:** 56px (clears the global `JeromeluTopBar`, applied centrally by `AppShell`)
+- **Mobile:** Full width
 - **Page grid (index):** 1 / 2 / 3 columns responsive
 
 ### CSS Variables Summary

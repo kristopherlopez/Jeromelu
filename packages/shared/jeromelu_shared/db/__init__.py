@@ -23,6 +23,7 @@ from jeromelu_shared.db.models import (
     PlayerTeamHistory,
     SquadSlot,
     SquadTrade,
+    DiscoveredSource,
 )
 
 __all__ = [
@@ -52,4 +53,5 @@ __all__ = [
     "PlayerTeamHistory",
     "SquadSlot",
     "SquadTrade",
+    "DiscoveredSource",
 ]

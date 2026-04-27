@@ -31,6 +31,8 @@
   --wiki-red-bg: #fae0e0;
   --wiki-accent: #b85c38;
   --wiki-accent-bg: #FFF0E8;
+  --wiki-gray: #5c5848;
+  --wiki-gray-bg: #e8e5de;
 }
 
 /* ── Dark theme (Warm Earth) ── */
@@ -54,6 +56,8 @@
   --wiki-red-bg: var(--red-bg);
   --wiki-accent: var(--accent);
   --wiki-accent-bg: var(--accent-bg);
+  --wiki-gray: var(--foreground-muted);
+  --wiki-gray-bg: rgba(237,228,214,0.06);
 }
 
 /* ── Sticky nav bar (breadcrumb + section anchors) ── */
@@ -61,8 +65,9 @@
 .wiki-page[data-theme="dark"] { --wiki-nav-bg: rgba(42,36,32,0.93); }
 .wiki-nav {
   position: sticky;
-  top: 0;
-  z-index: 100;
+  /* Sit just below the global JeromeluTopBar (56px). */
+  top: 56px;
+  z-index: 40;
   background: var(--wiki-nav-bg, rgba(250,249,245,0.93));
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--wiki-border);
@@ -131,12 +136,7 @@
 .wiki-nav-sections::-webkit-scrollbar { display: none; }
 .wiki-nav-sections a { padding: 0.85rem 0.75rem; }
 
-/* ── Wiki page offset to clear avatar/sidebar on desktop ── */
-@media (min-width: 1024px) {
-  .wiki-page {
-    padding-left: 300px;
-  }
-}
+/* Wiki page top offset is handled by AppShell (TOPBAR_HEIGHT). No sidebar offset. */
 
 /* ── Hero ── */
 .wiki-hero {
@@ -156,7 +156,7 @@
 .wiki-hero h1 {
   font-family: var(--wiki-serif);
   font-size: clamp(2.6rem, 5.5vw, 3.6rem);
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.1;
   margin-bottom: 0.75rem;
   color: var(--wiki-ink);
@@ -220,7 +220,7 @@
 .wiki-content h2 {
   font-family: var(--wiki-serif);
   font-size: clamp(1.8rem, 4vw, 2.4rem);
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.2;
   color: var(--wiki-ink);
   margin-bottom: 1.25rem;
@@ -228,7 +228,7 @@
 .wiki-content h3 {
   font-family: var(--wiki-serif);
   font-size: 1.25rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--wiki-ink);
   margin: 2.5rem 0 0.6rem;
 }
@@ -296,7 +296,7 @@
 .wiki-stat-card .value {
   font-family: var(--wiki-serif);
   font-size: 1.6rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--wiki-ink);
   margin-bottom: 0.15rem;
 }
@@ -375,7 +375,7 @@
     left: 0;
     top: -0.15rem;
     font-family: var(--wiki-serif);
-    font-weight: 600;
+    font-weight: 700;
     line-height: 1;
   }
   & .wiki-callout::before { content: "\201C"; font-size: 2.8rem; color: var(--wiki-accent); }
@@ -429,7 +429,7 @@
 .wiki-tag.purple { background: var(--wiki-purple-bg); color: var(--wiki-purple); }
 .wiki-tag.teal { background: var(--wiki-teal-bg); color: var(--wiki-teal); }
 .wiki-tag.accent { background: var(--wiki-accent-bg); color: var(--wiki-accent); }
-.wiki-tag.gray { background: #e8e5de; color: #5c5848; }
+.wiki-tag.gray { background: var(--wiki-gray-bg); color: var(--wiki-gray); }
 
 /* ── Trust/advisor list ── */
 .wiki-trust-list {
@@ -602,7 +602,7 @@
   justify-content: center;
   font-family: var(--wiki-serif);
   font-size: 0.85rem;
-  font-weight: 600;
+  font-weight: 700;
   position: relative;
   z-index: 1;
 }
@@ -611,7 +611,7 @@
 .wiki-timeline-dot.green { background: var(--wiki-green-bg); color: var(--wiki-green); }
 .wiki-timeline-dot.teal { background: var(--wiki-teal-bg); color: var(--wiki-teal); }
 .wiki-timeline-dot.purple { background: var(--wiki-purple-bg); color: var(--wiki-purple); }
-.wiki-timeline-dot.gray { background: #e8e5de; color: #5c5848; }
+.wiki-timeline-dot.gray { background: var(--wiki-gray-bg); color: var(--wiki-gray); }
 .wiki-timeline-body { padding-top: 0.3rem; }
 .wiki-timeline-body h4 {
   font-size: 13px;
@@ -666,4 +666,6 @@
   --wiki-green-bg: var(--teal-bg);
   --wiki-red: var(--red);
   --wiki-red-bg: var(--red-bg);
+  --wiki-gray: var(--foreground-muted);
+  --wiki-gray-bg: rgba(237,228,214,0.06);
 }
