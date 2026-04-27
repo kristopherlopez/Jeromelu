@@ -19,6 +19,10 @@ services:
     image: pgvector/pgvector:pg16
     container_name: jeromelu-postgres
     restart: unless-stopped
+    # Bind to host loopback only so SSH-tunneled GUI clients (pgAdmin, etc.)
+    # can reach Postgres without exposing it to the public internet.
+    ports:
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_DB: jeromelu
       POSTGRES_USER: jeromelu_admin
