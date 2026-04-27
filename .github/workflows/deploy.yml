@@ -80,18 +80,16 @@ jobs:
   deploy-lightsail:
     needs: [detect-changes, build-and-push]
     if: needs.detect-changes.outputs.api == 'true' || needs.detect-changes.outputs.web == 'true'
-    runs-on: ubuntu-latest
+    # Runs on the self-hosted runner installed on the Lightsail box itself —
+    # no inbound SSH from GitHub required, so the firewall can keep port 22
+    # locked to the operator's IP. See docs/ops/ci-runner.md.
+    runs-on: [self-hosted, jeromelu-prod]
     steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.LIGHTSAIL_HOST }}
-          username: ${{ secrets.LIGHTSAIL_USER }}
-          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
-          script: |
-            cd /opt/jeromelu
-            git pull --ff-only
-            IMAGE_TAG=${{ github.sha }} /opt/jeromelu/scripts/lightsail-deploy.sh
+      - name: Pull master and redeploy
+        run: |
+          cd /opt/jeromelu
+          git pull --ff-only
+          IMAGE_TAG=${{ github.sha }} /opt/jeromelu/scripts/lightsail-deploy.sh
 
   invalidate-cdn:
     needs: [detect-changes, deploy-lightsail]
