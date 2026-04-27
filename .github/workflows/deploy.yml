@@ -86,10 +86,14 @@ jobs:
     runs-on: [self-hosted, jeromelu-prod]
     steps:
       - name: Pull master and redeploy
+        # Deploys :latest (which build-and-push pushes alongside the SHA tag).
+        # Can't pin to ${{ github.sha }} here: path-filter builds only one of
+        # api/web per push, so the SHA tag won't exist for the unchanged image.
+        # For manual rollback, ssh in and run with IMAGE_TAG=<sha>.
         run: |
           cd /opt/jeromelu
           git pull --ff-only
-          IMAGE_TAG=${{ github.sha }} /opt/jeromelu/scripts/lightsail-deploy.sh
+          /opt/jeromelu/scripts/lightsail-deploy.sh
 
   invalidate-cdn:
     needs: [detect-changes, deploy-lightsail]

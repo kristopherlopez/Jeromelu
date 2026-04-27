@@ -9,7 +9,10 @@
 #   - /opt/jeromelu          checkout of this repo (or just docker/ + scripts/)
 #   - /opt/jeromelu/.env     runtime secrets (POSTGRES_PASSWORD, OPENAI_API_KEY, ...)
 #   - aws CLI authenticated  for `aws ecr get-login-password`
-#   - IMAGE_TAG              git sha to deploy (defaults to latest)
+#   - IMAGE_TAG              optional: pin to a specific git sha for rollback;
+#                            defaults to "latest". CI does NOT pass a sha because
+#                            path-filter builds only one of api/web per push, so
+#                            a single SHA tag won't exist for the unchanged image.
 
 set -euo pipefail
 
