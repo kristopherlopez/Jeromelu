@@ -6,6 +6,7 @@
 # Required environment (sourced from /opt/jeromelu/.env on the host):
 #   POSTGRES_PASSWORD       — db password (rotate from current RDS password on cutover)
 #   OPENAI_API_KEY
+#   ANTHROPIC_API_KEY       — required for Claude-Agent-SDK agents (Scout, etc.)
 #   ADMIN_KEY               — protects /api/admin/*
 #   AWS_ACCESS_KEY_ID       — for S3 access from api / pg-backup cron
 #   AWS_SECRET_ACCESS_KEY
@@ -44,6 +45,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://jeromelu_admin:${POSTGRES_PASSWORD}@postgres:5432/jeromelu
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       ADMIN_KEY: ${ADMIN_KEY}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
@@ -51,6 +53,7 @@ services:
       S3_RAW_BUCKET: jeromelu-raw-transcripts
       S3_CLEAN_BUCKET: jeromelu-clean-documents
       S3_ASSETS_BUCKET: jeromelu-public-assets
+      S3_AGENT_LOGS_BUCKET: jeromelu-clean-documents
       ENV: production
     depends_on:
       postgres:
