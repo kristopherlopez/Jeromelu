@@ -1,4 +1,4 @@
-export type WikiPageType = "player" | "team" | "advisor" | "round";
+export type WikiPageType = "player" | "team" | "advisor" | "round" | "channel";
 
 export interface WikiPageSummary {
   page_id: string;
@@ -18,6 +18,19 @@ export interface WikiEntity {
   metadata_json: Record<string, unknown>;
 }
 
+export interface WikiChannel {
+  channel_id: string;
+  slug: string;
+  platform: string;
+  name: string;
+  url: string | null;
+  description: string | null;
+  quality_rating: number;
+  tags: string[];
+  active: boolean;
+  last_polled_at: string | null;
+}
+
 export interface WikiPageDetail {
   page_id: string;
   slug: string;
@@ -28,6 +41,7 @@ export interface WikiPageDetail {
   status: string;
   metadata_json: Record<string, unknown>;
   entity: WikiEntity | null;
+  channel: WikiChannel | null;
   updated_at: string;
   revision_count: number;
 }

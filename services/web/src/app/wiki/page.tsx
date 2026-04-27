@@ -5,7 +5,7 @@ import type { WikiPagesResponse, WikiChangesResponse } from "./wiki-data";
 export const metadata = {
   title: "The Wiki | Jaromelu",
   description:
-    "Browse everything Jaromelu knows — players, teams, advisors, rounds.",
+    "Browse everything Jaromelu knows — players, teams, voices, rounds.",
 };
 
 export default async function WikiPage() {

@@ -15,44 +15,37 @@ import json
 import logging
 import os
 import time
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any
-from uuid import uuid4
 
 from anthropic import Anthropic
 from sqlalchemy.orm import Session
 
+from jeromelu_shared.agent_audit import (
+    AgentAuditLog,
+    AgentBounds,
+    estimate_token_cost,
+    make_run_id,
+    record_agent_ended,
+    record_agent_started,
+)
+from jeromelu_shared.config import settings
+
 from app.scout.prompt import SCOUT_SYSTEM_PROMPT, build_user_brief
-from app.scout.tools import CUSTOM_TOOL_HANDLERS, all_tools
+from app.scout.tools import CUSTOM_TOOL_HANDLERS, all_tools, summarise_known_sources
+
+# Scout's identity for the standard agent_audit machinery
+AGENT_ID = "scout"
+AGENT_NAME = "Scout"
 
 logger = logging.getLogger(__name__)
 
 
-# Pricing in USD per million tokens. Verify against current Anthropic pricing.
-# Used only for the budget gate — rough is fine.
-_PRICING = {
-    "claude-sonnet-4-6": {
-        "input": 3.00,
-        "output": 15.00,
-        "cache_read": 0.30,
-        "cache_write_5m": 3.75,
-    },
-    "claude-opus-4-7": {
-        "input": 15.00,
-        "output": 75.00,
-        "cache_read": 1.50,
-        "cache_write_5m": 18.75,
-    },
-}
-
-
-@dataclass
-class ScoutBounds:
-    max_turns: int = 20
-    max_tool_calls: int = 60
-    max_wall_seconds: int = 900            # 15 min
-    max_budget_usd: float = 3.00
+# Bounds + cost estimation come from the shared agent_audit module so all
+# agents share the same bounds shape and pricing table. Back-compat alias for
+# anything importing ScoutBounds from this module (notably cli.py).
+ScoutBounds = AgentBounds
 
 
 @dataclass
@@ -75,22 +68,6 @@ class ScoutRunResult:
     notes: list[str] = field(default_factory=list)
 
 
-def _estimate_cost(
-    model: str,
-    input_tokens: int,
-    output_tokens: int,
-    cache_read_tokens: int,
-    cache_write_tokens: int,
-) -> float:
-    p = _PRICING.get(model, _PRICING["claude-sonnet-4-6"])
-    return (
-        (input_tokens / 1_000_000) * p["input"]
-        + (output_tokens / 1_000_000) * p["output"]
-        + (cache_read_tokens / 1_000_000) * p["cache_read"]
-        + (cache_write_tokens / 1_000_000) * p["cache_write_5m"]
-    )
-
-
 def _summarise_tool_input(name: str, payload: dict[str, Any]) -> str:
     """Compact one-line summary of a tool call for console theatre."""
     if name == "web_search":
@@ -99,6 +76,9 @@ def _summarise_tool_input(name: str, payload: dict[str, Any]) -> str:
         return f"web_fetch({payload.get('url', '?')})"
     if name == "dedupe_check":
         return f"dedupe_check({payload.get('kind', '?')}, {payload.get('url', '?')})"
+    if name == "dedupe_check_bulk":
+        items = payload.get("items", [])
+        return f"dedupe_check_bulk({len(items)} items)"
     if name == "persist_candidate":
         return (
             f"persist_candidate({payload.get('kind', '?')} | "
@@ -112,12 +92,12 @@ def run_scout(
     *,
     brief: str | None = None,
     model: str = "claude-sonnet-4-6",
-    bounds: ScoutBounds | None = None,
+    bounds: AgentBounds | None = None,
     dry_run: bool = False,
 ) -> ScoutRunResult:
     """Run one Scout sweep. Synchronous — call from a CLI or background task."""
-    bounds = bounds or ScoutBounds()
-    run_id = f"scout-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}-{uuid4().hex[:6]}"
+    bounds = bounds or AgentBounds()
+    run_id = make_run_id(AGENT_ID)
     start_ts = time.time()
     started_at = datetime.now(timezone.utc)
 
@@ -127,6 +107,15 @@ def run_scout(
 
     client = Anthropic(api_key=api_key)
 
+    # Standard agent audit log: each event lands in agent_events (queryable
+    # live) and is buffered for a JSONL bundle uploaded to S3 at run end.
+    audit = AgentAuditLog(
+        session=session,
+        agent_id=AGENT_ID,
+        run_id=run_id,
+        s3_bucket=settings.s3_agent_logs_bucket,
+    )
+
     system = [
         {
             "type": "text",
@@ -135,8 +124,13 @@ def run_scout(
         }
     ]
     tools = all_tools()
+
+    # Per-run dynamic context: the known set goes in the user message (NOT the
+    # system prompt) so the system-prompt cache stays warm across runs.
+    known_set = summarise_known_sources(session)
+    user_brief = f"{known_set}\n\n---\n\n{build_user_brief(brief)}"
     messages: list[dict[str, Any]] = [
-        {"role": "user", "content": build_user_brief(brief)}
+        {"role": "user", "content": user_brief}
     ]
 
     turns = 0
@@ -149,11 +143,25 @@ def run_scout(
     notes: list[str] = []
 
     print(f"\n=== Scout run {run_id} (model={model}, dry_run={dry_run}) ===\n")
-    print(f"[brief] {build_user_brief(brief)}\n")
+    print(f"[brief]\n{user_brief}\n")
+
+    # Run-level audit start: crew_activity DB row + JSONL log header.
+    bounds_dict = asdict(bounds)
+    record_agent_started(
+        session,
+        agent_id=AGENT_ID,
+        agent_name=AGENT_NAME,
+        run_id=run_id,
+        model=model,
+        brief=user_brief,
+        bounds=bounds_dict,
+    )
+    audit.run_started(model=model, brief=user_brief, bounds=bounds_dict)
 
     while turns < bounds.max_turns:
         turns += 1
         print(f"\n--- turn {turns} ---")
+        audit.turn_started(turn=turns)
 
         try:
             with client.messages.stream(
@@ -176,6 +184,7 @@ def run_scout(
         except Exception as e:
             status = "failed"
             notes.append(f"turn {turns} api error: {e}")
+            audit.error(where=f"turn {turns} api", message=str(e))
             logger.exception("Scout API error")
             break
 
@@ -195,20 +204,35 @@ def run_scout(
             }
         )
 
-        # Walk the content for client-side tool_use blocks
+        # Walk every content block for the audit trail; only client-side
+        # tool_use blocks need a tool_result fed back next turn.
         tool_results: list[dict[str, Any]] = []
         for block in final.content:
-            if block.type != "tool_use":
+            btype = getattr(block, "type", "unknown")
+
+            if btype == "text":
+                audit.text(turn=turns, text=getattr(block, "text", "") or "")
                 continue
+
+            if btype != "tool_use":
+                # server_tool_use, web_search_tool_result, web_fetch_tool_result, etc.
+                # All run on Anthropic's side — log the block for forensics.
+                try:
+                    payload = block.model_dump()
+                except Exception:
+                    payload = {"repr": repr(block)}
+                audit.server_block(turn=turns, btype=btype, payload=payload)
+                continue
+
+            # Client-side tool call
             name = block.name
             tool_calls += 1
 
             print(f"[tool] {_summarise_tool_input(name, block.input)}")
+            audit.tool_use(
+                turn=turns, name=name, id=block.id, input=dict(block.input)
+            )
 
-            # Built-in tools (web_search, web_fetch) execute server-side; we don't
-            # see them as tool_use blocks — the API returns server_tool_use /
-            # web_search_tool_result blocks and continues. Only our custom tools
-            # need handling here.
             if name not in CUSTOM_TOOL_HANDLERS:
                 continue
 
@@ -233,6 +257,13 @@ def run_scout(
                         duplicates_skipped += 1
 
                 print(f"[tool-result] {json.dumps(result, default=str)[:300]}")
+                audit.tool_result(
+                    turn=turns,
+                    name=name,
+                    tool_use_id=block.id,
+                    result=result,
+                    is_error=False,
+                )
                 tool_results.append(
                     {
                         "type": "tool_result",
@@ -243,6 +274,13 @@ def run_scout(
             except Exception as e:
                 logger.exception("Custom tool %s failed", name)
                 notes.append(f"tool {name} failed: {e}")
+                audit.tool_result(
+                    turn=turns,
+                    name=name,
+                    tool_use_id=block.id,
+                    result={"error": str(e)},
+                    is_error=True,
+                )
                 tool_results.append(
                     {
                         "type": "tool_result",
@@ -252,6 +290,18 @@ def run_scout(
                     }
                 )
 
+        # Per-turn audit summary
+        audit.turn_complete(
+            turn=turns,
+            stop_reason=stop_reason,
+            usage={
+                "input_tokens": u.input_tokens,
+                "output_tokens": u.output_tokens,
+                "cache_read_input_tokens": getattr(u, "cache_read_input_tokens", 0) or 0,
+                "cache_creation_input_tokens": getattr(u, "cache_creation_input_tokens", 0) or 0,
+            },
+        )
+
         if tool_results:
             messages.append({"role": "user", "content": tool_results})
 
@@ -260,28 +310,32 @@ def run_scout(
             break
         if stop_reason == "max_tokens":
             notes.append(f"turn {turns} hit max_tokens; stopping")
+            audit.bound_hit(bound="max_tokens", value=turns)
             status = "aborted"
             break
 
         # Bounds
         elapsed = time.time() - start_ts
-        cost_so_far = _estimate_cost(model, in_tok, out_tok, cache_r, cache_w)
+        cost_so_far = estimate_token_cost(model, in_tok, out_tok, cache_r, cache_w)
 
         if elapsed > bounds.max_wall_seconds:
             notes.append(f"wall-clock bound hit at {elapsed:.0f}s")
+            audit.bound_hit(bound="max_wall_seconds", value=round(elapsed, 1))
             status = "aborted"
             break
         if tool_calls >= bounds.max_tool_calls:
             notes.append(f"max_tool_calls ({bounds.max_tool_calls}) hit")
+            audit.bound_hit(bound="max_tool_calls", value=tool_calls)
             status = "aborted"
             break
         if cost_so_far >= bounds.max_budget_usd:
             notes.append(f"budget ${cost_so_far:.3f} >= cap ${bounds.max_budget_usd}")
+            audit.bound_hit(bound="max_budget_usd", value=round(cost_so_far, 4))
             status = "aborted"
             break
 
     ended_at = datetime.now(timezone.utc)
-    final_cost = _estimate_cost(model, in_tok, out_tok, cache_r, cache_w)
+    final_cost = estimate_token_cost(model, in_tok, out_tok, cache_r, cache_w)
 
     result = ScoutRunResult(
         run_id=run_id,
@@ -302,12 +356,54 @@ def run_scout(
         notes=notes,
     )
 
+    summary_dict = {
+        "turns_used": turns,
+        "tool_calls": tool_calls,
+        "candidates_filed": candidates_filed,
+        "duplicates_skipped": duplicates_skipped,
+        "input_tokens": in_tok,
+        "output_tokens": out_tok,
+        "cache_read_tokens": cache_r,
+        "cache_write_tokens": cache_w,
+        "estimated_cost_usd": round(final_cost, 4),
+        "stop_reason": stop_reason,
+        "notes": notes,
+        "started_at": started_at.isoformat(),
+        "ended_at": ended_at.isoformat(),
+    }
+
+    audit.run_ended(status=status, summary=summary_dict)
+    s3_log_key = audit.flush_to_s3()
+
+    summary_text = (
+        f"Scout run {status} — {candidates_filed} filed, {duplicates_skipped} dupes, "
+        f"{turns} turns, {tool_calls} tool calls, ${final_cost:.3f}"
+    )
+    record_agent_ended(
+        session,
+        agent_id=AGENT_ID,
+        agent_name=AGENT_NAME,
+        run_id=run_id,
+        status=status,
+        summary_text=summary_text,
+        detail={
+            **summary_dict,
+            "model": model,
+            "s3_log_key": s3_log_key,
+            "s3_log_bucket": settings.s3_agent_logs_bucket if s3_log_key else None,
+            "agent_events_count": audit.event_count,
+        },
+    )
+
     print(f"\n=== Scout run done ===")
     print(f"  status: {status}")
     print(f"  turns: {turns}, tool_calls: {tool_calls}")
     print(f"  filed: {candidates_filed}, duplicates: {duplicates_skipped}")
     print(f"  tokens: in={in_tok} out={out_tok} cache_read={cache_r} cache_write={cache_w}")
     print(f"  est. cost: ${final_cost:.4f}")
+    print(f"  events: {audit.event_count} rows in agent_events (run_id={run_id})")
+    if s3_log_key:
+        print(f"  bundle: s3://{settings.s3_agent_logs_bucket}/{s3_log_key}")
     if notes:
         print(f"  notes: {notes}")
     print()

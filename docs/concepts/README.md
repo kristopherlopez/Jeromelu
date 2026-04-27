@@ -27,3 +27,4 @@ The underlying concepts (drill-downs, remarks, crew presence, the stream) still 
 | [06-audience.md](06-audience.md) | Audience interaction patterns |
 | [07-first-run.md](07-first-run.md) | First-run experience |
 | [08-stitch-requirements.md](08-stitch-requirements.md) | Stitch requirements for composed UI |
+| [entity-roles.md](entity-roles.md) | Entity-role SCD-2 model — how a single person carries multiple roles over time |

@@ -6,6 +6,7 @@ from jeromelu_shared.db.models import (
     SourceDocument,
     SourceChunk,
     Entity,
+    EntityRole,
     Quote,
     Claim,
     ClaimChunk,
@@ -24,6 +25,7 @@ from jeromelu_shared.db.models import (
     SquadSlot,
     SquadTrade,
     DiscoveredSource,
+    AgentEvent,
 )
 
 __all__ = [
@@ -36,6 +38,7 @@ __all__ = [
     "SourceDocument",
     "SourceChunk",
     "Entity",
+    "EntityRole",
     "Quote",
     "Claim",
     "ClaimChunk",
@@ -54,4 +57,5 @@ __all__ = [
     "SquadSlot",
     "SquadTrade",
     "DiscoveredSource",
+    "AgentEvent",
 ]

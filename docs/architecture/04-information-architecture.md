@@ -91,11 +91,38 @@ Internal only:
 
 ### entities
 - entity_id
-- entity_type (player, team, expert, advisor, matchup, round)
+- entity_type (player, team, advisor, coach, referee, commentator, journalist, matchup, round) — denorm of current primary role for people-typed entities
 - canonical_name
 - aliases
 - slug
 - metadata_json
+
+### entity_roles (SCD-2)
+Tracks role tenure so a single entity can carry multiple sequential or concurrent roles
+(e.g. Andrew Johns: player → commentator; Michael Ennis: coach + commentator).
+- entity_role_id
+- entity_id (FK → entities)
+- role (player, coach, commentator, journalist, referee, advisor)
+- effective_from (DATE)
+- effective_to (DATE, NULL = current)
+- is_primary (drives the wiki page route; one current primary per entity, enforced by partial unique index)
+- metadata_json (role-scoped: team for player, network for commentator, club for coach)
+- source
+
+See [Entity roles](../concepts/entity-roles.md) for worked examples and the role-transition pattern.
+
+### wiki_pages
+- page_id
+- entity_id (FK → entities, nullable)
+- channel_id (FK → channels, nullable)
+- page_type (player, team, advisor, channel, round)
+- slug (UNIQUE)
+- title, content, summary, metadata_json, status
+- exactly one of entity_id / channel_id is set per row (`ck_wiki_page_subject`)
+
+Channel-typed pages describe the outlet (SC Playbook YouTube). Entity-typed
+pages describe a person/team/round. The wiki index combines `advisor` and
+`channel` pages under the **Voices** tab. See [Wiki overview](../pages/wiki/overview.md).
 
 ### quotes
 - quote_id

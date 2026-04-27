@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     s3_clean_bucket: str = "jeromelu-clean-documents"
     s3_assets_bucket: str = "jeromelu-public-assets"
     s3_player_data_bucket: str = "jeromelu-player-data"
+    s3_agent_logs_bucket: str = "jeromelu-clean-documents"
     openai_api_key: str = ""
     openrouter_api_key: str = ""
     llm_provider: str = "openai"  # "openai" or "openrouter"

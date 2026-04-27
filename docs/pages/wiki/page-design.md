@@ -343,11 +343,28 @@ Renders as a centered bordered box with "Jaromelu's Call" kicker and serif itali
 
 | Route | Page | Content |
 |-------|------|---------|
-| `/wiki` | Index | Editorial dashboard (Explore topics, Recently Updated, How this connects) — sub-bar with `Players / Teams / Advisors / Rounds` filter + search appears once a tab is selected or a search is typed |
+| `/wiki` | Index | Editorial dashboard (Explore topics, Recently Updated, How this connects) — sub-bar with `Players / Teams / Voices / Rounds` filter + search appears once a tab is selected or a search is typed. The **Voices** tab combines channel and advisor pages. |
 | `/wiki/player/[slug]` | Player page | Full editorial page |
 | `/wiki/team/[slug]` | Team page | Full editorial page |
-| `/wiki/advisor/[slug]` | Advisor page | Full editorial page + track record |
+| `/wiki/channel/[slug]` | Channel page | Lighter template — About, Recent Sources, Coverage, Hosts (placeholder until advisors land) |
+| `/wiki/advisor/[slug]` | Advisor page | Full editorial page + track record (deferred — schema reserved, no rows seeded yet) |
 | `/wiki/round/[season]/[round]` | Round page | Preview → recap with game subsections |
+
+### Channel page template
+
+Channel pages are operationally lean — what we have is concrete (URL, platform,
+quality_rating, polling cadence) and we don't fabricate editorial commentary
+for an outlet we haven't analysed. Default sections:
+
+```
+## About            — channels.description
+## Recent Sources   — last 10 ingested artifacts (timestamps, claim counts)
+## Coverage         — channels.tags (e.g. captain, trades, value_picks, injuries)
+## Hosts            — links to advisor pages; placeholder until advisors exist
+```
+
+Phase 3 adds `## Track Record` once we can score channel-level prediction
+accuracy.
 
 ---
 

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from jeromelu_shared.db import Entity, WikiPage, WikiRevision
+from jeromelu_shared.db import Channel, Entity, WikiPage, WikiRevision
 
 from ..deps import get_db
 
@@ -123,8 +123,17 @@ def get_page(slug: str, db: Session = Depends(get_db)):
     if not page:
         raise HTTPException(status_code=404, detail="Wiki page not found")
 
-    # Load the entity
-    entity = db.query(Entity).filter(Entity.entity_id == page.entity_id).first()
+    # Load the subject — entity for entity-backed pages, channel for channel pages
+    entity = (
+        db.query(Entity).filter(Entity.entity_id == page.entity_id).first()
+        if page.entity_id
+        else None
+    )
+    channel = (
+        db.query(Channel).filter(Channel.channel_id == page.channel_id).first()
+        if page.channel_id
+        else None
+    )
 
     # Recent revisions
     revisions = (
@@ -171,6 +180,18 @@ def get_page(slug: str, db: Session = Depends(get_db)):
                 "entity_type": entity.entity_type,
                 "metadata_json": entity.metadata_json,
             } if entity else None,
+            "channel": {
+                "channel_id": str(channel.channel_id),
+                "slug": channel.slug,
+                "platform": channel.platform,
+                "name": channel.name,
+                "url": channel.url,
+                "description": channel.description,
+                "quality_rating": channel.quality_rating,
+                "tags": channel.tags or [],
+                "active": channel.active,
+                "last_polled_at": channel.last_polled_at.isoformat() if channel.last_polled_at else None,
+            } if channel else None,
             "updated_at": page.updated_at.isoformat(),
             "revision_count": revision_count or 0,
         },

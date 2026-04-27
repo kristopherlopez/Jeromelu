@@ -9,6 +9,8 @@ import {
   Radio,
   Calendar,
   ChevronDown,
+  Mic,
+  Rss,
 } from "lucide-react";
 import type {
   WikiPageSummary,
@@ -27,15 +29,19 @@ const TYPE_CONFIG: Record<
 > = {
   player: { label: "Players", icon: FileText },
   team: { label: "Teams", icon: Users },
-  advisor: { label: "Advisors", icon: Radio },
+  advisor: { label: "Advisors", icon: Mic },
+  channel: { label: "Channels", icon: Rss },
   round: { label: "Rounds", icon: Calendar },
 };
+
+// Voices is a virtual tab that combines advisor + channel pages.
+const VOICES_TYPES: WikiPageType[] = ["advisor", "channel"];
 
 const FILTER_TABS: { key: string; label: string }[] = [
   { key: "all", label: "All" },
   { key: "player", label: "Players" },
   { key: "team", label: "Teams" },
-  { key: "advisor", label: "Advisors" },
+  { key: "voices", label: "Voices" },
   { key: "round", label: "Rounds" },
 ];
 
@@ -114,8 +120,11 @@ export default function WikiIndexClient({
 
   const filtered = useMemo(() => {
     let result = pages;
-    if (activeFilter !== "all")
+    if (activeFilter === "voices") {
+      result = result.filter((p) => VOICES_TYPES.includes(p.page_type));
+    } else if (activeFilter !== "all") {
       result = result.filter((p) => p.page_type === activeFilter);
+    }
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(
@@ -132,9 +141,14 @@ export default function WikiIndexClient({
       player: 0,
       team: 0,
       advisor: 0,
+      channel: 0,
       round: 0,
+      voices: 0,
     };
-    for (const p of pages) c[p.page_type] = (c[p.page_type] || 0) + 1;
+    for (const p of pages) {
+      c[p.page_type] = (c[p.page_type] || 0) + 1;
+      if (VOICES_TYPES.includes(p.page_type)) c.voices += 1;
+    }
     return c;
   }, [pages]);
 
@@ -184,7 +198,7 @@ export default function WikiIndexClient({
               lineHeight: 1.5,
             }}
           >
-            Players, teams, advisors and rounds — written and maintained by
+            Players, teams, voices and rounds — written and maintained by
             Jaromelu.
           </p>
         </header>
@@ -293,12 +307,33 @@ function Dashboard({
   search: string;
   onSearch: (s: string) => void;
 }) {
-  const topicOrder: WikiPageType[] = ["player", "team", "advisor", "round"];
-  const topicCopy: Record<WikiPageType, string> = {
-    player: "Profiles, form, value calls.",
-    team: "Squads, structures, edges.",
-    advisor: "The voices Jaromelu trusts.",
-    round: "Matchups, recaps, predictions.",
+  // Dashboard tiles use a "voices" virtual tile that combines advisor + channel.
+  type TopicKey = "player" | "team" | "voices" | "round";
+  const topicOrder: TopicKey[] = ["player", "team", "voices", "round"];
+  const topicConfig: Record<
+    TopicKey,
+    { label: string; icon: typeof FileText; copy: string }
+  > = {
+    player: {
+      label: "Players",
+      icon: FileText,
+      copy: "Profiles, form, value calls.",
+    },
+    team: {
+      label: "Teams",
+      icon: Users,
+      copy: "Squads, structures, edges.",
+    },
+    voices: {
+      label: "Voices",
+      icon: Radio,
+      copy: "Channels and the people behind them.",
+    },
+    round: {
+      label: "Rounds",
+      icon: Calendar,
+      copy: "Matchups, recaps, predictions.",
+    },
   };
 
   return (
@@ -322,7 +357,7 @@ function Dashboard({
           className="grid-cols-2 md:grid-cols-4"
         >
           {topicOrder.map((key) => {
-            const cfg = TYPE_CONFIG[key];
+            const cfg = topicConfig[key];
             const Icon = cfg.icon;
             return (
               <button
@@ -367,7 +402,7 @@ function Dashboard({
                     lineHeight: 1.4,
                   }}
                 >
-                  {topicCopy[key]}
+                  {cfg.copy}
                 </div>
                 <div
                   style={{
@@ -437,7 +472,7 @@ function Dashboard({
         <SectionTitle>The map of NRL knowledge.</SectionTitle>
         <SectionSubtitle>
           Soon: hover to explore the relations between players, teams, rounds
-          and the advisors talking about them.
+          and the voices talking about them.
         </SectionSubtitle>
 
         <ConnectsTeaser />
@@ -615,7 +650,7 @@ function ConnectsTeaser() {
       <NodeChip x="50%" y="46%" emphasis>Edge Attack</NodeChip>
       <NodeChip x="18%" y="22%">Player</NodeChip>
       <NodeChip x="82%" y="22%">Team</NodeChip>
-      <NodeChip x="18%" y="72%">Advisor</NodeChip>
+      <NodeChip x="18%" y="72%">Voice</NodeChip>
       <NodeChip x="82%" y="72%">Round</NodeChip>
       <NodeChip x="50%" y="14%">Tactic</NodeChip>
 
@@ -733,6 +768,7 @@ function RecentTypeIcon({ type }: { type: WikiPageType }) {
     player: { bg: v.tealBg, color: v.teal, letter: "P" },
     team: { bg: v.accentBg, color: v.accent, letter: "T" },
     advisor: { bg: v.purpleBg, color: v.purple, letter: "A" },
+    channel: { bg: v.purpleBg, color: v.purple, letter: "C" },
     round: { bg: v.amberBg, color: v.amber, letter: "R" },
   };
   const c = config[type];

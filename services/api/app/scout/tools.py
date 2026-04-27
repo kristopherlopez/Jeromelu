@@ -1,7 +1,11 @@
 """Scout's tool palette — Anthropic tool definitions + Python handlers.
 
 Built-in tools (Anthropic-hosted): web_search, web_fetch.
-Custom tools (local Python): dedupe_check, persist_candidate.
+Custom tools (local Python): dedupe_check, dedupe_check_bulk, persist_candidate.
+
+Also exposes `summarise_known_sources()` — used by the run loop to seed the
+per-run user brief with the channels Scout already knows, so it doesn't
+re-discover them.
 """
 
 from __future__ import annotations
@@ -152,9 +156,45 @@ PERSIST_CANDIDATE_TOOL: dict[str, Any] = {
 }
 
 
+DEDUPE_CHECK_BULK_TOOL: dict[str, Any] = {
+    "name": "dedupe_check_bulk",
+    "description": (
+        "Batched dedupe. Pass a list of {kind, url} items (typically a whole "
+        "page of web_search results) and get back a known/unknown verdict for "
+        "each in one call. PREFER THIS over single dedupe_check whenever you "
+        "have more than one candidate to check — it saves turns and keeps you "
+        "from drilling into already-known sources."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "items": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "kind": {"type": "string", "enum": ["channel", "video"]},
+                        "url": {"type": "string"},
+                    },
+                    "required": ["kind", "url"],
+                },
+                "description": "List of candidates to check.",
+            },
+        },
+        "required": ["items"],
+    },
+}
+
+
 def all_tools() -> list[dict[str, Any]]:
     """Tool array passed to the Anthropic Messages API."""
-    return [WEB_SEARCH_TOOL, WEB_FETCH_TOOL, DEDUPE_CHECK_TOOL, PERSIST_CANDIDATE_TOOL]
+    return [
+        WEB_SEARCH_TOOL,
+        WEB_FETCH_TOOL,
+        DEDUPE_CHECK_BULK_TOOL,
+        DEDUPE_CHECK_TOOL,
+        PERSIST_CANDIDATE_TOOL,
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -339,7 +379,94 @@ def handle_persist_candidate(
     }
 
 
+def handle_dedupe_check_bulk(
+    session: Session, *, items: list[dict[str, str]]
+) -> dict[str, Any]:
+    """Batched dedupe — check many URLs in one tool call.
+
+    Each item: {"kind": "channel"|"video", "url": "..."}.
+    Returns: {"results": [{...same shape as dedupe_check..., "input": item}, ...]}.
+    """
+    results: list[dict[str, Any]] = []
+    for item in items:
+        kind = item.get("kind", "")
+        url = item.get("url", "")
+        if kind not in ("channel", "video") or not url:
+            results.append(
+                {"input": item, "ok": False, "error": "invalid-item"}
+            )
+            continue
+        verdict = handle_dedupe_check(session, kind=kind, url=url)
+        results.append({"input": item, **verdict})
+    return {"checked": len(results), "results": results}
+
+
+def summarise_known_sources(session: Session, *, max_lines: int = 200) -> str:
+    """Build a compact text summary of YouTube sources Scout already knows.
+
+    Used to seed the per-run user brief. Two sections:
+      1. Tracked channels (in `channels`, active or inactive)
+      2. Previously surfaced candidates (in `discovered_sources`, any status)
+
+    Capped at `max_lines` total to keep token cost bounded.
+    """
+    tracked = session.execute(
+        select(Channel.name, Channel.external_id, Channel.active)
+        .where(Channel.platform == "youtube")
+        .order_by(Channel.name)
+    ).all()
+
+    surfaced = session.execute(
+        select(
+            DiscoveredSource.title,
+            DiscoveredSource.external_id,
+            DiscoveredSource.status,
+        )
+        .where(
+            DiscoveredSource.platform == "youtube",
+            DiscoveredSource.kind == "channel",
+        )
+        .order_by(DiscoveredSource.discovered_at.desc())
+    ).all()
+
+    lines: list[str] = []
+    lines.append("KNOWN SET — DO NOT REDISCOVER")
+    lines.append("")
+
+    if tracked:
+        lines.append(f"Tracked YouTube channels ({len(tracked)}):")
+        for row in tracked[:max_lines]:
+            tag = "" if row.active else " [inactive]"
+            ext = row.external_id or "?"
+            lines.append(f"  - {row.name} — {ext}{tag}")
+        if len(tracked) > max_lines:
+            lines.append(f"  ... and {len(tracked) - max_lines} more")
+        lines.append("")
+
+    if surfaced:
+        lines.append(
+            f"Previously surfaced as candidates ({len(surfaced)}, any status):"
+        )
+        budget = max(0, max_lines - len(tracked))
+        for row in surfaced[:budget]:
+            lines.append(f"  - {row.title} — {row.external_id} [{row.status}]")
+        if len(surfaced) > budget:
+            lines.append(f"  ... and {len(surfaced) - budget} more")
+        lines.append("")
+
+    if not tracked and not surfaced:
+        lines.append("(empty — no known sources yet, you have a clean slate)")
+
+    lines.append(
+        "Rule: do not search for these names. If they appear in search results, "
+        "skip them. Search ADJACENT — niches around them, not them. Always run "
+        "dedupe_check_bulk on a fresh search result list before drilling in."
+    )
+    return "\n".join(lines)
+
+
 CUSTOM_TOOL_HANDLERS = {
     "dedupe_check": handle_dedupe_check,
+    "dedupe_check_bulk": handle_dedupe_check_bulk,
     "persist_candidate": handle_persist_candidate,
 }

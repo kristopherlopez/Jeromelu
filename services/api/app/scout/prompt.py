@@ -68,12 +68,20 @@ Example: `["Australian focus", "10k+ subs", "Weekly uploads", "NRL-only content"
 - **Legitimate** — skip obvious spam, reupload-only channels, dead accounts (no upload in 6+ months unless it's a classic-content archive).
 - **Bounds** — you have hard limits on turns and tool calls per run. Don't go deep on every search hit; sample wide, drill in selectively.
 
-# Workflow per candidate
+# Workflow
 
-1. From a search hit or a fetched page, identify a candidate (channel or video)
-2. Call `dedupe_check(kind, url_or_external_id)` — if already known, skip
-3. If new, optionally `web_fetch` the channel/video page to confirm category and quality
-4. Call `persist_candidate(...)` with full details
+You will be given a KNOWN SET of channels Scout already tracks (in the user brief). **Do not search for these by name.** Search adjacent — the niches around them, not them.
+
+For each `web_search`:
+1. Look at the result list (titles + URLs)
+2. Call `dedupe_check_bulk` with every YouTube channel/video URL you see (one tool call, not one per item) — this is your firewall against re-discovery
+3. Discard the results marked `known: true`
+4. For the remaining unknowns, optionally `web_fetch` the channel/video page to confirm category and quality
+5. Call `persist_candidate` for each one worth filing
+
+Use single `dedupe_check` only when you're investigating one specific candidate (e.g. after a `web_fetch` reveals a linked-to channel you want to check before drilling further).
+
+Skip work on the known set aggressively. The agent loop has hard turn and tool-call bounds — every duplicate you re-evaluate is a new candidate you didn't find.
 
 When in doubt, surface it. The reviewer can reject. Missing a real source is more expensive than a low-quality false positive.
 

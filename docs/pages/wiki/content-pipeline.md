@@ -119,13 +119,32 @@ Each page type has a defined section structure. The agent updates specific secti
 | `## Recent Results` | Agent (post-round) | Match stats |
 | `## Key Players` | Agent (post-round) | Top SC scorers, form players |
 
-### Advisor Pages
+### Channel Pages
+
+Channel pages describe the **outlet** (SC Playbook YouTube, NRL Physio Twitter).
+They are seeded from the `channels` table and updated as new sources are ingested
+through that channel.
 
 | Section | Updated by | Source data |
 |---------|-----------|-------------|
-| `## Overview` | Agent (infrequent) | Advisor/channel metadata |
-| `## Recent Calls` | Agent (post-claims) | Latest claims from this advisor |
-| `## Track Record` | Agent (post-round, Phase 3) | Prediction accuracy vs actuals |
+| `## About` | Agent (infrequent) | `channels.description`, platform metadata |
+| `## Recent Sources` | Agent (per-source) | Last ~10 `sources` rows for this channel |
+| `## Coverage` | Agent (infrequent) | `channels.tags` |
+| `## Hosts` | Agent (when advisor pages land) | Linked advisor entities (deferred until Phase 2 speaker diarisation) |
+| `## Track Record` | Agent (post-round, Phase 3) | Channel-level prediction accuracy |
+
+### Advisor Pages (deferred)
+
+Advisor pages describe the **person/voice** (Tim Williams, Brien Seeney). The
+schema and route exist but no advisor pages are seeded yet — they appear as
+the agent identifies named voices with confidence (post speaker diarisation).
+
+| Section | Updated by | Source data |
+|---------|-----------|-------------|
+| `## Overview` | Agent (infrequent) | Person bio, role history (`entity_roles`) |
+| `## Channels` | Agent (when host data exists) | Channels this person publishes through |
+| `## Recent Calls` | Agent (post-claims) | Latest claims where `quotes.speaker_entity_id` matches |
+| `## Track Record` | Agent (post-round, Phase 3) | Person-level accuracy across all their channels |
 
 ### Round Pages
 
@@ -151,6 +170,25 @@ Every wiki update creates a `wiki_revisions` record. The `source_trigger` field 
 | `seed_wiki.py` | Initial seeding (historical) |
 
 Revisions power the activity feed (`GET /api/wiki/recent-changes`) and per-page revision history.
+
+---
+
+## Role Transitions
+
+When the agent encounters evidence that a person's role has changed (e.g. a
+player has retired and started commentating), it should update `entity_roles`
+rather than mutating the entity row:
+
+1. Close the existing primary role: `UPDATE entity_roles SET effective_to = <date> WHERE entity_id = X AND is_primary AND effective_to IS NULL`.
+2. Insert the new primary role: `INSERT INTO entity_roles ... is_primary = TRUE, effective_to = NULL`.
+3. Sync the denorm: `UPDATE entities SET entity_type = '<new role>' WHERE entity_id = X`.
+
+For concurrent roles (Michael Ennis: coach + commentator), insert the secondary
+role with `is_primary = FALSE` and the same open `effective_to`. Only the primary
+role drives the wiki page route.
+
+Transition detection is slow-moving and operator-confirmed by default. See
+[Entity roles](../../concepts/entity-roles.md) for examples.
 
 ---
 

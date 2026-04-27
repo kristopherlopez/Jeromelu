@@ -31,24 +31,51 @@ See also: [Page design](page-design.md) · [Content pipeline](content-pipeline.m
 
 ---
 
-## Entity Types
+## Page Types
 
 ### Phase 1 (MVP)
 
-| Type | Route | Example |
-|------|-------|---------|
-| Player | `/wiki/player/[slug]` | `/wiki/player/tom-trbojevic` |
-| Team | `/wiki/team/[slug]` | `/wiki/team/melbourne-storm` |
-| Advisor | `/wiki/advisor/[slug]` | `/wiki/advisor/sc-playbook` |
-| Round | `/wiki/round/[season]/[round]` | `/wiki/round/2026/7` |
+| Type | Route | Example | Backed by |
+|------|-------|---------|-----------|
+| Player | `/wiki/player/[slug]` | `/wiki/player/tom-trbojevic` | `entities` |
+| Team | `/wiki/team/[slug]` | `/wiki/team/melbourne-storm` | `entities` |
+| Channel | `/wiki/channel/[slug]` | `/wiki/channel/sc-playbook-youtube` | `channels` |
+| Advisor | `/wiki/advisor/[slug]` | `/wiki/advisor/tim-williams` *(deferred)* | `entities` (advisor role) |
+| Round | `/wiki/round/[season]/[round]` | `/wiki/round/2026/7` | `entities` |
 
 Rounds include game subsections within the page content.
 
+**Channel vs Advisor.** A *channel* is the outlet (SC Playbook YouTube, NRL Physio
+Twitter); an *advisor* is the person/voice (Tim Williams, Brien Seeney). Channels
+have authoritative records and are seeded from the `channels` table; advisor
+pages are deferred until speaker diarisation provides confident person-level
+attribution. In the index, both surface under the **Voices** tab.
+
+`wiki_pages.entity_id` is now nullable; the new `channel_id` FK points to
+`channels` for channel-typed pages. Exactly one of `entity_id` / `channel_id` is
+set per row, enforced by `ck_wiki_page_subject`.
+
 ### Phase 2
 
-- Coaches
-- Referees
+- Coach pages (`/wiki/coach/[slug]`)
+- Referee pages (`/wiki/referee/[slug]`)
+- Commentator pages (`/wiki/commentator/[slug]`)
+- Journalist pages (`/wiki/journalist/[slug]`)
 - Topic/concept pages (agent-discovered)
+
+The underlying entity types (`coach`, `referee`, `commentator`, `journalist`) are
+already valid in `entities.entity_type` from migration `018_entity_roles.sql`.
+Wiki page templates and routes for them ship as Phase 2 lands.
+
+### Roles vs entity types
+
+A single person can hold multiple roles over time (Andrew Johns: player → commentator;
+Michael Ennis: coach + commentator concurrently). Identity is one entity row, with
+role tenure tracked in the `entity_roles` table. `entities.entity_type` carries the
+*current primary role* — used to drive the wiki page route. See
+[Entity roles](../../concepts/entity-roles.md) for the SCD-2 pattern and worked examples.
+
+The `expert` entity type was deprecated in migration 018 (use `advisor`).
 
 ---
 
@@ -59,8 +86,9 @@ Rounds include game subsections within the page content.
 | Column | Type | Notes |
 |--------|------|-------|
 | page_id | UUID PK | |
-| entity_id | UUID FK→entities | One page per entity |
-| page_type | TEXT | player, team, advisor, round |
+| entity_id | UUID FK→entities, nullable | One page per entity for entity-backed pages |
+| channel_id | UUID FK→channels, nullable | For channel-backed pages |
+| page_type | TEXT | player, team, advisor, channel, round |
 | slug | TEXT UNIQUE | URL slug |
 | title | TEXT | Display name |
 | content | TEXT | Markdown with `[[slug]]` wiki-links |
@@ -69,6 +97,8 @@ Rounds include game subsections within the page content.
 | status | TEXT | stub → draft → published |
 | created_at | TIMESTAMPTZ | |
 | updated_at | TIMESTAMPTZ | Auto-update |
+
+`ck_wiki_page_subject` enforces exactly one of `entity_id` / `channel_id` is set.
 
 ### wiki_revisions
 
@@ -84,7 +114,10 @@ Rounds include game subsections within the page content.
 | metadata_json | JSONB | |
 | created_at | TIMESTAMPTZ | |
 
-Migration: `packages/db/migrations/015_wiki.sql`
+Migrations:
+- `packages/db/migrations/015_wiki.sql` — initial schema
+- `packages/db/migrations/018_entity_roles.sql` — SCD-2 entity roles + new people types
+- `packages/db/migrations/019_wiki_channels.sql` — channel page type, channel_id FK, seeded 47 channel pages
 
 ---
 

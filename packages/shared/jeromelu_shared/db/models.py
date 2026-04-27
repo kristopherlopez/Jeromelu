@@ -143,10 +143,56 @@ class Entity(Base):
     metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
+    roles: Mapped[list["EntityRole"]] = relationship(back_populates="entity", cascade="all, delete-orphan")
+
     __table_args__ = (
-        CheckConstraint("entity_type IN ('player', 'team', 'expert', 'advisor', 'matchup', 'round')", name="ck_entity_type"),
+        CheckConstraint(
+            "entity_type IN ("
+            "'player', 'team', 'advisor', 'coach', 'referee', "
+            "'commentator', 'journalist', 'matchup', 'round'"
+            ")",
+            name="ck_entity_type",
+        ),
         Index("idx_entities_type", "entity_type"),
         Index("idx_entities_name", "canonical_name"),
+    )
+
+
+class EntityRole(Base):
+    __tablename__ = "entity_roles"
+
+    entity_role_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    entity_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("entities.entity_id", ondelete="CASCADE"), nullable=False
+    )
+    role: Mapped[str] = mapped_column(Text, nullable=False)
+    effective_from: Mapped[date] = mapped_column(Date, nullable=False)
+    effective_to: Mapped[date | None] = mapped_column(Date)
+    is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
+    source: Mapped[str] = mapped_column(Text, nullable=False, default="seed")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+    entity: Mapped["Entity"] = relationship(back_populates="roles")
+
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('player', 'coach', 'commentator', 'journalist', 'referee', 'advisor')",
+            name="ck_entity_roles_role",
+        ),
+        CheckConstraint(
+            "effective_to IS NULL OR effective_to >= effective_from",
+            name="ck_entity_roles_period",
+        ),
+        Index("idx_entity_roles_entity", "entity_id", "effective_to"),
+        Index("idx_entity_roles_role_period", "role", "effective_from", "effective_to"),
+        Index(
+            "uq_entity_roles_primary_current",
+            "entity_id",
+            unique=True,
+            postgresql_where="is_primary AND effective_to IS NULL",
+        ),
     )
 
 
@@ -487,7 +533,8 @@ class WikiPage(Base):
     __tablename__ = "wiki_pages"
 
     page_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
-    entity_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("entities.entity_id"), nullable=False)
+    entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("entities.entity_id"))
+    channel_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("channels.channel_id"))
     page_type: Mapped[str] = mapped_column(Text, nullable=False)
     slug: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     title: Mapped[str] = mapped_column(Text, nullable=False)
@@ -501,11 +548,20 @@ class WikiPage(Base):
     revisions: Mapped[list["WikiRevision"]] = relationship(back_populates="page", cascade="all, delete-orphan")
 
     __table_args__ = (
-        CheckConstraint("page_type IN ('player', 'team', 'advisor', 'round')", name="ck_wiki_page_type"),
+        CheckConstraint(
+            "page_type IN ('player', 'team', 'advisor', 'round', 'channel')",
+            name="ck_wiki_page_type",
+        ),
         CheckConstraint("status IN ('stub', 'draft', 'published')", name="ck_wiki_status"),
+        CheckConstraint(
+            "(entity_id IS NOT NULL AND channel_id IS NULL) "
+            "OR (entity_id IS NULL AND channel_id IS NOT NULL)",
+            name="ck_wiki_page_subject",
+        ),
         Index("idx_wiki_pages_type", "page_type"),
         Index("idx_wiki_pages_slug", "slug"),
         Index("idx_wiki_pages_entity", "entity_id"),
+        Index("idx_wiki_pages_channel", "channel_id"),
         Index("idx_wiki_pages_updated", "updated_at"),
         Index("idx_wiki_pages_status", "status"),
     )
@@ -529,6 +585,32 @@ class WikiRevision(Base):
     __table_args__ = (
         Index("idx_wiki_revisions_page", "page_id", "created_at"),
         Index("idx_wiki_revisions_created", "created_at"),
+    )
+
+
+class AgentEvent(Base):
+    """Per-event audit trail for Claude-Agent-SDK-based agents.
+
+    Live-queryable store for the JSONL event stream that gets uploaded to S3
+    at run end. One row per event; dense `sequence` per run for ordered replay.
+    See `docs/agents/system/agent-audit.md` for the standard event types.
+    """
+    __tablename__ = "agent_events"
+
+    event_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    run_id: Mapped[str] = mapped_column(Text, nullable=False)
+    agent_id: Mapped[str] = mapped_column(Text, nullable=False)
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    t: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    type: Mapped[str] = mapped_column(Text, nullable=False)
+    turn: Mapped[int | None] = mapped_column(Integer)
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+    __table_args__ = (
+        UniqueConstraint("run_id", "sequence", name="uq_agent_events_run_sequence"),
+        Index("idx_agent_events_run", "run_id", "sequence"),
+        Index("idx_agent_events_agent_t", "agent_id", "t"),
+        Index("idx_agent_events_type", "type"),
     )
 
 

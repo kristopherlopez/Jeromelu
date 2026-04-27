@@ -29,7 +29,15 @@ function formatRelative(iso: string): string {
 }
 
 function typeLabel(type: WikiPageType): string {
-  return { player: "Player", team: "Team", advisor: "Advisor", round: "Round" }[type] || type;
+  return (
+    {
+      player: "Player",
+      team: "Team",
+      advisor: "Advisor",
+      round: "Round",
+      channel: "Channel",
+    }[type] || type
+  );
 }
 
 function extractSections(content: string): { id: string; title: string }[] {
