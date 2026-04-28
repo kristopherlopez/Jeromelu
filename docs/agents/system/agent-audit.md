@@ -50,7 +50,7 @@ Every event is a row in `agent_events` (and a line in the at-end JSONL bundle).
 | `tool_use` | Each client-side tool call | `name`, `id`, `input` |
 | `tool_result` | After each client-side tool returns | `name`, `tool_use_id`, `result`, `is_error` |
 | `server_block` | Each server-side block (web_search, web_fetch, their results, etc.) | `block_type`, `block` |
-| `turn_complete` | Each turn end | `stop_reason`, `usage` |
+| `turn_complete` | Each turn end | `stop_reason`, `usage`, `message_id`, `model`, `latency_ms`, `tool_counts` |
 | `bound_hit` | When a bound aborts the run | `bound`, `value` |
 | `error` | API or tool exception | `where`, `message` |
 | `run_ended` | Once at end | `status`, `summary` |
@@ -109,6 +109,11 @@ Two rows per run, both with `agent_id` set to the agent's id and `detail_json.ru
     "s3_log_key": "agent-logs/scout/2026/04/27/scout-...jsonl",
     "s3_log_bucket": "jeromelu-clean-documents",
     "agent_events_count": 247,
+    "web_searches": 13,
+    "web_fetches": 2,
+    "total_api_latency_ms": 82117,
+    "token_cost_usd": 0.1011,
+    "search_cost_usd": 0.1300,
     // ...plus agent-specific counters (e.g. candidates_filed, claims_extracted)
   }
 }
@@ -184,9 +189,14 @@ Override per-agent at the call site if a particular agent legitimately needs dif
 
 ---
 
-## Cost estimation — `estimate_token_cost(model, in, out, cache_read, cache_write)`
+## Cost estimation
 
-Single shared pricing table in `MODEL_PRICING`. Models added to the system go in this dict. Unknown model → falls back to Sonnet 4.6 pricing (so the budget gate still trips, you just pay rough). Verify pricing against current Anthropic numbers when editing any agent loop — the dict is the single source of truth.
+Two helpers, summed for the budget gate:
+
+- **`estimate_token_cost(model, in, out, cache_read, cache_write)`** — pricing from `MODEL_PRICING` dict. Unknown model → falls back to Sonnet 4.6 pricing (so the budget gate still trips, you just pay rough).
+- **`estimate_server_tool_cost({"web_search": n, "web_fetch": m})`** — pricing from `SERVER_TOOL_PRICING_USD`. Currently `web_search` is $0.01/call ($10/1k), `web_fetch` is token-only.
+
+Server-side tools are billed separately from tokens — a typical Scout run does 5–15 web_searches = $0.05–$0.15 on top of token cost. Always combine both when gating against `bounds.max_budget_usd`. The shared module is the single source of truth; verify pricing against current Anthropic numbers when editing.
 
 ---
 

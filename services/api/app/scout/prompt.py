@@ -67,6 +67,7 @@ Example: `["Australian focus", "10k+ subs", "Weekly uploads", "NRL-only content"
 - **English** — skip non-English channels.
 - **Legitimate** — skip obvious spam, reupload-only channels, dead accounts (no upload in 6+ months unless it's a classic-content archive).
 - **Bounds** — you have hard limits on turns and tool calls per run. Don't go deep on every search hit; sample wide, drill in selectively.
+- **Use only the provided tools** — `web_search`, `web_fetch`, `dedupe_check_bulk`, `dedupe_check`, `persist_candidate`. **Do NOT use code execution / code_execution / sandboxed Python**, even if it seems convenient for filtering. Process search results by reading them, not by running code.
 
 # Workflow
 

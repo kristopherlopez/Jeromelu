@@ -47,6 +47,10 @@ WEB_SEARCH_TOOL: dict[str, Any] = {
 WEB_FETCH_TOOL: dict[str, Any] = {
     "type": "web_fetch_20260309",
     "name": "web_fetch",
+    # Restrict to direct model-driven calls. Required for Haiku 4.5; harmless
+    # on Sonnet/Opus. Without this, Haiku rejects with "does not support
+    # programmatic tool calling."
+    "allowed_callers": ["direct"],
 }
 
 DEDUPE_CHECK_TOOL: dict[str, Any] = {

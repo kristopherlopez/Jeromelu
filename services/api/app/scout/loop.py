@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 from jeromelu_shared.agent_audit import (
     AgentAuditLog,
     AgentBounds,
+    estimate_server_tool_cost,
     estimate_token_cost,
     make_run_id,
     record_agent_ended,
@@ -68,15 +69,29 @@ class ScoutRunResult:
     notes: list[str] = field(default_factory=list)
 
 
-def _content_block_for_send(block: Any) -> dict[str, Any]:
+def _content_block_for_send(block: Any) -> dict[str, Any] | None:
     """Serialise an SDK response content block to the shape the API accepts on
-    the round-trip. The SDK's `model_dump()` includes fields it auto-populates
-    on parse (notably a stray `text` on `server_tool_use`,
-    `web_search_tool_result`, `web_fetch_tool_result`, etc.) that the API
-    rejects on send. Strip `text` from anything that isn't an actual text block.
+    the round-trip. Returns None for blocks that should be dropped entirely.
+
+    Two transforms:
+      1. Strip stray `text` fields the SDK populates on parse for non-text
+         blocks (`server_tool_use`, `web_search_tool_result`, etc.) — the API
+         rejects them on send.
+      2. Drop `code_execution` blocks. The agent occasionally reaches for an
+         implicit code_execution capability that ships alongside web_search,
+         but our pinned SDK doesn't yet surface the `container_id` required
+         for round-trip — and we never authorised code_execution as a tool
+         anyway. Drop both the invocation and its result.
     """
     payload = block.model_dump()
-    if payload.get("type") != "text":
+    btype = payload.get("type")
+
+    if btype == "code_execution_tool_result":
+        return None
+    if btype == "server_tool_use" and payload.get("name") == "code_execution":
+        return None
+
+    if btype != "text":
         payload.pop("text", None)
     return payload
 
@@ -151,6 +166,9 @@ def run_scout(
     candidates_filed = 0
     duplicates_skipped = 0
     in_tok = out_tok = cache_r = cache_w = 0
+    web_searches_total = 0
+    web_fetches_total = 0
+    total_api_latency_ms = 0
     stop_reason = "unknown"
     status = "completed"
     notes: list[str] = []
@@ -176,6 +194,7 @@ def run_scout(
         print(f"\n--- turn {turns} ---")
         audit.turn_started(turn=turns)
 
+        turn_start_ts = time.time()
         try:
             with client.messages.stream(
                 model=model,
@@ -200,6 +219,8 @@ def run_scout(
             audit.error(where=f"turn {turns} api", message=str(e))
             logger.exception("Scout API error")
             break
+        turn_latency_ms = int((time.time() - turn_start_ts) * 1000)
+        total_api_latency_ms += turn_latency_ms
 
         # Track usage
         u = final.usage
@@ -210,17 +231,21 @@ def run_scout(
         stop_reason = final.stop_reason or "unknown"
 
         # Append assistant message verbatim, stripping fields the SDK adds on
-        # parse but the API rejects on the round-trip.
+        # parse but the API rejects on the round-trip. Some blocks (e.g.
+        # code_execution) are dropped entirely — _content_block_for_send
+        # returns None for those.
+        prepared = [_content_block_for_send(b) for b in final.content]
         messages.append(
             {
                 "role": "assistant",
-                "content": [_content_block_for_send(block) for block in final.content],
+                "content": [b for b in prepared if b is not None],
             }
         )
 
         # Walk every content block for the audit trail; only client-side
         # tool_use blocks need a tool_result fed back next turn.
         tool_results: list[dict[str, Any]] = []
+        turn_tool_counts: dict[str, int] = {}
         for block in final.content:
             btype = getattr(block, "type", "unknown")
 
@@ -236,6 +261,10 @@ def run_scout(
                 except Exception:
                     payload = {"repr": repr(block)}
                 audit.server_block(turn=turns, btype=btype, payload=payload)
+                if btype == "server_tool_use":
+                    name = getattr(block, "name", None)
+                    if name:
+                        turn_tool_counts[name] = turn_tool_counts.get(name, 0) + 1
                 continue
 
             # Client-side tool call
@@ -304,6 +333,9 @@ def run_scout(
                     }
                 )
 
+        web_searches_total += turn_tool_counts.get("web_search", 0)
+        web_fetches_total += turn_tool_counts.get("web_fetch", 0)
+
         # Per-turn audit summary
         audit.turn_complete(
             turn=turns,
@@ -314,6 +346,10 @@ def run_scout(
                 "cache_read_input_tokens": getattr(u, "cache_read_input_tokens", 0) or 0,
                 "cache_creation_input_tokens": getattr(u, "cache_creation_input_tokens", 0) or 0,
             },
+            message_id=getattr(final, "id", None),
+            model=getattr(final, "model", None),
+            latency_ms=turn_latency_ms,
+            tool_counts=turn_tool_counts,
         )
 
         if tool_results:
@@ -330,7 +366,12 @@ def run_scout(
 
         # Bounds
         elapsed = time.time() - start_ts
-        cost_so_far = estimate_token_cost(model, in_tok, out_tok, cache_r, cache_w)
+        cost_so_far = (
+            estimate_token_cost(model, in_tok, out_tok, cache_r, cache_w)
+            + estimate_server_tool_cost(
+                {"web_search": web_searches_total, "web_fetch": web_fetches_total}
+            )
+        )
 
         if elapsed > bounds.max_wall_seconds:
             notes.append(f"wall-clock bound hit at {elapsed:.0f}s")
@@ -349,7 +390,11 @@ def run_scout(
             break
 
     ended_at = datetime.now(timezone.utc)
-    final_cost = estimate_token_cost(model, in_tok, out_tok, cache_r, cache_w)
+    token_cost = estimate_token_cost(model, in_tok, out_tok, cache_r, cache_w)
+    search_cost = estimate_server_tool_cost(
+        {"web_search": web_searches_total, "web_fetch": web_fetches_total}
+    )
+    final_cost = token_cost + search_cost
 
     result = ScoutRunResult(
         run_id=run_id,
@@ -379,6 +424,11 @@ def run_scout(
         "output_tokens": out_tok,
         "cache_read_tokens": cache_r,
         "cache_write_tokens": cache_w,
+        "web_searches": web_searches_total,
+        "web_fetches": web_fetches_total,
+        "total_api_latency_ms": total_api_latency_ms,
+        "token_cost_usd": round(token_cost, 4),
+        "search_cost_usd": round(search_cost, 4),
         "estimated_cost_usd": round(final_cost, 4),
         "stop_reason": stop_reason,
         "notes": notes,
@@ -414,7 +464,9 @@ def run_scout(
     print(f"  turns: {turns}, tool_calls: {tool_calls}")
     print(f"  filed: {candidates_filed}, duplicates: {duplicates_skipped}")
     print(f"  tokens: in={in_tok} out={out_tok} cache_read={cache_r} cache_write={cache_w}")
-    print(f"  est. cost: ${final_cost:.4f}")
+    print(f"  server tools: web_search={web_searches_total} web_fetch={web_fetches_total}")
+    print(f"  api latency: {total_api_latency_ms} ms total")
+    print(f"  est. cost: ${final_cost:.4f}  (tokens: ${token_cost:.4f}, searches: ${search_cost:.4f})")
     print(f"  events: {audit.event_count} rows in agent_events (run_id={run_id})")
     if s3_log_key:
         print(f"  bundle: s3://{settings.s3_agent_logs_bucket}/{s3_log_key}")

@@ -130,6 +130,25 @@ def estimate_token_cost(
     )
 
 
+# Server-side tools are billed separately from tokens. Verify periodically.
+SERVER_TOOL_PRICING_USD: dict[str, float] = {
+    "web_search": 0.01,    # $10 per 1,000 searches (Anthropic-managed)
+    "web_fetch": 0.00,     # token cost only — no per-fetch charge
+}
+
+
+def estimate_server_tool_cost(tool_counts: dict[str, int]) -> float:
+    """USD cost for server-side tool usage (web_search, web_fetch).
+
+    Pass a dict like {"web_search": 12, "web_fetch": 3}. Unknown tool names
+    contribute 0 — better to under-report than to crash a run on a new tool.
+    """
+    return sum(
+        n * SERVER_TOOL_PRICING_USD.get(name, 0.0)
+        for name, n in (tool_counts or {}).items()
+    )
+
+
 # ---------------------------------------------------------------------------
 # Run identity
 # ---------------------------------------------------------------------------
@@ -281,9 +300,37 @@ class AgentAuditLog:
         self._write("server_block", turn=turn, block_type=btype, block=payload)
 
     def turn_complete(
-        self, *, turn: int, stop_reason: str, usage: dict[str, Any]
+        self,
+        *,
+        turn: int,
+        stop_reason: str,
+        usage: dict[str, Any],
+        message_id: str | None = None,
+        model: str | None = None,
+        latency_ms: int | None = None,
+        tool_counts: dict[str, int] | None = None,
     ) -> None:
-        self._write("turn_complete", turn=turn, stop_reason=stop_reason, usage=usage)
+        """Record end-of-turn metadata.
+
+        Required: turn, stop_reason, usage (Anthropic Usage shape).
+        Optional but recommended:
+          message_id   — Anthropic message id (for cross-reference / support)
+          model        — server-pinned model id (may differ from requested)
+          latency_ms   — wall-clock for this turn's stream call
+          tool_counts  — server-side tool invocations this turn
+                         (e.g. {"web_search": 3, "web_fetch": 1}). Used by
+                         estimate_server_tool_cost for accurate budget gating.
+        """
+        self._write(
+            "turn_complete",
+            turn=turn,
+            stop_reason=stop_reason,
+            usage=usage,
+            message_id=message_id,
+            model=model,
+            latency_ms=latency_ms,
+            tool_counts=tool_counts or {},
+        )
 
     def bound_hit(self, *, bound: str, value: Any) -> None:
         self._write("bound_hit", bound=bound, value=value)
