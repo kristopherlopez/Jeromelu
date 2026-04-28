@@ -4,15 +4,14 @@ Every agent built on the Anthropic Messages API + custom tools loop should use
 this module so observability, cost tracking, and forensic logs look the same
 across the system.
 
-Three layers per run:
-  1. `crew_activity` rows (start + end)        — DB run-level summary
+Three layers per run, all joinable on `run_id`:
+  1. `agent_runs` rows (start + end)           — DB run-level summary
   2. `agent_events` rows                       — DB per-event trace, queryable
                                                  live while the run is in flight
   3. JSONL bundle uploaded to S3 at run end    — long-term forensics
 
-All three share the same `run_id`. The S3 key is stamped into the end
-`crew_activity.detail_json.s3_log_key`, so a single SQL query goes from
-"this run" to its forensic transcript.
+The S3 key is stamped into the end `agent_runs.detail_json.s3_log_key`, so
+a single SQL query goes from "this run" to its forensic transcript.
 
 S3 key format:
   {settings.s3_agent_logs_bucket}/agent-logs/{agent_id}/{YYYY}/{MM}/{DD}/{run_id}.jsonl
@@ -45,7 +44,7 @@ Usage skeleton (see services/api/app/scout/loop.py for the reference impl):
                        detail={..., "s3_log_key": s3_key,
                                "agent_events_count": audit.event_count})
 
-When adding a new agent (e.g. 'critic'): also extend the CrewActivity
+When adding a new agent (e.g. 'critic'): also extend the agent_runs
 agent_id CHECK constraint via a new migration before first run, otherwise
 record_agent_started will fail.
 """
@@ -61,7 +60,7 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
-from jeromelu_shared.db import AgentEvent, CrewActivity
+from jeromelu_shared.db import AgentEvent, AgentRun
 
 logger = logging.getLogger(__name__)
 
@@ -392,7 +391,7 @@ class AgentAuditLog:
 
 
 # ---------------------------------------------------------------------------
-# CrewActivity helpers — agent-agnostic run-level summary rows
+# AgentRun helpers — agent-agnostic run-level summary rows
 # ---------------------------------------------------------------------------
 
 def record_agent_started(
@@ -405,12 +404,13 @@ def record_agent_started(
     brief: str,
     bounds: dict[str, Any],
 ) -> None:
-    """Insert a 'started' crew_activity row at the top of an agent run.
+    """Insert a 'started' agent_runs row at the top of an agent run.
 
-    Caller is responsible for ensuring `agent_id` is in the CrewActivity
+    Caller is responsible for ensuring `agent_id` is in the AgentRun
     CHECK constraint (extend via migration before adding a new agent).
     """
-    row = CrewActivity(
+    row = AgentRun(
+        run_id=run_id,
         agent_id=agent_id,
         agent_name=agent_name,
         activity_type="started",
@@ -419,7 +419,6 @@ def record_agent_started(
             f"budget=${bounds.get('max_budget_usd', '?')}"
         ),
         detail_json={
-            "run_id": run_id,
             "model": model,
             "brief_preview": brief[:500],
             "bounds": bounds,
@@ -439,18 +438,18 @@ def record_agent_ended(
     summary_text: str,
     detail: dict[str, Any],
 ) -> None:
-    """Insert a 'completed' or 'failed' crew_activity row at run end.
+    """Insert a 'completed' or 'failed' agent_runs row at run end.
 
-    `status` is the agent's logical status; maps to CrewActivity.activity_type:
+    `status` is the agent's logical status; maps to AgentRun.activity_type:
       'completed' | 'aborted' -> 'completed'  (status preserved in detail_json)
       'failed'                -> 'failed'
     """
     activity_type = "failed" if status == "failed" else "completed"
     enriched = dict(detail)
-    enriched["run_id"] = run_id
     enriched["status"] = status
 
-    row = CrewActivity(
+    row = AgentRun(
+        run_id=run_id,
         agent_id=agent_id,
         agent_name=agent_name,
         activity_type=activity_type,

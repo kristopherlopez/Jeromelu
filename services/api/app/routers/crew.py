@@ -1,6 +1,6 @@
 """Jaromelu status and round overview endpoints.
 
-Internal note: the underlying `CrewActivity` table still tracks per-internal-mode
+Internal note: the underlying `agent_runs` table still tracks per-internal-mode
 activity (scout / scribe / analyst / stats / fixtures) for engineering telemetry,
 but the user-facing API surfaces a single Jaromelu status — the wholesale model
 (see docs/agents/crew/README.md). File name retained for git history; routes
@@ -12,7 +12,7 @@ from sqlalchemy import func, desc, distinct
 from sqlalchemy.orm import Session
 
 from jeromelu_shared.db import (
-    CrewActivity,
+    AgentRun,
     Claim,
     Source,
     SourceDocument,
@@ -27,14 +27,14 @@ router = APIRouter()
 def jaromelu_status(db: Session = Depends(get_db)):
     """Current single-character Jaromelu status for the homepage.
 
-    Aggregates the most recent CrewActivity row across all internal modes into
+    Aggregates the most recent agent_runs row across all internal modes into
     a single status. The internal mode (e.g. scout / analyst) is reflected only
     in the action string — never as a separate agent identity in the response.
     """
 
     latest = (
-        db.query(CrewActivity)
-        .order_by(desc(CrewActivity.created_at))
+        db.query(AgentRun)
+        .order_by(desc(AgentRun.created_at))
         .first()
     )
 
@@ -55,8 +55,8 @@ def jaromelu_status(db: Session = Depends(get_db)):
 
     # Determine current round from latest crew activity or claims
     latest_round = (
-        db.query(func.max(CrewActivity.round))
-        .filter(CrewActivity.round.isnot(None))
+        db.query(func.max(AgentRun.round))
+        .filter(AgentRun.round.isnot(None))
         .scalar()
     )
     if not latest_round:
@@ -85,9 +85,9 @@ def round_overview(
 
     # 1. Activity for this round (internal mode rows aggregate to a single Jaromelu timeline)
     activities = (
-        db.query(CrewActivity)
-        .filter(CrewActivity.round == round_num, CrewActivity.season == season)
-        .order_by(desc(CrewActivity.created_at))
+        db.query(AgentRun)
+        .filter(AgentRun.round == round_num, AgentRun.season == season)
+        .order_by(desc(AgentRun.created_at))
         .all()
     )
 

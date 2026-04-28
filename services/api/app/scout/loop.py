@@ -176,7 +176,7 @@ def run_scout(
     print(f"\n=== Scout run {run_id} (model={model}, dry_run={dry_run}) ===\n")
     print(f"[brief]\n{user_brief}\n")
 
-    # Run-level audit start: crew_activity DB row + JSONL log header.
+    # Run-level audit start: agent_runs DB row + JSONL log header.
     bounds_dict = asdict(bounds)
     record_agent_started(
         session,

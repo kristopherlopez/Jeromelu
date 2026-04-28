@@ -614,10 +614,17 @@ class AgentEvent(Base):
     )
 
 
-class CrewActivity(Base):
-    __tablename__ = "crew_activity"
+class AgentRun(Base):
+    """Run-level summary for Claude-Agent-SDK-based agents.
+
+    Two rows per run (one `started`, one `completed`/`failed`), joined to
+    `agent_events` via the shared `run_id` text column. Both rows share the
+    same `run_id`; they are NOT a 1:1 entity. Use `activity_type` to filter.
+    """
+    __tablename__ = "agent_runs"
 
     activity_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    run_id: Mapped[str | None] = mapped_column(Text)
     agent_id: Mapped[str] = mapped_column(Text, nullable=False)
     agent_name: Mapped[str] = mapped_column(Text, nullable=False)
     activity_type: Mapped[str] = mapped_column(Text, nullable=False)
@@ -630,15 +637,16 @@ class CrewActivity(Base):
     __table_args__ = (
         CheckConstraint(
             "agent_id IN ('scout', 'scribe', 'analyst', 'stats', 'fixtures')",
-            name="ck_crew_agent_id",
+            name="ck_agent_runs_agent_id",
         ),
         CheckConstraint(
             "activity_type IN ('started', 'completed', 'failed', 'handoff')",
-            name="ck_crew_activity_type",
+            name="ck_agent_runs_activity_type",
         ),
-        Index("idx_crew_activity_agent", "agent_id"),
-        Index("idx_crew_activity_round", "round", "season"),
-        Index("idx_crew_activity_created", "created_at"),
+        Index("idx_agent_runs_agent", "agent_id"),
+        Index("idx_agent_runs_run", "run_id"),
+        Index("idx_agent_runs_round", "round", "season"),
+        Index("idx_agent_runs_created", "created_at"),
     )
 
 

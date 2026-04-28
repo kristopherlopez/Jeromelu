@@ -14,11 +14,13 @@ Three layers, all joined by a single `run_id`:
 
 | Layer | Where | Built for |
 |---|---|---|
-| **Run summary** | `crew_activity` (DB) — `started` row + `completed`/`failed` row | "Did agent X run today, what was the outcome, what did it cost" |
+| **Run summary** | `agent_runs` (DB) — `started` row + `completed`/`failed` row, both with top-level `run_id` | "Did agent X run today, what was the outcome, what did it cost" |
 | **Per-event trace** | `agent_events` (DB) — one row per event, queryable while the run is in progress; **plus** an at-end JSONL bundle uploaded to `s3://{settings.s3_agent_logs_bucket}/agent-logs/{agent_id}/{YYYY}/{MM}/{DD}/{run_id}.jsonl` | "Why did it skip that result? What did web_search return on turn 3?" — DB for live + ad-hoc queries; S3 for long-term forensics. |
 | **Domain output** | Agent-specific tables (`discovered_sources` for Scout, `claims` for Analyst, etc.) tagged with `run_id` | "What did this run actually produce" |
 
-No local files. The DB is the live store, S3 is the forensic archive. The S3 key is stamped into the end `crew_activity.detail_json.s3_log_key`, so a single SQL query gets you from "this run" to its bundle. DB write failures during a run are logged but don't abort — the in-memory buffer still flushes to S3 as the safety net.
+All three tables expose `run_id` as a top-level indexed column, so cross-table queries are clean: `SELECT … FROM agent_runs JOIN agent_events USING (run_id, agent_id) …`.
+
+No local files. The DB is the live store, S3 is the forensic archive. The S3 key is stamped into the end `agent_runs.detail_json.s3_log_key`, so a single SQL query gets you from "this run" to its bundle. DB write failures during a run are logged but don't abort — the in-memory buffer still flushes to S3 as the safety net.
 
 ---
 
@@ -72,19 +74,19 @@ UNIQUE (run_id, sequence)
 
 ---
 
-## Required CrewActivity rows
+## Required `agent_runs` rows
 
-Two rows per run, both with `agent_id` set to the agent's id and `detail_json.run_id` matching:
+Two rows per run, both with `agent_id` and a shared top-level `run_id`:
 
 **Started:**
 ```json
 {
+  "run_id": "scout-20260427T103045-a1b2c3",
   "agent_id": "scout",
   "agent_name": "Scout",
   "activity_type": "started",
   "summary": "Scout run started — model=claude-sonnet-4-6, budget=$3.0",
   "detail_json": {
-    "run_id": "scout-20260427T103045-a1b2c3",
     "model": "...",
     "brief_preview": "<first 500 chars>",
     "bounds": {...}
@@ -95,10 +97,11 @@ Two rows per run, both with `agent_id` set to the agent's id and `detail_json.ru
 **Ended** (`activity_type` ∈ `{completed, failed}` — `aborted` runs map to `completed` with `detail_json.status='aborted'`):
 ```json
 {
+  "run_id": "scout-20260427T103045-a1b2c3",
   "activity_type": "completed",
   "summary": "<one-line human summary>",
   "detail_json": {
-    "run_id": "...", "status": "completed|aborted|failed", "model": "...",
+    "status": "completed|aborted|failed", "model": "...",
     "turns_used": ..., "tool_calls": ...,
     "input_tokens": ..., "output_tokens": ...,
     "cache_read_tokens": ..., "cache_write_tokens": ...,
@@ -209,15 +212,15 @@ The agent prefix lets you grep logs / S3 keys / DB rows by agent without parsing
 
 ---
 
-## CrewActivity CHECK constraint — gotcha for new agents
+## `agent_runs` CHECK constraint — gotcha for new agents
 
-`crew_activity.agent_id` has a CHECK constraint enumerating allowed values (currently `scout`, `scribe`, `analyst`, `stats`, `fixtures`). When adding a new agent (e.g. `critic`, `bookkeeper`, `archivist`), **first ship a migration that extends the constraint**, otherwise `record_agent_started` will fail at INSERT time.
+`agent_runs.agent_id` has a CHECK constraint enumerating allowed values (currently `scout`, `scribe`, `analyst`, `stats`, `fixtures`). When adding a new agent (e.g. `critic`, `bookkeeper`, `archivist`), **first ship a migration that extends the constraint**, otherwise `record_agent_started` will fail at INSERT time.
 
 Migration template:
 ```sql
--- 0NN_extend_crew_activity_agent_ids.sql
-ALTER TABLE crew_activity DROP CONSTRAINT ck_crew_agent_id;
-ALTER TABLE crew_activity ADD CONSTRAINT ck_crew_agent_id
+-- 0NN_extend_agent_runs_agent_ids.sql
+ALTER TABLE agent_runs DROP CONSTRAINT ck_agent_runs_agent_id;
+ALTER TABLE agent_runs ADD CONSTRAINT ck_agent_runs_agent_id
     CHECK (agent_id IN ('scout', 'scribe', 'analyst', 'stats', 'fixtures', 'critic'));
 ```
 
@@ -232,20 +235,20 @@ Update the matching `__table_args__` in `packages/shared/jeromelu_shared/db/mode
 ```sql
 -- Most recent runs across ALL agents, with status, cost, S3 bundle key
 SELECT
-  ca.created_at                              AS started_at,
-  ca.agent_name,
-  ca.detail_json->>'run_id'                  AS run_id,
-  end_row.activity_type                      AS final_state,
-  end_row.detail_json->>'status'             AS status_detail,
-  end_row.detail_json->>'estimated_cost_usd' AS cost,
-  end_row.detail_json->>'agent_events_count' AS events,
-  end_row.detail_json->>'s3_log_key'         AS s3_log_key
-FROM crew_activity ca
-LEFT JOIN crew_activity end_row
-  ON end_row.detail_json->>'run_id' = ca.detail_json->>'run_id'
+  start_row.created_at                              AS started_at,
+  start_row.agent_name,
+  start_row.run_id,
+  end_row.activity_type                             AS final_state,
+  end_row.detail_json->>'status'                    AS status_detail,
+  end_row.detail_json->>'estimated_cost_usd'        AS cost,
+  end_row.detail_json->>'agent_events_count'        AS events,
+  end_row.detail_json->>'s3_log_key'                AS s3_log_key
+FROM agent_runs start_row
+LEFT JOIN agent_runs end_row
+  ON end_row.run_id = start_row.run_id
  AND end_row.activity_type IN ('completed', 'failed')
-WHERE ca.activity_type='started'
-ORDER BY ca.created_at DESC
+WHERE start_row.activity_type='started'
+ORDER BY start_row.created_at DESC
 LIMIT 50;
 
 -- Cost per agent over the last 7 days
@@ -253,11 +256,19 @@ SELECT
   agent_id,
   count(*) AS runs,
   sum((detail_json->>'estimated_cost_usd')::numeric) AS spend_usd
-FROM crew_activity
+FROM agent_runs
 WHERE activity_type IN ('completed', 'failed')
   AND created_at > now() - interval '7 days'
 GROUP BY agent_id
 ORDER BY spend_usd DESC NULLS LAST;
+
+-- Run summary + event count via a clean JOIN
+SELECT ar.run_id, ar.activity_type, ar.summary, count(ae.event_id) AS events
+FROM agent_runs ar
+LEFT JOIN agent_events ae USING (run_id, agent_id)
+WHERE ar.created_at > now() - interval '24 hours'
+GROUP BY ar.run_id, ar.activity_type, ar.summary, ar.created_at
+ORDER BY ar.created_at DESC;
 ```
 
 ### Live trace via `agent_events`

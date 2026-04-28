@@ -85,9 +85,9 @@ Approval flow (writes to `channels` / `sources`) is a separate slice — no admi
 
 Scout uses the standardised audit pattern that every Claude-Agent-SDK-based agent follows. Full pattern doc: [`agent-audit.md`](agent-audit.md). Scout-specific surface summarised below.
 
-### 1. `crew_activity` — run-level summary (DB)
+### 1. `agent_runs` — run-level summary (DB)
 
-Two rows per run, both with `agent_id='scout'` and a shared `run_id` in `detail_json`.
+Two rows per run, both with `agent_id='scout'` and a shared top-level `run_id`. Joins cleanly to `agent_events` on `(run_id, agent_id)`.
 
 **Started row** — written before the agent's first turn:
 
@@ -165,22 +165,22 @@ Per-candidate record, joined to a run via `run_id`.
 ### Following the trail
 
 ```sql
--- Most recent runs with status, cost, and S3 log location
+-- Most recent Scout runs with status, cost, and S3 log location
 SELECT
-  ca.created_at                                           AS started_at,
-  ca.detail_json->>'run_id'                               AS run_id,
-  end_row.activity_type                                   AS final_state,
-  end_row.detail_json->>'status'                          AS status_detail,
-  end_row.detail_json->>'candidates_filed'                AS filed,
-  end_row.detail_json->>'duplicates_skipped'              AS dupes,
-  end_row.detail_json->>'estimated_cost_usd'              AS cost,
-  end_row.detail_json->>'s3_log_key'                      AS s3_log_key
-FROM crew_activity ca
-LEFT JOIN crew_activity end_row
-  ON end_row.detail_json->>'run_id' = ca.detail_json->>'run_id'
+  start_row.created_at                              AS started_at,
+  start_row.run_id,
+  end_row.activity_type                             AS final_state,
+  end_row.detail_json->>'status'                    AS status_detail,
+  end_row.detail_json->>'candidates_filed'          AS filed,
+  end_row.detail_json->>'duplicates_skipped'        AS dupes,
+  end_row.detail_json->>'estimated_cost_usd'        AS cost,
+  end_row.detail_json->>'s3_log_key'                AS s3_log_key
+FROM agent_runs start_row
+LEFT JOIN agent_runs end_row
+  ON end_row.run_id = start_row.run_id
  AND end_row.activity_type IN ('completed', 'failed')
-WHERE ca.agent_id='scout' AND ca.activity_type='started'
-ORDER BY ca.created_at DESC
+WHERE start_row.agent_id='scout' AND start_row.activity_type='started'
+ORDER BY start_row.created_at DESC
 LIMIT 20;
 
 -- Candidates from one specific run
@@ -188,6 +188,14 @@ SELECT kind, title, score, content_categories, url
 FROM discovered_sources
 WHERE run_id = 'scout-20260427T103045-a1b2c3'
 ORDER BY score DESC NULLS LAST;
+
+-- Run summary + event count via clean JOIN
+SELECT ar.run_id, ar.activity_type, ar.summary, count(ae.event_id) AS events
+FROM agent_runs ar
+LEFT JOIN agent_events ae USING (run_id, agent_id)
+WHERE ar.agent_id='scout'
+GROUP BY ar.run_id, ar.activity_type, ar.summary, ar.created_at
+ORDER BY ar.created_at DESC LIMIT 10;
 ```
 
 Reading the live trace:
