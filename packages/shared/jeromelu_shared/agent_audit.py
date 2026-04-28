@@ -80,7 +80,7 @@ class AgentBounds:
     max_turns: int = 20
     max_tool_calls: int = 60
     max_wall_seconds: int = 900            # 15 min
-    max_budget_usd: float = 3.00
+    max_budget_usd: float = 1.00
 
 
 # ---------------------------------------------------------------------------

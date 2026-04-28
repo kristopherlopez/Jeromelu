@@ -72,7 +72,7 @@ Defaults (override via CLI flags or `ScoutBounds`):
 - `max_turns=20`
 - `max_tool_calls=60`
 - `max_wall_seconds=900` (15 min)
-- `max_budget_usd=3.00` — rough estimate from token usage
+- `max_budget_usd=1.00` — rough estimate from token usage
 
 ## DB interactions
 

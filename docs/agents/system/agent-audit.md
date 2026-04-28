@@ -185,7 +185,7 @@ class AgentBounds:
     max_turns: int = 20
     max_tool_calls: int = 60
     max_wall_seconds: int = 900       # 15 min
-    max_budget_usd: float = 3.00
+    max_budget_usd: float = 1.00
 ```
 
 Override per-agent at the call site if a particular agent legitimately needs different caps; do NOT subclass with new bound names. If a new bound type is genuinely needed (e.g. `max_documents_processed`), add it to `AgentBounds` so it's available to everyone.

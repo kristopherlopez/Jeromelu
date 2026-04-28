@@ -29,7 +29,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-turns", type=int, default=20)
     parser.add_argument("--max-tool-calls", type=int, default=60)
     parser.add_argument("--max-wall-seconds", type=int, default=900)
-    parser.add_argument("--budget", type=float, default=3.00, help="USD budget cap per run")
+    parser.add_argument("--budget", type=float, default=1.00, help="USD budget cap per run")
     parser.add_argument(
         "--dry-run",
         action="store_true",
