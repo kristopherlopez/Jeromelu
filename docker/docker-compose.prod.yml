@@ -54,6 +54,10 @@ services:
       S3_CLEAN_BUCKET: jeromelu-clean-documents
       S3_ASSETS_BUCKET: jeromelu-public-assets
       S3_AGENT_LOGS_BUCKET: jeromelu-clean-documents
+      # Empty string overrides the dev default (http://localhost:9000 / MinIO)
+      # so jeromelu_shared.s3.get_s3_client() falls through to real AWS S3 in
+      # ap-southeast-2 with the AWS_* creds above.
+      S3_ENDPOINT: ""
       ENV: production
     depends_on:
       postgres:
