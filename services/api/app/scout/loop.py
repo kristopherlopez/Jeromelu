@@ -68,6 +68,19 @@ class ScoutRunResult:
     notes: list[str] = field(default_factory=list)
 
 
+def _content_block_for_send(block: Any) -> dict[str, Any]:
+    """Serialise an SDK response content block to the shape the API accepts on
+    the round-trip. The SDK's `model_dump()` includes fields it auto-populates
+    on parse (notably a stray `text` on `server_tool_use`,
+    `web_search_tool_result`, `web_fetch_tool_result`, etc.) that the API
+    rejects on send. Strip `text` from anything that isn't an actual text block.
+    """
+    payload = block.model_dump()
+    if payload.get("type") != "text":
+        payload.pop("text", None)
+    return payload
+
+
 def _summarise_tool_input(name: str, payload: dict[str, Any]) -> str:
     """Compact one-line summary of a tool call for console theatre."""
     if name == "web_search":
@@ -196,11 +209,12 @@ def run_scout(
         cache_w += getattr(u, "cache_creation_input_tokens", 0) or 0
         stop_reason = final.stop_reason or "unknown"
 
-        # Append assistant message verbatim (Anthropic SDK content blocks)
+        # Append assistant message verbatim, stripping fields the SDK adds on
+        # parse but the API rejects on the round-trip.
         messages.append(
             {
                 "role": "assistant",
-                "content": [block.model_dump() for block in final.content],
+                "content": [_content_block_for_send(block) for block in final.content],
             }
         )
 

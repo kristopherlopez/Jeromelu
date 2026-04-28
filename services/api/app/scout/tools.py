@@ -26,9 +26,9 @@ logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Tool definitions sent to the Anthropic API.
-# Built-in tool versions per Anthropic docs (verify on implementation):
-#   web_search:  type="web_search_20250305"
-#   web_fetch:   type="web_fetch_20250209"
+# Built-in tool versions (verified live 2026-04-28 — API reports valid set):
+#   web_search:  web_search_20250305 | web_search_20260209 (dynamic filtering, requires code_execution)
+#   web_fetch:   web_fetch_20250910 | web_fetch_20260209 | web_fetch_20260309
 # ---------------------------------------------------------------------------
 
 WEB_SEARCH_TOOL: dict[str, Any] = {
@@ -45,7 +45,7 @@ WEB_SEARCH_TOOL: dict[str, Any] = {
 }
 
 WEB_FETCH_TOOL: dict[str, Any] = {
-    "type": "web_fetch_20250209",
+    "type": "web_fetch_20260309",
     "name": "web_fetch",
 }
 
