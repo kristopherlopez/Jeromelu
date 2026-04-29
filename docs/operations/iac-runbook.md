@@ -85,8 +85,9 @@ bash infra/terraform/bootstrap/bootstrap.sh
 ```
 
 Verifies the AWS account, then creates the `jeromelu-tfstate` S3 bucket
-(versioned, SSE-S3, public access blocked) and the `jeromelu-tf-locks`
-DynamoDB table.
+(versioned, SSE-S3, public access blocked). Locking uses the S3-native
+lockfile feature (`use_lockfile = true` in `backend.tf`); no DynamoDB
+table is needed.
 
 ### Phase 2 — First Terraform run
 
@@ -216,21 +217,21 @@ terraform import aws_lightsail_static_ip_attachment.jeromelu jeromelu-ip
 If that also fails, check the provider version in `versions.tf` and
 upgrade to the latest `5.x`.
 
-### "Error: Error locking state" / "DynamoDB lock"
+### "Error: Error locking state" / S3 lockfile
 
-Someone (probably a previous attempt) holds the lock. Check who:
-
-```bash
-aws dynamodb scan --table-name jeromelu-tf-locks
-```
-
-If the holder is gone (e.g. a crashed CI run), force-unlock:
+The backend uses S3-native locking (`use_lockfile = true`). The lock is a
+single object at `prod/terraform.tfstate.tflock` in `jeromelu-tfstate`. If a
+previous run crashed and left it behind:
 
 ```bash
-terraform force-unlock <LOCK_ID>
+aws s3 ls s3://jeromelu-tfstate/prod/terraform.tfstate.tflock
+aws s3 cp s3://jeromelu-tfstate/prod/terraform.tfstate.tflock - | head
+# If you're certain no one else is running terraform:
+aws s3 rm s3://jeromelu-tfstate/prod/terraform.tfstate.tflock
 ```
 
-Only do this if you are certain no one else is running terraform.
+Or use `terraform force-unlock <LOCK_ID>` (the LOCK_ID is in the error
+message). Only force-unlock when you are certain no concurrent run exists.
 
 ### "Plan output too large for PR comment"
 

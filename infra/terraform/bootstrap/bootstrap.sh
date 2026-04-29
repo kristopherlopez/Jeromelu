@@ -1,20 +1,21 @@
 #!/usr/bin/env bash
-# Creates the Terraform state backend resources:
-#   - S3 bucket  jeromelu-tfstate     (versioned, SSE-S3, public access blocked)
-#   - DynamoDB   jeromelu-tf-locks    (LockID hash key, PAY_PER_REQUEST)
+# Creates the Terraform state backend bucket:
+#   - S3 bucket  jeromelu-tfstate  (versioned, SSE-S3, public access blocked)
+#
+# State locking is via the S3-native lockfile (`use_lockfile = true` in
+# backend.tf), so no DynamoDB table is required.
 #
 # Run this once, before the first `terraform init` in infra/terraform/.
-# Idempotent: skips creation if either resource already exists.
+# Idempotent: skips creation if the bucket already exists.
 #
-# Requires AWS credentials with permissions to create S3 buckets and DynamoDB
-# tables in account 111424988703.
+# Requires AWS credentials with permissions to create S3 buckets in account
+# 111424988703.
 
 set -euo pipefail
 
 REGION="ap-southeast-2"
 ACCOUNT_ID="111424988703"
 BUCKET="jeromelu-tfstate"
-TABLE="jeromelu-tf-locks"
 
 CALLER_ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
 if [ "$CALLER_ACCOUNT" != "$ACCOUNT_ID" ]; then
@@ -48,21 +49,6 @@ else
   aws s3api put-bucket-tagging \
     --bucket "$BUCKET" \
     --tagging 'TagSet=[{Key=Project,Value=jeromelu},{Key=ManagedBy,Value=bootstrap-script},{Key=Purpose,Value=terraform-state}]'
-fi
-
-if aws dynamodb describe-table --table-name "$TABLE" --region "$REGION" >/dev/null 2>&1; then
-  echo "[skip] DynamoDB table $TABLE already exists."
-else
-  echo "[create] DynamoDB lock table $TABLE in $REGION..."
-  aws dynamodb create-table \
-    --table-name "$TABLE" \
-    --attribute-definitions AttributeName=LockID,AttributeType=S \
-    --key-schema AttributeName=LockID,KeyType=HASH \
-    --billing-mode PAY_PER_REQUEST \
-    --region "$REGION" \
-    --tags Key=Project,Value=jeromelu Key=ManagedBy,Value=bootstrap-script Key=Purpose,Value=terraform-locks
-
-  aws dynamodb wait table-exists --table-name "$TABLE" --region "$REGION"
 fi
 
 echo

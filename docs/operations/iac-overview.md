@@ -37,12 +37,13 @@ the cost and simplicity wins of Lightsail.
 
 - **Bucket:** `jeromelu-tfstate` (ap-southeast-2, versioned, SSE-S3, public
   access blocked). Created out-of-band by `infra/terraform/bootstrap/bootstrap.sh`.
-- **Lock table:** `jeromelu-tf-locks` (DynamoDB, PAY_PER_REQUEST).
+- **Locking:** S3-native lockfile (`use_lockfile = true` in `backend.tf`) —
+  Terraform 1.10+ feature. No DynamoDB table required.
 - **State key:** `prod/terraform.tfstate`.
 
-The bootstrap resources cannot live in the same Terraform root they back, so
-they are managed by the bootstrap script and tagged `ManagedBy=bootstrap-script`
-to make this lineage visible.
+The bootstrap bucket cannot live in the same Terraform root it backs, so it
+is created by the bootstrap script and tagged `ManagedBy=bootstrap-script` to
+make this lineage visible.
 
 ## What Terraform does **not** manage
 

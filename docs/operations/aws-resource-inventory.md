@@ -2,12 +2,13 @@
 
 Track all created AWS resources here. Updated as infrastructure is provisioned.
 
-> **2026-04-29 — Adoption into Terraform in progress.**
+> **2026-04-30 — Live AWS resources are now under Terraform.**
 > The IaC source of truth is [`infra/terraform/`](../../infra/terraform/README.md).
-> Per-resource Terraform coverage is tracked in the status table at the top of
-> that README (currently: S3 buckets, ECR repos, SSM Parameter Store).
-> Anything else listed below is still managed manually. New resources should be
-> added in Terraform, not by clicking around the console.
+> All V1 resources are imported into `terraform.tfstate`; per-resource coverage
+> is in the status table at the top of `infra/terraform/README.md`.
+> The V0 orphans listed in Phases 1, 5, 7 (workers), and 9 below were
+> **deleted on 2026-04-30** by [`cleanup-v0.sh`](../../infra/terraform/cleanup-v0.sh).
+> New resources should be added in Terraform, not by clicking around the console.
 
 > **2026-04-25 — V1 architecture switched from ECS/Fargate to Lightsail.** Phases 1–9 below reflect the original V0 build. Resources marked **DECOMMISSIONED 2026-04-25** are slated for deletion as part of the cutover (see Phase 11). Phase 11 lists the live V1 resources.
 
@@ -15,29 +16,34 @@ Track all created AWS resources here. Updated as infrastructure is provisioned.
 
 ## Phase 1 — Networking Foundation
 
-### Step 1.1 — VPC (COMPLETE)
+### Step 1.1 — VPC (COMPLETE — **DELETED 2026-04-30**)
+
+> The V0 VPC and all its children (IGW, S3 endpoint, subnets, route tables,
+> security groups) were deleted on 2026-04-30 by `cleanup-v0.sh`. None of
+> these are recoverable; if multi-AZ networking is ever needed again, see
+> the future scale path in `docs/architecture/12-aws-architecture.md`.
 
 | Resource | ID / Value |
 |----------|------------|
-| VPC | `jeromelu-vpc` — CIDR `10.0.0.0/16` |
-| Public subnet 1 | ap-southeast-2a |
-| Public subnet 2 | ap-southeast-2b |
-| Private subnet 1 | ap-southeast-2a |
-| Private subnet 2 | ap-southeast-2b |
-| Internet Gateway | `igw-0927b99dac1731a77` |
-| NAT Gateway | `nat-0ebe6638ebe58e8ce` (1 AZ) — **DECOMMISSIONED 2026-04-25** (Phase 11) |
-| S3 Gateway Endpoint | `vpce-0cf3ea6da9fdf4300` |
+| VPC | `jeromelu-vpc` — CIDR `10.0.0.0/16` — **DELETED 2026-04-30** |
+| Public subnet 1 | ap-southeast-2a — **DELETED 2026-04-30** |
+| Public subnet 2 | ap-southeast-2b — **DELETED 2026-04-30** |
+| Private subnet 1 | ap-southeast-2a — **DELETED 2026-04-30** |
+| Private subnet 2 | ap-southeast-2b — **DELETED 2026-04-30** |
+| Internet Gateway | `igw-0927b99dac1731a77` — **DELETED 2026-04-30** |
+| NAT Gateway | `nat-0ebe6638ebe58e8ce` (1 AZ) — DECOMMISSIONED 2026-04-25 (Phase 11) |
+| S3 Gateway Endpoint | `vpce-0cf3ea6da9fdf4300` — **DELETED 2026-04-30** |
 
-### Step 1.2 — Security Groups (COMPLETE)
+### Step 1.2 — Security Groups (COMPLETE — **DELETED 2026-04-30**)
 
 | Resource | ID | Inbound | Outbound |
 |----------|----|---------|----------|
-| `jeromelu-alb-sg` | `sg-07f576d4ce99ee90b` | HTTP/80 from 0.0.0.0/0, HTTPS/443 from 0.0.0.0/0 | All traffic |
-| `jeromelu-app-sg` | `sg-0fc05899987c60da7` | TCP/3000 from alb-sg, TCP/8000 from alb-sg | All traffic |
-| `jeromelu-worker-sg` | `sg-07b938985a1c88680` | None | All traffic |
-| `jeromelu-db-sg` | `sg-02c8e33ecca48185b` | TCP/5432 from app-sg, TCP/5432 from worker-sg | None |
+| `jeromelu-alb-sg` | `sg-07f576d4ce99ee90b` — **DELETED** | HTTP/80 from 0.0.0.0/0, HTTPS/443 from 0.0.0.0/0 | All traffic |
+| `jeromelu-app-sg` | `sg-0fc05899987c60da7` — **DELETED** | TCP/3000 from alb-sg, TCP/8000 from alb-sg | All traffic |
+| `jeromelu-worker-sg` | `sg-07b938985a1c88680` — **DELETED** | None | All traffic |
+| `jeromelu-db-sg` | `sg-02c8e33ecca48185b` — **DELETED** | TCP/5432 from app-sg, TCP/5432 from worker-sg | None |
 
-VPC: `vpc-0dfbe4160b1d408ef`
+VPC: `vpc-0dfbe4160b1d408ef` — **DELETED 2026-04-30**
 
 ---
 
@@ -64,7 +70,7 @@ VPC: `vpc-0dfbe4160b1d408ef`
 | Resource | ARN |
 |----------|-----|
 | Certificate (us-east-1, CloudFront) | `arn:aws:acm:us-east-1:111424988703:certificate/361488ce-fcf5-46ed-8f98-ab25d21c7f0e` |
-| Certificate (ap-southeast-2, ALB) | `arn:aws:acm:ap-southeast-2:111424988703:certificate/f270cfe9-d799-4d99-b9c1-1bb93b79fa11` |
+| Certificate (ap-southeast-2, ALB) | `arn:aws:acm:ap-southeast-2:111424988703:certificate/f270cfe9-d799-4d99-b9c1-1bb93b79fa11` — **DELETED 2026-04-30** |
 
 Domains: `jeromelu.ai`, `*.jeromelu.ai` — DNS validated via Route 53.
 
@@ -141,10 +147,10 @@ Note: `jeromelu/openai-api-key` has a placeholder value — replace with real ke
 |------------|------------|-----------------|
 | `jeromelu/web` | AES-256 | Untagged >14d, keep last 10 |
 | `jeromelu/api` | AES-256 | Untagged >14d, keep last 10 |
-| `jeromelu/worker-ingestion` | AES-256 | Untagged >14d, keep last 10 |
-| `jeromelu/worker-extraction` | AES-256 | Untagged >14d, keep last 10 |
-| `jeromelu/worker-decision` | AES-256 | Untagged >14d, keep last 10 |
-| `jeromelu/worker-publishing` | AES-256 | Untagged >14d, keep last 10 |
+| `jeromelu/worker-ingestion` | AES-256 | Untagged >14d, keep last 10 — **DELETED 2026-04-30** |
+| `jeromelu/worker-extraction` | AES-256 | Untagged >14d, keep last 10 — **DELETED 2026-04-30** |
+| `jeromelu/worker-decision` | AES-256 | Untagged >14d, keep last 10 — **DELETED 2026-04-30** |
+| `jeromelu/worker-publishing` | AES-256 | Untagged >14d, keep last 10 — **DELETED 2026-04-30** |
 
 Tag immutability enabled, scan on push enabled.
 

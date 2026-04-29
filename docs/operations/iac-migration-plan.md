@@ -93,8 +93,9 @@ HCL existing in the repo.
 
 - Repo layout, providers (`ap-southeast-2` + `us-east-1` alias), default
   tags, S3 backend.
-- `bootstrap/bootstrap.sh` creates the `jeromelu-tfstate` bucket + DynamoDB
-  lock table out-of-band.
+- `bootstrap/bootstrap.sh` creates the `jeromelu-tfstate` bucket out-of-band.
+  State locking is via S3-native lockfile (`use_lockfile = true`); no
+  DynamoDB table needed.
 - HCL + import blocks for: 3 S3 buckets, 2 ECR repos, 15 SSM parameters.
 
 These are the safest resources to adopt: no inter-resource references,
