@@ -34,7 +34,11 @@ logger = logging.getLogger(__name__)
 WEB_SEARCH_TOOL: dict[str, Any] = {
     "type": "web_search_20250305",
     "name": "web_search",
-    "max_uses": 15,
+    # Each search returns 1-3KB of result content into the conversation, which
+    # round-trips on every subsequent turn. 6 keeps the per-run input budget
+    # comfortably under Anthropic's 50k tokens/min rate limit while still
+    # leaving room for varied query angles.
+    "max_uses": 6,
     "user_location": {
         "type": "approximate",
         "city": "Sydney",

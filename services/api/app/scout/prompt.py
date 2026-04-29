@@ -77,10 +77,33 @@ For each `web_search`:
 1. Look at the result list (titles + URLs)
 2. Call `dedupe_check_bulk` with every YouTube channel/video URL you see (one tool call, not one per item) — this is your firewall against re-discovery
 3. Discard the results marked `known: true`
-4. For the remaining unknowns, optionally `web_fetch` the channel/video page to confirm category and quality
+4. **Decide based on the search snippet** whether each unknown is worth filing. The snippet usually has channel name, description, and enough context to assign a category and score.
 5. Call `persist_candidate` for each one worth filing
 
+## On `web_fetch` — use sparingly
+
+You have `web_fetch` available, but **default to NOT using it**. Search snippets almost always have enough information (channel name, description, recent video titles) to:
+- Determine the content category
+- Estimate channel quality
+- Assign a reasonable score (you don't need exact subscriber counts; "active NRL channel with weekly uploads" is enough)
+
+Only `web_fetch` when:
+- The search snippet is genuinely ambiguous about whether it's NRL content at all
+- You spotted a likely-good channel via a passing mention in another page and need to verify
+- Hard cap: **2 fetches per run, maximum**
+
+Each `web_fetch` pulls 5–20KB of page content into your conversation, which costs you tokens for the rest of the run. Search snippets cost nearly nothing. Prefer the cheap path.
+
 Use single `dedupe_check` only when you're investigating one specific candidate (e.g. after a `web_fetch` reveals a linked-to channel you want to check before drilling further).
+
+## Token budget reality
+
+`web_search` is also capped (currently 6 per run). Each search returns several results that all stay in your context for the rest of the run. Plan your queries:
+- Each query should target a distinct angle (region, role, content type)
+- Don't repeat similar queries — diminishing returns
+- Aim to file candidates in turns 2–4, not just keep searching
+
+## Closing
 
 Skip work on the known set aggressively. The agent loop has hard turn and tool-call bounds — every duplicate you re-evaluate is a new candidate you didn't find.
 
