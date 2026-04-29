@@ -34,11 +34,10 @@ logger = logging.getLogger(__name__)
 WEB_SEARCH_TOOL: dict[str, Any] = {
     "type": "web_search_20250305",
     "name": "web_search",
-    # Each search returns 1-3KB of result content into the conversation, which
-    # round-trips on every subsequent turn. 6 keeps the per-run input budget
-    # comfortably under Anthropic's 50k tokens/min rate limit while still
-    # leaving room for varied query angles.
-    "max_uses": 6,
+    # web_search is now a fallback for off-platform discovery (blogs, news
+    # articles that mention new YouTube creators). Primary discovery is via
+    # the YouTube Data API tools above. Cap accordingly — 2 keeps us tight.
+    "max_uses": 2,
     "user_location": {
         "type": "approximate",
         "city": "Sydney",
@@ -194,9 +193,109 @@ DEDUPE_CHECK_BULK_TOOL: dict[str, Any] = {
 }
 
 
+YOUTUBE_SEARCH_CHANNELS_TOOL: dict[str, Any] = {
+    "name": "youtube_search_channels",
+    "description": (
+        "Deterministic YouTube channel search via the YouTube Data API v3. "
+        "Returns structured metadata (channel_id, title, description) and "
+        "pre-filters out channels we already track. Prefer this over "
+        "web_search for finding new YouTube channels — it's cheaper, "
+        "deterministic, and pre-deduped."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "Search query (e.g. 'NRL injury podcast', 'NRLW analysis').",
+            },
+            "max_results": {
+                "type": "integer",
+                "description": "How many channels to return (1-50, default 10).",
+            },
+        },
+        "required": ["query"],
+    },
+}
+
+
+YOUTUBE_SEARCH_VIDEOS_TOOL: dict[str, Any] = {
+    "name": "youtube_search_videos",
+    "description": (
+        "Deterministic YouTube video search via the Data API. Returns "
+        "structured video metadata (video_id, channel_id, title, description, "
+        "published_at) and pre-filters videos we already ingested. Use to "
+        "find recent NRL videos worth onboarding."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "query": {"type": "string"},
+            "max_results": {
+                "type": "integer",
+                "description": "1-50, default 10.",
+            },
+            "published_after": {
+                "type": "string",
+                "description": "RFC 3339 timestamp (e.g. '2026-04-01T00:00:00Z'). Restrict to recent uploads.",
+            },
+        },
+        "required": ["query"],
+    },
+}
+
+
+YOUTUBE_CHANNEL_STATS_TOOL: dict[str, Any] = {
+    "name": "youtube_channel_stats",
+    "description": (
+        "Look up rich metadata for one or more YouTube channels: subs, "
+        "video count, country, default language, total views. Use to "
+        "verify a candidate before persisting (especially for channels "
+        "where the search snippet was thin). Cheap — 1 quota unit per call "
+        "regardless of how many channels are passed (up to 50)."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "channel_ids": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Up to 50 channel UCxxxx ids in a single call.",
+            },
+        },
+        "required": ["channel_ids"],
+    },
+}
+
+
+YOUTUBE_RELATED_CHANNELS_TOOL: dict[str, Any] = {
+    "name": "youtube_related_channels",
+    "description": (
+        "Find channels that a known-good channel features in its 'channels' "
+        "sections (collaborators, network shows, etc.). Strong signal for "
+        "discovering adjacent creators we might not find via keyword search."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "channel_id": {"type": "string"},
+        },
+        "required": ["channel_id"],
+    },
+}
+
+
 def all_tools() -> list[dict[str, Any]]:
-    """Tool array passed to the Anthropic Messages API."""
+    """Tool array passed to the Anthropic Messages API.
+
+    YouTube tools come first — they're the primary discovery surface.
+    web_search is the off-platform fallback.
+    """
     return [
+        YOUTUBE_SEARCH_CHANNELS_TOOL,
+        YOUTUBE_SEARCH_VIDEOS_TOOL,
+        YOUTUBE_RELATED_CHANNELS_TOOL,
+        YOUTUBE_CHANNEL_STATS_TOOL,
         WEB_SEARCH_TOOL,
         WEB_FETCH_TOOL,
         DEDUPE_CHECK_BULK_TOOL,
@@ -480,8 +579,139 @@ def summarise_known_sources(session: Session, *, max_lines: int = 200) -> str:
     return "\n".join(lines)
 
 
+# ---------------------------------------------------------------------------
+# YouTube Data API tools
+# ---------------------------------------------------------------------------
+
+def _known_channel_external_ids(session: Session) -> set[str]:
+    """All YouTube channel external_ids we already know about — tracked
+    channels + any candidate previously surfaced (any status)."""
+    tracked = {
+        row[0]
+        for row in session.execute(
+            select(Channel.external_id).where(
+                Channel.platform == "youtube",
+                Channel.external_id.isnot(None),
+            )
+        ).all()
+    }
+    surfaced = {
+        row[0]
+        for row in session.execute(
+            select(DiscoveredSource.external_id).where(
+                DiscoveredSource.platform == "youtube",
+                DiscoveredSource.kind == "channel",
+            )
+        ).all()
+    }
+    return tracked | surfaced
+
+
+def _known_video_external_ids(session: Session) -> set[str]:
+    """All YouTube video external_ids in discovered_sources (any status)."""
+    return {
+        row[0]
+        for row in session.execute(
+            select(DiscoveredSource.external_id).where(
+                DiscoveredSource.platform == "youtube",
+                DiscoveredSource.kind == "video",
+            )
+        ).all()
+    }
+
+
+def handle_youtube_search_channels(
+    session: Session, *, query: str, max_results: int = 10
+) -> dict[str, Any]:
+    """Channel search via the YouTube Data API. Pre-filters known channels."""
+    from app.scout.youtube_api import YouTubeAPIError, search_channels
+
+    known = _known_channel_external_ids(session)
+    try:
+        results = search_channels(
+            query, max_results=max_results, filter_known_external_ids=known
+        )
+    except YouTubeAPIError as e:
+        return {"ok": False, "error": str(e)}
+    return {
+        "ok": True,
+        "query": query,
+        "returned": len(results),
+        "skipped_known": len(known),
+        "results": results,
+    }
+
+
+def handle_youtube_search_videos(
+    session: Session,
+    *,
+    query: str,
+    max_results: int = 10,
+    published_after: str | None = None,
+) -> dict[str, Any]:
+    """Video search via the YouTube Data API. Pre-filters known videos."""
+    from app.scout.youtube_api import YouTubeAPIError, search_videos
+
+    known = _known_video_external_ids(session)
+    try:
+        results = search_videos(
+            query,
+            max_results=max_results,
+            published_after=published_after,
+            filter_known_external_ids=known,
+        )
+    except YouTubeAPIError as e:
+        return {"ok": False, "error": str(e)}
+    return {
+        "ok": True,
+        "query": query,
+        "returned": len(results),
+        "skipped_known": len(known),
+        "results": results,
+    }
+
+
+def handle_youtube_channel_stats(
+    session: Session, *, channel_ids: list[str]
+) -> dict[str, Any]:
+    """Detailed metadata for one or more channels."""
+    from app.scout.youtube_api import YouTubeAPIError, get_channel_stats
+
+    try:
+        results = get_channel_stats(channel_ids)
+    except YouTubeAPIError as e:
+        return {"ok": False, "error": str(e)}
+    return {"ok": True, "returned": len(results), "results": results}
+
+
+def handle_youtube_related_channels(
+    session: Session, *, channel_id: str
+) -> dict[str, Any]:
+    """Channels that the given channel features in its 'channels' sections."""
+    from app.scout.youtube_api import YouTubeAPIError, get_channel_sections
+
+    try:
+        related_ids = get_channel_sections(channel_id)
+    except YouTubeAPIError as e:
+        return {"ok": False, "error": str(e)}
+    # Pre-filter known channels — agent only sees novel related channels.
+    known = _known_channel_external_ids(session)
+    novel = [cid for cid in related_ids if cid not in known]
+    return {
+        "ok": True,
+        "channel_id": channel_id,
+        "returned": len(novel),
+        "skipped_known": len(related_ids) - len(novel),
+        "related_channel_ids": novel,
+    }
+
+
 CUSTOM_TOOL_HANDLERS = {
     "dedupe_check": handle_dedupe_check,
     "dedupe_check_bulk": handle_dedupe_check_bulk,
     "persist_candidate": handle_persist_candidate,
+    "youtube_search_channels": handle_youtube_search_channels,
+    "youtube_search_videos": handle_youtube_search_videos,
+    "youtube_channel_stats": handle_youtube_channel_stats,
+    "youtube_related_channels": handle_youtube_related_channels,
 }

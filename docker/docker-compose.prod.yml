@@ -7,6 +7,7 @@
 #   POSTGRES_PASSWORD       — db password (rotate from current RDS password on cutover)
 #   OPENAI_API_KEY
 #   ANTHROPIC_API_KEY       — required for Claude-Agent-SDK agents (Scout, etc.)
+#   YOUTUBE_API_KEY         — Scout's YouTube Data API v3 discovery tools
 #   ADMIN_KEY               — protects /api/admin/*
 #   AWS_ACCESS_KEY_ID       — for S3 access from api / pg-backup cron
 #   AWS_SECRET_ACCESS_KEY
@@ -46,6 +47,7 @@ services:
       DATABASE_URL: postgresql+psycopg://jeromelu_admin:${POSTGRES_PASSWORD}@postgres:5432/jeromelu
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY}
       ADMIN_KEY: ${ADMIN_KEY}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
