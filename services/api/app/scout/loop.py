@@ -198,7 +198,7 @@ def run_scout(
         try:
             with client.messages.stream(
                 model=model,
-                max_tokens=4096,
+                max_tokens=16384,
                 system=system,
                 tools=tools,
                 messages=messages,

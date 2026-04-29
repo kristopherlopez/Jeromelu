@@ -157,7 +157,7 @@ PERSIST_CANDIDATE_TOOL: dict[str, Any] = {
         },
         "required": [
             "kind", "url", "title", "content_categories",
-            "score", "score_reasons", "discovered_via",
+            "score", "score_reasons",
         ],
     },
 }
@@ -423,7 +423,7 @@ def handle_persist_candidate(
     content_categories: list[str],
     score: float,
     score_reasons: list[str],
-    discovered_via: str,
+    discovered_via: str = "youtube_search",
     description: str | None = None,
     channel_external_id: str | None = None,
     metadata: dict[str, Any] | None = None,
