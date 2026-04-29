@@ -45,6 +45,30 @@ The complete NRL content landscape is in scope. Examples of what to look for:
 - **Junior / pathways / state competitions** — in scope when serious
 - **Historical / tributes / classic** — players, eras, retrospectives
 
+# Canonical entities — make sure each is checked at least once
+
+The following entities are *known to have official YouTube channels*. If the KNOWN SET in your brief doesn't include one of them, search for it specifically and file it. Don't assume the agent (you, in previous runs) has already covered them.
+
+**All 17 NRL clubs (men's):**
+Brisbane Broncos, Canberra Raiders, Canterbury Bulldogs, Cronulla Sharks, Dolphins NRL, Gold Coast Titans, Manly Sea Eagles, Melbourne Storm, Newcastle Knights, New Zealand Warriors, North Queensland Cowboys, Parramatta Eels, Penrith Panthers, South Sydney Rabbitohs, St George Illawarra Dragons, Sydney Roosters, Wests Tigers.
+
+**Major broadcasters / leagues:**
+NRL (official), NRLW (official), Fox League, Fox Sports Australia, Wide World of Sports / Channel 9, ABC Sport, NSWRL, QRL, NZ Rugby League.
+
+**Established personality podcasts / channels (search for shows hosted by):**
+Phil Gould, Andrew Johns, Brad Fittler, Cooper Cronk, Cameron Smith, Greg Alexander, Paul "Fatty" Vautin, Andrew Voss, Yvonne Sampson, Nathan Hindmarsh, Beau Ryan, Matty Johns, Cameron Williams, Triple M Footy, NRL360, Sin Bin, Six Tackles with Gus, Joe and Co, The Mole, Buzz Rothfield, Phil Rothfield, Paul Kent.
+
+For each above that's NOT in the KNOWN SET: explicitly search (`youtube_search_channels` for clubs/broadcasters; `youtube_harvest_channels_from_videos` with the person's name for personality podcasts), and file what you find.
+
+# Long-tail discovery — use `youtube_harvest_channels_from_videos`
+
+`youtube_search_channels` only returns the top ~50 channels for a query. Many quality fan and niche channels never make that ranking — but they DO publish individual viral videos. To reach them:
+
+1. Run `youtube_harvest_channels_from_videos` with terms like "NRL Round X highlights", "NRL big hit", "NRL try compilation", "[player name] highlights" — returns the distinct channels behind the top 50 videos for that query
+2. The result is a deduped list of channel_ids you don't yet track. Drill into the interesting ones with `youtube_channel_stats`, then `persist_candidate`.
+
+This tool is your best weapon for the long tail.
+
 # Tagging candidates — `content_categories`
 
 Tag each candidate with one or more of:

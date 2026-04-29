@@ -82,7 +82,7 @@ def _get(path: str, params: dict[str, Any]) -> dict[str, Any]:
 
 def search_channels(
     query: str,
-    max_results: int = 10,
+    max_results: int = 50,
     filter_known_external_ids: Iterable[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Channel search via Data API. Region-biased to AU."""
@@ -115,7 +115,7 @@ def search_channels(
 
 def search_videos(
     query: str,
-    max_results: int = 10,
+    max_results: int = 50,
     published_after: str | None = None,
     filter_known_external_ids: Iterable[str] | None = None,
 ) -> list[dict[str, Any]]:
@@ -148,6 +148,48 @@ def search_videos(
             "url": f"https://www.youtube.com/watch?v={vid}",
         })
     return out
+
+
+# ---------------------------------------------------------------------------
+# Long-tail discovery — videos → distinct channels
+#
+# YouTube channel search is ranked; long-tail channels never make the top 50.
+# But popular VIDEOS for niche queries do, and each video carries a channel_id.
+# Searching videos and extracting distinct channels reveals channels that:
+#   - Publish viral one-off content but have low subscriber counts
+#   - Cover specific events (round, match, player) and rank on those terms
+#   - Are too small to win a channel-search relevance battle
+# ---------------------------------------------------------------------------
+
+def harvest_channels_from_videos(
+    query: str,
+    max_videos: int = 50,
+    published_after: str | None = None,
+    filter_known_external_ids: Iterable[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Search videos for `query`, return distinct channels publishing them.
+
+    First-seen video title is included so the agent can see WHY this channel
+    surfaced (helps with category/score judgment).
+    """
+    videos = search_videos(
+        query,
+        max_results=max_videos,
+        published_after=published_after,
+    )
+    known = set(filter_known_external_ids or [])
+    seen: dict[str, dict[str, Any]] = {}
+    for v in videos:
+        cid = v.get("channel_id")
+        if not cid or cid in known or cid in seen:
+            continue
+        seen[cid] = {
+            "channel_id": cid,
+            "channel_title": v.get("channel_title", ""),
+            "first_seen_video_title": v.get("title", ""),
+            "first_seen_video_published_at": v.get("published_at", ""),
+        }
+    return list(seen.values())
 
 
 # ---------------------------------------------------------------------------

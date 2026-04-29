@@ -285,6 +285,42 @@ YOUTUBE_RELATED_CHANNELS_TOOL: dict[str, Any] = {
 }
 
 
+YOUTUBE_HARVEST_CHANNELS_FROM_VIDEOS_TOOL: dict[str, Any] = {
+    "name": "youtube_harvest_channels_from_videos",
+    "description": (
+        "Long-tail channel discovery via video search. Runs a video search "
+        "for `query`, takes the top 50 results, returns the DISTINCT channels "
+        "that published them (with the first-seen video title for context). "
+        "USE THIS to find channels that publish viral or event-specific NRL "
+        "content but don't win channel-search rankings — fan channels, niche "
+        "match-clip pages, event accounts, breakout creators. Pre-filters "
+        "known channels server-side."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": (
+                    "Video search query. Specific terms work best — e.g. "
+                    "'NRL Round 1 highlights 2026', 'Origin Game 1 try', "
+                    "'NRL big hit compilation', 'Cooper Cronk podcast'."
+                ),
+            },
+            "max_videos": {
+                "type": "integer",
+                "description": "How many videos to scan, 1-50. Default 50.",
+            },
+            "published_after": {
+                "type": "string",
+                "description": "RFC 3339 (e.g. '2026-04-01T00:00:00Z'). Optional, restricts to recent.",
+            },
+        },
+        "required": ["query"],
+    },
+}
+
+
 def all_tools() -> list[dict[str, Any]]:
     """Tool array passed to the Anthropic Messages API.
 
@@ -294,6 +330,7 @@ def all_tools() -> list[dict[str, Any]]:
     return [
         YOUTUBE_SEARCH_CHANNELS_TOOL,
         YOUTUBE_SEARCH_VIDEOS_TOOL,
+        YOUTUBE_HARVEST_CHANNELS_FROM_VIDEOS_TOOL,
         YOUTUBE_RELATED_CHANNELS_TOOL,
         YOUTUBE_CHANNEL_STATS_TOOL,
         WEB_SEARCH_TOOL,
@@ -706,6 +743,36 @@ def handle_youtube_related_channels(
     }
 
 
+def handle_youtube_harvest_channels_from_videos(
+    session: Session,
+    *,
+    query: str,
+    max_videos: int = 50,
+    published_after: str | None = None,
+) -> dict[str, Any]:
+    """Search videos for `query`, return distinct unknown channels."""
+    from app.scout.youtube_api import YouTubeAPIError, harvest_channels_from_videos
+
+    known = _known_channel_external_ids(session)
+    try:
+        results = harvest_channels_from_videos(
+            query,
+            max_videos=max_videos,
+            published_after=published_after,
+            filter_known_external_ids=known,
+        )
+    except YouTubeAPIError as e:
+        return {"ok": False, "error": str(e)}
+    return {
+        "ok": True,
+        "query": query,
+        "videos_scanned": max_videos,
+        "distinct_channels_returned": len(results),
+        "skipped_known": len(known),
+        "results": results,
+    }
+
+
 CUSTOM_TOOL_HANDLERS = {
     "dedupe_check": handle_dedupe_check,
     "dedupe_check_bulk": handle_dedupe_check_bulk,
@@ -714,4 +781,5 @@ CUSTOM_TOOL_HANDLERS = {
     "youtube_search_videos": handle_youtube_search_videos,
     "youtube_channel_stats": handle_youtube_channel_stats,
     "youtube_related_channels": handle_youtube_related_channels,
+    "youtube_harvest_channels_from_videos": handle_youtube_harvest_channels_from_videos,
 }
