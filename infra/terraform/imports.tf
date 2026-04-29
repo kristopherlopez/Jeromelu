@@ -69,10 +69,11 @@ import {
   id = "jeromelu-public-assets"
 }
 
-import {
-  to = aws_s3_bucket_lifecycle_configuration.public_assets
-  id = "jeromelu-public-assets"
-}
+# Note: aws_s3_bucket_lifecycle_configuration.public_assets is intentionally
+# NOT imported — the lifecycle rule documented in the inventory was never
+# actually configured on the live bucket. On first apply, Terraform creates
+# the rule from HCL, finally bringing the bucket in line with the documented
+# 30-day expiry on `backups/postgres/`.
 
 # ---- ECR ---------------------------------------------------------------------
 
@@ -163,23 +164,12 @@ import {
 }
 
 # ---- Lightsail ---------------------------------------------------------------
+#
+# Only the instance is imported. The static IP, its attachment, and the
+# public-ports resource cannot be imported in AWS provider 5.x; see
+# lightsail.tf for how each is handled.
 
 import {
   to = aws_lightsail_instance.jeromelu
-  id = "jeromelu"
-}
-
-import {
-  to = aws_lightsail_static_ip.jeromelu
-  id = "jeromelu-ip"
-}
-
-import {
-  to = aws_lightsail_static_ip_attachment.jeromelu
-  id = "jeromelu-ip"
-}
-
-import {
-  to = aws_lightsail_instance_public_ports.jeromelu
   id = "jeromelu"
 }

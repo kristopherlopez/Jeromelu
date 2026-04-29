@@ -46,7 +46,7 @@ resource "aws_route53_record" "api" {
   name    = "api.${var.domain}"
   type    = "A"
   ttl     = 60
-  records = [aws_lightsail_static_ip.jeromelu.ip_address]
+  records = [var.lightsail_static_ip]
 }
 
 resource "aws_route53_record" "origin" {
@@ -54,5 +54,5 @@ resource "aws_route53_record" "origin" {
   name    = "origin.${var.domain}"
   type    = "A"
   ttl     = 60
-  records = [aws_lightsail_static_ip.jeromelu.ip_address]
+  records = [var.lightsail_static_ip]
 }

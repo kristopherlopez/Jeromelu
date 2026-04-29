@@ -13,11 +13,21 @@
 #     key was created via console; private half lives at ~/.ssh/jeromelu-prod
 #     on the operator workstation. If we ever need to rotate, do it via
 #     console and update the operator's local key file.
+#   - Static IP and its attachment to the instance. AWS provider 5.x does
+#     not support `terraform import` for `aws_lightsail_static_ip` (or its
+#     attachment). The IP exists in AWS, attached to the instance; we read
+#     it via `data "aws_lightsail_static_ip"` for downstream references.
 #   - cloud-init `user_data`. Already executed at first boot; subsequent edits
 #     would be no-ops at best and reprovision-the-host at worst.
 #   - Snapshots. Taken weekly via console.
 #   - Anything inside the VM (Docker, /opt/jeromelu, /etc/cron.d/...) — that
 #     is Compose's territory.
+#
+# `aws_lightsail_instance_public_ports` also can't be imported, but it can
+# be created — the AWS API call is idempotent (`PutInstancePublicPorts`
+# replaces the full port set), so creating the resource against an instance
+# that already has the exact same ports configured is a no-op. After the
+# first apply it lives in state and is managed normally.
 ################################################################################
 
 resource "aws_lightsail_instance" "jeromelu" {
@@ -33,15 +43,6 @@ resource "aws_lightsail_instance" "jeromelu" {
       blueprint_id, # blueprints rev frequently; don't reprovision the host
     ]
   }
-}
-
-resource "aws_lightsail_static_ip" "jeromelu" {
-  name = "jeromelu-ip"
-}
-
-resource "aws_lightsail_static_ip_attachment" "jeromelu" {
-  static_ip_name = aws_lightsail_static_ip.jeromelu.name
-  instance_name  = aws_lightsail_instance.jeromelu.name
 }
 
 resource "aws_lightsail_instance_public_ports" "jeromelu" {

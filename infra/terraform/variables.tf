@@ -32,3 +32,9 @@ variable "operator_ssh_cidr" {
   type        = string
   default     = "112.213.139.221/32"
 }
+
+variable "lightsail_static_ip" {
+  description = "Public IP attached to the Lightsail instance. The static IP itself isn't TF-managed (no provider import support); this variable lets DNS records reference it."
+  type        = string
+  default     = "52.65.91.199"
+}

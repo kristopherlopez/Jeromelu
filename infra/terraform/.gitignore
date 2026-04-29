@@ -14,3 +14,12 @@ crash.*.log
 
 # Generated config from `terraform plan -generate-config-out=`
 generated.tf
+
+# Saved plan files
+tfplan
+tfplan.*
+*.tfplan
+
+# Operational logs from local plan/apply runs
+plan.log
+apply.log

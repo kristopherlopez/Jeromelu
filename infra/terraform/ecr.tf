@@ -30,7 +30,7 @@ locals {
       },
       {
         rulePriority = 2
-        description  = "Keep the last 10 tagged images"
+        description  = "Keep only the last 10 tagged images"
         selection = {
           tagStatus      = "tagged"
           tagPatternList = ["*"]
@@ -46,8 +46,12 @@ locals {
 resource "aws_ecr_repository" "this" {
   for_each = local.ecr_repos
 
+  # Live state is MUTABLE (despite the inventory saying tag immutability is
+  # enabled). Switching to IMMUTABLE would break `docker push :latest` from
+  # the deploy workflow. If we ever want immutable tags, the deploy workflow
+  # must drop the `latest` push first.
   name                 = each.key
-  image_tag_mutability = "IMMUTABLE"
+  image_tag_mutability = "MUTABLE"
 
   image_scanning_configuration {
     scan_on_push = true
