@@ -34,37 +34,28 @@ def jaromelu_status(db: Session = Depends(get_db)):
 
     latest = (
         db.query(AgentRun)
-        .order_by(desc(AgentRun.created_at))
+        .order_by(desc(AgentRun.started_at))
         .first()
     )
 
-    if latest and latest.activity_type == "started":
-        status = "active"
-    else:
-        status = "dormant"
+    status = "active" if (latest and latest.status == "running") else "dormant"
 
     last_activity = None
     if latest:
         last_activity = {
             "summary": latest.summary,
-            "timestamp": latest.created_at.isoformat(),
-            "activity_type": latest.activity_type,
+            "timestamp": (latest.ended_at or latest.started_at).isoformat(),
+            "status": latest.status,
         }
 
     action = latest.summary if status == "active" and latest else None
 
-    # Determine current round from latest crew activity or claims
+    # Current round comes from claims — agent_runs is round-agnostic.
     latest_round = (
-        db.query(func.max(AgentRun.round))
-        .filter(AgentRun.round.isnot(None))
+        db.query(func.max(Claim.effective_round))
+        .filter(Claim.effective_round.isnot(None))
         .scalar()
     )
-    if not latest_round:
-        latest_round = (
-            db.query(func.max(Claim.effective_round))
-            .filter(Claim.effective_round.isnot(None))
-            .scalar()
-        )
 
     return {
         "status": status,
@@ -81,41 +72,23 @@ def round_overview(
     season: int = Query(default=2026),
     db: Session = Depends(get_db),
 ):
-    """Full round overview — Jaromelu's activity, consensus, sources."""
+    """Full round overview — consensus and sources for the round.
 
-    # 1. Activity for this round (internal mode rows aggregate to a single Jaromelu timeline)
-    activities = (
-        db.query(AgentRun)
-        .filter(AgentRun.round == round_num, AgentRun.season == season)
-        .order_by(desc(AgentRun.created_at))
-        .all()
+    Note: agent_runs no longer carries round/season (it's engineering telemetry
+    that doesn't generalise per-round), so `activity_log` is empty here. Round
+    status is derived from whether claims exist for the round.
+    """
+
+    activity_log: list[dict] = []
+
+    # Round status: claims exist => 'complete' (the round has signal); else 'pending'.
+    has_claims = (
+        db.query(Claim.claim_id)
+        .filter(Claim.effective_round == round_num, Claim.season == season)
+        .first()
+        is not None
     )
-
-    activity_log = [
-        {
-            "activity_id": str(a.activity_id),
-            "activity_type": a.activity_type,
-            "summary": a.summary,
-            "detail_json": a.detail_json or {},
-            "created_at": a.created_at.isoformat(),
-        }
-        for a in activities
-    ]
-
-    # 2. Round status
-    has_started = any(a.activity_type == "started" for a in activities)
-    all_completed = all(
-        a.activity_type in ("completed", "handoff")
-        for a in activities
-        if a.activity_type != "started"
-    ) if activities else False
-
-    if not activities:
-        round_status = "pending"
-    elif has_started and not all_completed:
-        round_status = "in_progress"
-    else:
-        round_status = "complete"
+    round_status = "complete" if has_claims else "pending"
 
     # 3. Claims for this round — consensus
     claim_rows = (

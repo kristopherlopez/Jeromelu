@@ -416,20 +416,11 @@ def run_scout(
     )
 
     summary_dict = {
-        "turns_used": turns,
-        "tool_calls": tool_calls,
         "candidates_filed": candidates_filed,
         "duplicates_skipped": duplicates_skipped,
-        "input_tokens": in_tok,
-        "output_tokens": out_tok,
-        "cache_read_tokens": cache_r,
-        "cache_write_tokens": cache_w,
         "web_searches": web_searches_total,
         "web_fetches": web_fetches_total,
         "total_api_latency_ms": total_api_latency_ms,
-        "token_cost_usd": round(token_cost, 4),
-        "search_cost_usd": round(search_cost, 4),
-        "estimated_cost_usd": round(final_cost, 4),
         "stop_reason": stop_reason,
         "notes": notes,
         "started_at": started_at.isoformat(),
@@ -445,18 +436,23 @@ def run_scout(
     )
     record_agent_ended(
         session,
-        agent_id=AGENT_ID,
-        agent_name=AGENT_NAME,
         run_id=run_id,
         status=status,
         summary_text=summary_text,
-        detail={
-            **summary_dict,
-            "model": model,
-            "s3_log_key": s3_log_key,
-            "s3_log_bucket": settings.s3_agent_logs_bucket if s3_log_key else None,
-            "agent_events_count": audit.event_count,
+        model=model,
+        turns_used=turns,
+        tool_calls=tool_calls,
+        input_tokens=in_tok,
+        output_tokens=out_tok,
+        cache_read_tokens=cache_r,
+        cache_write_tokens=cache_w,
+        server_tool_counts={
+            "web_search": web_searches_total,
+            "web_fetch": web_fetches_total,
         },
+        agent_events_count=audit.event_count,
+        s3_log_key=s3_log_key,
+        detail=summary_dict,
     )
 
     print(f"\n=== Scout run done ===")

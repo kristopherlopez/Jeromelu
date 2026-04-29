@@ -5,13 +5,15 @@ this module so observability, cost tracking, and forensic logs look the same
 across the system.
 
 Three layers per run, all joinable on `run_id`:
-  1. `agent_runs` rows (start + end)           — DB run-level summary
-  2. `agent_events` rows                       — DB per-event trace, queryable
-                                                 live while the run is in flight
-  3. JSONL bundle uploaded to S3 at run end    — long-term forensics
+  1. `agent_runs` row (one per run, updated in place)
+                                                — DB run-level summary
+  2. `agent_events` rows                        — DB per-event trace, queryable
+                                                  live while the run is in flight
+  3. JSONL bundle uploaded to S3 at run end     — long-term forensics
 
-The S3 key is stamped into the end `agent_runs.detail_json.s3_log_key`, so
-a single SQL query goes from "this run" to its forensic transcript.
+The S3 key is stamped into `agent_runs.s3_log_key` (and mirrored in
+`detail_json.s3_log_key`), so a single SQL query goes from "this run" to its
+forensic transcript.
 
 S3 key format:
   {settings.s3_agent_logs_bucket}/agent-logs/{agent_id}/{YYYY}/{MM}/{DD}/{run_id}.jsonl
@@ -39,13 +41,22 @@ Usage skeleton (see services/api/app/scout/loop.py for the reference impl):
 
     audit.run_ended(status=..., summary={...})
     s3_key = audit.flush_to_s3()
-    record_agent_ended(session, agent_id="scout", agent_name="Scout",
-                       run_id=run_id, status=..., summary_text=...,
-                       detail={..., "s3_log_key": s3_key,
-                               "agent_events_count": audit.event_count})
+    record_agent_ended(
+        session, run_id=run_id, status=..., summary_text=...,
+        model=..., turns_used=..., tool_calls=...,
+        input_tokens=..., output_tokens=...,
+        cache_read_tokens=..., cache_write_tokens=...,
+        server_tool_counts={"web_search": 9, "web_fetch": 2},
+        agent_events_count=audit.event_count, s3_log_key=s3_key,
+        detail={...},  # optional extras, merged into detail_json
+    )
 
-When adding a new agent (e.g. 'critic'): also extend the agent_runs
-agent_id CHECK constraint via a new migration before first run, otherwise
+`record_agent_ended` computes the cost columns internally via
+`estimate_token_cost` and `estimate_server_tool_cost` so every agent's cost
+rollup is derived the same way — callers can't accidentally drift.
+
+When adding a new agent (e.g. 'critic'): extend the agent_runs.agent_id CHECK
+constraint via a new migration before first run, otherwise
 record_agent_started will fail.
 """
 
@@ -404,7 +415,10 @@ def record_agent_started(
     brief: str,
     bounds: dict[str, Any],
 ) -> None:
-    """Insert a 'started' agent_runs row at the top of an agent run.
+    """Insert the agent_runs row at the top of an agent run.
+
+    Sets status='running'; the same row is later updated by
+    `record_agent_ended` rather than a second row being inserted.
 
     Caller is responsible for ensuring `agent_id` is in the AgentRun
     CHECK constraint (extend via migration before adding a new agent).
@@ -413,16 +427,15 @@ def record_agent_started(
         run_id=run_id,
         agent_id=agent_id,
         agent_name=agent_name,
-        activity_type="started",
+        status="running",
+        started_at=datetime.now(timezone.utc),
+        model=model,
+        brief_preview=brief[:500] if brief else None,
+        bounds_json=bounds,
         summary=(
             f"{agent_name} run started — model={model}, "
             f"budget=${bounds.get('max_budget_usd', '?')}"
         ),
-        detail_json={
-            "model": model,
-            "brief_preview": brief[:500],
-            "bounds": bounds,
-        },
     )
     session.add(row)
     session.commit()
@@ -431,30 +444,65 @@ def record_agent_started(
 def record_agent_ended(
     session: Session,
     *,
-    agent_id: str,
-    agent_name: str,
     run_id: str,
     status: str,
     summary_text: str,
-    detail: dict[str, Any],
+    model: str,
+    turns_used: int | None = None,
+    tool_calls: int | None = None,
+    input_tokens: int = 0,
+    output_tokens: int = 0,
+    cache_read_tokens: int = 0,
+    cache_write_tokens: int = 0,
+    server_tool_counts: dict[str, int] | None = None,
+    agent_events_count: int | None = None,
+    s3_log_key: str | None = None,
+    detail: dict[str, Any] | None = None,
 ) -> None:
-    """Insert a 'completed' or 'failed' agent_runs row at run end.
+    """Update the existing agent_runs row at run end.
 
-    `status` is the agent's logical status; maps to AgentRun.activity_type:
-      'completed' | 'aborted' -> 'completed'  (status preserved in detail_json)
-      'failed'                -> 'failed'
+    Computes cost columns internally via `estimate_token_cost` and
+    `estimate_server_tool_cost` so every agent's spend tracking is derived the
+    same way. Pass token totals + `server_tool_counts` (e.g.
+    {"web_search": 9, "web_fetch": 2}); the helper does the rest.
+
+    `status` lands in agent_runs.status directly: must be one of
+    'completed', 'aborted', 'failed' (or 'running' if you're updating
+    mid-run, though the typical pattern is start -> end).
     """
-    activity_type = "failed" if status == "failed" else "completed"
-    enriched = dict(detail)
-    enriched["status"] = status
-
-    row = AgentRun(
-        run_id=run_id,
-        agent_id=agent_id,
-        agent_name=agent_name,
-        activity_type=activity_type,
-        summary=summary_text,
-        detail_json=enriched,
+    server_tool_counts = server_tool_counts or {}
+    token_cost = estimate_token_cost(
+        model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens
     )
-    session.add(row)
+    server_tool_cost = estimate_server_tool_cost(server_tool_counts)
+    total_cost = token_cost + server_tool_cost
+
+    row = (
+        session.query(AgentRun)
+        .filter(AgentRun.run_id == run_id)
+        .one_or_none()
+    )
+    if row is None:
+        logger.error(
+            "record_agent_ended: no agent_runs row for run_id=%s; "
+            "did record_agent_started run? Skipping update.",
+            run_id,
+        )
+        return
+
+    row.status = status
+    row.ended_at = datetime.now(timezone.utc)
+    row.summary = summary_text
+    row.detail_json = detail or {}
+    row.s3_log_key = s3_log_key
+    row.agent_events_count = agent_events_count
+    row.turns_used = turns_used
+    row.tool_calls = tool_calls
+    row.input_tokens = input_tokens
+    row.output_tokens = output_tokens
+    row.cache_read_tokens = cache_read_tokens
+    row.cache_write_tokens = cache_write_tokens
+    row.token_cost_usd = token_cost
+    row.server_tool_cost_usd = server_tool_cost
+    row.total_cost_usd = total_cost
     session.commit()

@@ -14,13 +14,13 @@ Three layers, all joined by a single `run_id`:
 
 | Layer | Where | Built for |
 |---|---|---|
-| **Run summary** | `agent_runs` (DB) — `started` row + `completed`/`failed` row, both with top-level `run_id` | "Did agent X run today, what was the outcome, what did it cost" |
+| **Run summary** | `agent_runs` (DB) — **one row per run, keyed by `run_id`**; inserted with `status='running'`, updated in place at run end | "Did agent X run today, what was the outcome, what did it cost" |
 | **Per-event trace** | `agent_events` (DB) — one row per event, queryable while the run is in progress; **plus** an at-end JSONL bundle uploaded to `s3://{settings.s3_agent_logs_bucket}/agent-logs/{agent_id}/{YYYY}/{MM}/{DD}/{run_id}.jsonl` | "Why did it skip that result? What did web_search return on turn 3?" — DB for live + ad-hoc queries; S3 for long-term forensics. |
 | **Domain output** | Agent-specific tables (`discovered_sources` for Scout, `claims` for Analyst, etc.) tagged with `run_id` | "What did this run actually produce" |
 
-All three tables expose `run_id` as a top-level indexed column, so cross-table queries are clean: `SELECT … FROM agent_runs JOIN agent_events USING (run_id, agent_id) …`.
+All three tables expose `run_id` as a top-level indexed column (PK on `agent_runs`, unique-with-sequence on `agent_events`), so cross-table queries are clean: `SELECT … FROM agent_runs JOIN agent_events USING (run_id, agent_id) …`.
 
-No local files. The DB is the live store, S3 is the forensic archive. The S3 key is stamped into the end `agent_runs.detail_json.s3_log_key`, so a single SQL query gets you from "this run" to its bundle. DB write failures during a run are logged but don't abort — the in-memory buffer still flushes to S3 as the safety net.
+No local files. The DB is the live store, S3 is the forensic archive. The S3 key is stamped into `agent_runs.s3_log_key` (top-level column), so a single SQL query gets you from "this run" to its bundle. DB write failures during a run are logged but don't abort — the in-memory buffer still flushes to S3 as the safety net.
 
 ---
 
@@ -74,53 +74,44 @@ UNIQUE (run_id, sequence)
 
 ---
 
-## Required `agent_runs` rows
+## `agent_runs` schema
 
-Two rows per run, both with `agent_id` and a shared top-level `run_id`:
+One row per run, keyed by `run_id` (the primary key). Inserted with
+`status='running'` on `record_agent_started`, updated in place on
+`record_agent_ended`.
 
-**Started:**
-```json
-{
-  "run_id": "scout-20260427T103045-a1b2c3",
-  "agent_id": "scout",
-  "agent_name": "Scout",
-  "activity_type": "started",
-  "summary": "Scout run started — model=claude-sonnet-4-6, budget=$3.0",
-  "detail_json": {
-    "model": "...",
-    "brief_preview": "<first 500 chars>",
-    "bounds": {...}
-  }
-}
+```
+run_id                TEXT          PK
+agent_id              TEXT          NOT NULL  (CHECK: scout|scribe|analyst|stats|fixtures)
+agent_name            TEXT          NOT NULL
+status                TEXT          NOT NULL  (CHECK: running|completed|aborted|failed)
+started_at            TIMESTAMPTZ   NOT NULL
+ended_at              TIMESTAMPTZ
+model                 TEXT
+brief_preview         TEXT          (first 500 chars of the brief)
+bounds_json           JSONB         (AgentBounds at start)
+summary               TEXT          (one-line human summary; updated at end)
+detail_json           JSONB         (agent-specific extras)
+s3_log_key            TEXT          (forensic JSONL bundle in S3)
+agent_events_count    INTEGER
+turns_used            INTEGER
+tool_calls            INTEGER
+input_tokens          INTEGER
+output_tokens         INTEGER
+cache_read_tokens     INTEGER
+cache_write_tokens    INTEGER
+token_cost_usd        NUMERIC(12,6)
+server_tool_cost_usd  NUMERIC(12,6)
+total_cost_usd        NUMERIC(12,6)
 ```
 
-**Ended** (`activity_type` ∈ `{completed, failed}` — `aborted` runs map to `completed` with `detail_json.status='aborted'`):
-```json
-{
-  "run_id": "scout-20260427T103045-a1b2c3",
-  "activity_type": "completed",
-  "summary": "<one-line human summary>",
-  "detail_json": {
-    "status": "completed|aborted|failed", "model": "...",
-    "turns_used": ..., "tool_calls": ...,
-    "input_tokens": ..., "output_tokens": ...,
-    "cache_read_tokens": ..., "cache_write_tokens": ...,
-    "estimated_cost_usd": ...,
-    "stop_reason": "...",
-    "notes": [...],
-    "started_at": "...", "ended_at": "...",
-    "s3_log_key": "agent-logs/scout/2026/04/27/scout-...jsonl",
-    "s3_log_bucket": "jeromelu-clean-documents",
-    "agent_events_count": 247,
-    "web_searches": 13,
-    "web_fetches": 2,
-    "total_api_latency_ms": 82117,
-    "token_cost_usd": 0.1011,
-    "search_cost_usd": 0.1300,
-    // ...plus agent-specific counters (e.g. candidates_filed, claims_extracted)
-  }
-}
-```
+Token and cost columns are populated by `record_agent_ended` from the
+parameters passed in — `estimate_token_cost` and `estimate_server_tool_cost`
+run inside the helper, so every agent's spend is derived identically.
+
+Round/season aren't on `agent_runs` — they're agent-specific concerns and
+belong on per-agent output tables (`claims.effective_round`,
+`discovered_sources.discovered_at`, etc.), not on the run-level summary.
 
 ---
 
@@ -162,18 +153,27 @@ def run_analyst(session, *, brief=None, model="claude-sonnet-4-6",
     # On bound hit: audit.bound_hit(bound="max_budget_usd", value=...)
     # On error: audit.error(where=..., message=...)
 
-    summary = {...}     # agent-specific counters + the standard set
+    summary = {...}     # agent-specific counters (candidates_filed, etc.)
     audit.run_ended(status=status, summary=summary)
     s3_key = audit.flush_to_s3()
 
-    record_agent_ended(session, agent_id=AGENT_ID, agent_name=AGENT_NAME,
-                       run_id=run_id, status=status,
-                       summary_text=f"...{AGENT_NAME} run ...",
-                       detail={**summary, "model": model,
-                               "s3_log_key": s3_key,
-                               "s3_log_bucket": settings.s3_agent_logs_bucket if s3_key else None,
-                               "agent_events_count": audit.event_count})
+    record_agent_ended(
+        session, run_id=run_id, status=status,
+        summary_text=f"...{AGENT_NAME} run ...",
+        model=model,
+        turns_used=turns, tool_calls=tool_calls,
+        input_tokens=in_tok, output_tokens=out_tok,
+        cache_read_tokens=cache_r, cache_write_tokens=cache_w,
+        server_tool_counts={"web_search": ws, "web_fetch": wf},
+        agent_events_count=audit.event_count,
+        s3_log_key=s3_key,
+        detail=summary,                # agent-specific extras → detail_json
+    )
 ```
+
+Cost columns (`token_cost_usd`, `server_tool_cost_usd`, `total_cost_usd`) are
+derived inside `record_agent_ended` from the token totals and
+`server_tool_counts` — callers don't compute them.
 
 ---
 
@@ -199,7 +199,16 @@ Two helpers, summed for the budget gate:
 - **`estimate_token_cost(model, in, out, cache_read, cache_write)`** — pricing from `MODEL_PRICING` dict. Unknown model → falls back to Sonnet 4.6 pricing (so the budget gate still trips, you just pay rough).
 - **`estimate_server_tool_cost({"web_search": n, "web_fetch": m})`** — pricing from `SERVER_TOOL_PRICING_USD`. Currently `web_search` is $0.01/call ($10/1k), `web_fetch` is token-only.
 
-Server-side tools are billed separately from tokens — a typical Scout run does 5–15 web_searches = $0.05–$0.15 on top of token cost. Always combine both when gating against `bounds.max_budget_usd`. The shared module is the single source of truth; verify pricing against current Anthropic numbers when editing.
+**At run end**, `record_agent_ended` calls both internally and writes the
+result to the typed cost columns (`token_cost_usd`, `server_tool_cost_usd`,
+`total_cost_usd`) on `agent_runs`. Don't recompute or duplicate this in the
+agent loop.
+
+**Mid-run** (for budget gating), call them yourself in the loop and compare
+to `bounds.max_budget_usd`. Server-side tools are billed separately — a
+typical Scout run does 5–15 web_searches = $0.05–$0.15 on top of token cost,
+always combine both for the gate. The shared module is the single source of
+truth; verify pricing against current Anthropic numbers when editing.
 
 ---
 
@@ -234,41 +243,37 @@ Update the matching `__table_args__` in `packages/shared/jeromelu_shared/db/mode
 
 ```sql
 -- Most recent runs across ALL agents, with status, cost, S3 bundle key
-SELECT
-  start_row.created_at                              AS started_at,
-  start_row.agent_name,
-  start_row.run_id,
-  end_row.activity_type                             AS final_state,
-  end_row.detail_json->>'status'                    AS status_detail,
-  end_row.detail_json->>'estimated_cost_usd'        AS cost,
-  end_row.detail_json->>'agent_events_count'        AS events,
-  end_row.detail_json->>'s3_log_key'                AS s3_log_key
-FROM agent_runs start_row
-LEFT JOIN agent_runs end_row
-  ON end_row.run_id = start_row.run_id
- AND end_row.activity_type IN ('completed', 'failed')
-WHERE start_row.activity_type='started'
-ORDER BY start_row.created_at DESC
+SELECT started_at, agent_name, run_id, status,
+       total_cost_usd, agent_events_count, s3_log_key
+FROM agent_runs
+ORDER BY started_at DESC
 LIMIT 50;
 
 -- Cost per agent over the last 7 days
-SELECT
-  agent_id,
-  count(*) AS runs,
-  sum((detail_json->>'estimated_cost_usd')::numeric) AS spend_usd
+SELECT agent_id,
+       count(*) AS runs,
+       sum(total_cost_usd) AS spend_usd,
+       sum(token_cost_usd) AS token_usd,
+       sum(server_tool_cost_usd) AS server_tool_usd
 FROM agent_runs
-WHERE activity_type IN ('completed', 'failed')
-  AND created_at > now() - interval '7 days'
+WHERE status IN ('completed', 'aborted', 'failed')
+  AND started_at > now() - interval '7 days'
 GROUP BY agent_id
 ORDER BY spend_usd DESC NULLS LAST;
 
+-- Currently running agents
+SELECT run_id, agent_id, started_at, model
+FROM agent_runs
+WHERE status = 'running'
+ORDER BY started_at DESC;
+
 -- Run summary + event count via a clean JOIN
-SELECT ar.run_id, ar.activity_type, ar.summary, count(ae.event_id) AS events
+SELECT ar.run_id, ar.status, ar.summary, count(ae.event_id) AS events
 FROM agent_runs ar
 LEFT JOIN agent_events ae USING (run_id, agent_id)
-WHERE ar.created_at > now() - interval '24 hours'
-GROUP BY ar.run_id, ar.activity_type, ar.summary, ar.created_at
-ORDER BY ar.created_at DESC;
+WHERE ar.started_at > now() - interval '24 hours'
+GROUP BY ar.run_id, ar.status, ar.summary, ar.started_at
+ORDER BY ar.started_at DESC;
 ```
 
 ### Live trace via `agent_events`
@@ -337,4 +342,5 @@ If unset (or S3 unreachable in dev), `flush_to_s3()` silently no-ops and `agent_
 4. **Don't invent a run_id format.** Use `make_run_id(agent_id)`.
 5. **Don't write to a per-agent S3 prefix.** The `agent-logs/{agent_id}/...` layout is the standard.
 6. **Don't write audit data to local files.** `agent_events` (DB) is the live store; S3 is the archive. No `data/agent-logs/` writes.
-7. **Don't skip the CrewActivity start row.** Zero-candidate / failed runs are invisible without it. Always pair `record_agent_started` with `record_agent_ended` (in a try/finally if the loop can raise).
+7. **Don't skip `record_agent_started`.** `record_agent_ended` is an UPDATE — without a started row to update, run-level metadata is lost. Always pair `record_agent_started` with `record_agent_ended` (in a try/finally if the loop can raise).
+8. **Don't manually populate the cost columns.** Pass the token totals + `server_tool_counts` to `record_agent_ended`; it computes and writes them. Hand-set columns drift from the pricing table over time.

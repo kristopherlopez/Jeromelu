@@ -13,6 +13,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     Text,
     UniqueConstraint,
 )
@@ -617,36 +618,61 @@ class AgentEvent(Base):
 class AgentRun(Base):
     """Run-level summary for Claude-Agent-SDK-based agents.
 
-    Two rows per run (one `started`, one `completed`/`failed`), joined to
-    `agent_events` via the shared `run_id` text column. Both rows share the
-    same `run_id`; they are NOT a 1:1 entity. Use `activity_type` to filter.
+    One row per run, keyed by `run_id`. Inserted with status='running' at the
+    top of a run and updated in place at run end with totals, summary, and
+    cost rollup. Joined to `agent_events` (the per-event trail) via `run_id`.
+
+    Token columns are rolled up from `agent_events.payload->'usage'`. Cost
+    columns are estimated via `jeromelu_shared.agent_audit.estimate_*` — used
+    for budget gates and observability, not invoicing.
     """
     __tablename__ = "agent_runs"
 
-    activity_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
-    run_id: Mapped[str | None] = mapped_column(Text)
+    run_id: Mapped[str] = mapped_column(Text, primary_key=True)
     agent_id: Mapped[str] = mapped_column(Text, nullable=False)
     agent_name: Mapped[str] = mapped_column(Text, nullable=False)
-    activity_type: Mapped[str] = mapped_column(Text, nullable=False)
-    round: Mapped[int | None] = mapped_column(Integer)
-    season: Mapped[int] = mapped_column(Integer, default=2026)
-    summary: Mapped[str] = mapped_column(Text, nullable=False)
-    detail_json: Mapped[dict] = mapped_column(JSONB, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="running")
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    model: Mapped[str | None] = mapped_column(Text)
+    brief_preview: Mapped[str | None] = mapped_column(Text)
+    bounds_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+    summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    detail_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    s3_log_key: Mapped[str | None] = mapped_column(Text)
+    agent_events_count: Mapped[int | None] = mapped_column(Integer)
+
+    turns_used: Mapped[int | None] = mapped_column(Integer)
+    tool_calls: Mapped[int | None] = mapped_column(Integer)
+
+    input_tokens: Mapped[int | None] = mapped_column(Integer)
+    output_tokens: Mapped[int | None] = mapped_column(Integer)
+    cache_read_tokens: Mapped[int | None] = mapped_column(Integer)
+    cache_write_tokens: Mapped[int | None] = mapped_column(Integer)
+
+    token_cost_usd: Mapped[float | None] = mapped_column(Numeric(12, 6))
+    server_tool_cost_usd: Mapped[float | None] = mapped_column(Numeric(12, 6))
+    total_cost_usd: Mapped[float | None] = mapped_column(Numeric(12, 6))
 
     __table_args__ = (
+        CheckConstraint(
+            "status IN ('running', 'completed', 'aborted', 'failed')",
+            name="ck_agent_runs_status",
+        ),
         CheckConstraint(
             "agent_id IN ('scout', 'scribe', 'analyst', 'stats', 'fixtures')",
             name="ck_agent_runs_agent_id",
         ),
-        CheckConstraint(
-            "activity_type IN ('started', 'completed', 'failed', 'handoff')",
-            name="ck_agent_runs_activity_type",
+        Index("idx_agent_runs_agent_started", "agent_id", "started_at"),
+        Index("idx_agent_runs_started", "started_at"),
+        Index(
+            "idx_agent_runs_status_running",
+            "started_at",
+            postgresql_where="status = 'running'",
         ),
-        Index("idx_agent_runs_agent", "agent_id"),
-        Index("idx_agent_runs_run", "run_id"),
-        Index("idx_agent_runs_round", "round", "season"),
-        Index("idx_agent_runs_created", "created_at"),
     )
 
 
