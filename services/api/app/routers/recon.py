@@ -15,6 +15,7 @@ Auth: same X-Admin-Key header pattern as the rest of /admin/*.
 
 from __future__ import annotations
 
+import logging
 import re
 from datetime import datetime, timezone
 from typing import Any
@@ -28,7 +29,14 @@ from sqlalchemy.orm import Session
 from jeromelu_shared.db import Channel, ChannelMetric, DiscoveredSource, Source, WikiPage
 
 from ..deps import get_db
+from ..scout.refresh import (
+    refresh_all_channels_incremental,
+    refresh_all_video_stats,
+    refresh_channel_videos,
+)
 from .admin import require_admin
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -221,6 +229,10 @@ def approve_candidate(
         # Promote channel: upsert channels row + create channel-type wiki page
         slug_base = _slugify(row.title)
         slug = _unique_slug(db, Channel, Channel.slug, slug_base)
+        # Logo URL was captured into metadata_json by persist_candidate at
+        # discovery time (from the YouTube validation response). Copy it
+        # forward so the wiki UI can render avatars without an extra fetch.
+        logo_url = (row.metadata_json or {}).get("logo_url")
         ch_stmt = (
             pg_insert(Channel)
             .values(
@@ -233,6 +245,7 @@ def approve_candidate(
                 quality_rating=int(round((row.score or 0.5) * 10)),
                 tags=row.content_categories or [],
                 active=True,
+                logo_url=logo_url,
             )
             .on_conflict_do_nothing(index_elements=["platform", "external_id"])
             .returning(Channel.channel_id)
@@ -304,12 +317,33 @@ def approve_candidate(
         row.promoted_channel_id = channel_id
         db.commit()
 
+        # Backfill the channel's videos as `sources` rows + snapshot initial
+        # video stats. Wrapped in a try/except so a YouTube API hiccup never
+        # rolls back the approval — the admin can re-run via /admin/scout/
+        # refresh-videos to recover.
+        enumerate_result: dict[str, Any] | None = None
+        if channel_id and row.platform == "youtube":
+            channel_obj = db.get(Channel, channel_id)
+            if channel_obj is not None:
+                try:
+                    enumerate_result = refresh_channel_videos(
+                        db, channel_obj, full_backfill=True
+                    )
+                except Exception as e:  # noqa: BLE001
+                    logger.warning(
+                        "Post-approval video enumeration failed for channel %s: %s",
+                        channel_id,
+                        e,
+                    )
+                    enumerate_result = {"error": str(e)}
+
         return {
             "ok": True,
             "status": "approved",
             "candidate_id": str(row.id),
             "promoted_channel_id": str(channel_id) if channel_id else None,
             "wiki_page_created": channel_id is not None,
+            "videos_enumerated": enumerate_result,
         }
 
     elif row.kind == "video":
@@ -409,3 +443,42 @@ def stats(db: Session = Depends(get_db)):
     for status, kind, n in rows:
         by_status.setdefault(status, {})[kind] = n
     return {"by_status": by_status}
+
+
+# ---------------------------------------------------------------------------
+# POST — weekly Scout refresh job
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/admin/scout/refresh-videos",
+    dependencies=[Depends(require_admin)],
+)
+def refresh_videos(
+    skip_stats: bool = Query(default=False),
+    skip_enumerate: bool = Query(default=False),
+    db: Session = Depends(get_db),
+):
+    """Weekly cron entry point.
+
+    Runs two jobs in sequence:
+      1. Incremental video enumerate across every active YouTube channel —
+         picks up any new uploads since the last run.
+      2. Stats refresh across every YouTube source — appends a row to
+         video_metrics so we can track view velocity / detect breakouts.
+
+    Both jobs are idempotent. Use `?skip_stats=true` to do enumerate only,
+    or `?skip_enumerate=true` to do stats only.
+    """
+    enumerate_result: dict[str, Any] | None = None
+    stats_result: dict[str, Any] | None = None
+
+    if not skip_enumerate:
+        enumerate_result = refresh_all_channels_incremental(db)
+    if not skip_stats:
+        stats_result = refresh_all_video_stats(db)
+
+    return {
+        "ok": True,
+        "enumerate": enumerate_result,
+        "stats": stats_result,
+    }

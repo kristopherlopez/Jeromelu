@@ -536,6 +536,16 @@ def handle_persist_candidate(
         metadata["view_count"] = int(stats["viewCount"])
     if "country" not in metadata and snip.get("country"):
         metadata["country"] = snip["country"]
+    if "logo_url" not in metadata:
+        thumbs = snip.get("thumbnails", {}) or {}
+        # Prefer high; fall back to medium / default. YouTube returns these
+        # for every channel including ones that haven't customised — they
+        # default to a letter avatar.
+        for size in ("high", "medium", "default"):
+            url_at_size = thumbs.get(size, {}).get("url")
+            if url_at_size:
+                metadata["logo_url"] = url_at_size
+                break
     if "published_at" not in metadata and snip.get("publishedAt"):
         metadata["published_at"] = snip["publishedAt"]
 

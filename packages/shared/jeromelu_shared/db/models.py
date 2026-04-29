@@ -46,6 +46,7 @@ class Channel(Base):
     quality_rating: Mapped[int] = mapped_column(Integer, default=5)
     tags: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    logo_url: Mapped[str | None] = mapped_column(Text)
     last_polled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
@@ -801,4 +802,32 @@ class ChannelMetric(Base):
         Index("idx_channel_metrics_channel_time", "channel_id", "sampled_at"),
         Index("idx_channel_metrics_platform_time", "platform", "sampled_at"),
         Index("idx_channel_metrics_sampled_at", "sampled_at"),
+    )
+
+
+class VideoMetric(Base):
+    """Time-series popularity metrics per video (a `sources` row).
+
+    Sibling of ChannelMetric. YouTube payload shape:
+    {views, likes, comments, duration_seconds}. Sampled at video discovery
+    time (channel approval) and weekly thereafter via the admin refresh
+    endpoint.
+
+    For "current state" queries prefer the `video_latest_metrics` view.
+    """
+
+    __tablename__ = "video_metrics"
+
+    metric_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    source_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sources.source_id", ondelete="CASCADE"), nullable=False
+    )
+    sampled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    source: Mapped[str] = mapped_column(Text, nullable=False)
+    metrics: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+    __table_args__ = (
+        UniqueConstraint("source_id", "sampled_at", name="uq_video_metrics_source_sampled"),
+        Index("idx_video_metrics_source_time", "source_id", "sampled_at"),
+        Index("idx_video_metrics_sampled_at", "sampled_at"),
     )
