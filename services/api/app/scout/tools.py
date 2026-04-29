@@ -356,7 +356,14 @@ def handle_persist_candidate(
             status="pending",
             run_id=run_id,
         )
-        .on_conflict_do_nothing(constraint="uq_discovered_platform_kind_external")
+        # Use index_elements (column list) rather than the constraint name —
+        # migration 017 created the unique constraint inline (no explicit name)
+        # so Postgres auto-named it; the model's explicit `name=` doesn't match
+        # the actual DB. index_elements lets Postgres resolve the constraint
+        # by the columns it covers, working regardless of how it was named.
+        .on_conflict_do_nothing(
+            index_elements=["platform", "kind", "external_id"]
+        )
         .returning(DiscoveredSource.id)
     )
     result = session.execute(stmt).first()
