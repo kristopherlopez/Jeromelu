@@ -772,3 +772,33 @@ class DiscoveredSource(Base):
         Index("idx_discovered_run", "run_id"),
         Index("idx_discovered_at", "discovered_at"),
     )
+
+
+class ChannelMetric(Base):
+    """Time-series popularity metrics per channel.
+
+    Multi-platform via the JSONB `metrics` column — YouTube uses
+    {subscribers, videos, views, country, channel_published_at}; other
+    platforms (podcast, twitter) carry their own shape. See migration 023.
+
+    For "current state" queries, prefer the `channel_latest_metrics` view
+    over scanning this table.
+    """
+
+    __tablename__ = "channel_metrics"
+
+    metric_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    channel_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("channels.channel_id", ondelete="CASCADE"), nullable=False
+    )
+    platform: Mapped[str] = mapped_column(Text, nullable=False)
+    sampled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    source: Mapped[str] = mapped_column(Text, nullable=False)
+    metrics: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+    __table_args__ = (
+        UniqueConstraint("channel_id", "sampled_at", name="uq_channel_metrics_channel_sampled"),
+        Index("idx_channel_metrics_channel_time", "channel_id", "sampled_at"),
+        Index("idx_channel_metrics_platform_time", "platform", "sampled_at"),
+        Index("idx_channel_metrics_sampled_at", "sampled_at"),
+    )

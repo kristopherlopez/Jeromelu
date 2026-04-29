@@ -25,7 +25,7 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from jeromelu_shared.db import Channel, DiscoveredSource, Source, WikiPage
+from jeromelu_shared.db import Channel, ChannelMetric, DiscoveredSource, Source, WikiPage
 
 from ..deps import get_db
 from .admin import require_admin
@@ -54,6 +54,36 @@ def _unique_slug(session: Session, model, slug_col, base: str) -> str:
         candidate = f"{base}-{n}"
         n += 1
     return candidate
+
+
+def _normalised_youtube_metrics(metadata: dict[str, Any] | None) -> dict[str, Any]:
+    """Pull YouTube stats from a discovered_sources.metadata_json dict and
+    normalise into the canonical channel_metrics shape. Handles the early
+    'subs' / 'subscribers' key inconsistency Scout produced before we pinned
+    the schema."""
+    md = metadata or {}
+    subs = md.get("subscribers") or md.get("subs")
+    out: dict[str, Any] = {}
+    if subs is not None:
+        try:
+            out["subscribers"] = int(subs)
+        except (TypeError, ValueError):
+            pass
+    if (vc := md.get("video_count")) is not None:
+        try:
+            out["videos"] = int(vc)
+        except (TypeError, ValueError):
+            pass
+    if (vw := md.get("view_count")) is not None:
+        try:
+            out["views"] = int(vw)
+        except (TypeError, ValueError):
+            pass
+    if md.get("country"):
+        out["country"] = md["country"]
+    if md.get("published_at"):
+        out["channel_published_at"] = md["published_at"]
+    return out
 
 
 def _channel_wiki_content(name: str, description: str | None, tags: list[str]) -> str:
@@ -250,6 +280,22 @@ def approve_candidate(
                         status="stub",
                     )
                 )
+
+            # Snapshot the discovery-time metrics so the wiki has subs / videos /
+            # views / country / channel age for this channel from day one.
+            # Only YouTube has metadata in this shape today.
+            if row.platform == "youtube":
+                normalised = _normalised_youtube_metrics(row.metadata_json)
+                if normalised:
+                    db.add(
+                        ChannelMetric(
+                            channel_id=channel_id,
+                            platform=row.platform,
+                            sampled_at=datetime.now(timezone.utc),
+                            source="youtube_api",
+                            metrics=normalised,
+                        )
+                    )
 
         row.status = "approved"
         row.reviewed_at = datetime.now(timezone.utc)

@@ -26,6 +26,7 @@ from jeromelu_shared.db.models import (
     SquadTrade,
     DiscoveredSource,
     AgentEvent,
+    ChannelMetric,
 )
 
 __all__ = [
@@ -58,4 +59,5 @@ __all__ = [
     "SquadTrade",
     "DiscoveredSource",
     "AgentEvent",
+    "ChannelMetric",
 ]
