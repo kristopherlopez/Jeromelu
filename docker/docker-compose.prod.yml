@@ -49,6 +49,10 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       YOUTUBE_API_KEY: ${YOUTUBE_API_KEY}
       ADMIN_KEY: ${ADMIN_KEY}
+      # Pydantic-settings reads `admin_api_key` from ADMIN_API_KEY env var,
+      # so route the same secret under both names. Without this the api
+      # falls back to the dev default 'local-dev-admin-key'.
+      ADMIN_API_KEY: ${ADMIN_KEY}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_DEFAULT_REGION: ap-southeast-2
