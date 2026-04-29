@@ -4,6 +4,15 @@
 **Region:** ap-southeast-2 (Sydney)
 **Domain:** jeromelu.ai (registered with Namecheap, DNS via Route 53)
 
+> **As of 2026-04-29, infrastructure is being adopted into Terraform** (see
+> [`infra/terraform/`](../../infra/terraform/README.md) and
+> [`docs/operations/iac-overview.md`](iac-overview.md)).
+> For new resources, add Terraform definitions and apply via PR — do not
+> follow the manual phases below. The phases here remain accurate for any
+> resources not yet imported (status table in
+> [`infra/terraform/README.md`](../../infra/terraform/README.md)) and as the
+> historical record of how the account was originally provisioned.
+
 > **Active V1 setup is the Lightsail Production Setup section below.** The V0 ECS/Fargate phases that follow it are kept for history but **superseded as of 2026-04-25** — do not follow them for new setups. See `docs/architecture/12-aws-architecture.md` for the rationale.
 
 ---

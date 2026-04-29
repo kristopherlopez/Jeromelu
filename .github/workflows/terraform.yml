@@ -1,0 +1,116 @@
+name: Terraform
+
+# Plan-only CI for infra/terraform/. Runs on every PR that touches Terraform
+# and posts the plan as a PR comment. Apply is intentionally manual (run from
+# operator workstation with admin creds) until the team is large enough to
+# justify the IAM expansion needed for auto-apply.
+#
+# Auth: a dedicated IAM user `jeromelu-terraform-plan` with the AWS-managed
+# `ReadOnlyAccess` policy. Access keys are stored as TF_AWS_ACCESS_KEY_ID and
+# TF_AWS_SECRET_ACCESS_KEY in repo secrets.
+
+on:
+  pull_request:
+    paths:
+      - "infra/terraform/**"
+      - ".github/workflows/terraform.yml"
+  push:
+    branches: [master]
+    paths:
+      - "infra/terraform/**"
+      - ".github/workflows/terraform.yml"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: fmt + validate + plan
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: infra/terraform
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.TF_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.TF_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-southeast-2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.5"
+
+      - name: terraform fmt
+        id: fmt
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+
+      - name: terraform init
+        id: init
+        run: terraform init -input=false
+
+      - name: terraform validate
+        id: validate
+        run: terraform validate -no-color
+
+      - name: terraform plan
+        id: plan
+        run: terraform plan -no-color -lock-timeout=300s -input=false
+        continue-on-error: true
+
+      - name: Comment plan on PR
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        env:
+          PLAN: ${{ steps.plan.outputs.stdout }}
+        with:
+          script: |
+            const plan = process.env.PLAN || "(no plan output captured)";
+            const maxLen = 60000;
+            const truncated = plan.length > maxLen;
+            const body = truncated
+              ? plan.slice(-maxLen) + "\n\n... [truncated, see full output in workflow logs]"
+              : plan;
+
+            const summary = [
+              `### Terraform Plan`,
+              ``,
+              `\`fmt\` ${{ steps.fmt.outcome }} · `
+                + `\`init\` ${{ steps.init.outcome }} · `
+                + `\`validate\` ${{ steps.validate.outcome }} · `
+                + `\`plan\` ${{ steps.plan.outcome }}`,
+              ``,
+              `<details><summary>Plan output${truncated ? " (truncated)" : ""}</summary>`,
+              ``,
+              "```",
+              body,
+              "```",
+              ``,
+              `</details>`,
+            ].join("\n");
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary,
+            });
+
+      - name: Fail if any step failed
+        if: steps.fmt.outcome != 'success' || steps.init.outcome != 'success' || steps.validate.outcome != 'success' || steps.plan.outcome != 'success'
+        run: |
+          echo "Pipeline status: fmt=${{ steps.fmt.outcome }} init=${{ steps.init.outcome }} validate=${{ steps.validate.outcome }} plan=${{ steps.plan.outcome }}"
+          exit 1

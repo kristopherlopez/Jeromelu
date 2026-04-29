@@ -1,0 +1,16 @@
+# Local Terraform state
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfstate.lock.info
+.terraform.tfstate.lock.info
+
+# Local-only var files (committed defaults live in *.auto.tfvars)
+*.tfvars.local
+
+# Crash logs
+crash.log
+crash.*.log
+
+# Generated config from `terraform plan -generate-config-out=`
+generated.tf

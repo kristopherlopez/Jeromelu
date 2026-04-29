@@ -4,6 +4,13 @@ This is the practical AWS shape for Jeromelu V1. We deliberately picked the chea
 
 If load grows past what one Lightsail instance can serve, the migration target is ECS Fargate behind an ALB — see "Future scale path" at the bottom.
 
+> **Provisioning:** as of 2026-04-29 the AWS resources described below are being
+> adopted into Terraform under [`infra/terraform/`](../../infra/terraform/README.md).
+> See the IaC document set:
+> [overview](../operations/iac-overview.md) (decisions),
+> [migration plan](../operations/iac-migration-plan.md) (project plan),
+> [runbook](../operations/iac-runbook.md) (execution checklist).
+
 ## Why Lightsail (not Fargate) for V1
 
 The previous V0 architecture used VPC + NAT Gateway + ALB + ECS Fargate + RDS. That setup ran ~$140/mo even at zero traffic, because NAT ($53), ALB ($18), Fargate 24/7 ($32), and RDS 24/7 ($21) are all fixed idle costs.
@@ -152,11 +159,14 @@ The image format, ECR repos, GitHub Actions structure, and CloudFront distributi
 
 | File | Purpose |
 |---|---|
+| `infra/terraform/` | Terraform source for all adopted AWS resources. |
+| `infra/terraform/README.md` | IaC runbook + per-resource adoption status. |
+| `docs/operations/iac-overview.md` | Why Terraform, what is/isn't managed, migration roadmap. |
 | `docker/docker-compose.prod.yml` | Production stack (postgres, caddy, web, api). |
 | `docker/Caddyfile` | TLS + reverse proxy config. |
 | `scripts/lightsail-deploy.sh` | Pull images and restart on the Lightsail box. |
 | `scripts/pg-backup.sh` | Cron'd nightly Postgres dump → S3. |
 | `.github/workflows/deploy.yml` | CI: build → push to ECR → SSH deploy. |
 | `Makefile` | `deploy-prod`, `prod-shell`, `prod-logs`. |
-| `docs/operations/aws-setup-guide.md` | One-time provisioning runbook. |
+| `docs/operations/aws-setup-guide.md` | One-time provisioning runbook (manual fallback / historical). |
 | `docs/operations/aws-resource-inventory.md` | Live inventory of provisioned AWS resources. |

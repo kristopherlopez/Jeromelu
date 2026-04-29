@@ -66,6 +66,14 @@ make prod-logs                     # tail compose logs
 make prod-shell                    # ssh in
 ```
 
+## Infrastructure
+
+AWS resources are managed in Terraform under [infra/terraform/](infra/terraform/README.md). Three companion docs cover the shift to IaC:
+
+- [docs/operations/iac-overview.md](docs/operations/iac-overview.md) — current state, decisions, what's managed.
+- [docs/operations/iac-migration-plan.md](docs/operations/iac-migration-plan.md) — the project plan: baseline, target, phases, risks, rollback.
+- [docs/operations/iac-runbook.md](docs/operations/iac-runbook.md) — execution checklist, troubleshooting, day-2 maintenance.
+
 ## Other Docs
 
 - [docs/avatar/](docs/avatar/README.md) — the Jaromelu avatar as the site's persistent, interactive presence layer

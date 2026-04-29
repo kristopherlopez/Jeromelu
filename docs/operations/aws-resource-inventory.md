@@ -2,6 +2,13 @@
 
 Track all created AWS resources here. Updated as infrastructure is provisioned.
 
+> **2026-04-29 — Adoption into Terraform in progress.**
+> The IaC source of truth is [`infra/terraform/`](../../infra/terraform/README.md).
+> Per-resource Terraform coverage is tracked in the status table at the top of
+> that README (currently: S3 buckets, ECR repos, SSM Parameter Store).
+> Anything else listed below is still managed manually. New resources should be
+> added in Terraform, not by clicking around the console.
+
 > **2026-04-25 — V1 architecture switched from ECS/Fargate to Lightsail.** Phases 1–9 below reflect the original V0 build. Resources marked **DECOMMISSIONED 2026-04-25** are slated for deletion as part of the cutover (see Phase 11). Phase 11 lists the live V1 resources.
 
 ---
