@@ -33,26 +33,26 @@ resource "aws_iam_user" "cicd" {
 
 data "aws_iam_policy_document" "cicd" {
   statement {
-    sid       = "EcrAuth"
+    sid       = "ECRAuth"
     effect    = "Allow"
     actions   = ["ecr:GetAuthorizationToken"]
     resources = ["*"]
   }
 
   statement {
-    sid    = "EcrRepoPushPull"
+    sid    = "ECRPushPull"
     effect = "Allow"
     actions = [
       "ecr:BatchCheckLayerAvailability",
-      "ecr:GetDownloadUrlForLayer",
       "ecr:BatchGetImage",
-      "ecr:DescribeRepositories",
-      "ecr:DescribeImages",
-      "ecr:ListImages",
-      "ecr:InitiateLayerUpload",
-      "ecr:UploadLayerPart",
       "ecr:CompleteLayerUpload",
+      "ecr:DescribeImages",
+      "ecr:DescribeRepositories",
+      "ecr:GetDownloadUrlForLayer",
+      "ecr:InitiateLayerUpload",
+      "ecr:ListImages",
       "ecr:PutImage",
+      "ecr:UploadLayerPart",
     ]
     resources = [
       "arn:aws:ecr:${var.aws_region}:${var.aws_account_id}:repository/jeromelu/web",
@@ -61,7 +61,7 @@ data "aws_iam_policy_document" "cicd" {
   }
 
   statement {
-    sid    = "CloudFrontInvalidation"
+    sid    = "CloudFrontInvalidate"
     effect = "Allow"
     actions = [
       "cloudfront:CreateInvalidation",
@@ -88,19 +88,19 @@ resource "aws_iam_user" "instance" {
 
 data "aws_iam_policy_document" "instance" {
   statement {
-    sid       = "EcrAuth"
+    sid       = "ECRPullOnly"
     effect    = "Allow"
     actions   = ["ecr:GetAuthorizationToken"]
     resources = ["*"]
   }
 
   statement {
-    sid    = "EcrRepoPull"
+    sid    = "ECRPullImages"
     effect = "Allow"
     actions = [
       "ecr:BatchCheckLayerAvailability",
-      "ecr:GetDownloadUrlForLayer",
       "ecr:BatchGetImage",
+      "ecr:GetDownloadUrlForLayer",
     ]
     resources = [
       "arn:aws:ecr:${var.aws_region}:${var.aws_account_id}:repository/jeromelu/web",
@@ -109,11 +109,12 @@ data "aws_iam_policy_document" "instance" {
   }
 
   statement {
-    sid    = "S3BucketAccess"
+    sid    = "S3App"
     effect = "Allow"
     actions = [
       "s3:GetObject",
       "s3:PutObject",
+      "s3:DeleteObject",
       "s3:ListBucket",
     ]
     resources = [
@@ -127,7 +128,7 @@ data "aws_iam_policy_document" "instance" {
   }
 
   statement {
-    sid    = "SsmRead"
+    sid    = "SSMReadParams"
     effect = "Allow"
     actions = [
       "ssm:GetParameter",
