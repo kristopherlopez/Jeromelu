@@ -465,7 +465,13 @@ def handle_persist_candidate(
     channel_external_id: str | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Insert a candidate. Idempotent on (platform, kind, external_id)."""
+    """Insert a candidate. Idempotent on (platform, kind, external_id).
+
+    Validates YouTube existence at persist time — if the agent fabricated
+    a handle that doesn't actually exist on YouTube, the candidate is
+    rejected before insertion. Also canonicalises @handle external_ids
+    to UC ids and auto-populates metadata from the API response.
+    """
     external_id = extract_youtube_id(kind, url)
     if not external_id:
         return {
@@ -473,6 +479,65 @@ def handle_persist_candidate(
             "error": "could-not-extract-youtube-id",
             "url": url,
         }
+
+    # Validate YouTube existence — defends against agent-fabricated handles
+    # for podcasts that live on Apple/Spotify rather than YouTube.
+    from app.scout.youtube_api import (
+        YouTubeAPIError,
+        validate_channel,
+        validate_video,
+    )
+
+    try:
+        if kind == "channel":
+            yt_item = validate_channel(external_id)
+        elif kind == "video":
+            yt_item = validate_video(external_id)
+        else:
+            yt_item = None
+    except YouTubeAPIError as e:
+        return {
+            "ok": False,
+            "error": "youtube-validation-failed",
+            "detail": str(e),
+            "external_id": external_id,
+        }
+
+    if yt_item is None:
+        return {
+            "ok": False,
+            "error": "youtube-not-found",
+            "external_id": external_id,
+            "url": url,
+            "hint": (
+                f"YouTube has no {kind} matching '{external_id}'. If this is a "
+                "podcast that lives on Apple/Spotify rather than YouTube, do "
+                "NOT file it as a YouTube channel — that's a different platform "
+                "(podcast discovery is a separate Scout run)."
+            ),
+        }
+
+    # Canonicalise @handle → UC id. Update url to match.
+    canonical_id = yt_item.get("id")
+    if kind == "channel" and canonical_id and canonical_id != external_id:
+        external_id = canonical_id
+        url = f"https://www.youtube.com/channel/{canonical_id}"
+
+    # Auto-fill metadata if the agent didn't pass any (or augment what it did).
+    if metadata is None:
+        metadata = {}
+    snip = yt_item.get("snippet", {}) or {}
+    stats = yt_item.get("statistics", {}) or {}
+    if "subscribers" not in metadata and not stats.get("hiddenSubscriberCount") and stats.get("subscriberCount"):
+        metadata["subscribers"] = int(stats["subscriberCount"])
+    if "video_count" not in metadata and stats.get("videoCount"):
+        metadata["video_count"] = int(stats["videoCount"])
+    if "view_count" not in metadata and stats.get("viewCount"):
+        metadata["view_count"] = int(stats["viewCount"])
+    if "country" not in metadata and snip.get("country"):
+        metadata["country"] = snip["country"]
+    if "published_at" not in metadata and snip.get("publishedAt"):
+        metadata["published_at"] = snip["publishedAt"]
 
     stmt = (
         pg_insert(DiscoveredSource)

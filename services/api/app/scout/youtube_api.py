@@ -6,8 +6,10 @@ counts, video counts, country, language, last-upload date, and structured
 filtering — all of which require the official Data API.
 
 Requires `YOUTUBE_API_KEY` (free tier: 10,000 units/day; search.list = 100
-units, channels.list / channelSections.list = 1 unit). A typical Scout run
-with 6 channel searches + 20 channel-stats lookups consumes ~620 units.
+units, channels.list / channelSections.list / playlistItems.list / videos.list
+= 1 unit). A typical Scout run with 6 channel searches + 20 channel-stats
+lookups consumes ~620 units. A weekly video-stats refresh across ~150 channels
+consumes ~750 units.
 
 Module surface — all functions are sync (Scout's loop is sync) and use httpx
 (already a transitive dep via anthropic/openai SDKs):
@@ -26,6 +28,15 @@ Module surface — all functions are sync (Scout's loop is sync) and use httpx
     get_channel_sections(channel_id)
         → list of featured channel_ids (channelSections of type 'multipleChannels')
 
+    list_channel_videos(channel_external_id, after_video_id=None, max_results=200)
+        → list of {video_id, title, description, published_at, url}
+        Walks the channel's uploads playlist newest-first. Stops when it hits
+        `after_video_id` (incremental refresh) or `max_results` items.
+
+    get_video_stats(video_ids)
+        → dict mapping video_id → {views, likes, comments, duration_seconds,
+                                   published_at}. Batches up to 50 per call.
+
 `filter_known_external_ids` lets the caller pass a set of already-known YouTube
 ids; matching results are dropped server-side before returning to the agent
 (saves agent tokens and prevents repeat work).
@@ -34,6 +45,7 @@ ids; matching results are dropped server-side before returning to the agent
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Iterable
 
 import httpx
@@ -246,6 +258,41 @@ def get_channel_stats(channel_ids: list[str]) -> list[dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
+# Existence validation — used at persist time to catch fabricated handles.
+# Returns the canonical YouTube item dict (with snippet+statistics) or None.
+# 1 quota unit per call.
+# ---------------------------------------------------------------------------
+
+def validate_channel(external_id: str | None) -> dict[str, Any] | None:
+    """Verify a channel exists on YouTube. Accepts UC… ids and @handles.
+
+    Returns the channel item (with snippet, statistics, contentDetails) if
+    found — caller can read item['id'] for the canonical UC id even if
+    the input was a handle. Returns None if YouTube has no item for the
+    given identifier (i.e. the handle was fabricated or the channel was
+    deleted).
+    """
+    if not external_id:
+        return None
+    if external_id.startswith("@"):
+        params = {"part": "snippet,statistics,contentDetails", "forHandle": external_id}
+    else:
+        params = {"part": "snippet,statistics,contentDetails", "id": external_id}
+    raw = _get("channels", params)
+    items = raw.get("items", [])
+    return items[0] if items else None
+
+
+def validate_video(video_id: str | None) -> dict[str, Any] | None:
+    """Verify a video exists on YouTube. Returns the videos.list item or None."""
+    if not video_id:
+        return None
+    raw = _get("videos", {"part": "snippet,statistics,contentDetails", "id": video_id})
+    items = raw.get("items", [])
+    return items[0] if items else None
+
+
+# ---------------------------------------------------------------------------
 # channelSections.list (1 unit) — featured channels surface
 # ---------------------------------------------------------------------------
 
@@ -269,3 +316,145 @@ def get_channel_sections(channel_id: str) -> list[str]:
             if cid and cid != channel_id:
                 related.add(cid)
     return sorted(related)
+
+
+# ---------------------------------------------------------------------------
+# playlistItems.list / videos.list (1 unit each) — channel uploads + stats
+#
+# Every YouTube channel has a hidden "uploads" playlist whose ID is just the
+# channel ID with the "UC" prefix swapped for "UU". Walking that playlist
+# newest-first is the cheapest way to enumerate every video a channel has
+# published — far cheaper than search.list?channelId=... (100 units/page).
+# ---------------------------------------------------------------------------
+
+# ISO 8601 duration like "PT1H23M45S" — YouTube's format for video length.
+_DURATION_RE = re.compile(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?")
+
+
+def _parse_iso_duration(value: str | None) -> int | None:
+    """Convert ISO 8601 duration (e.g. 'PT1H23M45S') to seconds. None if unparseable."""
+    if not value:
+        return None
+    m = _DURATION_RE.fullmatch(value)
+    if not m:
+        return None
+    h, mn, s = m.groups()
+    return (int(h or 0) * 3600) + (int(mn or 0) * 60) + int(s or 0)
+
+
+def _uploads_playlist_id(channel_external_id: str) -> str:
+    """Convert a UC... channel ID to its uploads playlist ID (UU...).
+
+    YouTube guarantees this for every channel (the "uploads" auto-playlist).
+    Cheaper than calling channels.list?part=contentDetails just to read it.
+    """
+    if not channel_external_id.startswith("UC"):
+        # Defensive: if the convention ever breaks for legacy channels, the
+        # caller will get a 404 from the API and we can fall back then.
+        raise YouTubeAPIError(
+            f"Channel external_id does not start with 'UC': {channel_external_id!r}"
+        )
+    return "UU" + channel_external_id[2:]
+
+
+def list_channel_videos(
+    channel_external_id: str,
+    after_video_id: str | None = None,
+    max_results: int = 200,
+) -> list[dict[str, Any]]:
+    """Enumerate videos from a channel's uploads playlist, newest first.
+
+    Uses playlistItems.list (1 quota unit per page) on the channel's auto
+    'uploads' playlist. Returns at most `max_results` videos.
+
+    For incremental refresh, pass `after_video_id` = the most-recent video_id
+    you already have for this channel. Pagination stops as soon as that id
+    appears in the response, so weekly refreshes are typically a single page.
+    """
+    playlist_id = _uploads_playlist_id(channel_external_id)
+    target = max(min(max_results, 1000), 1)
+    out: list[dict[str, Any]] = []
+    page_token: str | None = None
+    while len(out) < target:
+        page_size = min(50, target - len(out))
+        params: dict[str, Any] = {
+            "part": "snippet,contentDetails",
+            "playlistId": playlist_id,
+            "maxResults": page_size,
+        }
+        if page_token:
+            params["pageToken"] = page_token
+        raw = _get("playlistItems", params)
+        items = raw.get("items", [])
+        if not items:
+            break
+        hit_known = False
+        for item in items:
+            cd = item.get("contentDetails", {}) or {}
+            snip = item.get("snippet", {}) or {}
+            vid = cd.get("videoId") or snip.get("resourceId", {}).get("videoId")
+            if not vid:
+                continue
+            if after_video_id and vid == after_video_id:
+                hit_known = True
+                break
+            out.append({
+                "video_id": vid,
+                "title": snip.get("title", ""),
+                "description": snip.get("description", ""),
+                "published_at": cd.get("videoPublishedAt") or snip.get("publishedAt", ""),
+                "url": f"https://www.youtube.com/watch?v={vid}",
+            })
+        if hit_known:
+            break
+        page_token = raw.get("nextPageToken")
+        if not page_token:
+            break
+    return out
+
+
+def get_video_stats(video_ids: list[str]) -> dict[str, dict[str, Any]]:
+    """Batch-fetch view/like/comment/duration for a list of video ids.
+
+    1 quota unit per call, up to 50 ids per call. Returns a dict keyed by
+    video_id; missing ids (private, deleted) are simply absent.
+    """
+    if not video_ids:
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+    for i in range(0, len(video_ids), 50):
+        batch = video_ids[i : i + 50]
+        raw = _get(
+            "videos",
+            {
+                "part": "statistics,contentDetails,snippet",
+                "id": ",".join(batch),
+            },
+        )
+        for item in raw.get("items", []):
+            stats = item.get("statistics", {}) or {}
+            cd = item.get("contentDetails", {}) or {}
+            snip = item.get("snippet", {}) or {}
+            entry: dict[str, Any] = {}
+            if "viewCount" in stats:
+                try:
+                    entry["views"] = int(stats["viewCount"])
+                except (TypeError, ValueError):
+                    pass
+            if "likeCount" in stats:
+                try:
+                    entry["likes"] = int(stats["likeCount"])
+                except (TypeError, ValueError):
+                    pass
+            if "commentCount" in stats:
+                try:
+                    entry["comments"] = int(stats["commentCount"])
+                except (TypeError, ValueError):
+                    pass
+            duration_seconds = _parse_iso_duration(cd.get("duration"))
+            if duration_seconds is not None:
+                entry["duration_seconds"] = duration_seconds
+            if snip.get("publishedAt"):
+                entry["published_at"] = snip["publishedAt"]
+            out[item["id"]] = entry
+    return out
