@@ -1,49 +1,34 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Clock,
   FileText,
   Users,
-  Radio,
   Calendar,
   ChevronDown,
   Mic,
-  Rss,
+  ArrowRight,
+  ArrowLeft,
+  RefreshCw,
+  X,
+  Info,
+  Send,
 } from "lucide-react";
-import type {
-  WikiPageSummary,
-  WikiPageType,
-  WikiChangeItem,
-} from "./wiki-data";
+import type { WikiPageSummary, WikiPageType } from "./wiki-data";
+import VoicesView from "./VoicesView";
 import "./wiki.css";
 
 /* ── Constants ── */
 
 const ITEMS_PER_PAGE = 30;
 
-const TYPE_CONFIG: Record<
-  WikiPageType,
-  { label: string; icon: typeof FileText }
-> = {
-  player: { label: "Players", icon: FileText },
-  team: { label: "Teams", icon: Users },
-  advisor: { label: "Advisors", icon: Mic },
-  channel: { label: "Channels", icon: Rss },
-  round: { label: "Rounds", icon: Calendar },
-};
-
 // Voices is a virtual tab that combines advisor + channel pages.
 const VOICES_TYPES: WikiPageType[] = ["advisor", "channel"];
 
-const FILTER_TABS: { key: string; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "player", label: "Players" },
-  { key: "team", label: "Teams" },
-  { key: "voices", label: "Voices" },
-  { key: "round", label: "Rounds" },
-];
+type EntityKey = "player" | "team" | "round" | "voices";
 
 /* ── Helpers ── */
 
@@ -71,13 +56,21 @@ function pageHref(page: { page_type: WikiPageType; slug: string }): string {
   return `/wiki/${page.page_type}/${page.slug}`;
 }
 
-function changeHref(c: WikiChangeItem): string {
-  return pageHref({ page_type: c.page_type, slug: c.page_slug });
-}
-
-/** Extract team name from metadata_json, or null */
 function getTeam(page: WikiPageSummary): string | null {
   return (page.metadata_json?.team as string) ?? null;
+}
+
+function pagesByEntity(pages: WikiPageSummary[], key: EntityKey): WikiPageSummary[] {
+  if (key === "voices") return pages.filter((p) => VOICES_TYPES.includes(p.page_type));
+  return pages.filter((p) => p.page_type === key);
+}
+
+function initials(title: string): string {
+  return title
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
 }
 
 /* ── Style tokens (CSS var refs) ── */
@@ -103,68 +96,177 @@ const v = {
 };
 
 /* ══════════════════════════════════════════════════════
-   Main component
+   Top-level component — renders dashboard or entity view
    ══════════════════════════════════════════════════════ */
 
 interface WikiIndexClientProps {
   pages: WikiPageSummary[];
-  recentChanges?: WikiChangeItem[];
+  initialType?: string;
 }
+
+const VALID_TYPES: EntityKey[] = ["player", "team", "round", "voices"];
 
 export default function WikiIndexClient({
   pages,
-  recentChanges = [],
+  initialType,
 }: WikiIndexClientProps) {
-  const [activeFilter, setActiveFilter] = useState("all");
-  const [search, setSearch] = useState("");
+  const filterKey = (VALID_TYPES as string[]).includes(initialType ?? "")
+    ? (initialType as EntityKey)
+    : null;
 
   const filtered = useMemo(() => {
-    let result = pages;
-    if (activeFilter === "voices") {
-      result = result.filter((p) => VOICES_TYPES.includes(p.page_type));
-    } else if (activeFilter !== "all") {
-      result = result.filter((p) => p.page_type === activeFilter);
-    }
-    if (search) {
-      const q = search.toLowerCase();
-      result = result.filter(
-        (p) =>
-          p.title.toLowerCase().includes(q) ||
-          (getTeam(p) ?? "").toLowerCase().includes(q),
-      );
-    }
-    return result;
-  }, [pages, activeFilter, search]);
-
-  const counts = useMemo(() => {
-    const c: Record<string, number> = {
-      player: 0,
-      team: 0,
-      advisor: 0,
-      channel: 0,
-      round: 0,
-      voices: 0,
-    };
-    for (const p of pages) {
-      c[p.page_type] = (c[p.page_type] || 0) + 1;
-      if (VOICES_TYPES.includes(p.page_type)) c.voices += 1;
-    }
-    return c;
-  }, [pages]);
-
-  const isDashboard = activeFilter === "all" && !search;
+    if (!filterKey) return pages;
+    return pagesByEntity(pages, filterKey);
+  }, [pages, filterKey]);
 
   return (
     <div className="min-h-screen">
-      <div className="max-w-5xl mx-auto px-6 py-12">
-        {/* Editorial header */}
-        <header
+      <div className="max-w-5xl mx-auto px-6 py-8">
+        {filterKey ? (
+          <EntityView entityKey={filterKey} pages={filtered} />
+        ) : (
+          <DashboardView pages={pages} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   Entity view — reached via /wiki?type=<entity>
+   ══════════════════════════════════════════════════════ */
+
+function EntityView({
+  entityKey,
+  pages,
+}: {
+  entityKey: EntityKey;
+  pages: WikiPageSummary[];
+}) {
+  if (entityKey === "voices") {
+    return <VoicesView pages={pages} />;
+  }
+
+  const label = ENTITY_CONFIG[entityKey].label;
+
+  return (
+    <>
+      <Link
+        href="/wiki"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "0.4rem",
+          fontSize: "12px",
+          fontWeight: 600,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color: v.inkFaint,
+          textDecoration: "none",
+          marginBottom: "1.5rem",
+        }}
+      >
+        <ArrowLeft size={14} /> Back to the Wiki
+      </Link>
+      <h1
+        style={{
+          fontFamily: v.serif,
+          fontSize: "clamp(1.8rem, 4vw, 2.4rem)",
+          fontWeight: 700,
+          color: v.ink,
+          lineHeight: 1.1,
+          marginBottom: "0.4rem",
+        }}
+      >
+        {label}
+      </h1>
+      <p
+        style={{
+          fontSize: "14px",
+          color: v.inkFaint,
+          marginBottom: "2rem",
+        }}
+      >
+        {pages.length} {pages.length === 1 ? "page" : "pages"}
+      </p>
+      {entityKey === "player" ? (
+        <PlayersTab pages={pages} search="" />
+      ) : (
+        <PaginatedGrid pages={pages} />
+      )}
+      {pages.length === 0 && (
+        <div
           style={{
-            maxWidth: 640,
-            margin: "0 auto 3rem",
             textAlign: "center",
+            padding: "4rem 0",
+            color: v.inkFaint,
           }}
         >
+          <FileText size={32} style={{ marginBottom: "0.75rem", opacity: 0.5 }} />
+          <p style={{ fontSize: "14px" }}>No pages found.</p>
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   Dashboard — the landing page
+   ══════════════════════════════════════════════════════ */
+
+function DashboardView({ pages }: { pages: WikiPageSummary[] }) {
+  const [aboutOpen, setAboutOpen] = useState(false);
+
+  return (
+    <>
+      <Hero onAboutClick={() => setAboutOpen(true)} />
+      <ExploreByEntity pages={pages} />
+      <AskJaromelu />
+      <HowItConnects />
+      <DashboardFooter />
+      {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
+    </>
+  );
+}
+
+/* ── Hero ─────────────────────────────────────────────── */
+
+function Hero({ onAboutClick }: { onAboutClick: () => void }) {
+  return (
+    <section
+      style={{
+        position: "relative",
+        marginBottom: "2.25rem",
+      }}
+    >
+      <button
+        onClick={onAboutClick}
+        style={{
+          position: "absolute",
+          top: 0,
+          right: 0,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "0.35rem",
+          fontSize: "12px",
+          fontWeight: 500,
+          color: v.inkFaint,
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          fontFamily: "inherit",
+        }}
+      >
+        <Info size={13} /> About the Wiki
+      </button>
+      <div
+        className="grid grid-cols-1 md:grid-cols-[1.7fr_1fr]"
+        style={{
+          gap: "2rem",
+          alignItems: "center",
+        }}
+      >
+        <div>
           <div
             style={{
               fontSize: "11px",
@@ -180,216 +282,845 @@ export default function WikiIndexClient({
           <h1
             style={{
               fontFamily: v.serif,
-              fontSize: "clamp(2.2rem, 5vw, 3rem)",
+              fontSize: "clamp(2rem, 4.4vw, 2.9rem)",
               fontWeight: 700,
               color: v.ink,
-              lineHeight: 1.1,
-              marginBottom: "0.6rem",
+              lineHeight: 1.08,
+              marginBottom: "0.85rem",
+              maxWidth: 560,
             }}
           >
-            Knowledge Base
+            Explore the knowledge behind Jaromelu.
           </h1>
           <p
             style={{
               fontFamily: v.serif,
-              fontSize: "1.05rem",
+              fontSize: "1.1rem",
               fontStyle: "italic",
               color: v.inkMuted,
               lineHeight: 1.5,
+              maxWidth: 520,
             }}
           >
-            Players, teams, voices and rounds — written and maintained by
-            Jaromelu.
+            Players, teams, rounds and voices — connected by context.
           </p>
-        </header>
+        </div>
+        <AmbientGraph />
+      </div>
+    </section>
+  );
+}
 
-        {/* Sub-bar (filter + search) only on filtered/search views */}
-        {!isDashboard && (
-          <div
-            className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-8"
-            style={{
-              paddingBottom: "1rem",
-              borderBottom: `1px solid ${v.border}`,
-            }}
-          >
-            <div className="flex flex-wrap gap-1">
-              {FILTER_TABS.map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveFilter(tab.key)}
-                  className="px-3 py-1.5 text-xs font-semibold rounded-md transition-colors"
-                  style={{
-                    letterSpacing: "0.06em",
-                    textTransform: "uppercase",
-                    backgroundColor:
-                      activeFilter === tab.key ? v.accentBg : "transparent",
-                    color: activeFilter === tab.key ? v.accent : v.inkFaint,
-                  }}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-            <input
-              type="text"
-              placeholder="Search pages..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full sm:w-64 sm:ml-auto px-3 py-2 text-sm rounded-lg border focus:outline-none"
-              style={{
-                borderColor: v.border,
-                background: v.surface,
-                color: v.ink,
-              }}
-            />
-          </div>
-        )}
+/* ── Ambient graph (decorative, NON-INTERACTIVE) ── */
 
-        {/* ── Tab content ── */}
-        {isDashboard ? (
-          <Dashboard
-            counts={counts}
-            recentChanges={recentChanges}
-            onNavigate={setActiveFilter}
-            search={search}
-            onSearch={setSearch}
+function AmbientGraph() {
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        position: "relative",
+        width: "100%",
+        height: 220,
+        pointerEvents: "none",
+      }}
+    >
+      <svg
+        viewBox="0 0 400 280"
+        width="100%"
+        height="100%"
+        style={{ overflow: "visible" }}
+      >
+        <defs>
+          <radialGradient id="centreGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="var(--wiki-accent)" stopOpacity="0.55" />
+            <stop offset="100%" stopColor="var(--wiki-accent)" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+
+        {/* Faint connecting lines */}
+        <g stroke="var(--wiki-accent)" strokeWidth="1" opacity="0.25" fill="none">
+          <line x1="200" y1="140" x2="200" y2="40" />
+          <line x1="200" y1="140" x2="80" y2="140" />
+          <line x1="200" y1="140" x2="320" y2="140" />
+          <line x1="200" y1="140" x2="200" y2="240" />
+        </g>
+
+        {/* Centre glow */}
+        <circle cx="200" cy="140" r="48" fill="url(#centreGlow)" />
+        <circle
+          cx="200"
+          cy="140"
+          r="9"
+          fill="var(--wiki-accent)"
+          opacity="0.85"
+        >
+          <animate
+            attributeName="r"
+            values="9;11;9"
+            dur="3.6s"
+            repeatCount="indefinite"
           />
-        ) : activeFilter === "player" ? (
-          <PlayersTab pages={filtered} search={search} />
-        ) : activeFilter === "all" && search ? (
-          <SearchResults pages={filtered} />
-        ) : (
-          <PaginatedGrid pages={filtered} />
-        )}
+          <animate
+            attributeName="opacity"
+            values="0.85;0.6;0.85"
+            dur="3.6s"
+            repeatCount="indefinite"
+          />
+        </circle>
 
-        {filtered.length === 0 && activeFilter !== "all" && (
-          <div
-            style={{
-              textAlign: "center",
-              padding: "4rem 0",
-              color: v.inkFaint,
-            }}
-          >
-            <FileText
-              size={32}
-              style={{ marginBottom: "0.75rem", opacity: 0.5 }}
-            />
-            <p style={{ fontSize: "14px" }}>No pages found.</p>
-          </div>
-        )}
+        {/* Satellites */}
+        <SatelliteNode cx={200} cy={40} label="Rounds" />
+        <SatelliteNode cx={80} cy={140} label="Players" />
+        <SatelliteNode cx={320} cy={140} label="Teams" />
+        <SatelliteNode cx={200} cy={240} label="Voices" />
+      </svg>
+    </div>
+  );
+}
+
+function SatelliteNode({
+  cx,
+  cy,
+  label,
+}: {
+  cx: number;
+  cy: number;
+  label: string;
+}) {
+  return (
+    <g>
+      <circle
+        cx={cx}
+        cy={cy}
+        r="5"
+        fill="var(--wiki-surface)"
+        stroke="var(--wiki-accent)"
+        strokeWidth="1.5"
+      />
+      <text
+        x={cx}
+        y={cy + 22}
+        textAnchor="middle"
+        fontSize="11"
+        fontWeight="600"
+        fill="var(--wiki-ink-muted)"
+        style={{ letterSpacing: "0.04em" }}
+      >
+        {label}
+      </text>
+    </g>
+  );
+}
+
+/* ── About modal ────────────────────────────────────── */
+
+function AboutModal({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="About the Wiki"
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.45)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 100,
+        padding: "1rem",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: v.surface,
+          border: `1px solid ${v.border}`,
+          padding: "2rem",
+          maxWidth: 480,
+          width: "100%",
+          position: "relative",
+        }}
+      >
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          style={{
+            position: "absolute",
+            top: "0.85rem",
+            right: "0.85rem",
+            background: "none",
+            border: "none",
+            color: v.inkFaint,
+            cursor: "pointer",
+            padding: "0.25rem",
+          }}
+        >
+          <X size={16} />
+        </button>
+        <div
+          style={{
+            fontSize: "11px",
+            fontWeight: 600,
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+            color: v.accent,
+            marginBottom: "0.5rem",
+          }}
+        >
+          About the Wiki
+        </div>
+        <h2
+          style={{
+            fontFamily: v.serif,
+            fontSize: "1.6rem",
+            fontWeight: 700,
+            color: v.ink,
+            lineHeight: 1.2,
+            marginBottom: "1rem",
+          }}
+        >
+          A living knowledge base of NRL SuperCoach.
+        </h2>
+        <div
+          style={{
+            fontSize: "14px",
+            color: v.inkMuted,
+            lineHeight: 1.6,
+          }}
+        >
+          <p style={{ marginBottom: "0.85rem" }}>
+            Jaromelu maintains pages on every player, team, round and voice
+            — connected so you can move between them by context.
+          </p>
+          <p style={{ marginBottom: "0.85rem" }}>
+            Browse by entity to drop into a category, or use{" "}
+            <strong style={{ color: v.ink }}>Ask Jaromelu</strong> for
+            quick, scoped questions. For deeper, open-ended chat, head to{" "}
+            <strong style={{ color: v.ink }}>Ask Me</strong>.
+          </p>
+          <p style={{ margin: 0 }}>
+            New insights are added daily by the crew.
+          </p>
+        </div>
       </div>
     </div>
   );
 }
 
-/* ══════════════════════════════════════════════════════
-   Dashboard — Explore topics + Recently Updated +
-   How this connects (static teaser) + footer
-   ══════════════════════════════════════════════════════ */
+/* ── Explore by Entity ─────────────────────────────── */
 
-const NEW_BADGE_HOURS = 72;
+const ENTITY_CONFIG: Record<
+  EntityKey,
+  {
+    label: string;
+    singular: string;
+    icon: typeof FileText;
+    copy: string;
+    accent: string;
+    accentBg: string;
+  }
+> = {
+  player: {
+    label: "Players",
+    singular: "player",
+    icon: Users,
+    copy: "Profiles, form and value calls.",
+    accent: v.teal,
+    accentBg: v.tealBg,
+  },
+  team: {
+    label: "Teams",
+    singular: "team",
+    icon: FileText,
+    copy: "Squads, structures and edges.",
+    accent: v.accent,
+    accentBg: v.accentBg,
+  },
+  round: {
+    label: "Rounds",
+    singular: "round",
+    icon: Calendar,
+    copy: "Matchups, recaps and predictions.",
+    accent: v.amber,
+    accentBg: v.amberBg,
+  },
+  voices: {
+    label: "Voices",
+    singular: "voice",
+    icon: Mic,
+    copy: "Channels and the people behind them.",
+    accent: v.purple,
+    accentBg: v.purpleBg,
+  },
+};
 
-function isNew(iso: string): boolean {
-  const hours = (Date.now() - new Date(iso).getTime()) / 3600000;
-  return hours < NEW_BADGE_HOURS;
+const ENTITY_ORDER: EntityKey[] = ["player", "team", "round", "voices"];
+
+function ExploreByEntity({ pages }: { pages: WikiPageSummary[] }) {
+  return (
+    <section style={{ marginBottom: "2.5rem" }}>
+      <SectionLabel>Explore by Entity</SectionLabel>
+      <div
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+        style={{
+          gap: "1rem",
+          marginTop: "1.25rem",
+        }}
+      >
+        {ENTITY_ORDER.map((key) => {
+          const samples = pagesByEntity(pages, key).slice(0, 4);
+          const total = pagesByEntity(pages, key).length;
+          return (
+            <EntityCard
+              key={key}
+              entityKey={key}
+              samples={samples}
+              total={total}
+            />
+          );
+        })}
+      </div>
+    </section>
+  );
 }
 
-function Dashboard({
-  counts,
-  recentChanges,
-  onNavigate,
-  search,
-  onSearch,
+function EntityCard({
+  entityKey,
+  samples,
+  total,
 }: {
-  counts: Record<string, number>;
-  recentChanges: WikiChangeItem[];
-  onNavigate: (tab: string) => void;
-  search: string;
-  onSearch: (s: string) => void;
+  entityKey: EntityKey;
+  samples: WikiPageSummary[];
+  total: number;
 }) {
-  // Dashboard tiles use a "voices" virtual tile that combines advisor + channel.
-  type TopicKey = "player" | "team" | "voices" | "round";
-  const topicOrder: TopicKey[] = ["player", "team", "voices", "round"];
-  const topicConfig: Record<
-    TopicKey,
-    { label: string; icon: typeof FileText; copy: string }
-  > = {
-    player: {
-      label: "Players",
-      icon: FileText,
-      copy: "Profiles, form, value calls.",
-    },
-    team: {
-      label: "Teams",
-      icon: Users,
-      copy: "Squads, structures, edges.",
-    },
-    voices: {
-      label: "Voices",
-      icon: Radio,
-      copy: "Channels and the people behind them.",
-    },
-    round: {
-      label: "Rounds",
-      icon: Calendar,
-      copy: "Matchups, recaps, predictions.",
-    },
+  const cfg = ENTITY_CONFIG[entityKey];
+  const Icon = cfg.icon;
+  const browseHref = `/wiki?type=${entityKey}`;
+
+  return (
+    <div
+      style={{
+        background: cfg.accentBg,
+        border: `1px solid ${cfg.accent}`,
+        borderRadius: 6,
+        padding: "1.6rem 1.4rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "1rem",
+      }}
+    >
+      <div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.7rem",
+            marginBottom: "0.85rem",
+          }}
+        >
+          <div
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: "50%",
+              background: "rgba(255,255,255,0.08)",
+              color: cfg.accent,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              border: `1px solid ${cfg.accent}`,
+              flexShrink: 0,
+            }}
+          >
+            <Icon size={17} />
+          </div>
+          <Link
+            href={browseHref}
+            style={{
+              fontFamily: v.serif,
+              fontSize: "1.35rem",
+              fontWeight: 700,
+              color: cfg.accent,
+              lineHeight: 1.1,
+              textDecoration: "none",
+            }}
+          >
+            {cfg.label}
+          </Link>
+        </div>
+        <p
+          style={{
+            fontSize: "13px",
+            color: v.inkMuted,
+            lineHeight: 1.45,
+            minHeight: "2.9em",
+          }}
+        >
+          {cfg.copy}
+        </p>
+      </div>
+
+      <div>
+        <div
+          style={{
+            fontSize: "13px",
+            fontWeight: 700,
+            color: cfg.accent,
+            marginBottom: "0.5rem",
+          }}
+        >
+          {total} {total === 1 ? cfg.singular : cfg.label.toLowerCase()}
+        </div>
+        {samples.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+              flexWrap: "wrap",
+            }}
+          >
+            {samples.map((s) => (
+              <Link
+                key={s.page_id}
+                href={pageHref(s)}
+                title={s.title}
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: "50%",
+                  background: "rgba(0,0,0,0.18)",
+                  color: cfg.accent,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  letterSpacing: "0.04em",
+                  textDecoration: "none",
+                  border: `1px solid ${cfg.accent}`,
+                }}
+              >
+                {initials(s.title)}
+              </Link>
+            ))}
+            {total > samples.length && (
+              <span
+                style={{
+                  fontSize: "11px",
+                  color: cfg.accent,
+                  marginLeft: "0.4rem",
+                  fontWeight: 600,
+                }}
+              >
+                +{total - samples.length}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      <Link
+        href={browseHref}
+        style={{
+          marginTop: "auto",
+          fontSize: "12px",
+          fontWeight: 600,
+          color: cfg.accent,
+          textDecoration: "none",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "0.3rem",
+        }}
+      >
+        Browse all {cfg.label.toLowerCase()} <ArrowRight size={12} />
+      </Link>
+    </div>
+  );
+}
+
+/* ── Ask Jaromelu ──────────────────────────────────── */
+
+type AskScope = "general" | EntityKey;
+
+const ASK_CHIPS: Record<AskScope, string[]> = {
+  general: [
+    "What changed today?",
+    "Who's trending right now?",
+    "Cheap value picks",
+    "Trade targets this week",
+    "Bye-round planning",
+    "Captain options",
+    "Watchlist for next week",
+    "Most owned vs. most valuable",
+  ],
+  player: [
+    "Top scoring forwards this week",
+    "Best HFB form right now",
+    "Players returning from injury",
+    "Breakeven movers",
+    "Cheap rookies starting",
+    "Captain options",
+    "Players to trade out",
+  ],
+  team: [
+    "Strongest forward packs",
+    "Teams under pressure",
+    "Best home record",
+    "Travel-affected teams",
+    "Defensive struggles",
+    "Form lines into this round",
+  ],
+  round: [
+    "This round's top picks",
+    "Captain options",
+    "Teams with double chance",
+    "Injury watchlist",
+    "Weather-affected games",
+    "Late mail and team-list shifts",
+  ],
+  voices: [
+    "Most trusted voices right now",
+    "Recent calls vs. reality",
+    "Best podcasts this week",
+    "New voices added",
+    "Trust-score movers",
+  ],
+};
+
+function AskJaromelu() {
+  const router = useRouter();
+  const [chipOffset, setChipOffset] = useState(0);
+  const [question, setQuestion] = useState("");
+  const [submitted, setSubmitted] = useState<string | null>(null);
+
+  const allChips = ASK_CHIPS.general;
+  const chips = useMemo(() => {
+    const start = chipOffset % allChips.length;
+    return [...allChips.slice(start), ...allChips.slice(0, start)].slice(0, 5);
+  }, [allChips, chipOffset]);
+
+  const submit = (q: string) => {
+    if (!q.trim()) return;
+    setSubmitted(q.trim());
+  };
+
+  const continueToAskMe = () => {
+    const q = submitted ?? question;
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    router.push(`/ask?${params.toString()}`);
+  };
+
+  const reset = () => {
+    setSubmitted(null);
+    setQuestion("");
   };
 
   return (
-    <>
-      {/* ── Section: Explore topics ── */}
-      <section style={{ paddingBottom: "3rem" }}>
-        <SectionLabel>Explore topics</SectionLabel>
-        <SectionTitle>Pick a place to start.</SectionTitle>
-        <SectionSubtitle>
-          Four directions through the knowledge base. Tap any to dive in.
-        </SectionSubtitle>
+    <section
+      style={{
+        marginBottom: "3rem",
+        padding: "1.75rem 0",
+        borderTop: `1px solid ${v.border}`,
+        borderBottom: `1px solid ${v.border}`,
+      }}
+    >
+      <SectionLabel>Ask Jaromelu</SectionLabel>
+      <SectionTitle>What do you want to know?</SectionTitle>
 
+      {/* Chips */}
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "0.5rem",
+          alignItems: "center",
+          marginTop: "1.25rem",
+          marginBottom: "1rem",
+        }}
+      >
+        {chips.map((c) => (
+          <button
+            key={c}
+            onClick={() => submit(c)}
+            style={{
+              fontSize: "13px",
+              padding: "0.45rem 0.85rem",
+              borderRadius: 999,
+              border: `1px solid ${v.border}`,
+              background: v.surface,
+              color: v.ink,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              transition: "background 0.15s, border-color 0.15s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = v.accentBg;
+              e.currentTarget.style.borderColor = v.accent;
+              e.currentTarget.style.color = v.accent;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = v.surface;
+              e.currentTarget.style.borderColor = v.border;
+              e.currentTarget.style.color = v.ink;
+            }}
+          >
+            {c}
+          </button>
+        ))}
+        <button
+          onClick={() => setChipOffset((o) => o + 5)}
+          aria-label="Refresh suggestions"
+          style={{
+            width: 30,
+            height: 30,
+            borderRadius: "50%",
+            border: `1px solid ${v.border}`,
+            background: v.surface,
+            color: v.inkFaint,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <RefreshCw size={13} />
+        </button>
+      </div>
+
+      {/* Input */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit(question);
+        }}
+        style={{
+          display: "flex",
+          gap: "0.5rem",
+          alignItems: "center",
+          background: v.surface,
+          border: `1px solid ${v.border}`,
+          borderRadius: 8,
+          padding: "0.4rem 0.4rem 0.4rem 1rem",
+        }}
+      >
+        <input
+          type="text"
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          placeholder="Or type your own question…"
+          style={{
+            flex: 1,
+            border: "none",
+            background: "transparent",
+            outline: "none",
+            fontSize: "14px",
+            color: v.ink,
+            fontFamily: "inherit",
+          }}
+        />
+        <button
+          type="submit"
+          aria-label="Ask"
+          disabled={!question.trim()}
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 6,
+            border: "none",
+            background: question.trim() ? v.accent : v.border,
+            color: "white",
+            cursor: question.trim() ? "pointer" : "default",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Send size={14} />
+        </button>
+      </form>
+
+      {/* Answer block */}
+      {submitted && (
         <div
           style={{
-            display: "grid",
-            gap: "1px",
-            background: v.border,
+            marginTop: "1.25rem",
+            padding: "1.25rem 1.4rem",
+            background: v.surface,
             border: `1px solid ${v.border}`,
-            marginTop: "1.5rem",
+            borderLeft: `3px solid ${v.accent}`,
           }}
-          className="grid-cols-2 md:grid-cols-4"
         >
-          {topicOrder.map((key) => {
-            const cfg = topicConfig[key];
+          <div
+            style={{
+              fontSize: "11px",
+              fontWeight: 600,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              color: v.inkFaint,
+              marginBottom: "0.4rem",
+            }}
+          >
+            You asked
+          </div>
+          <div
+            style={{
+              fontSize: "15px",
+              color: v.ink,
+              fontWeight: 500,
+              marginBottom: "0.75rem",
+            }}
+          >
+            {submitted}
+          </div>
+          <p
+            style={{
+              fontSize: "14px",
+              color: v.inkMuted,
+              lineHeight: 1.6,
+              marginBottom: "1rem",
+            }}
+          >
+            Jaromelu&rsquo;s inline answer engine is on its way. In the
+            meantime, take this question to{" "}
+            <strong style={{ color: v.ink }}>Ask Me</strong> for a full
+            response.
+          </p>
+          <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+            <button
+              onClick={continueToAskMe}
+              style={{
+                fontSize: "13px",
+                fontWeight: 600,
+                color: v.accent,
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontFamily: "inherit",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.35rem",
+              }}
+            >
+              Continue in Ask Me <ArrowRight size={13} />
+            </button>
+            <button
+              onClick={reset}
+              style={{
+                fontSize: "12px",
+                color: v.inkFaint,
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              Ask another
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ── How it Connects ──────────────────────────────── */
+
+function HowItConnects() {
+  const stages: { key: EntityKey; caption: string }[] = [
+    { key: "player", caption: "Who they are." },
+    { key: "team", caption: "How they play." },
+    { key: "round", caption: "What happened." },
+    { key: "voices", caption: "What it means." },
+  ];
+
+  return (
+    <section style={{ marginBottom: "3rem", paddingTop: "0.5rem" }}>
+      <SectionLabel>How it Connects</SectionLabel>
+      <SectionTitle>Everything is connected.</SectionTitle>
+      <SectionSubtitle>
+        Players sit inside teams, teams play out rounds, voices interpret the
+        signal. The same pages, four lenses.
+      </SectionSubtitle>
+
+      <div
+        aria-hidden="true"
+        style={{
+          marginTop: "2rem",
+          padding: "2rem 1rem",
+          background: v.surface,
+          border: `1px solid ${v.border}`,
+          position: "relative",
+        }}
+      >
+        {/* Connecting line */}
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(2rem + 22px)",
+            left: "12%",
+            right: "12%",
+            height: 1,
+            background: v.border,
+          }}
+        />
+        <div
+          className="grid"
+          style={{
+            display: "grid",
+            gridTemplateColumns: `repeat(${stages.length}, 1fr)`,
+            gap: "0.5rem",
+            position: "relative",
+          }}
+        >
+          {stages.map(({ key, caption }) => {
+            const cfg = ENTITY_CONFIG[key];
             const Icon = cfg.icon;
             return (
-              <button
+              <div
                 key={key}
-                onClick={() => onNavigate(key)}
                 style={{
-                  background: v.surface,
-                  padding: "1.6rem 1.2rem",
-                  textAlign: "left",
-                  cursor: "pointer",
-                  border: "none",
-                  fontFamily: "inherit",
-                  transition: "background 0.15s",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = v.bg;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = v.surface;
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  textAlign: "center",
+                  gap: "0.5rem",
                 }}
               >
-                <Icon
-                  size={18}
-                  style={{ color: v.accent, marginBottom: "0.6rem" }}
-                />
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: "50%",
+                    background: cfg.accentBg,
+                    color: cfg.accent,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    border: `1px solid ${v.border}`,
+                    position: "relative",
+                    zIndex: 1,
+                  }}
+                >
+                  <Icon size={18} />
+                </div>
                 <div
                   style={{
                     fontFamily: v.serif,
-                    fontSize: "1.4rem",
+                    fontSize: "1rem",
                     fontWeight: 700,
                     color: v.ink,
-                    lineHeight: 1.1,
                   }}
                 >
                   {cfg.label}
@@ -397,317 +1128,83 @@ function Dashboard({
                 <div
                   style={{
                     fontSize: "12px",
-                    color: v.inkMuted,
-                    marginTop: "0.25rem",
-                    lineHeight: 1.4,
-                  }}
-                >
-                  {cfg.copy}
-                </div>
-                <div
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 600,
-                    letterSpacing: "0.1em",
-                    textTransform: "uppercase",
                     color: v.inkFaint,
-                    marginTop: "0.85rem",
+                    lineHeight: 1.4,
+                    maxWidth: 120,
                   }}
                 >
-                  {counts[key] ?? 0}{" "}
-                  {(counts[key] ?? 0) === 1
-                    ? cfg.label.slice(0, -1)
-                    : cfg.label}
+                  {caption}
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
+      </div>
 
-        {/* Inline search — secondary affordance, after the tabs */}
-        <div style={{ marginTop: "1.5rem", maxWidth: 360 }}>
-          <input
-            type="text"
-            placeholder="Or search pages..."
-            value={search}
-            onChange={(e) => onSearch(e.target.value)}
-            className="w-full px-3 py-2 text-sm rounded-lg border focus:outline-none"
-            style={{
-              borderColor: v.border,
-              background: v.surface,
-              color: v.ink,
-            }}
-          />
-        </div>
-      </section>
-
-      {/* ── Section: Recently Updated ── */}
-      {recentChanges.length > 0 && (
-        <section
+      <div style={{ marginTop: "1.25rem", textAlign: "right" }}>
+        <Link
+          href="/wiki/map"
           style={{
-            paddingTop: "2.5rem",
-            paddingBottom: "3rem",
-            borderTop: `1px solid ${v.border}`,
+            fontSize: "13px",
+            fontWeight: 600,
+            color: v.accent,
+            textDecoration: "none",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.35rem",
           }}
         >
-          <SectionLabel>Recently Updated</SectionLabel>
-          <SectionTitle>What Jaromelu touched lately.</SectionTitle>
-          <SectionSubtitle>
-            Live revisions across the wiki, freshest first.
-          </SectionSubtitle>
+          Open the map <ArrowRight size={13} />
+        </Link>
+      </div>
+    </section>
+  );
+}
 
-          <RecentList items={recentChanges} />
-        </section>
-      )}
+/* ── Footer ───────────────────────────────────────── */
 
-      {/* ── Section: How this connects (static teaser) ── */}
-      <section
+function DashboardFooter() {
+  return (
+    <footer
+      style={{
+        marginTop: "1rem",
+        paddingTop: "2rem",
+        borderTop: `1px solid ${v.border}`,
+        display: "flex",
+        gap: "0.75rem",
+      }}
+      className="flex-col items-center text-center sm:flex-row sm:items-center sm:justify-between sm:text-left"
+    >
+      <span
         style={{
-          paddingTop: "2.5rem",
-          paddingBottom: "3rem",
-          borderTop: `1px solid ${v.border}`,
-        }}
-      >
-        <SectionLabel>How this connects</SectionLabel>
-        <SectionTitle>The map of NRL knowledge.</SectionTitle>
-        <SectionSubtitle>
-          Soon: hover to explore the relations between players, teams, rounds
-          and the voices talking about them.
-        </SectionSubtitle>
-
-        <ConnectsTeaser />
-      </section>
-
-      {/* ── Footer ── */}
-      <footer
-        style={{
-          marginTop: "1rem",
-          paddingTop: "2rem",
-          borderTop: `1px solid ${v.border}`,
-          textAlign: "center",
           fontSize: "12px",
           color: v.inkFaint,
           letterSpacing: "0.04em",
         }}
       >
-        Updated continuously by{" "}
-        <Link
-          href="/feed"
-          style={{
-            color: v.accent,
-            fontWeight: 500,
-            textDecoration: "none",
-          }}
-        >
-          Scout
-        </Link>
-        .
-      </footer>
-    </>
-  );
-}
-
-/* ── Recently Updated list ── */
-
-function RecentList({ items }: { items: WikiChangeItem[] }) {
-  return (
-    <ol
-      style={{
-        listStyle: "none",
-        padding: 0,
-        margin: "1.5rem 0 0",
-        background: v.surface,
-        border: `1px solid ${v.border}`,
-      }}
-    >
-      {items.slice(0, 6).map((c, i) => (
-        <li
-          key={c.revision_id}
-          style={{
-            borderTop: i === 0 ? "none" : `1px solid ${v.border}`,
-          }}
-        >
-          <Link
-            href={changeHref(c)}
-            className="group block transition-colors"
-            style={{
-              padding: "1rem 1.2rem",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.85rem",
-              textDecoration: "none",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = v.bg;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "transparent";
-            }}
-          >
-            <RecentTypeIcon type={c.page_type} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div
-                className="flex items-center gap-2"
-                style={{ marginBottom: "0.15rem" }}
-              >
-                <span
-                  className="group-hover:underline"
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: 600,
-                    color: v.ink,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {c.page_title}
-                </span>
-                {isNew(c.created_at) && <NewBadge />}
-              </div>
-              <div
-                style={{
-                  fontSize: "12px",
-                  color: v.inkFaint,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {c.summary || c.section_heading || "Updated"}
-              </div>
-            </div>
-            <span
-              style={{
-                fontSize: "11px",
-                color: v.inkFaint,
-                whiteSpace: "nowrap",
-                flexShrink: 0,
-              }}
-            >
-              {formatRelative(c.created_at)}
-            </span>
-          </Link>
-        </li>
-      ))}
-    </ol>
-  );
-}
-
-function NewBadge() {
-  return (
-    <span
-      style={{
-        fontSize: "9px",
-        fontWeight: 700,
-        letterSpacing: "0.1em",
-        textTransform: "uppercase",
-        padding: "0.15rem 0.4rem",
-        borderRadius: "2px",
-        background: v.greenBg,
-        color: v.green,
-        flexShrink: 0,
-      }}
-    >
-      New
-    </span>
-  );
-}
-
-/* ── How this connects — static teaser ── */
-
-function ConnectsTeaser() {
-  return (
-    <div
-      style={{
-        position: "relative",
-        marginTop: "1.5rem",
-        background: v.surface,
-        border: `1px solid ${v.border}`,
-        padding: "3rem 1.5rem",
-        minHeight: 260,
-        overflow: "hidden",
-      }}
-    >
-      <svg
-        viewBox="0 0 600 240"
-        preserveAspectRatio="xMidYMid meet"
+        New insights added daily by the crew.
+      </span>
+      <Link
+        href="/pulse"
         style={{
-          position: "absolute",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          opacity: 0.6,
-        }}
-      >
-        <line x1="300" y1="110" x2="108" y2="53" stroke="var(--wiki-border)" strokeWidth="1" />
-        <line x1="300" y1="110" x2="492" y2="53" stroke="var(--wiki-border)" strokeWidth="1" />
-        <line x1="300" y1="110" x2="108" y2="173" stroke="var(--wiki-border)" strokeWidth="1" />
-        <line x1="300" y1="110" x2="492" y2="173" stroke="var(--wiki-border)" strokeWidth="1" />
-        <line x1="300" y1="110" x2="300" y2="34" stroke="var(--wiki-border)" strokeWidth="1" />
-      </svg>
-
-      <NodeChip x="50%" y="46%" emphasis>Edge Attack</NodeChip>
-      <NodeChip x="18%" y="22%">Player</NodeChip>
-      <NodeChip x="82%" y="22%">Team</NodeChip>
-      <NodeChip x="18%" y="72%">Voice</NodeChip>
-      <NodeChip x="82%" y="72%">Round</NodeChip>
-      <NodeChip x="50%" y="14%">Tactic</NodeChip>
-
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 14,
-          textAlign: "center",
-          fontSize: "11px",
+          fontSize: "12px",
           fontWeight: 600,
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-          color: v.inkFaint,
+          color: v.accent,
+          textDecoration: "none",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "0.35rem",
         }}
       >
-        Graph view coming soon
-      </div>
-    </div>
+        See latest updates in Live Pulse <ArrowRight size={12} />
+      </Link>
+    </footer>
   );
 }
 
-function NodeChip({
-  x,
-  y,
-  children,
-  emphasis,
-}: {
-  x: string;
-  y: string;
-  children: React.ReactNode;
-  emphasis?: boolean;
-}) {
-  return (
-    <div
-      style={{
-        position: "absolute",
-        left: x,
-        top: y,
-        transform: "translate(-50%, -50%)",
-        padding: emphasis ? "0.45rem 0.85rem" : "0.3rem 0.65rem",
-        background: emphasis ? v.accentBg : v.bg,
-        color: emphasis ? v.accent : v.inkMuted,
-        border: emphasis ? `1px solid ${v.accent}` : `1px solid ${v.border}`,
-        borderRadius: 999,
-        fontSize: emphasis ? "13px" : "11px",
-        fontWeight: emphasis ? 600 : 500,
-        whiteSpace: "nowrap",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-/* ── Editorial section primitives ── */
+/* ══════════════════════════════════════════════════════
+   Editorial primitives
+   ══════════════════════════════════════════════════════ */
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -760,42 +1257,9 @@ function SectionSubtitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-function RecentTypeIcon({ type }: { type: WikiPageType }) {
-  const config: Record<
-    WikiPageType,
-    { bg: string; color: string; letter: string }
-  > = {
-    player: { bg: v.tealBg, color: v.teal, letter: "P" },
-    team: { bg: v.accentBg, color: v.accent, letter: "T" },
-    advisor: { bg: v.purpleBg, color: v.purple, letter: "A" },
-    channel: { bg: v.purpleBg, color: v.purple, letter: "C" },
-    round: { bg: v.amberBg, color: v.amber, letter: "R" },
-  };
-  const c = config[type];
-  return (
-    <div
-      style={{
-        width: 28,
-        height: 28,
-        borderRadius: "50%",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: "12px",
-        fontWeight: 600,
-        background: c.bg,
-        color: c.color,
-        flexShrink: 0,
-      }}
-    >
-      {c.letter}
-    </div>
-  );
-}
-
 /* ══════════════════════════════════════════════════════
-   Players Tab — grouped by team or alphabetically,
-   collapsible, with A-Z jump bar
+   Players Tab — grouped by team or alphabetically
+   (used by EntityView for type=player)
    ══════════════════════════════════════════════════════ */
 
 function PlayersTab({
@@ -862,9 +1326,7 @@ function PlayersTab({
 
   return (
     <>
-      {/* Controls row */}
-      <div className="flex items-center justify-between mb-3">
-        <SectionHeading icon={FileText} label="Players" count={pages.length} />
+      <div className="flex items-center justify-end mb-3">
         {groupKeys.length > 3 && (
           <div className="flex gap-2">
             <button
@@ -897,7 +1359,6 @@ function PlayersTab({
         )}
       </div>
 
-      {/* A-Z bar */}
       {!search && groupKeys.length > 5 && (
         <div className="flex flex-wrap gap-0.5 mb-4">
           {"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((letter) => {
@@ -931,18 +1392,6 @@ function PlayersTab({
                   cursor: active ? "pointer" : "default",
                   opacity: active ? 1 : 0.3,
                 }}
-                onMouseEnter={(e) => {
-                  if (active) {
-                    e.currentTarget.style.background = v.accentBg;
-                    e.currentTarget.style.color = v.accent;
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "none";
-                  e.currentTarget.style.color = active
-                    ? v.inkMuted
-                    : v.inkFaint;
-                }}
               >
                 {letter}
               </button>
@@ -951,7 +1400,6 @@ function PlayersTab({
         </div>
       )}
 
-      {/* Groups */}
       {groupKeys.map((key) => {
         const groupPages = groups.get(key) || [];
         const isCollapsed = collapsedGroups.has(key);
@@ -1018,12 +1466,6 @@ function PlayersTab({
                     href={pageHref(page)}
                     className="group block transition-colors"
                     style={{ background: v.surface, padding: "0.8rem 1rem" }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = v.bg;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = v.surface;
-                    }}
                   >
                     <div className="flex items-center gap-2">
                       {typeof page.metadata_json?.position === "string" && (
@@ -1081,10 +1523,7 @@ function PlayersTab({
                             flexShrink: 0,
                           }}
                         >
-                          $
-                          {(
-                            page.metadata_json.price as number
-                          ).toLocaleString()}
+                          ${(page.metadata_json.price as number).toLocaleString()}
                         </span>
                       )}
                     </div>
@@ -1100,59 +1539,7 @@ function PlayersTab({
 }
 
 /* ══════════════════════════════════════════════════════
-   Search Results — grouped by type when searching "all"
-   ══════════════════════════════════════════════════════ */
-
-function SearchResults({ pages }: { pages: WikiPageSummary[] }) {
-  const grouped = useMemo(() => {
-    const groups: Partial<Record<WikiPageType, WikiPageSummary[]>> = {};
-    for (const page of pages) {
-      if (!groups[page.page_type]) groups[page.page_type] = [];
-      groups[page.page_type]!.push(page);
-    }
-    return groups;
-  }, [pages]);
-
-  if (pages.length === 0) {
-    return (
-      <div
-        style={{
-          textAlign: "center",
-          padding: "4rem 0",
-          color: v.inkFaint,
-        }}
-      >
-        <FileText
-          size={32}
-          style={{ marginBottom: "0.75rem", opacity: 0.5 }}
-        />
-        <p style={{ fontSize: "14px" }}>No pages found.</p>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      {Object.entries(grouped).map(([type, groupPages]) => {
-        const config = TYPE_CONFIG[type as WikiPageType];
-        const Icon = config?.icon || FileText;
-        return (
-          <div key={type} className="mb-8">
-            <SectionHeading
-              icon={Icon}
-              label={config?.label || type}
-              count={groupPages!.length}
-            />
-            <PageGrid pages={groupPages!} />
-          </div>
-        );
-      })}
-    </>
-  );
-}
-
-/* ══════════════════════════════════════════════════════
-   Paginated Grid — for teams, advisors, rounds
+   Paginated grid — for teams, rounds, voices
    ══════════════════════════════════════════════════════ */
 
 function PaginatedGrid({ pages }: { pages: WikiPageSummary[] }) {
@@ -1264,38 +1651,6 @@ function PaginationBtn({
   );
 }
 
-/* ══════════════════════════════════════════════════════
-   Shared components
-   ══════════════════════════════════════════════════════ */
-
-function SectionHeading({
-  icon: Icon,
-  label,
-  count,
-}: {
-  icon: typeof FileText;
-  label: string;
-  count: number;
-}) {
-  return (
-    <div className="flex items-center gap-2 mb-3">
-      <Icon size={16} style={{ color: v.accent }} />
-      <h2
-        style={{
-          fontSize: "11px",
-          fontWeight: 600,
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-          color: v.inkFaint,
-        }}
-      >
-        {label}
-      </h2>
-      <span style={{ fontSize: "12px", color: v.inkFaint }}>({count})</span>
-    </div>
-  );
-}
-
 function PageGrid({ pages }: { pages: WikiPageSummary[] }) {
   return (
     <div
@@ -1313,12 +1668,6 @@ function PageGrid({ pages }: { pages: WikiPageSummary[] }) {
           href={pageHref(page)}
           className="group block transition-colors"
           style={{ background: v.surface, padding: "1.4rem" }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = v.bg;
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = v.surface;
-          }}
         >
           <h3
             className="group-hover:underline"

@@ -1,6 +1,6 @@
 import { apiFetch } from "@/lib/api";
 import WikiIndexClient from "./WikiIndexClient";
-import type { WikiPagesResponse, WikiChangesResponse } from "./wiki-data";
+import type { WikiPagesResponse } from "./wiki-data";
 
 export const metadata = {
   title: "The Wiki | Jaromelu",
@@ -8,20 +8,22 @@ export const metadata = {
     "Browse everything Jaromelu knows — players, teams, voices, rounds.",
 };
 
-export default async function WikiPage() {
+export default async function WikiPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ type?: string }>;
+}) {
+  const { type } = await searchParams;
   let pages: WikiPagesResponse["items"] = [];
-  let recentChanges: WikiChangesResponse["items"] = [];
 
   try {
-    const [pagesData, changesData] = await Promise.all([
-      apiFetch<WikiPagesResponse>("/api/wiki/pages?limit=500"),
-      apiFetch<WikiChangesResponse>("/api/wiki/recent-changes?limit=10"),
-    ]);
+    const pagesData = await apiFetch<WikiPagesResponse>(
+      "/api/wiki/pages?limit=500",
+    );
     pages = pagesData.items;
-    recentChanges = changesData.items;
   } catch {
     // API may not be running
   }
 
-  return <WikiIndexClient pages={pages} recentChanges={recentChanges} />;
+  return <WikiIndexClient pages={pages} initialType={type} />;
 }
