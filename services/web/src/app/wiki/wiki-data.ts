@@ -9,6 +9,9 @@ export interface WikiPageSummary {
   status: string;
   metadata_json: Record<string, unknown>;
   updated_at: string;
+  /** Channel avatar (YouTube thumbnail / podcast cover art / etc.). Set
+   * for channel-type pages where the channel has a logo on file. */
+  logo_url?: string | null;
 }
 
 export interface WikiEntity {
@@ -28,6 +31,7 @@ export interface WikiChannel {
   quality_rating: number;
   tags: string[];
   active: boolean;
+  logo_url: string | null;
   last_polled_at: string | null;
 }
 

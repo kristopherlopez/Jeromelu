@@ -15,7 +15,7 @@ from ..deps import get_db
 router = APIRouter()
 
 
-def _page_summary(page: WikiPage) -> dict:
+def _page_summary(page: WikiPage, logo_url: str | None = None) -> dict:
     return {
         "page_id": str(page.page_id),
         "slug": page.slug,
@@ -25,7 +25,23 @@ def _page_summary(page: WikiPage) -> dict:
         "status": page.status,
         "metadata_json": page.metadata_json or {},
         "updated_at": page.updated_at.isoformat(),
+        "logo_url": logo_url,
     }
+
+
+def _logos_for_pages(db: Session, pages: list[WikiPage]) -> dict[uuid.UUID, str]:
+    """Bulk-load logo_url for channel-backed pages. Returns {page_id: logo_url}.
+    Issues one extra query regardless of how many pages are passed."""
+    channel_page_ids = [p.page_id for p in pages if p.channel_id]
+    if not channel_page_ids:
+        return {}
+    rows = (
+        db.query(WikiPage.page_id, Channel.logo_url)
+        .join(Channel, Channel.channel_id == WikiPage.channel_id)
+        .filter(WikiPage.page_id.in_(channel_page_ids))
+        .all()
+    )
+    return {pid: logo for pid, logo in rows if logo}
 
 
 def _revision_item(rev: WikiRevision) -> dict:
@@ -71,8 +87,9 @@ def list_pages(
         pages = pages[:limit]
     next_before = pages[-1].updated_at.isoformat() if pages and has_more else None
 
+    logos = _logos_for_pages(db, pages)
     return {
-        "items": [_page_summary(p) for p in pages],
+        "items": [_page_summary(p, logos.get(p.page_id)) for p in pages],
         "next_before": next_before,
     }
 
@@ -190,6 +207,7 @@ def get_page(slug: str, db: Session = Depends(get_db)):
                 "quality_rating": channel.quality_rating,
                 "tags": channel.tags or [],
                 "active": channel.active,
+                "logo_url": channel.logo_url,
                 "last_polled_at": channel.last_polled_at.isoformat() if channel.last_polled_at else None,
             } if channel else None,
             "updated_at": page.updated_at.isoformat(),

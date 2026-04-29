@@ -90,6 +90,27 @@ export default function WikiPageClient({
       {/* ── Hero header ── */}
       <header className="wiki-hero">
         <p className="kicker">{typeLabel(page.page_type)}</p>
+        {page.channel?.logo_url && (
+          // Channel avatar (YouTube thumbnail / podcast cover art / etc.).
+          // Plain <img> rather than next/image since the YouTube CDN
+          // (yt3.ggpht.com) isn't pre-allowlisted.
+          <img
+            src={page.channel.logo_url}
+            alt=""
+            width={96}
+            height={96}
+            style={{
+              width: 96,
+              height: 96,
+              borderRadius: 12,
+              objectFit: "cover",
+              marginBottom: "0.75rem",
+              display: "block",
+            }}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+          />
+        )}
         <h1>{page.title}</h1>
         {page.summary && <p className="subtitle">{page.summary}</p>}
         <div className="wiki-hero-meta">

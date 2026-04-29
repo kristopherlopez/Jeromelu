@@ -1669,18 +1669,43 @@ function PageGrid({ pages }: { pages: WikiPageSummary[] }) {
           className="group block transition-colors"
           style={{ background: v.surface, padding: "1.4rem" }}
         >
-          <h3
-            className="group-hover:underline"
-            style={{
-              fontFamily: v.serif,
-              fontSize: "1.1rem",
-              fontWeight: 700,
-              color: v.ink,
-              marginBottom: "0.3rem",
-            }}
-          >
-            {page.title}
-          </h3>
+          <div className="flex items-start gap-3" style={{ marginBottom: "0.3rem" }}>
+            {page.logo_url && (
+              // Channel avatar (YouTube thumbnail / podcast cover art / etc.).
+              // Plain <img> rather than next/image since YouTube's CDN
+              // (yt3.ggpht.com) isn't pre-allowlisted and the perf cost is
+              // negligible for a 40px thumbnail in a list view.
+              <img
+                src={page.logo_url}
+                alt=""
+                width={40}
+                height={40}
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 6,
+                  flexShrink: 0,
+                  objectFit: "cover",
+                  background: v.border,
+                }}
+                loading="lazy"
+                referrerPolicy="no-referrer"
+              />
+            )}
+            <h3
+              className="group-hover:underline"
+              style={{
+                fontFamily: v.serif,
+                fontSize: "1.1rem",
+                fontWeight: 700,
+                color: v.ink,
+                marginBottom: 0,
+                flex: 1,
+              }}
+            >
+              {page.title}
+            </h3>
+          </div>
           {page.summary && (
             <p
               className="line-clamp-2"
