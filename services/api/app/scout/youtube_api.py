@@ -80,26 +80,47 @@ def _get(path: str, params: dict[str, Any]) -> dict[str, Any]:
 # search.list (100 units per call)
 # ---------------------------------------------------------------------------
 
+def _paginated_search(base_params: dict[str, Any], max_results: int) -> list[dict[str, Any]]:
+    """Loop search.list with nextPageToken until we have `max_results` items
+    or there are no more pages. Each page is one quota call (100 units)."""
+    target = max(min(max_results, 200), 1)  # hard cap at 200 to bound quota
+    items: list[dict[str, Any]] = []
+    page_token: str | None = None
+    while len(items) < target:
+        page_size = min(50, target - len(items))
+        params = {**base_params, "maxResults": page_size}
+        if page_token:
+            params["pageToken"] = page_token
+        raw = _get("search", params)
+        page_items = raw.get("items", [])
+        if not page_items:
+            break
+        items.extend(page_items)
+        page_token = raw.get("nextPageToken")
+        if not page_token:
+            break
+    return items
+
+
 def search_channels(
     query: str,
     max_results: int = 50,
     filter_known_external_ids: Iterable[str] | None = None,
 ) -> list[dict[str, Any]]:
-    """Channel search via Data API. Region-biased to AU."""
-    raw = _get(
-        "search",
+    """Channel search via Data API. Region-biased to AU. Up to 100 via pagination."""
+    raw_items = _paginated_search(
         {
             "part": "snippet",
             "q": query,
             "type": "channel",
-            "maxResults": min(max(max_results, 1), 50),
             "regionCode": "AU",
             "relevanceLanguage": "en",
         },
+        max_results,
     )
     known = set(filter_known_external_ids or [])
     out: list[dict[str, Any]] = []
-    for item in raw.get("items", []):
+    for item in raw_items:
         cid = item.get("snippet", {}).get("channelId") or item.get("id", {}).get("channelId")
         if not cid or cid in known:
             continue
@@ -119,21 +140,20 @@ def search_videos(
     published_after: str | None = None,
     filter_known_external_ids: Iterable[str] | None = None,
 ) -> list[dict[str, Any]]:
-    """Video search. `published_after` is RFC 3339 (e.g. '2026-04-01T00:00:00Z')."""
-    params: dict[str, Any] = {
+    """Video search. `published_after` is RFC 3339. Up to 100 via pagination."""
+    base: dict[str, Any] = {
         "part": "snippet",
         "q": query,
         "type": "video",
-        "maxResults": min(max(max_results, 1), 50),
         "regionCode": "AU",
         "relevanceLanguage": "en",
     }
     if published_after:
-        params["publishedAfter"] = published_after
-    raw = _get("search", params)
+        base["publishedAfter"] = published_after
+    raw_items = _paginated_search(base, max_results)
     known = set(filter_known_external_ids or [])
     out: list[dict[str, Any]] = []
-    for item in raw.get("items", []):
+    for item in raw_items:
         vid = item.get("id", {}).get("videoId")
         if not vid or vid in known:
             continue

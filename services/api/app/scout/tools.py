@@ -211,7 +211,7 @@ YOUTUBE_SEARCH_CHANNELS_TOOL: dict[str, Any] = {
             },
             "max_results": {
                 "type": "integer",
-                "description": "How many channels to return (1-50, default 10).",
+                "description": "How many channels to return (1-200, default 50). >50 paginates server-side.",
             },
         },
         "required": ["query"],
@@ -233,7 +233,7 @@ YOUTUBE_SEARCH_VIDEOS_TOOL: dict[str, Any] = {
             "query": {"type": "string"},
             "max_results": {
                 "type": "integer",
-                "description": "1-50, default 10.",
+                "description": "1-200, default 50. >50 paginates server-side.",
             },
             "published_after": {
                 "type": "string",
