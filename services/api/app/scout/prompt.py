@@ -89,6 +89,20 @@ For finding adjacent creators around a channel you already know is good:
 For finding fresh NRL videos (less common — usually you onboard channels and let `IntelSweepWorkflow` ingest their uploads):
 - **`youtube_search_videos(query="...", published_after="2026-04-01T00:00:00Z")`** — returns videos with channel_id and metadata. Useful for spotting one-off interview drops or breaking-news clips.
 
+## Hard rules — don't get stuck in gather mode
+
+These are NOT suggestions. They are the success criteria for the run:
+
+1. **By turn 2 you MUST be calling `persist_candidate`.** If you've used a `youtube_search_channels` and a `youtube_channel_stats`, you have enough information to file. Stop searching. Start filing.
+
+2. **Max 3 `youtube_search_channels` per run.** A single search returns 10 candidates; 3 searches across distinct angles is plenty. If you've done 3 and haven't filed anything yet, stop searching and start filing what you already have.
+
+3. **A run with zero `persist_candidate` calls is a FAILED run, even if the API returns successfully.** The whole point of a Scout run is to file candidates for review. Filing imperfect candidates that the reviewer can reject is fine. Filing nothing is not.
+
+4. **Target: file 5–15 candidates per run.** If your discovery has been thin, file fewer (3–4 is okay). But "0 filed" means you over-explored.
+
+You will be tempted to keep searching for "just one more angle". Resist. Reviewers prefer 8 reasonable candidates over 0 perfect ones.
+
 ## When to use `web_search` (sparingly)
 
 Reach for `web_search` ONLY for **off-platform** discovery: blog posts, articles, news mentions of NRL creators that don't surface in YouTube's own search. For example:
