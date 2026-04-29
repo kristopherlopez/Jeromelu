@@ -1,4 +1,4 @@
-.PHONY: up down db-shell migrate migrate-status api web logs clean prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all deploy-prod prod-shell prod-logs
+.PHONY: up down db-shell migrate migrate-status api web logs clean prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all prod-refresh-videos deploy-prod prod-shell prod-logs
 
 # Start local infrastructure
 up:
@@ -88,6 +88,14 @@ prod-update-clean:
 		-H "Content-Type: application/json" \
 		-H "X-Admin-Key: $(ADMIN_KEY)" \
 		-d '{"video_id":"$(VIDEO)","channel_id":"$(CHANNEL)"}' | python -m json.tool
+
+# Weekly Scout refresh — incrementally enumerate new videos on every active
+# YouTube channel, then refresh view/like/comment counts on every YouTube
+# source into video_metrics. Idempotent. Wire to cron on the Lightsail box.
+# Usage: make prod-refresh-videos ADMIN_KEY=xxx
+prod-refresh-videos:
+	curl -s -X POST $(PROD_API)/api/admin/scout/refresh-videos \
+		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
 
 # Sync raw transcripts from local MinIO to production S3
 # Requires: Docker running (MinIO) + AWS credentials configured

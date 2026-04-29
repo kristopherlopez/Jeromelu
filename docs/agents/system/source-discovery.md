@@ -5,9 +5,11 @@
 | **Package** | `services/api/app/scout/` |
 | **Trigger** | Manual CLI for now (`python -m app.scout.cli`); admin endpoint + cron later |
 | **Crew counterpart** | [Scout](../crew/scout.md) — this is Scout's source-discovery mode |
-| **Status** | Slice 1 — discovery + persistence (no admin UI / live recon UI yet) |
+| **Status** | Slice 2 — discovery + admin recon API + post-approval video enumeration |
 
 Scout's "find new sources" job. An autonomous Anthropic agent that hunts the web for NRL YouTube channels and videos, scores them, and files them to `discovered_sources` for human review. **Not Temporal-based** — runs in-process, see [project-temporal-not-in-prod note](../../operations/aws-resource-inventory.md).
+
+Approval of a channel candidate triggers deterministic post-processing: the channel's full uploads playlist is enumerated and each video is inserted as a `sources` row, with an initial popularity snapshot in `video_metrics`. A weekly refresh job re-walks each channel for new uploads and re-snapshots view/like/comment counts so we can rank videos by influence and detect breakouts. See [§ Post-approval video enumeration](#post-approval-video-enumeration) below.
 
 ---
 
@@ -44,7 +46,12 @@ ANTHROPIC_API_KEY
 | `app/scout/tools.py` | Anthropic tool definitions + Python handlers (`dedupe_check`, `persist_candidate`) |
 | `app/scout/loop.py` | Multi-turn streaming loop with bounds (turns, tool calls, wall-clock, USD budget) |
 | `app/scout/cli.py` | `python -m app.scout.cli` entry point |
+| `app/scout/youtube_api.py` | YouTube Data API v3 client (search, channel stats, playlist enumeration, video stats) |
+| `app/scout/refresh.py` | Post-approval video enumeration + weekly stats refresh (deterministic, not agent-driven) |
+| `app/routers/recon.py` | Admin recon endpoints (list/approve/reject candidates) + the weekly refresh entry point |
 | `packages/db/migrations/017_discovered_sources.sql` | Candidate inbox table |
+| `packages/db/migrations/023_channel_metrics.sql` | Time-series channel popularity (subs/views/videos) |
+| `packages/db/migrations/024_video_metrics.sql` | Time-series video popularity (views/likes/comments) |
 
 ## Tool palette
 
@@ -277,14 +284,101 @@ WHERE status='pending'
 ORDER BY score DESC NULLS LAST, discovered_at DESC;
 ```
 
-## What's not in Slice 1
+## Post-approval video enumeration
 
-- Admin review queue UI (`/admin/recon`) — Slice 2
+When a channel candidate is approved, the recon endpoint commits the `channels`
+row, then synchronously calls `refresh_channel_videos(channel, full_backfill=True)`.
+This:
+
+1. Walks the channel's auto-generated **uploads playlist** (`UU` + last 22 chars
+   of the `UC...` channel id) via `playlistItems.list`. Newest first, capped at
+   200 by default. Cheap — 1 quota unit per page of 50.
+2. Inserts each video as a `sources` row (`source_type='youtube'`,
+   `approved_flag=true` since the parent channel is already approved,
+   `ingestion_status='pending'`). Idempotent on `canonical_url`.
+3. Calls `videos.list?part=statistics,contentDetails` (1 unit per 50 ids) and
+   writes one `video_metrics` row per newly-inserted video as the
+   discovery-time snapshot.
+
+If the YouTube API call fails the approval still commits — the channel is in
+the canonical tables, and the admin can re-trigger enumeration via the weekly
+refresh endpoint (below).
+
+## Weekly video refresh
+
+A single admin endpoint runs both the incremental enumerate and the stats
+refresh:
+
+```
+POST /api/admin/scout/refresh-videos
+  ?skip_stats=true        # enumerate only
+  ?skip_enumerate=true    # stats only
+  Header: X-Admin-Key
+```
+
+The job is idempotent and does two things:
+
+1. **Incremental enumerate** (`refresh_all_channels_incremental`) — for every
+   `channel` where `platform='youtube'` and `active=true`, find the most
+   recent already-known `sources.canonical_url`, extract its `video_id`, and
+   pass that as the `after_video_id` cursor to `playlistItems.list`. The
+   walker stops as soon as it sees the cursor, so most weeks this is one API
+   page (1 quota unit) and zero new videos per channel.
+2. **Stats refresh** (`refresh_all_video_stats`) — pulls every YouTube source,
+   batches `videos.list` 50 ids at a time, and appends one `video_metrics`
+   row per video. ~1 quota unit per 50 videos. ~150 channels × ~200 videos =
+   ~600 quota units per pass.
+
+Total weekly quota cost: ~750 units against a 10,000-unit daily free tier.
+
+Cron suggestion (Lightsail box, weekly Monday 09:00 AET):
+
+```
+0 9 * * 1 curl -s -X POST https://api.jeromelu.ai/api/admin/scout/refresh-videos \
+            -H "X-Admin-Key: $ADMIN_KEY" >/dev/null
+```
+
+## Influence ranking
+
+Once `video_metrics` has 2+ samples per video you can compute view-velocity:
+
+```sql
+-- Videos by week-over-week view delta, top 50
+WITH latest AS (
+  SELECT source_id, sampled_at, (metrics->>'views')::bigint AS views
+  FROM video_latest_metrics
+),
+prior AS (
+  SELECT DISTINCT ON (source_id)
+    source_id,
+    (metrics->>'views')::bigint AS views_prior
+  FROM video_metrics
+  WHERE sampled_at < now() - interval '5 days'
+  ORDER BY source_id, sampled_at DESC
+)
+SELECT
+  s.title,
+  c.name AS channel_name,
+  l.views AS views_now,
+  l.views - COALESCE(p.views_prior, 0) AS view_delta_week,
+  s.canonical_url
+FROM latest l
+JOIN sources s ON s.source_id = l.source_id
+LEFT JOIN channels c ON c.channel_id = s.channel_id
+LEFT JOIN prior p ON p.source_id = l.source_id
+ORDER BY view_delta_week DESC NULLS LAST
+LIMIT 50;
+```
+
+## What's not in Slice 2
+
+- Admin review queue UI (`/admin/recon`) — backend endpoints exist; UI pending
 - Live Recon stream in `/pulse` (SSE) — Slice 3
-- Scheduled runs (cron / APScheduler) — Slice 4
-- `crew_activity` rows for run summaries — TBD when admin UI needs them
+- Scheduled Scout runs (cron / APScheduler) — Slice 4
 - `Event` rows for the agent's reasoning trace — TBD when the live stream lands
-- Promotion endpoint (approve a candidate → write `Channel`/`Source` row) — Slice 2
+- Transcript-ingestion automation for newly-enumerated videos — videos land
+  in `sources` with `ingestion_status='pending'`; the existing
+  `make prod-ingest` flow still expects manual triggering per video
 
 ## Future improvements — Tier 2 and Tier 3
 

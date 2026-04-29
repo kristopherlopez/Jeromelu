@@ -27,6 +27,7 @@ from jeromelu_shared.db.models import (
     DiscoveredSource,
     AgentEvent,
     ChannelMetric,
+    VideoMetric,
 )
 
 __all__ = [
@@ -60,4 +61,5 @@ __all__ = [
     "DiscoveredSource",
     "AgentEvent",
     "ChannelMetric",
+    "VideoMetric",
 ]
