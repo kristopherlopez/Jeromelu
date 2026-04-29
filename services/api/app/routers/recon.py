@@ -1,0 +1,365 @@
+"""Admin endpoints for reviewing and promoting Scout's discovered candidates.
+
+Workflow:
+  Scout fills `discovered_sources` (status='pending').
+  Reviewer hits these endpoints to approve / reject candidates.
+  Approval promotes a row into the canonical tables:
+    - kind='channel' → INSERT channels row + INSERT channel-type wiki_pages row
+    - kind='video'   → INSERT sources row (channel_id linked to parent if known)
+
+All approve/reject ops are transactional. Idempotent on re-approval (already-
+approved rows stay approved without crashing).
+
+Auth: same X-Admin-Key header pattern as the rest of /admin/*.
+"""
+
+from __future__ import annotations
+
+import re
+from datetime import datetime, timezone
+from typing import Any
+from uuid import UUID
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.orm import Session
+
+from jeromelu_shared.db import Channel, DiscoveredSource, Source, WikiPage
+
+from ..deps import get_db
+from .admin import require_admin
+
+router = APIRouter()
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+_SLUG_STRIP = re.compile(r"[^a-z0-9]+")
+
+
+def _slugify(name: str) -> str:
+    """Lowercase, hyphen-separated, alphanumeric only. Falls back to 'channel'."""
+    base = _SLUG_STRIP.sub("-", (name or "").lower()).strip("-")
+    return base or "channel"
+
+
+def _unique_slug(session: Session, model, slug_col, base: str) -> str:
+    """Return `base`, or `base-2`, `base-3`, ... such that nothing matches."""
+    candidate = base
+    n = 2
+    while session.execute(select(slug_col).where(slug_col == candidate)).first():
+        candidate = f"{base}-{n}"
+        n += 1
+    return candidate
+
+
+def _channel_wiki_content(name: str, description: str | None, tags: list[str]) -> str:
+    """Stub content matching the shape of migration 019's backfill."""
+    desc = description or ""
+    tag_str = ", ".join(tags) if tags else "_(none)_"
+    return (
+        "## About\n\n"
+        f"{desc}\n\n"
+        "## Recent Sources\n\n_None yet._\n\n"
+        "## Coverage\n\n"
+        f"Tags: {tag_str}\n\n"
+        "## Hosts\n\n_Hosts will be linked once advisor pages exist._"
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET — list candidates
+# ---------------------------------------------------------------------------
+
+@router.get("/admin/recon/candidates", dependencies=[Depends(require_admin)])
+def list_candidates(
+    status: str | None = Query(default="pending"),
+    kind: str | None = Query(default=None),
+    min_score: float | None = Query(default=None),
+    limit: int = Query(default=50, le=500),
+    db: Session = Depends(get_db),
+):
+    """List discovered candidates, default to status=pending."""
+    q = db.query(DiscoveredSource)
+    if status:
+        q = q.filter(DiscoveredSource.status == status)
+    if kind:
+        q = q.filter(DiscoveredSource.kind == kind)
+    if min_score is not None:
+        q = q.filter(DiscoveredSource.score >= min_score)
+    rows = q.order_by(
+        DiscoveredSource.score.desc().nullslast(),
+        DiscoveredSource.discovered_at.desc(),
+    ).limit(limit).all()
+    return {
+        "count": len(rows),
+        "candidates": [
+            {
+                "id": str(r.id),
+                "kind": r.kind,
+                "platform": r.platform,
+                "external_id": r.external_id,
+                "url": r.url,
+                "title": r.title,
+                "description": r.description,
+                "channel_external_id": r.channel_external_id,
+                "content_categories": r.content_categories,
+                "score": float(r.score) if r.score is not None else None,
+                "score_reasons": r.score_reasons,
+                "discovered_via": r.discovered_via,
+                "discovered_at": r.discovered_at.isoformat(),
+                "status": r.status,
+                "run_id": r.run_id,
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.get(
+    "/admin/recon/candidates/{candidate_id}", dependencies=[Depends(require_admin)]
+)
+def get_candidate(candidate_id: UUID, db: Session = Depends(get_db)):
+    row = db.get(DiscoveredSource, candidate_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    return {
+        "id": str(row.id),
+        "kind": row.kind,
+        "platform": row.platform,
+        "external_id": row.external_id,
+        "url": row.url,
+        "title": row.title,
+        "description": row.description,
+        "channel_external_id": row.channel_external_id,
+        "content_categories": row.content_categories,
+        "score": float(row.score) if row.score is not None else None,
+        "score_reasons": row.score_reasons,
+        "metadata_json": row.metadata_json,
+        "discovered_via": row.discovered_via,
+        "discovered_at": row.discovered_at.isoformat(),
+        "status": row.status,
+        "reviewed_at": row.reviewed_at.isoformat() if row.reviewed_at else None,
+        "reviewed_by": row.reviewed_by,
+        "reviewed_note": row.reviewed_note,
+        "promoted_channel_id": (
+            str(row.promoted_channel_id) if row.promoted_channel_id else None
+        ),
+        "run_id": row.run_id,
+    }
+
+
+# ---------------------------------------------------------------------------
+# POST — approve
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/admin/recon/candidates/{candidate_id}/approve",
+    dependencies=[Depends(require_admin)],
+)
+def approve_candidate(
+    candidate_id: UUID,
+    body: dict[str, Any] = Body(default_factory=dict),
+    db: Session = Depends(get_db),
+):
+    """Promote a discovered_sources row into the canonical tables.
+
+    For kind='channel': insert into channels + wiki_pages.
+    For kind='video':   insert into sources.
+
+    Idempotent — re-approving an already-approved row is a no-op.
+    """
+    row = db.get(DiscoveredSource, candidate_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+
+    if row.status == "approved" and row.promoted_channel_id:
+        return {
+            "ok": True,
+            "status": "already_approved",
+            "candidate_id": str(row.id),
+            "promoted_channel_id": str(row.promoted_channel_id),
+        }
+
+    reviewed_by = body.get("reviewed_by") or "admin"
+    note = body.get("note")
+
+    if row.kind == "channel":
+        # Promote channel: upsert channels row + create channel-type wiki page
+        slug_base = _slugify(row.title)
+        slug = _unique_slug(db, Channel, Channel.slug, slug_base)
+        ch_stmt = (
+            pg_insert(Channel)
+            .values(
+                slug=slug,
+                platform=row.platform,
+                external_id=row.external_id,
+                name=row.title,
+                url=row.url,
+                description=row.description,
+                quality_rating=int(round((row.score or 0.5) * 10)),
+                tags=row.content_categories or [],
+                active=True,
+            )
+            .on_conflict_do_nothing(index_elements=["platform", "external_id"])
+            .returning(Channel.channel_id)
+        )
+        result = db.execute(ch_stmt).first()
+        if result is None:
+            # Channel already existed under this (platform, external_id)
+            existing = db.execute(
+                select(Channel.channel_id).where(
+                    Channel.platform == row.platform,
+                    Channel.external_id == row.external_id,
+                )
+            ).first()
+            channel_id = existing[0] if existing else None
+        else:
+            channel_id = result[0]
+
+        # Wiki page (one per channel) — idempotent on (channel_id)
+        if channel_id:
+            existing_wp = db.execute(
+                select(WikiPage.page_id).where(WikiPage.channel_id == channel_id)
+            ).first()
+            if not existing_wp:
+                wiki_slug = _unique_slug(db, WikiPage, WikiPage.slug, slug_base)
+                content = _channel_wiki_content(
+                    row.title, row.description, row.content_categories or []
+                )
+                summary = (row.description or row.title)[:280]
+                metadata = {
+                    "platform": row.platform,
+                    "url": row.url,
+                    "quality_rating": int(round((row.score or 0.5) * 10)),
+                    "tags": row.content_categories or [],
+                }
+                db.add(
+                    WikiPage(
+                        entity_id=None,
+                        channel_id=channel_id,
+                        page_type="channel",
+                        slug=wiki_slug,
+                        title=row.title,
+                        content=content,
+                        summary=summary,
+                        metadata_json=metadata,
+                        status="stub",
+                    )
+                )
+
+        row.status = "approved"
+        row.reviewed_at = datetime.now(timezone.utc)
+        row.reviewed_by = reviewed_by
+        row.reviewed_note = note
+        row.promoted_channel_id = channel_id
+        db.commit()
+
+        return {
+            "ok": True,
+            "status": "approved",
+            "candidate_id": str(row.id),
+            "promoted_channel_id": str(channel_id) if channel_id else None,
+            "wiki_page_created": channel_id is not None,
+        }
+
+    elif row.kind == "video":
+        # Promote video: insert into sources. Try to link channel_id by parent.
+        parent_channel_id = None
+        if row.channel_external_id:
+            parent = db.execute(
+                select(Channel.channel_id).where(
+                    Channel.platform == row.platform,
+                    Channel.external_id == row.channel_external_id,
+                )
+            ).first()
+            if parent:
+                parent_channel_id = parent[0]
+
+        src_stmt = (
+            pg_insert(Source)
+            .values(
+                channel_id=parent_channel_id,
+                source_type="youtube",
+                title=row.title,
+                creator_name=None,
+                canonical_url=row.url,
+                approved_flag=True,
+                ingestion_status="pending",
+            )
+            .on_conflict_do_nothing(index_elements=["canonical_url"])
+            .returning(Source.source_id)
+        )
+        src_result = db.execute(src_stmt).first()
+        source_id = src_result[0] if src_result else None
+
+        row.status = "approved"
+        row.reviewed_at = datetime.now(timezone.utc)
+        row.reviewed_by = reviewed_by
+        row.reviewed_note = note
+        db.commit()
+
+        return {
+            "ok": True,
+            "status": "approved",
+            "candidate_id": str(row.id),
+            "promoted_source_id": str(source_id) if source_id else None,
+            "linked_channel_id": (
+                str(parent_channel_id) if parent_channel_id else None
+            ),
+        }
+
+    else:
+        raise HTTPException(
+            status_code=400, detail=f"Unsupported candidate kind: {row.kind}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# POST — reject
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/admin/recon/candidates/{candidate_id}/reject",
+    dependencies=[Depends(require_admin)],
+)
+def reject_candidate(
+    candidate_id: UUID,
+    body: dict[str, Any] = Body(default_factory=dict),
+    db: Session = Depends(get_db),
+):
+    row = db.get(DiscoveredSource, candidate_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+
+    row.status = "rejected"
+    row.reviewed_at = datetime.now(timezone.utc)
+    row.reviewed_by = body.get("reviewed_by") or "admin"
+    row.reviewed_note = body.get("note")
+    db.commit()
+
+    return {
+        "ok": True,
+        "status": "rejected",
+        "candidate_id": str(row.id),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Small stats helper for sanity checks
+# ---------------------------------------------------------------------------
+
+@router.get("/admin/recon/stats", dependencies=[Depends(require_admin)])
+def stats(db: Session = Depends(get_db)):
+    rows = (
+        db.query(DiscoveredSource.status, DiscoveredSource.kind, func.count())
+        .group_by(DiscoveredSource.status, DiscoveredSource.kind)
+        .all()
+    )
+    by_status: dict[str, dict[str, int]] = {}
+    for status, kind, n in rows:
+        by_status.setdefault(status, {})[kind] = n
+    return {"by_status": by_status}
