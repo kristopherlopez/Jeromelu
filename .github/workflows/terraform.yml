@@ -70,7 +70,10 @@ jobs:
 
       - name: terraform plan
         id: plan
-        run: terraform plan -no-color -lock-timeout=300s -input=false
+        # -lock=false: ReadOnlyAccess can't write the S3 lockfile. Plan is
+        # read-only against state, so concurrent plans don't corrupt anything.
+        # Local apply (with admin creds) still locks normally.
+        run: terraform plan -no-color -lock=false -input=false
         continue-on-error: true
 
       - name: Comment plan on PR
