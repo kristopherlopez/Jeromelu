@@ -280,15 +280,20 @@ Set on `kristopherlopez/Jeromelu`:
 
 Pre-existing non-secret parameters from V0 retained: `/jeromelu/env`, `/jeromelu/region`, `/jeromelu/db-name`, `/jeromelu/s3-{raw,clean,assets}-bucket`, `/jeromelu/feature/{chat-enabled,contrarian-mode,publishing-paused}`.
 
-### 11.4 — RDS Final Snapshot (COMPLETE 2026-04-25)
+### 11.4 — RDS Final Snapshot (COMPLETE 2026-04-25 — **DELETED 2026-04-30**)
+
+> Deleted ahead of the original 30-day retention. Row-count parity across
+> all 16 tables was verified at cutover and the V1 stack served real traffic
+> for 5 clean days; the marginal recovery value of the snapshot was below
+> the storage cost. Nightly `pg_dump` to S3 remains the active backup.
 
 | Resource | Value |
 |----------|-------|
-| Snapshot ID | `jeromelu-db-pre-lightsail-2026-04-25` |
+| Snapshot ID | `jeromelu-db-pre-lightsail-2026-04-25` — **DELETED 2026-04-30** |
 | Source instance | `jeromelu-db` |
-| Status | available, 100% progress, 20 GB |
+| Status | available, 100% progress, 20 GB (at time of deletion) |
 | Tags | `purpose=pre-lightsail-cutover`, `retain_until=2026-05-25` |
-| Retain until | 2026-05-25 (30 days post-cutover) |
+| Retained for | 5 days post-cutover (originally planned 30) |
 
 ### 11.4.1 — DB Migration Verification (COMPLETE 2026-04-25)
 
