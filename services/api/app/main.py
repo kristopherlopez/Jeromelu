@@ -6,6 +6,7 @@ from .routers.ask import router as ask_router
 from .routers.crew import router as crew_router
 from .routers.feed import router as feed_router
 from .routers.insights import router as insights_router
+from .routers.players import router as players_router
 from .routers.recon import router as recon_router
 from .routers.sources import router as sources_router
 from .routers.squad import router as squad_router
@@ -27,6 +28,7 @@ app.include_router(ask_router, prefix="/api")
 app.include_router(crew_router, prefix="/api")
 app.include_router(feed_router, prefix="/api")
 app.include_router(insights_router, prefix="/api")
+app.include_router(players_router, prefix="/api")
 app.include_router(recon_router, prefix="/api")
 app.include_router(squad_router, prefix="/api")
 app.include_router(wiki_router, prefix="/api")

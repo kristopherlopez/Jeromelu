@@ -177,14 +177,22 @@ temporal queries we need without disturbing the rest of the system.
 ## Convention for new SCD-2 child tables
 
 `entity_roles` follows the same shape as
-[`player_team_history`](../../packages/db/migrations/005_add_player_team_history.sql):
+[`player_attributes`](../../packages/db/migrations/027_consolidate_player_scd.sql):
 `effective_from` / `effective_to` / `is_primary` (or `is_current`) /
 `metadata_json` / `source`. Future temporal tables (e.g. coach-club tenure,
 commentator-network tenure) should follow the same shape.
 
-When a third such table is added, revisit and consider unifying into a generic
-`entity_affiliations` table. Two specialised tables is fine; three is the
-trigger to consolidate.
+We are currently at **two** specialised SCD-2 tables — `entity_roles`
+(cross-entity-type role tenure) and `player_attributes` (player-specific
+slow-changing facts: team, position, height/weight, contract).
+`player_team_history` (migration 005) was an earlier specialisation that
+has been absorbed into `player_attributes` (migration 027) — same SCD-2
+shape, broader scope, FK-linked to `entities` and `teams` rather than
+loose text.
+
+When a third specialised table is added, revisit and consider unifying
+into a generic `entity_affiliations` table. Two specialised tables is fine;
+three is the trigger to consolidate.
 
 ---
 
@@ -219,4 +227,4 @@ channel ↔ advisor links populate.
 - [Information architecture](../architecture/04-information-architecture.md) — full data model
 - `packages/db/migrations/018_entity_roles.sql` — entity_roles schema
 - `packages/db/migrations/019_wiki_channels.sql` — channel wiki pages
-- `packages/db/migrations/005_add_player_team_history.sql` — sibling SCD-2 table
+- `packages/db/migrations/027_consolidate_player_scd.sql` — sibling SCD-2 table (player_attributes; absorbs the deprecated player_team_history)

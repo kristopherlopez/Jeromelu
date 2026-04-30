@@ -41,7 +41,7 @@ Entity (player, team, expert/advisor, matchup, round)
 Derived / downstream:
 KnowledgeBase (distilled entries embedded for RAG; includes analysis articles)
 PlayerRound ─── standalone scraped stats per player/round/season
-PlayerTeamHistory ─── SCD Type 2 player-team assignments
+PlayerAttributes ─── SCD-2 of slow-changing player facts (team, position, height/weight, contract)
 Plan ─── standalone strategy documents per round
 ```
 
@@ -456,27 +456,73 @@ Per-player performance stats for each round/season. Scraped from external source
 
 ---
 
-### player_team_history
+### teams
 
-SCD Type 2 table tracking which team a player belongs to over time.
+Canonical roster of every team across all grades feeding into NRL — NRL,
+NRLW, NSW Cup, QLD Cup (Hostplus Cup), and the junior pathway grades
+(Jersey Flegg, Mal Meninga, SG Ball, Cyril Connell, Harold Matthews —
+schema-allowed; not yet seeded). `parent_team_id` self-references to link
+a feeder team to its senior NRL/NRLW side; `entity_id` links senior rows
+to the canonical `entities` row so claims/predictions/wiki pages tie back
+without duplication. Feeder grades typically inherit identity via
+`parent_team_id` and leave `entity_id` NULL.
+
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| team_id | UUID | PK | uuid4 | |
+| slug | text | no | | UNIQUE; e.g. `brisbane_broncos`, `norths_devils`, `brisbane_broncos_nrlw` |
+| name | text | no | | Full team name |
+| short_name | text | yes | | e.g. `Broncos` |
+| aliases | text[] | no | `{}` | Lower-grade rows may be empty |
+| grade | text | no | | `nrl`, `nrlw`, `nsw_cup`, `qld_cup`, `jersey_flegg`, `mal_meninga`, `sg_ball`, `cyril_connell`, `harold_matthews` |
+| competition | text | yes | | e.g. `NRL Premiership`, `NSW Cup` |
+| parent_team_id | UUID | yes | | FK → teams (senior team this feeds into; NULL for top grades) |
+| entity_id | UUID | yes | | UNIQUE; FK → entities; populated for NRL/NRLW rows |
+| metadata_json | jsonb | no | {} | |
+| active | bool | no | true | |
+| created_at | timestamptz | no | now() | |
+| updated_at | timestamptz | no | now() | Auto-updates |
+
+**Unique:** slug, entity_id
+**Indexes:** grade, parent_team_id, entity_id, active
+**FK:** parent_team_id → teams (ON DELETE SET NULL); entity_id → entities (ON DELETE SET NULL)
+
+Seeded from `data/teams.yaml` via `make seed-teams` (script: `scripts/data/seed_teams.py`). Idempotent.
+
+---
+
+### player_attributes
+
+SCD Type 2 of slow-changing player facts. Replaces `player_team_history`
+(dropped in migration 027). Holds team affiliation, primary position,
+height/weight and contract info on one row per current state — closed and
+reopened on change. Lifetime constants (dob, debut date) live on
+`entities.metadata_json`; per-round facts (price, breakeven, score, jersey,
+grade) live on `player_rounds`.
 
 | Column | Type | Nullable | Default | Notes |
 |--------|------|----------|---------|-------|
 | id | UUID | PK | uuid4 | |
-| player_name | text | no | | |
-| team_key | text | no | | Short team identifier |
-| team_name | text | no | | Full team name |
-| position | text | yes | | |
-| player_id | int | yes | | External player ID |
-| effective_from | date | no | | Start of assignment |
-| effective_to | date | yes | | End of assignment (null = current) |
+| entity_id | UUID | no | | FK → entities (ON DELETE CASCADE) |
+| team_id | UUID | yes | | FK → teams (ON DELETE SET NULL); parent NRL/NRLW row even when player is on a feeder grade |
+| primary_position | text | yes | | SC position string (FRF, HOK, HFB, ...) |
+| height_cm | int | yes | | |
+| weight_kg | int | yes | | |
+| contract_until | date | yes | | Real-world contract end |
+| real_salary_aud | int | yes | | Reserved for future feed; NULL today |
+| metadata_json | jsonb | no | `{}` | secondary_positions, captain, status='retired', supercoach_id mirror |
+| effective_from | date | no | | Start of this state |
+| effective_to | date | yes | | End of state (NULL = current) |
 | is_current | bool | no | true | |
-| source | text | no | `seed` | How the record was created |
+| source | text | no | `seed` | `supercoach`, `nrl_com`, `nswrl_com`, `qrl_com`, `seed`, ... |
 | created_at | timestamptz | no | now() | |
-| updated_at | timestamptz | no | now() | Auto-updates on change |
+| updated_at | timestamptz | no | now() | |
 
-**Unique:** (player_name, effective_from)
-**Indexes:** (player_name, is_current), (team_key, is_current), player_id
+**Indexes:** (entity_id, is_current), (team_id, is_current)
+**Unique partial index:** entity_id WHERE is_current — exactly one current row per entity
+**Check:** `effective_to IS NULL OR effective_to >= effective_from`
+
+Populated via the player-roster admin endpoints — see [player roster](../agents/system/player-roster.md). Local dev seed: `make seed-players` (after `make seed-teams`).
 
 ---
 
@@ -632,6 +678,7 @@ Originally designed for the retired "My Squad" page. Tables remain in the schema
 | channel.platform | `youtube`, `podcast`, `website`, `twitter`, `instagram` |
 | source.source_type | `youtube`, `podcast`, `web`, `radio`, `manual` |
 | entity.entity_type | `player`, `team`, `expert`, `advisor`, `matchup`, `round` |
+| teams.grade | `nrl`, `nrlw`, `nsw_cup`, `qld_cup`, `jersey_flegg`, `mal_meninga`, `sg_ball`, `cyril_connell`, `harold_matthews` |
 | claim.claim_type | `buy`, `sell`, `hold`, `captain`, `avoid`, `breakout`, `matchup_edge` |
 | decision.decision_type | `trade`, `captain`, `start_sit`, `squad_structure`, `article_topic`, `reply` |
 | event.display_mode | `thought`, `action`, `system`, `prediction`, `review`, `wiki_update` |
@@ -664,5 +711,7 @@ Originally designed for the retired "My Squad" page. Tables remain in the schema
 | 009 | `009_chunk_raw_clean_text.sql` | Rename text → raw_text, add clean_text to source_chunks |
 | 010+ | (verify actual migration filenames) | knowledge_base table, remarks + remark_reactions, alignment_scores, squad_slots + squad_trades (now deprecated) |
 | 015 | `015_wiki.sql` | wiki_pages + wiki_revisions tables |
+| 026 | `026_teams.sql` | teams table — canonical roster across all NRL pathway grades + NRLW |
+| 027 | `027_consolidate_player_scd.sql` | Add player_attributes (SCD-2) with team_id FK to teams; drop player_team_history |
 
 > The migrations list above drifts — verify against `packages/db/migrations/` for authoritative state. Whenever a new migration lands, update this table + the relevant table section + the lineage diagram.

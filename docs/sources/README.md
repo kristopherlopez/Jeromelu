@@ -75,6 +75,23 @@ Three problems this system needs to solve:
 
 ---
 
+## Roster ingestion (non-claim source)
+
+Not every source produces claims. The **player roster** ingestion pipeline
+populates `entities` + `player_attributes` (the SCD-2 of slow-changing
+player facts) directly from the SuperCoach `players-cf` API, and is
+refreshed weekly during season to pick up team / position changes. It
+runs alongside the claim pipeline above but doesn't go through cleaning
+or extraction — the JSON is structured already.
+
+See [`agents/system/player-roster.md`](../agents/system/player-roster.md)
+for the regime split (lifetime constants → `entities.metadata_json`,
+slow-changing → `player_attributes`, per-round → `player_rounds`), the
+SCD-2 transition pattern, and the v2 expansion to NRL.com / NSWRL / QRL
+as additional sources.
+
+---
+
 ## Related
 
 - [Wiki content pipeline](../pages/wiki/content-pipeline.md) — how wiki pages consume sources (downstream of this folder)

@@ -97,6 +97,25 @@ Internal only:
 - slug
 - metadata_json
 
+### teams
+Canonical roster of every team across all grades feeding into NRL plus NRLW.
+Covers NRL, NRLW, NSW Cup, QLD Cup (Hostplus Cup), Jersey Flegg, Mal Meninga,
+SG Ball, Cyril Connell, Harold Matthews. `parent_team_id` self-references
+to wire a feeder team to its senior NRL/NRLW side; `entity_id` links senior
+rows back into the canonical entities table so claims and predictions don't
+duplicate identity.
+- team_id
+- slug (UNIQUE; e.g. `brisbane_broncos`, `norths_devils`, `brisbane_broncos_nrlw`)
+- name, short_name, aliases
+- grade (nrl, nrlw, nsw_cup, qld_cup, jersey_flegg, mal_meninga, sg_ball, cyril_connell, harold_matthews)
+- competition (display string — NRL Premiership, NSW Cup, ...)
+- parent_team_id (FK → teams, NULL for top grades)
+- entity_id (FK → entities, UNIQUE, populated for NRL/NRLW rows)
+
+Seeded from `data/teams.yaml` via `make seed-teams`. Junior pathway grades
+are schema-allowed but not seeded yet — populate when current-season comp
+lineups are confirmed.
+
 ### entity_roles (SCD-2)
 Tracks role tenure so a single entity can carry multiple sequential or concurrent roles
 (e.g. Andrew Johns: player → commentator; Michael Ennis: coach + commentator).

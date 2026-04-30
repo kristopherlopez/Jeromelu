@@ -1,4 +1,4 @@
-.PHONY: up down db-shell migrate migrate-status api web logs clean prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all prod-refresh-videos deploy-prod prod-shell prod-logs
+.PHONY: up down db-shell migrate migrate-status seed-teams seed-players api web logs clean prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all prod-refresh-videos prod-seed-players prod-refresh-players deploy-prod prod-shell prod-logs
 
 # Start local infrastructure
 up:
@@ -15,6 +15,18 @@ migrate:
 # Show migration status (applied vs pending)
 migrate-status:
 	bash packages/db/migrate.sh --status
+
+# Seed the teams table from data/teams.yaml (NRL + reserve grades + NRLW).
+# Idempotent — safe to re-run.
+seed-teams:
+	python scripts/data/seed_teams.py
+
+# Seed entities + player_attributes locally from a SC roster JSON dump.
+# Reads scripts/data/scraped_players_api_raw.json (or the file passed as
+# the first arg). Requires teams to be seeded first.
+# Usage: make seed-players
+seed-players:
+	python scripts/data/seed_players_prod.py
 
 # Open database shell
 db-shell:
@@ -96,6 +108,28 @@ prod-update-clean:
 prod-refresh-videos:
 	curl -s -X POST $(PROD_API)/api/admin/scout/refresh-videos \
 		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
+
+# First-run prod player seed — POSTs the SC roster JSON to the admin
+# endpoint. Idempotent: existing player_attributes rows are left alone.
+# Requires teams already seeded in prod (run `make seed-teams` against the
+# prod DB once before this).
+# Usage: make prod-seed-players ADMIN_KEY=xxx [ROSTER_FILE=path/to/roster.json]
+ROSTER_FILE ?= scripts/data/scraped_players_api_raw.json
+prod-seed-players:
+	curl -s -X POST $(PROD_API)/api/admin/players/seed \
+		-H "Content-Type: application/json" \
+		-H "X-Admin-Key: $(ADMIN_KEY)" \
+		--data-binary @$(ROSTER_FILE) | python -m json.tool
+
+# Weekly prod player refresh — POSTs a fresh SC roster, applies SCD-2
+# transitions for team / position changes and adds rows for new players.
+# Run after `/scrape-supercoach` produces a fresh roster file.
+# Usage: make prod-refresh-players ADMIN_KEY=xxx [ROSTER_FILE=path/to/roster.json]
+prod-refresh-players:
+	curl -s -X POST $(PROD_API)/api/admin/players/refresh \
+		-H "Content-Type: application/json" \
+		-H "X-Admin-Key: $(ADMIN_KEY)" \
+		--data-binary @$(ROSTER_FILE) | python -m json.tool
 
 # Sync raw transcripts from local MinIO to production S3
 # Requires: Docker running (MinIO) + AWS credentials configured

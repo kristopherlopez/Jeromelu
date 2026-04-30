@@ -160,6 +160,59 @@ class Entity(Base):
     )
 
 
+class Team(Base):
+    """Canonical roster of every team across all grades feeding into NRL.
+
+    Covers NRL, NRLW, and the male pathway feeders (NSW Cup, QLD Cup,
+    Jersey Flegg, Mal Meninga, SG Ball, Cyril Connell, Harold Matthews).
+    `parent_team_id` self-references to link a feeder team to its senior
+    NRL/NRLW side; `entity_id` links senior rows to the canonical
+    `entities` row so existing claims/predictions/wiki pages keep
+    working without duplication.
+    """
+
+    __tablename__ = "teams"
+
+    team_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    slug: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    short_name: Mapped[str | None] = mapped_column(Text)
+    aliases: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
+    grade: Mapped[str] = mapped_column(Text, nullable=False)
+    competition: Mapped[str | None] = mapped_column(Text)
+    parent_team_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("teams.team_id", ondelete="SET NULL")
+    )
+    entity_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("entities.entity_id", ondelete="SET NULL"), unique=True
+    )
+    metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    parent: Mapped["Team | None"] = relationship("Team", remote_side=[team_id], backref="feeders")
+
+    __table_args__ = (
+        CheckConstraint(
+            "grade IN ("
+            "'nrl', 'nrlw', 'nsw_cup', 'qld_cup', "
+            "'jersey_flegg', 'mal_meninga', 'sg_ball', "
+            "'cyril_connell', 'harold_matthews'"
+            ")",
+            name="ck_teams_grade",
+        ),
+        CheckConstraint(
+            "parent_team_id IS NULL OR parent_team_id <> team_id",
+            name="ck_teams_grade_self_parent",
+        ),
+        Index("idx_teams_grade", "grade"),
+        Index("idx_teams_parent", "parent_team_id"),
+        Index("idx_teams_entity", "entity_id"),
+        Index("idx_teams_active", "active"),
+    )
+
+
 class EntityRole(Base):
     __tablename__ = "entity_roles"
 
@@ -477,15 +530,35 @@ class PlayerRound(Base):
     )
 
 
-class PlayerTeamHistory(Base):
-    __tablename__ = "player_team_history"
+class PlayerAttributes(Base):
+    """SCD-2 of slow-changing player facts.
+
+    Replaces ``player_team_history`` (migration 005). Carries team
+    affiliation, primary position, physical (height, weight) and contract
+    facts. All change at the same beats — preseason, transfer window,
+    contract renewal — so a single SCD-2 row per current state is cleaner
+    than parallel temporal tables.
+
+    Per-round facts (price, breakeven, score, jersey, grade) live in
+    :class:`PlayerRound`; lifetime constants in ``entities.metadata_json``;
+    cross-entity-type role tenure in :class:`EntityRole`.
+    """
+
+    __tablename__ = "player_attributes"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
-    player_name: Mapped[str] = mapped_column(Text, nullable=False)
-    team_key: Mapped[str] = mapped_column(Text, nullable=False)
-    team_name: Mapped[str] = mapped_column(Text, nullable=False)
-    position: Mapped[str | None] = mapped_column(Text)
-    player_id: Mapped[int | None] = mapped_column(Integer)
+    entity_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("entities.entity_id", ondelete="CASCADE"), nullable=False
+    )
+    team_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("teams.team_id", ondelete="SET NULL")
+    )
+    primary_position: Mapped[str | None] = mapped_column(Text)
+    height_cm: Mapped[int | None] = mapped_column(Integer)
+    weight_kg: Mapped[int | None] = mapped_column(Integer)
+    contract_until: Mapped[date | None] = mapped_column(Date)
+    real_salary_aud: Mapped[int | None] = mapped_column(Integer)
+    metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     effective_from: Mapped[date] = mapped_column(Date, nullable=False)
     effective_to: Mapped[date | None] = mapped_column(Date)
     is_current: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
@@ -494,10 +567,18 @@ class PlayerTeamHistory(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
     __table_args__ = (
-        UniqueConstraint("player_name", "effective_from", name="uq_player_team_effective"),
-        Index("idx_pth_player_current", "player_name", "is_current"),
-        Index("idx_pth_team_current", "team_key", "is_current"),
-        Index("idx_pth_player_id", "player_id"),
+        CheckConstraint(
+            "effective_to IS NULL OR effective_to >= effective_from",
+            name="ck_player_attributes_period",
+        ),
+        Index("idx_player_attributes_entity_current", "entity_id", "is_current"),
+        Index("idx_player_attributes_team_current", "team_id", "is_current"),
+        Index(
+            "uq_player_attributes_current",
+            "entity_id",
+            unique=True,
+            postgresql_where="is_current",
+        ),
     )
 
 
