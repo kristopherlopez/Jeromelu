@@ -29,8 +29,8 @@ locals {
 }
 
 resource "aws_cloudfront_distribution" "main" {
-  enabled             = true
-  is_ipv6_enabled     = true
+  enabled         = true
+  is_ipv6_enabled = true
   # Note: spelled "Jeromelu" (with E) to match live CloudFront comment.
   # The agent name is "Jaromelu" but the repo and infra use "Jeromelu";
   # changing this triggers a slow distribution-wide deploy for no gain.

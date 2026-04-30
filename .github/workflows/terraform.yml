@@ -51,7 +51,9 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.7.5"
+          # 1.10+ required for use_lockfile in backend.tf (S3 native locking).
+          # Pinned to match the version used for local apply.
+          terraform_version: "1.15.0"
 
       - name: terraform fmt
         id: fmt
@@ -68,7 +70,10 @@ jobs:
 
       - name: terraform plan
         id: plan
-        run: terraform plan -no-color -lock-timeout=300s -input=false
+        # -lock=false: ReadOnlyAccess can't write the S3 lockfile. Plan is
+        # read-only against state, so concurrent plans don't corrupt anything.
+        # Local apply (with admin creds) still locks normally.
+        run: terraform plan -no-color -lock=false -input=false
         continue-on-error: true
 
       - name: Comment plan on PR

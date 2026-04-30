@@ -17,7 +17,7 @@ coverage.
 | CloudFront distribution | yes (PR2) | `E2G6FL11A3JP8F` — HTTP-only origin override preserved; `web_acl_id` ignored |
 | Lightsail instance + static IP + firewall | yes (PR2) | `jeromelu` instance + `jeromelu-ip`. SSH key pair stays manual. |
 | V0 orphan teardown | yes (PR3) | Out-of-band script — see [`cleanup-v0.sh`](cleanup-v0.sh) |
-| CI workflow (`.github/workflows/terraform.yml`) | yes (PR4) | Plan-on-PR, comment plan; apply stays manual until apply IAM is sorted |
+| CI workflow (`.github/workflows/terraform.yml`) | yes (PR4) — live 2026-04-30 | Plan-on-PR, comment plan; apply stays manual until apply IAM is sorted |
 
 ## What is **not** managed by Terraform
 
