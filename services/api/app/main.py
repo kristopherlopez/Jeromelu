@@ -10,6 +10,7 @@ from .routers.players import router as players_router
 from .routers.recon import router as recon_router
 from .routers.sources import router as sources_router
 from .routers.squad import router as squad_router
+from .routers.teams import router as teams_router
 from .routers.wiki import router as wiki_router
 
 app = FastAPI(title="Jeromelu API", version="0.3.1")
@@ -31,6 +32,7 @@ app.include_router(insights_router, prefix="/api")
 app.include_router(players_router, prefix="/api")
 app.include_router(recon_router, prefix="/api")
 app.include_router(squad_router, prefix="/api")
+app.include_router(teams_router, prefix="/api")
 app.include_router(wiki_router, prefix="/api")
 
 

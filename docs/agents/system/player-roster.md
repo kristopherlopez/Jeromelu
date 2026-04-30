@@ -1,3 +1,7 @@
+---
+tags: [area/agents, subarea/system, status/live]
+---
+
 # Player Roster
 
 How player identity, club affiliation, and slow-changing player facts get
@@ -47,19 +51,45 @@ SuperCoach players-cf API   ──▶ scripts/data/scraped_players_api_raw.json
                                              team_id → teams)
 ```
 
-The `teams` table is a precondition — populated by
-`scripts/data/seed_teams.py` (`make seed-teams`) from `data/teams.yaml`.
-The roster module looks up Team rows by slug; if any of the 17 NRL clubs
-are missing it raises a clear precondition error rather than creating
-shadow rows.
+The `teams` table is a precondition — populated locally by
+`scripts/data/seed_teams.py` (`make seed-teams`) from `data/teams.yaml`,
+and in prod via the parallel admin endpoint `POST /api/admin/teams/seed`
+(`make prod-seed-teams`) which takes the same yaml content as JSON. The
+roster module looks up Team rows by slug; if any of the 17 NRL clubs are
+missing it raises a clear precondition error rather than creating shadow
+rows.
 
 ---
 
 ## Endpoints
 
-Both endpoints live on `services/api/app/routers/players.py` and reuse
-the same logic as the local seed script — `seed_roster()` and
-`refresh_roster()` from `jeromelu_shared.players.roster`.
+Three admin endpoints, all behind the same `X-Admin-Key` auth:
+
+- `POST /api/admin/teams/seed`     — `services/api/app/routers/teams.py`
+- `POST /api/admin/players/seed`   — `services/api/app/routers/players.py`
+- `POST /api/admin/players/refresh` — `services/api/app/routers/players.py`
+
+The team and player endpoints reuse the same logic as their local seed
+scripts — `seed_teams()` from `jeromelu_shared.teams`, and
+`seed_roster()` / `refresh_roster()` from `jeromelu_shared.players.roster`.
+
+### `POST /api/admin/teams/seed`
+
+Idempotent first-run / re-seed of the `teams` table. Body is the parsed
+contents of `data/teams.yaml` (top-level `teams` map plus optional `nrlw`
+map). Re-running only bumps `updated_at` on existing rows.
+
+```bash
+make prod-seed-teams ADMIN_KEY=$ADMIN_KEY
+```
+
+Response shape:
+```json
+{
+  "ok": true,
+  "counts": {"nrl": 17, "nsw_cup": 12, "qld_cup": 5, "nrlw": 12, "entities_linked_this_run": 0}
+}
+```
 
 ### `POST /api/admin/players/seed`
 
