@@ -51,7 +51,9 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.7.5"
+          # 1.10+ required for use_lockfile in backend.tf (S3 native locking).
+          # Pinned to match the version used for local apply.
+          terraform_version: "1.15.0"
 
       - name: terraform fmt
         id: fmt
