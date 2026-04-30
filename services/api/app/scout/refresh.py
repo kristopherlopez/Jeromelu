@@ -28,7 +28,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -37,6 +37,12 @@ from jeromelu_shared.db import Channel, Source, VideoMetric
 from . import youtube_api
 
 logger = logging.getLogger(__name__)
+
+
+# Only the time-varying fields belong in the video_metrics JSONB. Identity
+# fields (duration, description, thumbnail, title) are written to columns on
+# `sources` so they're queryable without unpacking JSON.
+_METRIC_FIELDS = ("views", "likes", "comments")
 
 
 _VIDEO_ID_RE = re.compile(r"(?:v=|/watch\?v=|youtu\.be/)([A-Za-z0-9_-]{11})")
@@ -118,6 +124,9 @@ def refresh_channel_videos(
             "metrics_recorded": 0,
         }
 
+    # Insert with the metadata that playlistItems already gave us at no extra
+    # cost — description, thumbnail. duration_seconds requires a videos.list
+    # call (handled below for newly-inserted rows only).
     inserted_source_ids: dict[str, UUID] = {}  # video_id → source_id
     for v in videos:
         published_at = _parse_published_at(v.get("published_at"))
@@ -127,6 +136,8 @@ def refresh_channel_videos(
                 channel_id=channel.channel_id,
                 source_type="youtube",
                 title=v["title"] or v["video_id"],
+                description=v.get("description") or None,
+                thumbnail_url=v.get("thumbnail_url"),
                 creator_name=channel.name,
                 canonical_url=v["url"],
                 approved_flag=True,  # parent channel is already approved
@@ -150,15 +161,26 @@ def refresh_channel_videos(
             entry = stats.get(video_id)
             if not entry:
                 continue
-            session.add(
-                VideoMetric(
-                    source_id=source_id,
-                    sampled_at=sampled_at,
-                    source="youtube_api",
-                    metrics=entry,
+            # Patch identity fields that videos.list returns but playlistItems
+            # didn't (duration in particular).
+            duration = entry.get("duration_seconds")
+            if duration is not None:
+                session.execute(
+                    update(Source)
+                    .where(Source.source_id == source_id)
+                    .values(duration_seconds=duration)
                 )
-            )
-            metrics_recorded += 1
+            metric_payload = {k: entry[k] for k in _METRIC_FIELDS if k in entry}
+            if metric_payload:
+                session.add(
+                    VideoMetric(
+                        source_id=source_id,
+                        sampled_at=sampled_at,
+                        source="youtube_api",
+                        metrics=metric_payload,
+                    )
+                )
+                metrics_recorded += 1
 
     session.commit()
 
@@ -184,11 +206,18 @@ def refresh_channel_videos(
 # ---------------------------------------------------------------------------
 
 def refresh_all_video_stats(session: Session) -> dict[str, Any]:
-    """Snapshot views/likes/comments for every active YouTube source.
+    """Snapshot views/likes/comments for every active YouTube source AND
+    sync identity fields (description, thumbnail, duration, title) onto
+    each `sources` row.
 
-    One row per source per call appended to `video_metrics`. Use the
-    `video_latest_metrics` view for "current state"; this table is for
-    history (week-over-week deltas, breakout detection).
+    Two outcomes per video, both paid for in the same `videos.list` call:
+      1. A new row in `video_metrics` carrying just the time-varying fields
+         (views/likes/comments). Use `video_latest_metrics` for current
+         state and the table itself for history.
+      2. The `sources` row is updated to mirror YouTube's current identity
+         fields. These can change (creators edit descriptions to add
+         chapter timestamps, thumbnails get refreshed) so always-overwrite
+         keeps the DB in sync rather than letting it drift.
 
     Quota: ~1 unit per 50 videos. ~150 channels × ~200 videos = ~600 units.
     """
@@ -208,10 +237,11 @@ def refresh_all_video_stats(session: Session) -> dict[str, Any]:
             video_to_source[vid] = source_id
 
     if not video_to_source:
-        return {"videos_refreshed": 0, "batches": 0}
+        return {"videos_refreshed": 0, "sources_synced": 0, "batches": 0}
 
     sampled_at = datetime.now(timezone.utc)
     refreshed = 0
+    sources_synced = 0
     batches = 0
     video_ids = list(video_to_source.keys())
     for i in range(0, len(video_ids), 50):
@@ -222,26 +252,52 @@ def refresh_all_video_stats(session: Session) -> dict[str, Any]:
             source_id = video_to_source.get(video_id)
             if not source_id or not entry:
                 continue
-            session.add(
-                VideoMetric(
-                    source_id=source_id,
-                    sampled_at=sampled_at,
-                    source="youtube_api",
-                    metrics=entry,
+
+            # Sync identity fields onto the source row. Only set keys we
+            # actually got back — this avoids clobbering existing data with
+            # NULL when the API drops a field.
+            source_updates: dict[str, Any] = {}
+            for src_col, api_key in (
+                ("title", "title"),
+                ("description", "description"),
+                ("thumbnail_url", "thumbnail_url"),
+                ("duration_seconds", "duration_seconds"),
+            ):
+                if api_key in entry:
+                    source_updates[src_col] = entry[api_key]
+            if source_updates:
+                session.execute(
+                    update(Source)
+                    .where(Source.source_id == source_id)
+                    .values(**source_updates)
                 )
-            )
-            refreshed += 1
+                sources_synced += 1
+
+            metric_payload = {k: entry[k] for k in _METRIC_FIELDS if k in entry}
+            if metric_payload:
+                session.add(
+                    VideoMetric(
+                        source_id=source_id,
+                        sampled_at=sampled_at,
+                        source="youtube_api",
+                        metrics=metric_payload,
+                    )
+                )
+                refreshed += 1
 
     session.commit()
     logger.info(
-        "Refreshed video stats: %d videos in %d API batches",
+        "Refreshed video stats: %d videos in %d API batches, "
+        "%d sources synced with identity fields",
         refreshed,
         batches,
+        sources_synced,
     )
 
     return {
         "videos_total": len(video_to_source),
         "videos_refreshed": refreshed,
+        "sources_synced": sources_synced,
         "batches": batches,
     }
 

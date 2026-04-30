@@ -29,13 +29,16 @@ Module surface — all functions are sync (Scout's loop is sync) and use httpx
         → list of featured channel_ids (channelSections of type 'multipleChannels')
 
     list_channel_videos(channel_external_id, after_video_id=None, max_results=200)
-        → list of {video_id, title, description, published_at, url}
+        → list of {video_id, title, description, thumbnail_url,
+                   published_at, url}
         Walks the channel's uploads playlist newest-first. Stops when it hits
         `after_video_id` (incremental refresh) or `max_results` items.
 
     get_video_stats(video_ids)
         → dict mapping video_id → {views, likes, comments, duration_seconds,
-                                   published_at}. Batches up to 50 per call.
+                                   published_at, title, description,
+                                   thumbnail_url, tags, category_id, is_live}.
+        Batches up to 50 per call.
 
 `filter_known_external_ids` lets the caller pass a set of already-known YouTube
 ids; matching results are dropped server-side before returning to the agent
@@ -56,6 +59,22 @@ logger = logging.getLogger(__name__)
 
 _BASE_URL = "https://www.googleapis.com/youtube/v3"
 _DEFAULT_TIMEOUT = httpx.Timeout(15.0, connect=5.0)
+
+
+def _best_thumbnail_url(thumbnails: dict[str, Any] | None) -> str | None:
+    """Pick the highest-resolution thumbnail YouTube returned.
+
+    YouTube returns up to 5 sizes (default, medium, high, standard, maxres)
+    but rarely includes all of them. Walk the list in descending quality and
+    return the first one that exists.
+    """
+    if not thumbnails:
+        return None
+    for size in ("maxres", "standard", "high", "medium", "default"):
+        entry = thumbnails.get(size)
+        if entry and entry.get("url"):
+            return entry["url"]
+    return None
 
 
 class YouTubeAPIError(RuntimeError):
@@ -229,7 +248,14 @@ def harvest_channels_from_videos(
 # ---------------------------------------------------------------------------
 
 def get_channel_stats(channel_ids: list[str]) -> list[dict[str, Any]]:
-    """Detailed metadata for up to 50 channels in one call. Cheap (1 unit)."""
+    """Detailed metadata for up to 50 channels in one call. Cheap (1 unit).
+
+    Returns the popularity stats (subs / videos / views) plus identity-ish
+    fields the API ships in the same response at no extra cost: handle
+    (`customUrl`), avatar URL (`snippet.thumbnails`), and the actual uploads
+    playlist id (`contentDetails.relatedPlaylists.uploads`). Callers can
+    persist the latter three onto `channels` rather than re-deriving them.
+    """
     if not channel_ids:
         return []
     raw = _get(
@@ -243,6 +269,8 @@ def get_channel_stats(channel_ids: list[str]) -> list[dict[str, Any]]:
     for item in raw.get("items", []):
         snip = item.get("snippet", {}) or {}
         stats = item.get("statistics", {}) or {}
+        cd = item.get("contentDetails", {}) or {}
+        related = cd.get("relatedPlaylists", {}) or {}
         out.append({
             "channel_id": item["id"],
             "title": snip.get("title", ""),
@@ -253,6 +281,10 @@ def get_channel_stats(channel_ids: list[str]) -> list[dict[str, Any]]:
             "subs": int(stats.get("subscriberCount", 0)) if not stats.get("hiddenSubscriberCount") else None,
             "video_count": int(stats.get("videoCount", 0)) if stats.get("videoCount") else 0,
             "view_count": int(stats.get("viewCount", 0)) if stats.get("viewCount") else 0,
+            # Free wins from snippet/contentDetails — cost the same call.
+            "handle": snip.get("customUrl") or None,
+            "avatar_url": _best_thumbnail_url(snip.get("thumbnails")),
+            "uploads_playlist_id": related.get("uploads") or None,
         })
     return out
 
@@ -402,6 +434,7 @@ def list_channel_videos(
                 "video_id": vid,
                 "title": snip.get("title", ""),
                 "description": snip.get("description", ""),
+                "thumbnail_url": _best_thumbnail_url(snip.get("thumbnails")),
                 "published_at": cd.get("videoPublishedAt") or snip.get("publishedAt", ""),
                 "url": f"https://www.youtube.com/watch?v={vid}",
             })
@@ -414,10 +447,17 @@ def list_channel_videos(
 
 
 def get_video_stats(video_ids: list[str]) -> dict[str, dict[str, Any]]:
-    """Batch-fetch view/like/comment/duration for a list of video ids.
+    """Batch-fetch view / like / comment counts plus identity metadata for a
+    list of video ids.
 
-    1 quota unit per call, up to 50 ids per call. Returns a dict keyed by
-    video_id; missing ids (private, deleted) are simply absent.
+    Single API call covers `part=statistics,contentDetails,snippet`, so the
+    returned dict carries everything in those three parts. Time-varying
+    fields (views/likes/comments) belong in `video_metrics`; identity fields
+    (duration, description, thumbnail, tags, category, is_live, title)
+    belong on `sources` — callers split as needed.
+
+    1 quota unit per call, up to 50 ids per call. Missing ids (private,
+    deleted, non-existent) are simply absent from the returned dict.
     """
     if not video_ids:
         return {}
@@ -436,6 +476,7 @@ def get_video_stats(video_ids: list[str]) -> dict[str, dict[str, Any]]:
             cd = item.get("contentDetails", {}) or {}
             snip = item.get("snippet", {}) or {}
             entry: dict[str, Any] = {}
+            # statistics — time-varying
             if "viewCount" in stats:
                 try:
                     entry["views"] = int(stats["viewCount"])
@@ -451,10 +492,30 @@ def get_video_stats(video_ids: list[str]) -> dict[str, dict[str, Any]]:
                     entry["comments"] = int(stats["commentCount"])
                 except (TypeError, ValueError):
                     pass
+            # contentDetails — identity
             duration_seconds = _parse_iso_duration(cd.get("duration"))
             if duration_seconds is not None:
                 entry["duration_seconds"] = duration_seconds
+            # snippet — identity (paid for already, was being discarded)
             if snip.get("publishedAt"):
                 entry["published_at"] = snip["publishedAt"]
+            if snip.get("title"):
+                entry["title"] = snip["title"]
+            if snip.get("description") is not None:
+                entry["description"] = snip["description"]
+            if snip.get("channelId"):
+                entry["channel_id"] = snip["channelId"]
+            if snip.get("channelTitle"):
+                entry["channel_title"] = snip["channelTitle"]
+            if snip.get("categoryId"):
+                entry["category_id"] = snip["categoryId"]
+            if snip.get("tags"):
+                entry["tags"] = list(snip["tags"])
+            thumb = _best_thumbnail_url(snip.get("thumbnails"))
+            if thumb:
+                entry["thumbnail_url"] = thumb
+            live = snip.get("liveBroadcastContent")
+            if live and live != "none":
+                entry["is_live"] = True
             out[item["id"]] = entry
     return out

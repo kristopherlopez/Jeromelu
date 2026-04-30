@@ -7,6 +7,7 @@ from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
+    Computed,
     Date,
     DateTime,
     Float,
@@ -47,6 +48,7 @@ class Channel(Base):
     tags: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     logo_url: Mapped[str | None] = mapped_column(Text)
+    handle: Mapped[str | None] = mapped_column(Text)
     last_polled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
@@ -70,6 +72,13 @@ class Source(Base):
     channel_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("channels.channel_id"))
     source_type: Mapped[str] = mapped_column(Text, nullable=False)
     title: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    thumbnail_url: Mapped[str | None] = mapped_column(Text)
+    duration_seconds: Mapped[int | None] = mapped_column(Integer)
+    is_short: Mapped[bool | None] = mapped_column(
+        Boolean,
+        Computed("duration_seconds IS NOT NULL AND duration_seconds < 60", persisted=True),
+    )
     creator_name: Mapped[str | None] = mapped_column(Text)
     canonical_url: Mapped[str | None] = mapped_column(Text, unique=True)
     approved_flag: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
