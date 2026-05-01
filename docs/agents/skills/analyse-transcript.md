@@ -1,3 +1,7 @@
+---
+tags: [area/agents, subarea/skills]
+---
+
 # Analyse Transcript — Hierarchical Multi-Agent Pipeline
 
 The analyse-transcript pipeline replaces the flat clean+process approach with progressive context building. Instead of one context window holding the entire transcript, it detects semantic chapters and spawns specialist agents per chapter — each with a fresh context and scoped enrichment data.

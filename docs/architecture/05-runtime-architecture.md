@@ -1,3 +1,7 @@
+---
+tags: [area/architecture]
+---
+
 # Runtime Architecture
 
 ## System Topology

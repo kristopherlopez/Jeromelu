@@ -1,3 +1,7 @@
+---
+tags: [area/agents]
+---
+
 # Agents
 
 Jaromelu is an agent-first product. "Agent" here spans three different things:

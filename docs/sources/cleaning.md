@@ -1,3 +1,7 @@
+---
+tags: [area/sources]
+---
+
 # Cleaning Workbench
 
 The cleaning stage turns raw, garbled originals into clean text that downstream extraction can reason about. This doc is the **workbench** — how we run cleaning, how we judge it, and how we iterate on it.

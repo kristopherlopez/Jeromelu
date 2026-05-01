@@ -1,3 +1,7 @@
+---
+tags: [area/operations]
+---
+
 # IaC Migration Plan
 
 The project plan for shifting Jeromelu's AWS infrastructure from click-ops to

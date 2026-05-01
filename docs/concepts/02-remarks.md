@@ -1,3 +1,7 @@
+---
+tags: [area/concepts]
+---
+
 # Remarks
 
 A Remark is the atomic unit of the entire experience. It is the thing the crew produces. It is the thing the audience interacts with. It is the thing that gets shared. Everything in the Stream either builds toward a Remark or resolves one.

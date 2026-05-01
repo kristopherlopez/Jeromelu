@@ -1,3 +1,7 @@
+---
+tags: [area/concepts]
+---
+
 # Design Language & Concepts
 
 These docs define the design language, narrative framing, and interaction concepts for the Jaromelu experience. They are not page specs — for those see [docs/pages/](../pages/).

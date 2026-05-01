@@ -1,3 +1,7 @@
+---
+tags: [area/sources]
+---
+
 # Sources
 
 The source system is a first-class concern. Every claim Jaromelu makes traces back to a source; every wiki page and every Ask Me answer surfaces source attribution. This folder owns the concept end-to-end — from original → cleaned → to the point where structured outputs leave for downstream pipelines.

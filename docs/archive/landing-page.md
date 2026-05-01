@@ -1,3 +1,7 @@
+---
+tags: [area/archive, status/archived]
+---
+
 # Landing Page
 
 Status: **Archived — moved to `/landing` route, no longer the default entry point**

@@ -1,3 +1,7 @@
+---
+tags: [area/archive, status/archived]
+---
+
 # Supercoach & NRL API Research
 
 ## Supercoach API

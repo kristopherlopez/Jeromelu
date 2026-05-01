@@ -1,3 +1,7 @@
+---
+tags: [area/architecture]
+---
+
 # AWS Architecture — Jeromelu V1
 
 This is the practical AWS shape for Jeromelu V1. We deliberately picked the cheapest realistic AWS deployment that keeps the site online: a single Lightsail VM running everything via Docker Compose, with CloudFront/Route 53/S3 around it. Target run-rate is ~$7.50/mo (Sydney pricing — $5 nano in US is unavailable in `ap-southeast-2`; the $7 `micro_3_2` is the smallest viable bundle).

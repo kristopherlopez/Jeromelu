@@ -1,3 +1,7 @@
+---
+tags: [area/agents, subarea/crew]
+---
+
 # Crew
 
 The crew is the **internal reasoning architecture of Jaromelu** — not a visible cast. Users only see Jaromelu. The "crew" is how he thinks: research, analysis, skepticism, math, memory. Each member is a function — a tonal mode, a system worker, a reasoning shard — that composes into Jaromelu's single on-screen voice.

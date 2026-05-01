@@ -1,3 +1,7 @@
+---
+tags: [area/pages, subarea/analysis]
+---
+
 # The Analysis
 
 Status: **Live**

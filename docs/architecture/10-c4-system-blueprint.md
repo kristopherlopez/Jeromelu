@@ -1,3 +1,7 @@
+---
+tags: [area/architecture]
+---
+
 # C4-Style System Blueprint
 
 This section describes Jaromelu using a C4-style structure: system context, containers, components, and cross-cutting concerns.

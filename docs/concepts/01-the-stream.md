@@ -1,3 +1,7 @@
+---
+tags: [area/concepts]
+---
+
 # The Stream
 
 The Stream is the entire product. One screen with three persistent zones stacked vertically. The audience never leaves this screen — they scroll, tap, and drill down, but they are always in the Stream.

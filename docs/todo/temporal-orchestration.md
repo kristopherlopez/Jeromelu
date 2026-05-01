@@ -1,3 +1,7 @@
+---
+tags: [area/todo, status/planning]
+---
+
 # 1.1 Temporal Orchestration Setup
 
 **Phase:** 1 — Prove the Brain (Intelligence Layer)

@@ -1,3 +1,7 @@
+---
+tags: [area/archive, status/archived]
+---
+
 # Jaromelu — What's Built (archived snapshot, superseded)
 
 > **Archived 2026-04-17.** This was a point-in-time snapshot. It is out of date (e.g., "Next.js placeholder landing page" no longer applies — the app now has five live pages). Kept only for historical reference. For current implementation status, read the code; for planned work, see [todo/TODO.md](../todo/TODO.md).

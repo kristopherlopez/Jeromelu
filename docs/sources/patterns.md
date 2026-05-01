@@ -1,3 +1,7 @@
+---
+tags: [area/sources]
+---
+
 # Correction Patterns
 
 The accumulating catalogue of what cleaning knows to fix — and what it must not touch. Updated whenever a new garble or false-correction surfaces.

@@ -143,6 +143,115 @@ class SourceChunk(Base):
     )
 
 
+class SourceSpeaker(Base):
+    """Diarised speaker turn over a source document.
+
+    Coarse-grained span layer above ``SourceChunk``. Populated by the
+    diarisation pass (Deepgram or equivalent) after document ingest.
+    ``speaker_entity_id`` is NULL until the raw diariser label
+    (``speaker_label``) is resolved to a known entity. See migration 034.
+    """
+
+    __tablename__ = "source_speakers"
+
+    segment_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("source_documents.document_id", ondelete="CASCADE"), nullable=False
+    )
+    speaker_entity_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("entities.entity_id", ondelete="SET NULL")
+    )
+    speaker_label: Mapped[str | None] = mapped_column(Text)
+    start_ts: Mapped[float] = mapped_column(Float, nullable=False)
+    end_ts: Mapped[float] = mapped_column(Float, nullable=False)
+    confidence: Mapped[float | None] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+    __table_args__ = (
+        CheckConstraint("end_ts >= start_ts", name="ck_source_speakers_span"),
+        Index("idx_source_speakers_document", "document_id"),
+        Index(
+            "idx_source_speakers_entity",
+            "speaker_entity_id",
+            postgresql_where="speaker_entity_id IS NOT NULL",
+        ),
+        Index("idx_source_speakers_doc_start", "document_id", "start_ts"),
+    )
+
+
+class SourceChapter(Base):
+    """Semantic chapter detected over a source document.
+
+    Output of the analyse-transcript pipeline. Used to scope claim
+    extraction (each chapter gets its own specialist agent) and to
+    attribute claims back to a chapter for UI navigation. See migration 034.
+    """
+
+    __tablename__ = "source_chapters"
+
+    chapter_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("source_documents.document_id", ondelete="CASCADE"), nullable=False
+    )
+    ordinal: Mapped[int] = mapped_column(Integer, nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    summary: Mapped[str | None] = mapped_column(Text)
+    start_ts: Mapped[float] = mapped_column(Float, nullable=False)
+    end_ts: Mapped[float] = mapped_column(Float, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+    __table_args__ = (
+        CheckConstraint("end_ts >= start_ts", name="ck_source_chapters_span"),
+        UniqueConstraint("document_id", "ordinal", name="uq_source_chapters_doc_ordinal"),
+        Index("idx_source_chapters_document", "document_id"),
+        Index("idx_source_chapters_doc_start", "document_id", "start_ts"),
+    )
+
+
+class SourceAnnotation(Base):
+    """Generic descriptive overlay over a source document.
+
+    Catch-all for sentiment, sub-topic tags, entity mentions, themes —
+    any enrichment that does not warrant a first-class table. ``kind``
+    is free-form text on purpose so new annotation types can be added
+    without schema changes. NULL ``start_ts``/``end_ts`` indicates a
+    document-level annotation. See migration 034.
+    """
+
+    __tablename__ = "source_annotations"
+
+    annotation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("source_documents.document_id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(Text, nullable=False)
+    start_ts: Mapped[float | None] = mapped_column(Float)
+    end_ts: Mapped[float | None] = mapped_column(Float)
+    target_entity_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("entities.entity_id", ondelete="SET NULL")
+    )
+    label: Mapped[str | None] = mapped_column(Text)
+    payload_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    confidence: Mapped[float | None] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+    __table_args__ = (
+        CheckConstraint(
+            "(start_ts IS NULL AND end_ts IS NULL) "
+            "OR (start_ts IS NOT NULL AND end_ts IS NOT NULL AND end_ts >= start_ts)",
+            name="ck_source_annotations_span",
+        ),
+        Index("idx_source_annotations_document", "document_id"),
+        Index("idx_source_annotations_kind", "kind"),
+        Index("idx_source_annotations_doc_kind", "document_id", "kind"),
+        Index(
+            "idx_source_annotations_target",
+            "target_entity_id",
+            postgresql_where="target_entity_id IS NOT NULL",
+        ),
+    )
+
+
 class Entity(Base):
     __tablename__ = "entities"
 
@@ -160,7 +269,7 @@ class Entity(Base):
         CheckConstraint(
             "entity_type IN ("
             "'player', 'team', 'advisor', 'coach', 'referee', "
-            "'commentator', 'journalist', 'matchup', 'round'"
+            "'commentator', 'journalist', 'match', 'round', 'venue'"
             ")",
             name="ck_entity_type",
         ),
@@ -530,12 +639,32 @@ class PlayerRound(Base):
     jersey: Mapped[int | None] = mapped_column(Integer)
     bye_round: Mapped[str | None] = mapped_column(Text)
 
+    # Canonical FKs — populated on writes after migration 032. Older rows
+    # remain NULL; the legacy `team`/`opposition`/`venue` text columns
+    # stay valid for historical queries.
+    match_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("matches.match_id", ondelete="SET NULL")
+    )
+    team_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("teams.team_id", ondelete="SET NULL")
+    )
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
     __table_args__ = (
         UniqueConstraint("player_id", "round", "season", name="uq_player_round_season"),
         Index("idx_player_rounds_season_round", "season", "round"),
         Index("idx_player_rounds_player", "player_id"),
+        Index(
+            "idx_player_rounds_match",
+            "match_id",
+            postgresql_where="match_id IS NOT NULL",
+        ),
+        Index(
+            "idx_player_rounds_team",
+            "team_id",
+            postgresql_where="team_id IS NOT NULL",
+        ),
     )
 
 
@@ -588,6 +717,264 @@ class PlayerAttributes(Base):
             unique=True,
             postgresql_where="is_current",
         ),
+    )
+
+
+class Venue(Base):
+    """Stadium reference table.
+
+    Small, slow-changing. Referenced by ``Match.venue_id``. Seeded from
+    ``data/venues.yaml`` via ``make seed-venues`` — see migration 028.
+    """
+
+    __tablename__ = "venues"
+
+    venue_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    slug: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    aliases: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
+    city: Mapped[str | None] = mapped_column(Text)
+    state: Mapped[str | None] = mapped_column(Text)
+    country: Mapped[str] = mapped_column(Text, nullable=False, default="AU")
+    capacity: Mapped[int | None] = mapped_column(Integer)
+    surface: Mapped[str | None] = mapped_column(Text)
+    roof: Mapped[str | None] = mapped_column(Text)
+    tz: Mapped[str | None] = mapped_column(Text)
+    entity_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("entities.entity_id", ondelete="SET NULL"), unique=True
+    )
+    metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    __table_args__ = (
+        CheckConstraint(
+            "surface IS NULL OR surface IN ('grass', 'hybrid', 'synthetic')",
+            name="ck_venues_surface",
+        ),
+        CheckConstraint(
+            "roof IS NULL OR roof IN ('open', 'closed', 'retractable')",
+            name="ck_venues_roof",
+        ),
+        Index("idx_venues_active", "active"),
+        Index("idx_venues_country_state", "country", "state"),
+    )
+
+
+class Match(Base):
+    """Fixture / result spine — one row per game across all grades.
+
+    Real-world side of the model; ``PlayerRound`` is the SuperCoach
+    overlay that joins via ``match_id``. ``external_match_id`` + ``source``
+    is the upsert key for the daily fixture sync — see migration 029.
+    """
+
+    __tablename__ = "matches"
+
+    match_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+
+    source: Mapped[str] = mapped_column(Text, nullable=False, default="nrl_com")
+    external_match_id: Mapped[str | None] = mapped_column(Text)
+
+    season: Mapped[int] = mapped_column(Integer, nullable=False)
+    round: Mapped[int | None] = mapped_column(Integer)
+    round_label: Mapped[str | None] = mapped_column(Text)
+    grade: Mapped[str] = mapped_column(Text, nullable=False)
+
+    home_team_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("teams.team_id", ondelete="RESTRICT"), nullable=False
+    )
+    away_team_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("teams.team_id", ondelete="RESTRICT"), nullable=False
+    )
+    venue_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("venues.venue_id", ondelete="SET NULL")
+    )
+
+    kickoff_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="scheduled")
+
+    home_score: Mapped[int | None] = mapped_column(Integer)
+    away_score: Mapped[int | None] = mapped_column(Integer)
+
+    weather: Mapped[str | None] = mapped_column(Text)
+    referee_name: Mapped[str | None] = mapped_column(Text)
+    broadcast: Mapped[str | None] = mapped_column(Text)
+    entity_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("entities.entity_id", ondelete="SET NULL"), unique=True
+    )
+    metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    __table_args__ = (
+        CheckConstraint(
+            "grade IN ("
+            "'nrl', 'nrlw', 'nsw_cup', 'qld_cup', "
+            "'jersey_flegg', 'mal_meninga', 'sg_ball', "
+            "'cyril_connell', 'harold_matthews'"
+            ")",
+            name="ck_matches_grade",
+        ),
+        CheckConstraint(
+            "status IN ('scheduled', 'live', 'final', 'postponed', 'cancelled', 'forfeit')",
+            name="ck_matches_status",
+        ),
+        CheckConstraint(
+            "home_team_id <> away_team_id",
+            name="ck_matches_distinct_teams",
+        ),
+        CheckConstraint(
+            "(home_score IS NULL AND away_score IS NULL) "
+            "OR (home_score IS NOT NULL AND away_score IS NOT NULL)",
+            name="ck_matches_score_paired",
+        ),
+        Index(
+            "uq_matches_source_external",
+            "source",
+            "season",
+            "grade",
+            "external_match_id",
+            unique=True,
+            postgresql_where="external_match_id IS NOT NULL",
+        ),
+        Index("idx_matches_season_round_grade", "season", "round", "grade"),
+        Index("idx_matches_kickoff", "kickoff_at"),
+        Index("idx_matches_status", "status"),
+        Index("idx_matches_home_team", "home_team_id"),
+        Index("idx_matches_away_team", "away_team_id"),
+        Index("idx_matches_venue", "venue_id"),
+    )
+
+
+class MatchTeamList(Base):
+    """Versioned named-17 announcement per match per team.
+
+    Each new public lineup release (Tuesday list, Thursday list, late
+    changes) appends a row with an incremented ``list_version`` rather
+    than mutating the prior row. Query the latest version to see the
+    live lineup; query the full history to see how it shifted.
+
+    See migration 030.
+    """
+
+    __tablename__ = "match_team_lists"
+
+    list_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    match_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("matches.match_id", ondelete="CASCADE"), nullable=False
+    )
+    team_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("teams.team_id", ondelete="RESTRICT"), nullable=False
+    )
+    player_entity_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("entities.entity_id", ondelete="RESTRICT"), nullable=False
+    )
+
+    jersey_number: Mapped[int | None] = mapped_column(Integer)
+    named_position: Mapped[str | None] = mapped_column(Text)
+    sc_position: Mapped[str | None] = mapped_column(Text)
+
+    list_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="named")
+    announced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    source: Mapped[str] = mapped_column(Text, nullable=False, default="nrl_com")
+    metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('named', 'late_change_in', 'late_change_out', "
+            "'19th_man', 'reserve', 'withdrawn')",
+            name="ck_match_team_lists_status",
+        ),
+        CheckConstraint(
+            "jersey_number IS NULL OR (jersey_number BETWEEN 1 AND 30)",
+            name="ck_match_team_lists_jersey_range",
+        ),
+        UniqueConstraint(
+            "match_id",
+            "team_id",
+            "player_entity_id",
+            "list_version",
+            name="uq_match_team_lists_match_team_player_version",
+        ),
+        Index("idx_match_team_lists_match", "match_id"),
+        Index("idx_match_team_lists_team", "team_id"),
+        Index("idx_match_team_lists_player", "player_entity_id"),
+        Index(
+            "idx_match_team_lists_match_team_version",
+            "match_id",
+            "team_id",
+            "list_version",
+        ),
+    )
+
+
+class Injury(Base):
+    """Append-on-change injury / suspension timeline.
+
+    A new row lands when a player's casualty-ward state changes. Resolving
+    an injury is recorded by both writing a new row with status='cleared'
+    *and* setting ``resolved_at`` on the prior open row. See migration 031.
+    """
+
+    __tablename__ = "injuries"
+
+    injury_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    player_entity_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("entities.entity_id", ondelete="CASCADE"), nullable=False
+    )
+    team_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("teams.team_id", ondelete="SET NULL")
+    )
+
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    body_part: Mapped[str | None] = mapped_column(Text)
+    mechanism: Mapped[str | None] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
+
+    expected_return_round: Mapped[int | None] = mapped_column(Integer)
+    expected_return_date: Mapped[date | None] = mapped_column(Date)
+    severity: Mapped[str | None] = mapped_column(Text)
+
+    reported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    source: Mapped[str] = mapped_column(Text, nullable=False)
+    source_url: Mapped[str | None] = mapped_column(Text)
+    metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('training', 'test', '1_week', '2_4_weeks', '4_8_weeks', "
+            "'indefinite', 'season', 'suspended', 'cleared')",
+            name="ck_injuries_status",
+        ),
+        CheckConstraint(
+            "severity IS NULL OR severity IN ('low', 'moderate', 'high', 'season')",
+            name="ck_injuries_severity",
+        ),
+        CheckConstraint(
+            "mechanism IS NULL OR mechanism IN ("
+            "'collision', 'non_contact', 'illness', "
+            "'concussion_protocol', 'suspension', 'unknown')",
+            name="ck_injuries_mechanism",
+        ),
+        Index("idx_injuries_player_reported", "player_entity_id", "reported_at"),
+        Index(
+            "idx_injuries_team_status",
+            "team_id",
+            "status",
+            postgresql_where="resolved_at IS NULL",
+        ),
+        Index("idx_injuries_reported_at", "reported_at"),
     )
 
 
@@ -827,8 +1214,19 @@ class Outcome(Base):
     scored_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
 
-class DiscoveredSource(Base):
-    __tablename__ = "discovered_sources"
+class ScoutCandidate(Base):
+    """Scout's candidate inbox.
+
+    Scout (the source-discovery agent) writes here as it hunts the web for
+    new NRL channels and videos worth onboarding. Humans approve or reject
+    via the admin review queue; approval promotes a row into the canonical
+    ``channels`` (kind=channel) or ``sources`` (kind=video) tables.
+
+    Distinct from ``sources`` so unapproved noise does not pollute the main
+    pipeline. Renamed from ``discovered_sources`` in migration 035.
+    """
+
+    __tablename__ = "scout_candidates"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
     kind: Mapped[str] = mapped_column(Text, nullable=False)
@@ -852,16 +1250,19 @@ class DiscoveredSource(Base):
     run_id: Mapped[str | None] = mapped_column(Text)
 
     __table_args__ = (
-        CheckConstraint("kind IN ('channel', 'video')", name="ck_discovered_kind"),
+        CheckConstraint("kind IN ('channel', 'video')", name="ck_scout_candidates_kind"),
         CheckConstraint(
             "status IN ('pending', 'approved', 'rejected', 'snoozed', 'duplicate')",
-            name="ck_discovered_status",
+            name="ck_scout_candidates_status",
         ),
-        UniqueConstraint("platform", "kind", "external_id", name="uq_discovered_platform_kind_external"),
-        Index("idx_discovered_status", "status"),
-        Index("idx_discovered_kind", "kind"),
-        Index("idx_discovered_run", "run_id"),
-        Index("idx_discovered_at", "discovered_at"),
+        UniqueConstraint(
+            "platform", "kind", "external_id",
+            name="uq_scout_candidates_platform_kind_external",
+        ),
+        Index("idx_scout_candidates_status", "status"),
+        Index("idx_scout_candidates_kind", "kind"),
+        Index("idx_scout_candidates_run", "run_id"),
+        Index("idx_scout_candidates_at", "discovered_at"),
     )
 
 

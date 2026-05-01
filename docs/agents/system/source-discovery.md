@@ -1,15 +1,30 @@
+---
+tags: [area/agents, subarea/system, status/live]
+---
+
 # Source Discovery (Scout)
 
 | | |
 |---|---|
 | **Package** | `services/api/app/scout/` |
 | **Trigger** | Manual CLI for now (`python -m app.scout.cli`); admin endpoint + cron later |
-| **Crew counterpart** | [Scout](../crew/scout.md) — this is Scout's source-discovery mode |
-| **Status** | Slice 2 — discovery + admin recon API + post-approval video enumeration |
+| **Crew counterpart** | [Scout](../crew/scout.md) — this is Scout's source-discovery surface |
+| **ETL role** | **Extract only.** No Transform. (Cleaning, diarisation, parsing, embedding are downstream — see [crew/scout.md § Hand-off contract](../crew/scout.md#hand-off-contract).) |
+| **Status** | Discovery + admin recon API + post-approval video enumeration shipped |
 
-Scout's "find new sources" job. An autonomous Anthropic agent that hunts the web for NRL YouTube channels and videos, scores them, and files them to `discovered_sources` for human review. **Not Temporal-based** — runs in-process, see [project-temporal-not-in-prod note](../../operations/aws-resource-inventory.md).
+Scout's "find new sources" job. An autonomous Anthropic agent that hunts the web for NRL YouTube channels and videos, scores them, and files them to `scout_candidates` for human review. **Not Temporal-based** — runs in-process, see [project-temporal-not-in-prod note](../../operations/aws-resource-inventory.md).
 
 Approval of a channel candidate triggers deterministic post-processing: the channel's full uploads playlist is enumerated and each video is inserted as a `sources` row, with an initial popularity snapshot in `video_metrics`. A weekly refresh job re-walks each channel for new uploads and re-snapshots view/like/comment counts so we can rank videos by influence and detect breakouts. See [§ Post-approval video enumeration](#post-approval-video-enumeration) below.
+
+### Extract-only boundary
+
+Per Scout's [ETL role](../crew/scout.md), this surface only writes **raw inventory**:
+- `scout_candidates` (full row at discovery)
+- `channels` (full row at approval)
+- `sources` (full row at enumeration; `ingestion_status='pending'`, `cleaned_text` left for Transform)
+- `video_metrics` / `channel_metrics` (snapshots from API output)
+
+It does not write `source_documents` (that's [ingestion](ingestion.md)), nor anything in the Transform layer — `cleaned_text`, `source_chunks.clean_text`/`embedding`, `source_speakers`, `source_chapters`, `source_annotations`, `quotes`, `claims`. If a feature would interpret, clean, normalise, or enrich the raw bytes, it does not belong in `services/api/app/scout/`.
 
 ---
 
@@ -30,8 +45,8 @@ ANTHROPIC_API_KEY
         ├── server-side tools (web_search, web_fetch) — executed by Anthropic
         │
         └── client-side tools — executed locally:
-              dedupe_check     → SELECT against channels / sources / discovered_sources
-              persist_candidate → INSERT discovered_sources (status='pending')
+              dedupe_check     → SELECT against channels / sources / scout_candidates
+              persist_candidate → INSERT scout_candidates (status='pending')
                                    ON CONFLICT DO NOTHING
         │
         ▼
@@ -49,7 +64,7 @@ ANTHROPIC_API_KEY
 | `app/scout/youtube_api.py` | YouTube Data API v3 client (search, channel stats, playlist enumeration, video stats) |
 | `app/scout/refresh.py` | Post-approval video enumeration + weekly stats refresh (deterministic, not agent-driven) |
 | `app/routers/recon.py` | Admin recon endpoints (list/approve/reject candidates) + the weekly refresh entry point |
-| `packages/db/migrations/017_discovered_sources.sql` | Candidate inbox table |
+| `packages/db/migrations/017_discovered_sources.sql` | Candidate inbox table (renamed to `scout_candidates` in mig 035) |
 | `packages/db/migrations/023_channel_metrics.sql` | Time-series channel popularity (subs/views/videos) |
 | `packages/db/migrations/024_video_metrics.sql` | Time-series video popularity (views/likes/comments) |
 
@@ -61,13 +76,13 @@ ANTHROPIC_API_KEY
 | `web_fetch` | Anthropic built-in (`web_fetch_20250209`) | Drill into a channel/video page to confirm details. |
 | `dedupe_check_bulk` | Custom | Batched dedupe: pass an array of `{kind, url}`, get a verdict for each in one call. **Preferred** for filtering a fresh search-result page. |
 | `dedupe_check` | Custom | Single-item dedupe. Use only when investigating one candidate (e.g. after a `web_fetch`). |
-| `persist_candidate` | Custom | Writes to `discovered_sources` with `status='pending'`. Idempotent on `(platform, kind, external_id)`. |
+| `persist_candidate` | Custom | Writes to `scout_candidates` with `status='pending'`. Idempotent on `(platform, kind, external_id)`. |
 
 ## Anti-rediscovery — Tier 1 (built)
 
 The first version of Scout kept re-discovering the same popular channels because `web_search` is server-side and we couldn't filter results before the agent saw them. Tier 1 fixes this:
 
-1. **Known-set injection** — at run-start, `summarise_known_sources(session)` builds a compact list of every YouTube channel Scout already tracks (`channels` table) plus every channel previously surfaced as a candidate (`discovered_sources`, any status). This list is prepended to the per-run user brief (NOT the system prompt — system stays cached) with the rule: *"do not search for these by name. Search adjacent."*
+1. **Known-set injection** — at run-start, `summarise_known_sources(session)` builds a compact list of every YouTube channel Scout already tracks (`channels` table) plus every channel previously surfaced as a candidate (`scout_candidates`, any status). This list is prepended to the per-run user brief (NOT the system prompt — system stays cached) with the rule: *"do not search for these by name. Search adjacent."*
 2. **`dedupe_check_bulk`** — a batched dedupe tool the agent calls once per search-result page, instead of one `dedupe_check` per candidate. Stops the agent from drilling into already-known URLs.
 
 Together these turn dedupe from a *post-hoc filter* into a *front-door firewall*.
@@ -83,8 +98,8 @@ Defaults (override via CLI flags or `ScoutBounds`):
 
 ## DB interactions
 
-- Reads: `channels.external_id`, `sources.canonical_url`, `discovered_sources.(platform,kind,external_id)` — all dedup checks.
-- Writes: `discovered_sources` rows (candidates), `crew_activity` rows (run-level start + end summaries — see Audit trail below).
+- Reads: `channels.external_id`, `sources.canonical_url`, `scout_candidates.(platform,kind,external_id)` — all dedup checks.
+- Writes: `scout_candidates` rows (candidates), `crew_activity` rows (run-level start + end summaries — see Audit trail below).
 
 Approval flow (writes to `channels` / `sources`) is a separate slice — no admin endpoint yet.
 
@@ -165,7 +180,7 @@ Event types:
 
 Every event has `t` (UTC ISO timestamp) and `run_id`. Large strings/dicts are truncated at 5–20KB to keep the log bounded; for a typical 15-min run expect 100–300 events / 50–500KB.
 
-### 3. `discovered_sources` (already documented above)
+### 3. `scout_candidates` (already documented above)
 
 Per-candidate record, joined to a run via `run_id`.
 
@@ -192,7 +207,7 @@ LIMIT 20;
 
 -- Candidates from one specific run
 SELECT kind, title, score, content_categories, url
-FROM discovered_sources
+FROM scout_candidates
 WHERE run_id = 'scout-20260427T103045-a1b2c3'
 ORDER BY score DESC NULLS LAST;
 
@@ -272,14 +287,14 @@ Until the admin UI lands (later slice), use SQL:
 ```sql
 -- Most recent run's candidates
 SELECT kind, title, score, content_categories, url, score_reasons
-FROM discovered_sources
-WHERE run_id = (SELECT run_id FROM discovered_sources
+FROM scout_candidates
+WHERE run_id = (SELECT run_id FROM scout_candidates
                 ORDER BY discovered_at DESC LIMIT 1)
 ORDER BY score DESC NULLS LAST;
 
 -- Pending review queue
 SELECT kind, title, score, content_categories, discovered_via
-FROM discovered_sources
+FROM scout_candidates
 WHERE status='pending'
 ORDER BY score DESC NULLS LAST, discovered_at DESC;
 ```
@@ -390,7 +405,7 @@ Tier 1 reduces wasted drill-ins but doesn't stop the upstream search engine from
 
 Add two custom tools that replace generic `web_search` for YouTube-specific discovery:
 
-- **`youtube_search(query, filter_known=True)`** — calls the YouTube Data API (or `yt-dlp --match-filter`) directly. Server-side filters out any channel/video whose `external_id` is already in `channels` / `sources` / `discovered_sources` *before* returning to the agent. The agent only ever sees novel results.
+- **`youtube_search(query, filter_known=True)`** — calls the YouTube Data API (or `yt-dlp --match-filter`) directly. Server-side filters out any channel/video whose `external_id` is already in `channels` / `sources` / `scout_candidates` *before* returning to the agent. The agent only ever sees novel results.
 - **`find_related_channels(known_channel_id, limit=10)`** — pulls channels related to one we already track, via YouTube's "related channels" signal or by scraping the channel's collaborators / community / featured-channels surface. High-leverage for finding adjacent creators we don't already know.
 
 Tradeoffs: more code, YouTube Data API quota to budget (search.list is 100 units/call vs the 10,000-unit daily free tier), and we lose some serendipity (`web_search` sometimes finds great channels via blog posts that mention them — a YouTube-native tool can't).
@@ -401,7 +416,7 @@ Keep `web_search` available but de-emphasise it in the prompt; use it for the of
 
 Today the brief is even-handed across the full NRL ecosystem. In practice the agent will gravitate to whatever sub-vertical the search engine surfaces most — likely SuperCoach + match highlights, since those dominate volume.
 
-Tier 3: pre-run, count `discovered_sources.content_categories` to find which tags are underrepresented (e.g. zero candidates for `nrlw`, `junior`, `classic`). Inject into the user brief:
+Tier 3: pre-run, count `scout_candidates.content_categories` to find which tags are underrepresented (e.g. zero candidates for `nrlw`, `junior`, `classic`). Inject into the user brief:
 
 ```
 Coverage gaps: nrlw (0 candidates), junior (0), classic (1).

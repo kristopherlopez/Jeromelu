@@ -1,3 +1,7 @@
+---
+tags: [area/avatar]
+---
+
 # The Jaromelu Avatar
 
 The avatar is the **sixth surface**. The [five canonical pages](../pages/) define *where* users go; the avatar defines *who is always there*. It's the connective tissue that makes the site feel alive rather than inert.

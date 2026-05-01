@@ -1,3 +1,7 @@
+---
+tags: [area/todo, status/planning]
+---
+
 # Jaromelu — Master To-Do
 
 Component-level work has its own file under `docs/todo/`. Cross-cutting items (infra, testing, security, launch prep) stay inline below.

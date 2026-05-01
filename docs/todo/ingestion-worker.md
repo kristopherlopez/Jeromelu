@@ -1,3 +1,7 @@
+---
+tags: [area/todo, status/planning]
+---
+
 # 1.2 Ingestion Worker
 
 **Phase:** 1 — Prove the Brain (Intelligence Layer)

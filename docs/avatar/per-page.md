@@ -1,3 +1,7 @@
+---
+tags: [area/avatar]
+---
+
 # Avatar Per-Page Behaviour
 
 Status: **Stub — design work in progress**

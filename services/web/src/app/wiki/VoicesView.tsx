@@ -2,11 +2,15 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
+  Clock,
+  Instagram,
   Search,
   ChevronDown,
+  Youtube,
 } from "lucide-react";
 import type { WikiPageSummary, WikiPageType } from "./wiki-data";
 
@@ -70,6 +74,80 @@ function brandColourFor(slug: string): { fg: string; bg: string } {
     hash = (hash * 31 + slug.charCodeAt(i)) | 0;
   }
   return BRAND_PALETTE[Math.abs(hash) % BRAND_PALETTE.length];
+}
+
+type PlatformSpec = {
+  label: string;
+  icon: typeof Youtube;
+  fg: string;
+};
+
+const PLATFORM_SPECS: Record<string, PlatformSpec> = {
+  youtube: { label: "YouTube", icon: Youtube, fg: "#ff0033" },
+  instagram: { label: "Instagram", icon: Instagram, fg: "#e1306c" },
+};
+
+function PlatformChip({
+  platform,
+  url,
+}: {
+  platform: string;
+  url?: string | null;
+}) {
+  const spec = PLATFORM_SPECS[platform.toLowerCase()];
+  if (!spec) return null;
+  const Icon = spec.icon;
+  const sharedStyle = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 26,
+    height: 26,
+    borderRadius: "50%",
+    background: spec.fg,
+    color: "#fff",
+    flexShrink: 0,
+    textDecoration: "none",
+  } as const;
+
+  if (url) {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={`Open ${spec.label} channel`}
+        aria-label={`Open ${spec.label} channel in new tab`}
+        onClick={(e) => e.stopPropagation()}
+        style={{ ...sharedStyle, cursor: "pointer" }}
+      >
+        <Icon size={15} strokeWidth={2.2} />
+      </a>
+    );
+  }
+  return (
+    <span title={spec.label} aria-label={spec.label} style={sharedStyle}>
+      <Icon size={15} strokeWidth={2.2} />
+    </span>
+  );
+}
+
+function timeAgo(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return "";
+  const diff = Math.max(0, Date.now() - then);
+  const min = Math.floor(diff / 60_000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  if (day < 7) return `${day}d ago`;
+  const wk = Math.floor(day / 7);
+  if (wk < 5) return `${wk}w ago`;
+  const mo = Math.floor(day / 30);
+  if (mo < 12) return `${mo}mo ago`;
+  return `${Math.floor(day / 365)}y ago`;
 }
 
 type SortKey = "active" | "alpha" | "newest" | "trusted";
@@ -407,9 +485,27 @@ function SideStack({
                 fontWeight: 700,
                 textDecoration: "none",
                 border: `1px solid ${c.fg}`,
+                overflow: "hidden",
               }}
             >
-              {initials(a.title)}
+              {a.logo_url ? (
+                <img
+                  src={a.logo_url}
+                  alt=""
+                  width={24}
+                  height={24}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    display: "block",
+                  }}
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                initials(a.title)
+              )}
             </Link>
           );
         })}
@@ -718,159 +814,170 @@ function VoicesControls({
 /* ── Voice card ──────────────────────────────────── */
 
 function VoiceCard({ voice }: { voice: WikiPageSummary }) {
-  const c = brandColourFor(voice.slug);
-  const tags = getTags(voice).slice(0, 3);
+  // Prefer the top-level platform from the API (sourced from channel.platform);
+  // fall back to metadata_json.platform if a page sets it manually.
   const platform =
-    typeof voice.metadata_json?.platform === "string"
+    voice.platform ??
+    (typeof voice.metadata_json?.platform === "string"
       ? (voice.metadata_json.platform as string)
-      : null;
+      : null);
+  const updated = timeAgo(voice.updated_at);
+  const router = useRouter();
+  const href = pageHref(voice);
 
+  // Card wrapper is a div (not <Link>) so the platform chip inside can be a
+  // real <a target="_blank"> without producing invalid nested anchors.
+  // Browser HTML repair on <a><a> moves the inner anchor out, breaking
+  // stopPropagation and causing the chip click to fall through to the card link.
   return (
-    <Link
-      href={pageHref(voice)}
+    <div
+      role="link"
+      tabIndex={0}
+      onClick={() => router.push(href)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          router.push(href);
+        }
+      }}
       style={{
-        display: "block",
+        display: "flex",
+        gap: "1.1rem",
         background: v.surface,
         border: `1px solid ${v.border}`,
-        textDecoration: "none",
+        borderRadius: 8,
+        padding: "1.1rem",
         color: "inherit",
-        overflow: "hidden",
+        cursor: "pointer",
         transition: "border-color 0.15s",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = c.fg;
+        e.currentTarget.style.borderColor = v.accent;
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.borderColor = "var(--wiki-border)";
       }}
     >
-      {/* Brand banner */}
       <div
         style={{
-          background: c.bg,
-          color: c.fg,
-          padding: "1.4rem 1.2rem",
           display: "flex",
-          alignItems: "center",
-          gap: "0.85rem",
-          borderBottom: `1px solid ${c.fg}`,
+          flexDirection: "column",
+          alignItems: "flex-start",
+          gap: "0.75rem",
+          flexShrink: 0,
         }}
       >
-        <div
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: "50%",
-            background: "rgba(0,0,0,0.18)",
-            color: c.fg,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontFamily: v.serif,
-            fontSize: "1.1rem",
-            fontWeight: 700,
-            border: `1px solid ${c.fg}`,
-            flexShrink: 0,
-          }}
-        >
-          {initials(voice.title, 2)}
-        </div>
-        <div style={{ minWidth: 0, flex: 1 }}>
+        {voice.logo_url ? (
+          <img
+            src={voice.logo_url}
+            alt=""
+            width={84}
+            height={84}
+            style={{
+              width: 84,
+              height: 84,
+              borderRadius: 6,
+              objectFit: "cover",
+              background: v.bg,
+            }}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
           <div
             style={{
+              width: 84,
+              height: 84,
+              borderRadius: 6,
+              background: v.bg,
+              color: v.inkMuted,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
               fontFamily: v.serif,
-              fontSize: "1.05rem",
+              fontSize: "1.4rem",
               fontWeight: 700,
-              color: c.fg,
-              lineHeight: 1.2,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
+              border: `1px solid ${v.border}`,
             }}
           >
-            {voice.title}
+            {initials(voice.title, 2)}
           </div>
-          {platform && (
-            <div
-              style={{
-                fontSize: "10px",
-                fontWeight: 600,
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-                color: c.fg,
-                opacity: 0.75,
-                marginTop: "0.15rem",
-              }}
-            >
-              {platform}
-            </div>
-          )}
-        </div>
+        )}
+        {platform && (
+          <div
+            style={{
+              marginTop: "auto",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.45rem",
+            }}
+          >
+            <PlatformChip platform={platform} url={voice.channel_url} />
+          </div>
+        )}
       </div>
 
-      {/* Body */}
-      <div style={{ padding: "1rem 1.2rem 1.1rem" }}>
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <h3
+          style={{
+            fontFamily: v.serif,
+            fontSize: "1.15rem",
+            fontWeight: 700,
+            color: v.ink,
+            lineHeight: 1.25,
+            margin: 0,
+            marginBottom: "0.35rem",
+          }}
+        >
+          {voice.title}
+        </h3>
         <p
           style={{
             fontSize: "13px",
             color: v.inkMuted,
             lineHeight: 1.5,
             display: "-webkit-box",
-            WebkitLineClamp: 2,
+            WebkitLineClamp: 3,
             WebkitBoxOrient: "vertical",
             overflow: "hidden",
-            minHeight: "2.9em",
             margin: 0,
+            flex: 1,
           }}
         >
           {voice.summary || "No summary yet."}
         </p>
 
-        {tags.length > 0 && (
-          <div
-            style={{
-              display: "flex",
-              gap: "0.3rem",
-              flexWrap: "wrap",
-              marginTop: "0.85rem",
-            }}
-          >
-            {tags.map((t) => (
-              <span
-                key={t}
-                style={{
-                  fontSize: "10px",
-                  fontWeight: 600,
-                  letterSpacing: "0.05em",
-                  textTransform: "uppercase",
-                  padding: "0.15rem 0.5rem",
-                  borderRadius: 2,
-                  background: c.bg,
-                  color: c.fg,
-                }}
-              >
-                {t}
-              </span>
-            ))}
-          </div>
-        )}
-
         <div
           style={{
-            marginTop: "0.85rem",
+            marginTop: "0.75rem",
             display: "flex",
             alignItems: "center",
-            justifyContent: "space-between",
+            gap: "0.75rem",
             fontSize: "11px",
             color: v.inkFaint,
+            flexWrap: "wrap",
           }}
         >
-          <span>{voice.page_type === "channel" ? "Channel" : "Voice"}</span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem", color: c.fg, fontWeight: 600 }}>
-            View <ArrowRight size={11} />
-          </span>
+          {updated && (
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.3rem",
+              }}
+            >
+              <Clock size={11} /> {updated}
+            </span>
+          )}
         </div>
       </div>
-    </Link>
+    </div>
   );
 }

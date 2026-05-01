@@ -1,3 +1,7 @@
+---
+tags: [area/concepts]
+---
+
 # Episode Beats
 
 The week is a show with a five-beat arc. The Stream doesn't just display content chronologically — it **changes character** as the episode progresses. The audience feels the shift without being told.

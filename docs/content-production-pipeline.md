@@ -1,3 +1,7 @@
+---
+tags: [area/avatar]
+---
+
 # Content Production Pipeline — Future Vision
 
 ## Intent

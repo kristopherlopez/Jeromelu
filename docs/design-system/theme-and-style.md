@@ -1,3 +1,7 @@
+---
+tags: [area/design-system]
+---
+
 # Theme & Style Guide
 
 Status: **Living document — evolves with the product**

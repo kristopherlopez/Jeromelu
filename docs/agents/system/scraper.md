@@ -1,3 +1,7 @@
+---
+tags: [area/agents, subarea/system, status/partial]
+---
+
 # Scraper
 
 | | |
@@ -58,3 +62,32 @@ In `scripts/fetchers/`. Fetch NRL stats but are **not yet wired into Temporal** 
 **Usage:** `python scripts/fetchers/fetch_player_stats.py --round 2 --season 2026`
 
 These are candidates for promotion into `worker-scraper` Temporal activities once the stubs are replaced.
+
+---
+
+## Fixture / Match / Injury sync (planned)
+
+The schema-side groundwork landed in migrations 028–032 — `venues`,
+`matches`, `match_team_lists`, `injuries`, plus `match_id` / `team_id`
+FKs on `player_rounds`. See [data-catalogue](../../operations/data-catalogue.md)
+for table shapes.
+
+Five new sync jobs build on top. Per the project's "Temporal not in
+production" rule, new prod scrapers run as simple cron-driven Python
+scripts that wrap `jeromelu_shared.agent_audit` for run id / bounds /
+cost tracking, not Temporal workflows.
+
+| Job | Cadence | Source | Writes to |
+|---|---|---|---|
+| `sync_fixtures` | Daily 5am AEST | NRL.com draw API | `matches` (upsert on source + external id) |
+| `sync_team_lists` | Tue 1pm, Wed 6pm, Thu 6pm AEST | NRL.com match centre | `match_team_lists` (new `list_version` per pull) |
+| `sync_match_results` | Hourly Fri evening → Mon noon AEST | NRL.com match centre | `matches.status/score`, late-change `match_team_lists` |
+| `sync_injuries` | Daily 8am + Tue 5pm AEST | NRL.com casualty ward (primary), Zero Tackle (cross-ref) | `injuries` (append-on-change) |
+| `sync_supercoach` (existing) | Mon / Wed / Thu | SuperCoach API | `player_rounds` (now also stamps `match_id`, `team_id`) |
+
+Each job's agent_id is reserved on `agent_runs.ck_agent_runs_agent_id`
+— `fixtures` already exists; `casualty` (or similar) gets added when the
+injury sync lands. NRL.com is the canonical spine for the fixture and
+team-list data; SuperCoach API is the fantasy-stats overlay; NRL Physio
+Twitter remains in the claim-extraction pipeline rather than being
+parsed structurally.

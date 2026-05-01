@@ -1,3 +1,7 @@
+---
+tags: [area/architecture]
+---
+
 # Workflow Architecture
 
 Implementation of each workflow lives in [`docs/agents/system/`](../agents/system/README.md). This doc describes intent; the agent pages describe what's actually built and which worker owns it.

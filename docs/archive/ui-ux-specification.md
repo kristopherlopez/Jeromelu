@@ -1,3 +1,7 @@
+---
+tags: [area/archive, status/archived]
+---
+
 # UI/UX Specification
 
 > **Status note (2026-04-17):** This is a legacy spec. The app has since consolidated to five canonical pages: **The Feed**, **The Wiki**, **The Ledger**, **The Analysis**, and **Ask Me**. Where this doc says:

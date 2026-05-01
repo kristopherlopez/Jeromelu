@@ -1,7 +1,7 @@
 """Admin endpoints for reviewing and promoting Scout's discovered candidates.
 
 Workflow:
-  Scout fills `discovered_sources` (status='pending').
+  Scout fills `scout_candidates` (status='pending').
   Reviewer hits these endpoints to approve / reject candidates.
   Approval promotes a row into the canonical tables:
     - kind='channel' → INSERT channels row + INSERT channel-type wiki_pages row
@@ -26,7 +26,7 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from jeromelu_shared.db import Channel, ChannelMetric, DiscoveredSource, Source, WikiPage
+from jeromelu_shared.db import Channel, ChannelMetric, ScoutCandidate, Source, WikiPage
 
 from ..deps import get_db
 from ..scout.refresh import (
@@ -65,7 +65,7 @@ def _unique_slug(session: Session, model, slug_col, base: str) -> str:
 
 
 def _normalised_youtube_metrics(metadata: dict[str, Any] | None) -> dict[str, Any]:
-    """Pull YouTube stats from a discovered_sources.metadata_json dict and
+    """Pull YouTube stats from a scout_candidates.metadata_json dict and
     normalise into the canonical channel_metrics shape. Handles the early
     'subs' / 'subscribers' key inconsistency Scout produced before we pinned
     the schema."""
@@ -121,16 +121,16 @@ def list_candidates(
     db: Session = Depends(get_db),
 ):
     """List discovered candidates, default to status=pending."""
-    q = db.query(DiscoveredSource)
+    q = db.query(ScoutCandidate)
     if status:
-        q = q.filter(DiscoveredSource.status == status)
+        q = q.filter(ScoutCandidate.status == status)
     if kind:
-        q = q.filter(DiscoveredSource.kind == kind)
+        q = q.filter(ScoutCandidate.kind == kind)
     if min_score is not None:
-        q = q.filter(DiscoveredSource.score >= min_score)
+        q = q.filter(ScoutCandidate.score >= min_score)
     rows = q.order_by(
-        DiscoveredSource.score.desc().nullslast(),
-        DiscoveredSource.discovered_at.desc(),
+        ScoutCandidate.score.desc().nullslast(),
+        ScoutCandidate.discovered_at.desc(),
     ).limit(limit).all()
     return {
         "count": len(rows),
@@ -161,7 +161,7 @@ def list_candidates(
     "/admin/recon/candidates/{candidate_id}", dependencies=[Depends(require_admin)]
 )
 def get_candidate(candidate_id: UUID, db: Session = Depends(get_db)):
-    row = db.get(DiscoveredSource, candidate_id)
+    row = db.get(ScoutCandidate, candidate_id)
     if not row:
         raise HTTPException(status_code=404, detail="Candidate not found")
     return {
@@ -203,14 +203,14 @@ def approve_candidate(
     body: dict[str, Any] = Body(default_factory=dict),
     db: Session = Depends(get_db),
 ):
-    """Promote a discovered_sources row into the canonical tables.
+    """Promote a scout_candidates row into the canonical tables.
 
     For kind='channel': insert into channels + wiki_pages.
     For kind='video':   insert into sources.
 
     Idempotent — re-approving an already-approved row is a no-op.
     """
-    row = db.get(DiscoveredSource, candidate_id)
+    row = db.get(ScoutCandidate, candidate_id)
     if not row:
         raise HTTPException(status_code=404, detail="Candidate not found")
 
@@ -411,7 +411,7 @@ def reject_candidate(
     body: dict[str, Any] = Body(default_factory=dict),
     db: Session = Depends(get_db),
 ):
-    row = db.get(DiscoveredSource, candidate_id)
+    row = db.get(ScoutCandidate, candidate_id)
     if not row:
         raise HTTPException(status_code=404, detail="Candidate not found")
 
@@ -435,8 +435,8 @@ def reject_candidate(
 @router.get("/admin/recon/stats", dependencies=[Depends(require_admin)])
 def stats(db: Session = Depends(get_db)):
     rows = (
-        db.query(DiscoveredSource.status, DiscoveredSource.kind, func.count())
-        .group_by(DiscoveredSource.status, DiscoveredSource.kind)
+        db.query(ScoutCandidate.status, ScoutCandidate.kind, func.count())
+        .group_by(ScoutCandidate.status, ScoutCandidate.kind)
         .all()
     )
     by_status: dict[str, dict[str, int]] = {}

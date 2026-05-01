@@ -1,3 +1,7 @@
+---
+tags: [area/todo, status/planning]
+---
+
 # 1.4 Consensus Engine
 
 **Phase:** 1 — Prove the Brain (Intelligence Layer)

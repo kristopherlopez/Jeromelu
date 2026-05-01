@@ -1,3 +1,7 @@
+---
+tags: [area/sources]
+---
+
 # Source Types
 
 Each type has different ingestion, cleaning, and attribution concerns.

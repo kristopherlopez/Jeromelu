@@ -1,3 +1,7 @@
+---
+tags: [area/concepts]
+---
+
 # Audience
 
 The audience is not passive. They have a role in the show. They react, challenge, submit, and get held accountable alongside Jaromelu.

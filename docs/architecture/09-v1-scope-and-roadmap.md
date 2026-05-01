@@ -1,3 +1,7 @@
+---
+tags: [area/architecture]
+---
+
 # V1 Scope
 
 ## Delivered

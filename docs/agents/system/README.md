@@ -1,3 +1,7 @@
+---
+tags: [area/agents, subarea/system]
+---
+
 # System Agents
 
 Backend workers. Temporal workflows, LLM activities, and scrapers that actually run.

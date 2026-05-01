@@ -1,3 +1,7 @@
+---
+tags: [area/pages, subarea/feed]
+---
+
 # Feed Page Layout
 
 Status: **Draft — deciding on layout and feature placement**

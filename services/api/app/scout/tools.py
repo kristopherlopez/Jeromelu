@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from jeromelu_shared.db import Channel, DiscoveredSource, Source
+from jeromelu_shared.db import Channel, ScoutCandidate, Source
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +61,7 @@ DEDUPE_CHECK_TOOL: dict[str, Any] = {
     "description": (
         "Check whether a YouTube channel or video is already known to the system "
         "(tracked in channels, ingested in sources, or previously surfaced as a "
-        "candidate in discovered_sources). Call this BEFORE persisting a candidate "
+        "candidate in scout_candidates). Call this BEFORE persisting a candidate "
         "to avoid wasted work on duplicates."
     ),
     "input_schema": {
@@ -390,7 +390,7 @@ def extract_youtube_id(kind: str, url: str) -> str | None:
 def handle_dedupe_check(session: Session, *, kind: str, url: str) -> dict[str, Any]:
     """Return whether this candidate is already known.
 
-    Checks (in order): channels, sources (for videos), discovered_sources.
+    Checks (in order): channels, sources (for videos), scout_candidates.
     """
     external_id = extract_youtube_id(kind, url)
     if not external_id:
@@ -433,16 +433,16 @@ def handle_dedupe_check(session: Session, *, kind: str, url: str) -> dict[str, A
 
     # 3. Already surfaced as a candidate (any status)?
     existing_disc = session.execute(
-        select(DiscoveredSource.id, DiscoveredSource.status).where(
-            DiscoveredSource.platform == "youtube",
-            DiscoveredSource.kind == kind,
-            DiscoveredSource.external_id == external_id,
+        select(ScoutCandidate.id, ScoutCandidate.status).where(
+            ScoutCandidate.platform == "youtube",
+            ScoutCandidate.kind == kind,
+            ScoutCandidate.external_id == external_id,
         )
     ).first()
     if existing_disc:
         return {
             "known": True,
-            "where": "discovered_sources",
+            "where": "scout_candidates",
             "status": existing_disc.status,
             "external_id": external_id,
         }
@@ -550,7 +550,7 @@ def handle_persist_candidate(
         metadata["published_at"] = snip["publishedAt"]
 
     stmt = (
-        pg_insert(DiscoveredSource)
+        pg_insert(ScoutCandidate)
         .values(
             kind=kind,
             platform="youtube",
@@ -575,7 +575,7 @@ def handle_persist_candidate(
         .on_conflict_do_nothing(
             index_elements=["platform", "kind", "external_id"]
         )
-        .returning(DiscoveredSource.id)
+        .returning(ScoutCandidate.id)
     )
     result = session.execute(stmt).first()
     session.commit()
@@ -583,10 +583,10 @@ def handle_persist_candidate(
     if result is None:
         # Already exists — fetch what's there
         existing = session.execute(
-            select(DiscoveredSource.id, DiscoveredSource.status).where(
-                DiscoveredSource.platform == "youtube",
-                DiscoveredSource.kind == kind,
-                DiscoveredSource.external_id == external_id,
+            select(ScoutCandidate.id, ScoutCandidate.status).where(
+                ScoutCandidate.platform == "youtube",
+                ScoutCandidate.kind == kind,
+                ScoutCandidate.external_id == external_id,
             )
         ).first()
         return {
@@ -632,7 +632,7 @@ def summarise_known_sources(session: Session, *, max_lines: int = 200) -> str:
 
     Used to seed the per-run user brief. Two sections:
       1. Tracked channels (in `channels`, active or inactive)
-      2. Previously surfaced candidates (in `discovered_sources`, any status)
+      2. Previously surfaced candidates (in `scout_candidates`, any status)
 
     Capped at `max_lines` total to keep token cost bounded.
     """
@@ -644,15 +644,15 @@ def summarise_known_sources(session: Session, *, max_lines: int = 200) -> str:
 
     surfaced = session.execute(
         select(
-            DiscoveredSource.title,
-            DiscoveredSource.external_id,
-            DiscoveredSource.status,
+            ScoutCandidate.title,
+            ScoutCandidate.external_id,
+            ScoutCandidate.status,
         )
         .where(
-            DiscoveredSource.platform == "youtube",
-            DiscoveredSource.kind == "channel",
+            ScoutCandidate.platform == "youtube",
+            ScoutCandidate.kind == "channel",
         )
-        .order_by(DiscoveredSource.discovered_at.desc())
+        .order_by(ScoutCandidate.discovered_at.desc())
     ).all()
 
     lines: list[str] = []
@@ -710,9 +710,9 @@ def _known_channel_external_ids(session: Session) -> set[str]:
     surfaced = {
         row[0]
         for row in session.execute(
-            select(DiscoveredSource.external_id).where(
-                DiscoveredSource.platform == "youtube",
-                DiscoveredSource.kind == "channel",
+            select(ScoutCandidate.external_id).where(
+                ScoutCandidate.platform == "youtube",
+                ScoutCandidate.kind == "channel",
             )
         ).all()
     }
@@ -720,13 +720,13 @@ def _known_channel_external_ids(session: Session) -> set[str]:
 
 
 def _known_video_external_ids(session: Session) -> set[str]:
-    """All YouTube video external_ids in discovered_sources (any status)."""
+    """All YouTube video external_ids in scout_candidates (any status)."""
     return {
         row[0]
         for row in session.execute(
-            select(DiscoveredSource.external_id).where(
-                DiscoveredSource.platform == "youtube",
-                DiscoveredSource.kind == "video",
+            select(ScoutCandidate.external_id).where(
+                ScoutCandidate.platform == "youtube",
+                ScoutCandidate.kind == "video",
             )
         ).all()
     }

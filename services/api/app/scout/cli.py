@@ -33,7 +33,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Run the agent and print everything but do NOT write to discovered_sources",
+        help="Run the agent and print everything but do NOT write to scout_candidates",
     )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)

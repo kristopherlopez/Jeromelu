@@ -1,3 +1,7 @@
+---
+tags: [area/operations]
+---
+
 # Jaromelu — AWS Resource Inventory
 
 Track all created AWS resources here. Updated as infrastructure is provisioned.

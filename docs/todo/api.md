@@ -1,3 +1,7 @@
+---
+tags: [area/todo, status/planning]
+---
+
 # 3.1 API Endpoints
 
 **Phase:** 3 — API & Frontend

@@ -1,3 +1,7 @@
+---
+tags: [area/pages, subarea/wiki]
+---
+
 # The Wiki — Page Design
 
 Status: **Phase 1 built**

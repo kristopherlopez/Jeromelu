@@ -1,3 +1,7 @@
+---
+tags: [area/operations]
+---
+
 # Infrastructure as Code Overview
 
 Adopted 2026-04-29. This document captures the *why* behind the IaC choices.

@@ -15,7 +15,12 @@ from ..deps import get_db
 router = APIRouter()
 
 
-def _page_summary(page: WikiPage, logo_url: str | None = None) -> dict:
+def _page_summary(
+    page: WikiPage,
+    logo_url: str | None = None,
+    platform: str | None = None,
+    channel_url: str | None = None,
+) -> dict:
     return {
         "page_id": str(page.page_id),
         "slug": page.slug,
@@ -26,22 +31,26 @@ def _page_summary(page: WikiPage, logo_url: str | None = None) -> dict:
         "metadata_json": page.metadata_json or {},
         "updated_at": page.updated_at.isoformat(),
         "logo_url": logo_url,
+        "platform": platform,
+        "channel_url": channel_url,
     }
 
 
-def _logos_for_pages(db: Session, pages: list[WikiPage]) -> dict[uuid.UUID, str]:
-    """Bulk-load logo_url for channel-backed pages. Returns {page_id: logo_url}.
-    Issues one extra query regardless of how many pages are passed."""
+def _channel_meta_for_pages(
+    db: Session, pages: list[WikiPage]
+) -> dict[uuid.UUID, tuple[str | None, str | None, str | None]]:
+    """Bulk-load (logo_url, platform, url) for channel-backed pages.
+    Returns {page_id: (logo_url, platform, url)}. One extra query regardless of page count."""
     channel_page_ids = [p.page_id for p in pages if p.channel_id]
     if not channel_page_ids:
         return {}
     rows = (
-        db.query(WikiPage.page_id, Channel.logo_url)
+        db.query(WikiPage.page_id, Channel.logo_url, Channel.platform, Channel.url)
         .join(Channel, Channel.channel_id == WikiPage.channel_id)
         .filter(WikiPage.page_id.in_(channel_page_ids))
         .all()
     )
-    return {pid: logo for pid, logo in rows if logo}
+    return {pid: (logo, platform, url) for pid, logo, platform, url in rows}
 
 
 def _revision_item(rev: WikiRevision) -> dict:
@@ -87,9 +96,12 @@ def list_pages(
         pages = pages[:limit]
     next_before = pages[-1].updated_at.isoformat() if pages and has_more else None
 
-    logos = _logos_for_pages(db, pages)
+    channel_meta = _channel_meta_for_pages(db, pages)
     return {
-        "items": [_page_summary(p, logos.get(p.page_id)) for p in pages],
+        "items": [
+            _page_summary(p, *channel_meta.get(p.page_id, (None, None, None)))
+            for p in pages
+        ],
         "next_before": next_before,
     }
 

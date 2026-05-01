@@ -1,3 +1,7 @@
+---
+tags: [area/pages, subarea/wiki]
+---
+
 # The Wiki
 
 Status: **Phase 1 — Vertical slice built**
@@ -125,7 +129,7 @@ Migrations:
 
 | Endpoint | Purpose |
 |----------|---------|
-| `GET /api/wiki/pages` | List pages. Filters: `page_type`, `status`, `q`. Cursor pagination. Returns `metadata_json` per page for team/position/price grouping. |
+| `GET /api/wiki/pages` | List pages. Filters: `page_type`, `status`, `q`. Cursor pagination. Returns `metadata_json` per page for team/position/price grouping. For channel-backed pages, also bulk-loads `logo_url`, `platform` and `channel_url` from the `channels` table (one extra query regardless of page count). |
 | `GET /api/wiki/pages/{slug}` | Full page detail + revisions + `linked_pages` map |
 | `GET /api/wiki/pages/{slug}/revisions` | Full revision history |
 | `GET /api/wiki/recent-changes` | Recent revisions across all pages |

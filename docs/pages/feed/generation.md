@@ -1,3 +1,7 @@
+---
+tags: [area/pages, subarea/feed]
+---
+
 # Feed Generation
 
 The feed generation pipeline converts extracted claims into opinionated, first-person feed events written in Jaromelu's voice. It runs on a 30-minute Temporal schedule, reads unprocessed claims from the database, synthesises them via LLM, and persists deduplicated `Event` rows that the frontend renders as the activity feed.

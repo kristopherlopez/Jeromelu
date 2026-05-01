@@ -1,3 +1,7 @@
+---
+tags: [area/agents, subarea/skills]
+---
+
 # Claude Code Skills
 
 Dev-time agents invoked via `/skill-name` inside Claude Code. These are not production workers — they support the development workflow (extraction experimentation, skill evaluation, transcript handling).

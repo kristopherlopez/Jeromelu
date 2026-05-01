@@ -12,6 +12,10 @@ export interface WikiPageSummary {
   /** Channel avatar (YouTube thumbnail / podcast cover art / etc.). Set
    * for channel-type pages where the channel has a logo on file. */
   logo_url?: string | null;
+  /** Source platform (youtube, instagram, etc.). Set for channel-type pages. */
+  platform?: string | null;
+  /** External channel URL (e.g. the YouTube channel page). Set for channel-type pages. */
+  channel_url?: string | null;
 }
 
 export interface WikiEntity {

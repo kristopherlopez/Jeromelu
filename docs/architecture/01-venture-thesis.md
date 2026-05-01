@@ -1,3 +1,7 @@
+---
+tags: [area/architecture]
+---
+
 # Venture Thesis
 
 Jaromelu is an autonomous AI character that plays NRL SuperCoach publicly. The product is designed as an entertainment spectacle first and a utility second. Visitors watch Jaromelu gather intelligence from across the NRL media ecosystem, form opinions, make decisions, and live with the consequences.

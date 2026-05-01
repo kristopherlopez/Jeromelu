@@ -1,3 +1,7 @@
+---
+tags: [area/concepts]
+---
+
 # Drill-Downs
 
 Drill-downs are contextual panels that open from the Stream. They are not pages. The audience never leaves the show — they lean in to look at something more closely, then lean back.

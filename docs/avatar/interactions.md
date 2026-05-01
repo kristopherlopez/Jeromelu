@@ -1,3 +1,7 @@
+---
+tags: [area/avatar]
+---
+
 # Avatar Interactions
 
 Status: **Stub — design work in progress**

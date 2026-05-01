@@ -1,3 +1,7 @@
+---
+tags: [area/pages, subarea/pulse]
+---
+
 # Live Pulse
 
 Status: **Stub — UI ported from design artifact, data is mock**

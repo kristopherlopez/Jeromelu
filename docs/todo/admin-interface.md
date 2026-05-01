@@ -1,3 +1,7 @@
+---
+tags: [area/todo, status/planning]
+---
+
 # 3.3 Admin Interface
 
 **Phase:** 3 — API & Frontend

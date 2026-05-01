@@ -1,3 +1,7 @@
+---
+tags: [area/concepts]
+---
+
 # First Run
 
 There is no onboarding. There is no tutorial. There is no "Welcome to Jaromelu." The show is on. You walked in.

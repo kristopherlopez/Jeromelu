@@ -1,3 +1,7 @@
+---
+tags: [area/agents, subarea/system, status/skeleton]
+---
+
 # Orchestrator
 
 | | |

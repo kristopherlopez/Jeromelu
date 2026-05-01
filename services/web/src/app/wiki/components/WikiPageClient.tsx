@@ -72,7 +72,14 @@ export default function WikiPageClient({
             Wiki
           </Link>
           <span className="wiki-nav-sep">›</span>
-          <Link href={`/wiki?type=${page.page_type}`} className="wiki-nav-link">
+          <Link
+            href={`/wiki?type=${
+              page.page_type === "channel" || page.page_type === "advisor"
+                ? "voices"
+                : page.page_type
+            }`}
+            className="wiki-nav-link"
+          >
             {typeLabel(page.page_type)}s
           </Link>
         </div>

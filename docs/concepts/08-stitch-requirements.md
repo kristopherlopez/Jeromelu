@@ -1,3 +1,7 @@
+---
+tags: [area/concepts]
+---
+
 # Stitch Requirements — Jaromelu
 
 ## What This Is

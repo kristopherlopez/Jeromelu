@@ -1,0 +1,20 @@
+{
+  "nodes": [
+    {"id": "title-001", "type": "text", "text": "# Jaromelu Project\n\nAutonomous AI character that plays NRL SuperCoach publicly. Spectacle first, utility second.", "x": -300, "y": -360, "width": 600, "height": 140, "color": "5"},
+    {"id": "arch-readme", "type": "file", "file": "architecture/01-venture-thesis.md", "x": -700, "y": -160, "width": 250, "height": 120, "color": "1"},
+    {"id": "agents-readme", "type": "file", "file": "agents/README.md", "x": -200, "y": -160, "width": 250, "height": 120, "color": "2"},
+    {"id": "concepts-readme", "type": "file", "file": "concepts/README.md", "x": 300, "y": -160, "width": 250, "height": 120, "color": "3"},
+    {"id": "pages-feed", "type": "file", "file": "pages/feed/overview.md", "x": -700, "y": 0, "width": 250, "height": 120, "color": "4"},
+    {"id": "ops-iac", "type": "file", "file": "operations/iac-overview.md", "x": -200, "y": 0, "width": 250, "height": 120, "color": "6"},
+    {"id": "avatar-readme", "type": "file", "file": "avatar/README.md", "x": 300, "y": 0, "width": 250, "height": 120, "color": "5"},
+    {"id": "dash-system", "type": "file", "file": "_dashboards/system-status.md", "x": -700, "y": 160, "width": 250, "height": 120, "color": "2"},
+    {"id": "dash-backlog", "type": "file", "file": "_dashboards/backlog.md", "x": -200, "y": 160, "width": 250, "height": 120, "color": "3"},
+    {"id": "dash-bya", "type": "file", "file": "_dashboards/by-area.md", "x": 300, "y": 160, "width": 250, "height": 120, "color": "4"},
+    {"id": "kanban-card", "type": "file", "file": "_dashboards/agents-kanban.md", "x": -200, "y": 320, "width": 250, "height": 120, "color": "6"}
+  ],
+  "edges": [
+    {"id": "e1", "fromNode": "title-001", "fromSide": "bottom", "toNode": "agents-readme", "toSide": "top"},
+    {"id": "e2", "fromNode": "agents-readme", "fromSide": "bottom", "toNode": "dash-system", "toSide": "top"},
+    {"id": "e3", "fromNode": "agents-readme", "fromSide": "bottom", "toNode": "kanban-card", "toSide": "top"}
+  ]
+}

@@ -1,3 +1,7 @@
+---
+tags: [area/todo, status/planning]
+---
+
 # 2.1 Decision Worker
 
 **Phase:** 2 — Prove the Character (Personality + Experience)

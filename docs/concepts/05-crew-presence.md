@@ -1,3 +1,7 @@
+---
+tags: [area/concepts]
+---
+
 # Jaromelu Presence
 
 Jaromelu is the only on-screen character. There is no multi-character "crew bar" — the user-facing surface shows one face, one voice, one presence. The internal "crew" (see [`../agents/crew/README.md`](../agents/crew/README.md)) describes Jaromelu's internal reasoning architecture, not separate visible characters.

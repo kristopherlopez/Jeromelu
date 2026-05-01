@@ -1,3 +1,7 @@
+---
+tags: [area/todo, status/planning]
+---
+
 # 2.3 Match Review System
 
 **Phase:** 2 — Prove the Character (Personality + Experience)

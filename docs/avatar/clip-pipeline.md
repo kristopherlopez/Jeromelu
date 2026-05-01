@@ -1,3 +1,7 @@
+---
+tags: [area/avatar]
+---
+
 # Avatar Clip Pipeline
 
 ## Overview

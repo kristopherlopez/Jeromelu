@@ -1,3 +1,7 @@
+---
+tags: [area/pages, subarea/wiki]
+---
+
 # Wiki Content Pipeline
 
 Status: **Design — not yet implemented**

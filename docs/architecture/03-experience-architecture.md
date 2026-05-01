@@ -1,3 +1,7 @@
+---
+tags: [area/architecture]
+---
+
 # Experience Architecture
 
 > **Status note (2026-04-17):** The live app has consolidated to five canonical pages — **The Feed** (`/`), **The Wiki** (`/wiki`), **The Ledger** (`/ledger`), **The Analysis** (`/insights`), **Ask Me** (`/ask`). This doc pre-dates that consolidation. Where it references **"My Squad"**, the concept was retired in favour of [The Analysis](../pages/analysis/overview.md) as an editorial hub. Where it references **"The Dossier"**, that role now lives in [The Wiki](../pages/wiki/overview.md) — per-entity pages written and maintained by Jaromelu. The narrative and design principles below still apply; only the page names have shifted.

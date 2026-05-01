@@ -1,3 +1,7 @@
+---
+tags: [area/agents, subarea/system, status/live]
+---
+
 # Agent Audit — Standardised Logging Pattern
 
 **Module:** `packages/shared/jeromelu_shared/agent_audit.py`
@@ -16,7 +20,7 @@ Three layers, all joined by a single `run_id`:
 |---|---|---|
 | **Run summary** | `agent_runs` (DB) — **one row per run, keyed by `run_id`**; inserted with `status='running'`, updated in place at run end | "Did agent X run today, what was the outcome, what did it cost" |
 | **Per-event trace** | `agent_events` (DB) — one row per event, queryable while the run is in progress; **plus** an at-end JSONL bundle uploaded to `s3://{settings.s3_agent_logs_bucket}/agent-logs/{agent_id}/{YYYY}/{MM}/{DD}/{run_id}.jsonl` | "Why did it skip that result? What did web_search return on turn 3?" — DB for live + ad-hoc queries; S3 for long-term forensics. |
-| **Domain output** | Agent-specific tables (`discovered_sources` for Scout, `claims` for Analyst, etc.) tagged with `run_id` | "What did this run actually produce" |
+| **Domain output** | Agent-specific tables (`scout_candidates` for Scout, `claims` for Analyst, etc.) tagged with `run_id` | "What did this run actually produce" |
 
 All three tables expose `run_id` as a top-level indexed column (PK on `agent_runs`, unique-with-sequence on `agent_events`), so cross-table queries are clean: `SELECT … FROM agent_runs JOIN agent_events USING (run_id, agent_id) …`.
 
@@ -111,7 +115,7 @@ run inside the helper, so every agent's spend is derived identically.
 
 Round/season aren't on `agent_runs` — they're agent-specific concerns and
 belong on per-agent output tables (`claims.effective_round`,
-`discovered_sources.discovered_at`, etc.), not on the run-level summary.
+`scout_candidates.discovered_at`, etc.), not on the run-level summary.
 
 ---
 

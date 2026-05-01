@@ -1,3 +1,7 @@
+---
+tags: [area/agents, subarea/system, status/live]
+---
+
 # Daily Intel Sweep
 
 The daily intel sweep discovers new YouTube videos from tracked channels, fetches their transcripts, and indexes them into the database. Downstream, transcripts are cleaned, claims are extracted, and results are pushed to production via S3 and the admin API.

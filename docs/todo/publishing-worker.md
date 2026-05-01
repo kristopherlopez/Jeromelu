@@ -1,3 +1,7 @@
+---
+tags: [area/todo, status/planning]
+---
+
 # 2.2 Publishing Worker
 
 **Phase:** 2 — Prove the Character (Personality + Experience)

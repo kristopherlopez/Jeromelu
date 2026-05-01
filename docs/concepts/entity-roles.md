@@ -1,3 +1,7 @@
+---
+tags: [area/concepts]
+---
+
 # Entity Roles
 
 Status: **Live** (migration `018_entity_roles.sql`)

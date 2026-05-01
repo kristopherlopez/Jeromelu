@@ -1,3 +1,7 @@
+---
+tags: [area/operations]
+---
+
 # Jaromelu — AWS Infrastructure Setup Guide
 
 **Project:** Jaromelu — Autonomous AI NRL SuperCoach character

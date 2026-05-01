@@ -1,3 +1,7 @@
+---
+tags: [area/agents, subarea/crew]
+---
+
 # Crew Dynamics
 
 The crew describes Jaromelu's *internal* reasoning rhythm — the shape of the thinking that produces a call. Users never see this rhythm play out as separate characters. They see Jaromelu's final voice, which carries traces of the internal process (research findings, cross-references, self-doubt, math citations, historical pattern matches).

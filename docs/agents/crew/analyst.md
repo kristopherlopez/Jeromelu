@@ -1,3 +1,7 @@
+---
+tags: [area/agents, subarea/crew]
+---
+
 # Analyst — Jaromelu's Cross-Reference Mode
 
 **Internal function** — cross-referencing claims across sources, finding contradictions, detecting consensus shifts, building structured evidence from raw transcripts. Turns raw intel into structured knowledge. **Not a separate visible character.** When this mode is active, Jaromelu's voice (and the UI activity status) reflects it.

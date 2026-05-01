@@ -1,3 +1,7 @@
+---
+tags: [area/operations]
+---
+
 # IaC Runbook
 
 Operational checklist for executing the IaC migration and for day-2

@@ -1,3 +1,7 @@
+---
+tags: [area/agents, subarea/skills]
+---
+
 # Skill Creator Agents
 
 Located at `.claude/skills/skill-creator/agents/`. Used by the `/skill-creator` skill for evaluating and improving Claude Code skills.

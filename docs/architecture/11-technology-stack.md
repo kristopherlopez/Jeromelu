@@ -1,3 +1,7 @@
+---
+tags: [area/architecture]
+---
+
 # Recommended Technology Stack
 
 ## Frontend

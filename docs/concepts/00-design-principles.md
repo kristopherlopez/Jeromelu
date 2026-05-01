@@ -1,3 +1,7 @@
+---
+tags: [area/concepts]
+---
+
 # Design Principles
 
 ## The Show Is On

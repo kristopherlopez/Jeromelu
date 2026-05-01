@@ -1,3 +1,7 @@
+---
+tags: [area/operations]
+---
+
 # CI deploy runner
 
 GitHub Actions deploys to prod by running the `deploy-lightsail` job on a

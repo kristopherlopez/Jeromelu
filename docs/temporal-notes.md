@@ -1,3 +1,7 @@
+---
+tags: [area/architecture]
+---
+
 # Temporal
 
 **Created:** 2026-03-09

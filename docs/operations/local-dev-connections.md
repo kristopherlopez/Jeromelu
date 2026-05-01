@@ -1,3 +1,7 @@
+---
+tags: [area/operations]
+---
+
 # Local Development Connections
 
 Infrastructure (Postgres, MinIO, Temporal) runs via Docker Compose. The API and web services run separately.

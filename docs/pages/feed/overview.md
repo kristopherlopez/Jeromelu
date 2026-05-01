@@ -1,3 +1,7 @@
+---
+tags: [area/pages, subarea/feed]
+---
+
 # The Feed
 
 Status: **Live — default entry point at `/`**

@@ -1,3 +1,7 @@
+---
+tags: [area/todo, status/planning]
+---
+
 # 1.3 Extraction Worker
 
 **Phase:** 1 — Prove the Brain (Intelligence Layer)

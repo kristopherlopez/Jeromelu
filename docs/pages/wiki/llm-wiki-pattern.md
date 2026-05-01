@@ -1,3 +1,7 @@
+---
+tags: [area/pages, subarea/wiki]
+---
+
 # LLM Wiki
 
 A pattern for building personal knowledge bases using LLMs.

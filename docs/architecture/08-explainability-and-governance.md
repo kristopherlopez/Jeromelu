@@ -1,3 +1,7 @@
+---
+tags: [area/architecture]
+---
+
 # Explainability Design
 
 Users should see internal reasoning steps, but not raw technical internals.

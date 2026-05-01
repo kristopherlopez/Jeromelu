@@ -1,3 +1,7 @@
+---
+tags: [area/agents, subarea/skills]
+---
+
 # Transcript Analysis Pipeline
 
 Full workflow doc: [`analyse-transcript.md`](analyse-transcript.md).

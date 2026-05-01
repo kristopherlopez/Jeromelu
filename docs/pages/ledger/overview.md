@@ -1,3 +1,7 @@
+---
+tags: [area/pages, subarea/ledger]
+---
+
 # The Ledger
 
 Status: **Stub — feature doc to be written**
