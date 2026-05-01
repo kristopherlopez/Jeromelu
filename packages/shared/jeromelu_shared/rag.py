@@ -6,7 +6,7 @@ import uuid
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from jeromelu_shared.db import Entity, KnowledgeBase, Source
+from jeromelu_shared.db import KnowledgeBase, Person, Source
 from jeromelu_shared.llm import chat_text, get_embeddings
 
 logger = logging.getLogger(__name__)
@@ -128,17 +128,16 @@ def ask_jeromelu(
 
     for entry in kb_entries:
         kb_entry_ids.append(str(entry.kb_id))
-        if entry.subject_entity_id:
-            entity_ids.add(entry.subject_entity_id)
+        if entry.person_id:
+            entity_ids.add(entry.person_id)
         if entry.source_claim_ids:
             source_claim_ids.update(entry.source_claim_ids)
 
-    # Load player entities for response
+    # Load people for response (KB.person_id only ever points at players today)
     players = []
     if entity_ids:
-        for e in db.query(Entity).filter(Entity.entity_id.in_(entity_ids)).all():
-            if e.entity_type == "player":
-                players.append({"entity_id": str(e.entity_id), "name": e.canonical_name})
+        for e in db.query(Person).filter(Person.person_id.in_(entity_ids)).all():
+            players.append({"entity_id": str(e.person_id), "name": e.canonical_name})
 
     # Load sources referenced by KB entries
     sources = []

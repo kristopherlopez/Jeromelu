@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
-from jeromelu_shared.db import Claim, Entity, KnowledgeBase, PlayerRound, Source
+from jeromelu_shared.db import Claim, KnowledgeBase, Person, PlayerRound, Source
 from jeromelu_shared.llm import chat_text, get_embeddings
 from jeromelu_shared.rag import BASE_PROMPT, TEMPERATURE_ADDONS
 
@@ -158,13 +158,13 @@ def query_top_players(
     top_n: int | None = 20,
     order_by: str = "score",
 ) -> list[dict]:
-    """Query top PlayerRound entries for a round with Entity join.
+    """Query top PlayerRound entries for a round with Person join.
 
-    Returns list of dicts with player stats and entity info.
+    Returns list of dicts with player stats and person info.
     """
-    q = db.query(PlayerRound, Entity).outerjoin(
-        Entity,
-        (Entity.canonical_name == PlayerRound.player_name) & (Entity.entity_type == "player"),
+    q = db.query(PlayerRound, Person).outerjoin(
+        Person,
+        Person.canonical_name == PlayerRound.player_name,
     ).filter(
         PlayerRound.round == round_num,
         PlayerRound.season == season,
@@ -180,9 +180,9 @@ def query_top_players(
         q = q.limit(top_n)
 
     results = []
-    for pr, entity in q.all():
+    for pr, person in q.all():
         results.append({
-            "entity_id": str(entity.entity_id) if entity else None,
+            "entity_id": str(person.person_id) if person else None,
             "player_name": pr.player_name,
             "team": pr.team,
             "position": pr.position,
@@ -205,12 +205,12 @@ def query_top_players(
 
 
 def resolve_entity_names(db: Session, entity_ids: set[str]) -> dict[str, str]:
-    """Map entity_id strings to canonical names."""
+    """Map entity_id strings to canonical names (people only — typed lookup)."""
     if not entity_ids:
         return {}
     uuids = [uuid.UUID(eid) for eid in entity_ids]
-    entities = db.query(Entity).filter(Entity.entity_id.in_(uuids)).all()
-    return {str(e.entity_id): e.canonical_name for e in entities}
+    people = db.query(Person).filter(Person.person_id.in_(uuids)).all()
+    return {str(p.person_id): p.canonical_name for p in people}
 
 
 def resolve_sources_from_claims(db: Session, claim_ids: list[uuid.UUID]) -> list[dict]:

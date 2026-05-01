@@ -32,9 +32,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from jeromelu_shared.db.models import (
-    Entity,
-    EntityRole,
-    PlayerAttributes,
+    Person,
+    PersonAttributes,
+    PersonRole,
     Team,
 )
 
@@ -109,53 +109,53 @@ def _player_canonical_name(sc_player: dict[str, Any]) -> str:
     return f"{sc_player.get('first_name', '').strip()} {sc_player.get('last_name', '').strip()}".strip()
 
 
-def _ensure_player_entity(session: Session, sc_player: dict[str, Any]) -> Entity:
+def _ensure_player_entity(session: Session, sc_player: dict[str, Any]) -> Person:
     name = _player_canonical_name(sc_player)
     sc_id = sc_player.get("id")
 
-    entity = session.execute(
-        select(Entity).where(
-            Entity.entity_type == "player",
-            Entity.canonical_name == name,
-        )
-    ).scalar_one_or_none()
+    person = None
+    if sc_id is not None:
+        person = session.execute(
+            select(Person).where(Person.supercoach_id == sc_id)
+        ).scalar_one_or_none()
+    if person is None:
+        person = session.execute(
+            select(Person).where(Person.canonical_name == name)
+        ).scalar_one_or_none()
 
-    if entity is None:
-        entity = Entity(
-            entity_type="player",
+    if person is None:
+        person = Person(
             canonical_name=name,
             slug=_slugify(name),
             aliases=[],
-            metadata_json={"supercoach_id": sc_id} if sc_id else {},
+            supercoach_id=sc_id,
+            metadata_json={},
         )
-        session.add(entity)
+        session.add(person)
         session.flush()
-    elif sc_id:
-        md = dict(entity.metadata_json or {})
-        if md.get("supercoach_id") != sc_id:
-            md["supercoach_id"] = sc_id
-            entity.metadata_json = md
+    elif sc_id and person.supercoach_id != sc_id:
+        person.supercoach_id = sc_id
 
-    return entity
+    return person
 
 
 def _ensure_player_role(
     session: Session,
-    entity: Entity,
+    entity: Person,
     source: str,
     effective_from: date,
 ) -> None:
     existing = session.execute(
-        select(EntityRole).where(
-            EntityRole.entity_id == entity.entity_id,
-            EntityRole.role == "player",
-            EntityRole.effective_to.is_(None),
+        select(PersonRole).where(
+            PersonRole.person_id == entity.person_id,
+            PersonRole.role == "player",
+            PersonRole.effective_to.is_(None),
         )
     ).scalar_one_or_none()
     if existing is None:
         session.add(
-            EntityRole(
-                entity_id=entity.entity_id,
+            PersonRole(
+                person_id=entity.person_id,
                 role="player",
                 effective_from=effective_from,
                 is_primary=True,
@@ -205,22 +205,21 @@ def seed_roster(
             continue
         team = teams_by_abbrev[abbrev]
 
-        existing_eid = session.execute(
-            select(Entity.entity_id).where(
-                Entity.entity_type == "player",
-                Entity.canonical_name == _player_canonical_name(sc_player),
+        existing_pid = session.execute(
+            select(Person.person_id).where(
+                Person.canonical_name == _player_canonical_name(sc_player),
             )
         ).scalar_one_or_none()
         entity = _ensure_player_entity(session, sc_player)
-        if existing_eid is None:
+        if existing_pid is None:
             counts["entities_created"] += 1
 
         _ensure_player_role(session, entity, source=source, effective_from=effective_from)
 
         existing_attrs = session.execute(
-            select(PlayerAttributes).where(
-                PlayerAttributes.entity_id == entity.entity_id,
-                PlayerAttributes.is_current.is_(True),
+            select(PersonAttributes).where(
+                PersonAttributes.person_id == entity.person_id,
+                PersonAttributes.is_current.is_(True),
             )
         ).scalar_one_or_none()
         if existing_attrs is not None:
@@ -229,14 +228,11 @@ def seed_roster(
 
         primary, secondary = _primary_and_secondary_positions(sc_player)
         session.add(
-            PlayerAttributes(
-                entity_id=entity.entity_id,
+            PersonAttributes(
+                person_id=entity.person_id,
                 team_id=team.team_id,
                 primary_position=primary,
-                metadata_json={
-                    "supercoach_id": sc_player.get("id"),
-                    "secondary_positions": secondary,
-                },
+                metadata_json={"secondary_positions": secondary},
                 effective_from=effective_from,
                 is_current=True,
                 source=source,
@@ -284,22 +280,19 @@ def refresh_roster(
         _ensure_player_role(session, entity, source=source, effective_from=today)
 
         current = session.execute(
-            select(PlayerAttributes).where(
-                PlayerAttributes.entity_id == entity.entity_id,
-                PlayerAttributes.is_current.is_(True),
+            select(PersonAttributes).where(
+                PersonAttributes.person_id == entity.person_id,
+                PersonAttributes.is_current.is_(True),
             )
         ).scalar_one_or_none()
 
         if current is None:
             session.add(
-                PlayerAttributes(
-                    entity_id=entity.entity_id,
+                PersonAttributes(
+                    person_id=entity.person_id,
                     team_id=team.team_id,
                     primary_position=primary,
-                    metadata_json={
-                        "supercoach_id": sc_player.get("id"),
-                        "secondary_positions": secondary,
-                    },
+                    metadata_json={"secondary_positions": secondary},
                     effective_from=today,
                     is_current=True,
                     source=source,
@@ -308,7 +301,7 @@ def refresh_roster(
             counts["new_players"] += 1
             transitions.append({
                 "kind": "new_player",
-                "entity_id": str(entity.entity_id),
+                "entity_id": str(entity.person_id),
                 "name": entity.canonical_name,
                 "team_slug": team.slug,
             })
@@ -332,14 +325,11 @@ def refresh_roster(
         current.is_current = False
 
         session.add(
-            PlayerAttributes(
-                entity_id=entity.entity_id,
+            PersonAttributes(
+                person_id=entity.person_id,
                 team_id=team.team_id,
                 primary_position=primary,
-                metadata_json={
-                    "supercoach_id": sc_player.get("id"),
-                    "secondary_positions": secondary,
-                },
+                metadata_json={"secondary_positions": secondary},
                 effective_from=today,
                 is_current=True,
                 source=source,
@@ -350,7 +340,7 @@ def refresh_roster(
             counts["team_changes"] += 1
             transitions.append({
                 "kind": "team_change",
-                "entity_id": str(entity.entity_id),
+                "entity_id": str(entity.person_id),
                 "name": entity.canonical_name,
                 "from_team_slug": prior_team_slug,
                 "to_team_slug": team.slug,
@@ -359,7 +349,7 @@ def refresh_roster(
             counts["position_changes"] += 1
             transitions.append({
                 "kind": "position_change",
-                "entity_id": str(entity.entity_id),
+                "entity_id": str(entity.person_id),
                 "name": entity.canonical_name,
                 "from_position": prior_position,
                 "to_position": primary,

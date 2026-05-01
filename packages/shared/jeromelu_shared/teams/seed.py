@@ -52,7 +52,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from jeromelu_shared.db.models import Entity, Team
+from jeromelu_shared.db.models import Team
 
 
 # Display competition name → schema grade enum.
