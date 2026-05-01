@@ -709,9 +709,27 @@ function EntityCard({
                   letterSpacing: "0.04em",
                   textDecoration: "none",
                   border: `1px solid ${cfg.accent}`,
+                  overflow: "hidden",
                 }}
               >
-                {initials(s.title)}
+                {s.logo_url ? (
+                  <img
+                    src={s.logo_url}
+                    alt=""
+                    width={30}
+                    height={30}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      display: "block",
+                    }}
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  initials(s.title)
+                )}
               </Link>
             ))}
             {total > samples.length && (
