@@ -2,13 +2,15 @@
 
 import logging
 
+from sqlalchemy.orm import joinedload
 from temporalio import activity
 
 from jeromelu_shared.db import (
-    Entity,
     Event,
+    Person,
     PlayerRound,
     Prediction,
+    PredictionAssociation,
     SessionLocal,
 )
 
@@ -34,10 +36,18 @@ async def generate_review_data() -> list[dict]:
             .all()
         )
 
-        # Get unresolved or recently resolved predictions
+        # Phase 2: subject lives on prediction_associations.person_id (typed FK).
         predictions = (
             session.query(Prediction)
-            .filter(Prediction.subject_entity_id.isnot(None))
+            .join(
+                PredictionAssociation,
+                PredictionAssociation.prediction_id == Prediction.prediction_id,
+            )
+            .filter(
+                PredictionAssociation.role == "subject",
+                PredictionAssociation.person_id.isnot(None),
+            )
+            .options(joinedload(Prediction.associations))
             .all()
         )
 
@@ -48,23 +58,38 @@ async def generate_review_data() -> list[dict]:
             logger.info("No unreviewed predictions found")
             return []
 
-        # Load entities
-        entity_ids = {p.subject_entity_id for p in unreviewed if p.subject_entity_id}
-        entities = {}
-        if entity_ids:
-            for e in session.query(Entity).filter(Entity.entity_id.in_(entity_ids)).all():
-                entities[e.entity_id] = e
+        # Load subject persons
+        person_ids = {
+            a.person_id
+            for p in unreviewed
+            for a in p.associations
+            if a.role == "subject" and a.person_id
+        }
+        people = {}
+        if person_ids:
+            for person in session.query(Person).filter(Person.person_id.in_(person_ids)).all():
+                people[person.person_id] = person
 
         reviews = []
         for pred in unreviewed:
-            entity = entities.get(pred.subject_entity_id)
-            if not entity:
+            subject_assoc = next(
+                (a for a in pred.associations if a.role == "subject" and a.person_id),
+                None,
+            )
+            if not subject_assoc:
+                continue
+            person = people.get(subject_assoc.person_id)
+            if not person:
                 continue
 
-            # Try to find matching player_round data
-            # Use metadata or event_window to determine which round to check
-            player_name = entity.canonical_name
-            player_id = entity.metadata_json.get("player_id") if entity.metadata_json else None
+            player_name = person.canonical_name
+            # supercoach_id was promoted to a column in mig 036; fall back to legacy
+            # metadata_json keys (player_id / supercoach_id) for rows that predate
+            # the promotion sweep.
+            player_id = person.supercoach_id or (
+                (person.metadata_json or {}).get("player_id")
+                or (person.metadata_json or {}).get("supercoach_id")
+            )
 
             if not player_id:
                 continue
@@ -86,7 +111,7 @@ async def generate_review_data() -> list[dict]:
                 "prediction_text": pred.predicted_value_text or "",
                 "prediction_type": pred.prediction_type or "",
                 "player_name": player_name,
-                "entity_id": str(pred.subject_entity_id),
+                "entity_id": str(person.person_id),
                 "actual_score": player_round.score,
                 "actual_round": player_round.round,
                 "actual_season": player_round.season,

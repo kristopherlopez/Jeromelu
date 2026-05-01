@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from jeromelu_shared.db import (
     Claim,
-    Entity,
+    ClaimAssociation,
     KnowledgeBase,
     PlayerRound,
     SquadSlot,
@@ -58,10 +58,15 @@ def _player_consensus(entity_id, current_round: int, season: int, db: Session) -
     if not entity_id:
         return consensus
 
+    # Phase 2: claim subject lives on claim_associations.person_id (typed FK)
+    # not Claim.subject_entity_id (polymorphic UUID). person_id == old entity_id
+    # by migration 036 design.
     rows = (
         db.query(Claim.claim_type, func.count().label("cnt"))
+        .join(ClaimAssociation, ClaimAssociation.claim_id == Claim.claim_id)
         .filter(
-            Claim.subject_entity_id == entity_id,
+            ClaimAssociation.person_id == entity_id,
+            ClaimAssociation.role == "subject",
             Claim.effective_round == current_round,
             Claim.season == season,
         )

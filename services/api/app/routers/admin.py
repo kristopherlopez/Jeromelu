@@ -15,13 +15,18 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from jeromelu_shared.config import settings
+from datetime import date
+
 from jeromelu_shared.db import (
     Claim,
+    ClaimAssociation,
     ClaimChunk,
-    Entity,
+    Person,
+    PersonRole,
     Source,
     SourceChunk,
     SourceDocument,
+    Team,
 )
 from jeromelu_shared.s3 import get_s3_client
 from jeromelu_shared.scraping.nrl import TEAM_CODE_MAP, normalize_name
@@ -102,34 +107,49 @@ _TEAM_NAMES = {v.lower(): v for v in set(TEAM_CODE_MAP.values())}
 _TEAM_NAMES.update({k.lower(): v for k, v in TEAM_CODE_MAP.items()})
 
 
-def _resolve_entity(session: Session, name: str, entity_type: str) -> Entity:
+def _resolve_person(session: Session, name: str) -> Person:
+    """Find-or-create a Person by name, with a current player role.
+
+    Replaces the post-mig-038 player branch of the old `_resolve_entity` helper.
+    """
     normalized = normalize_name(name).strip()
-    entity = session.query(Entity).filter(
-        Entity.entity_type == entity_type,
-        func.lower(Entity.canonical_name) == normalized.lower(),
+    person = session.query(Person).filter(
+        func.lower(Person.canonical_name) == normalized.lower(),
     ).first()
-    if entity:
-        return entity
-    entity = session.query(Entity).filter(
-        Entity.entity_type == entity_type,
-        Entity.aliases.any(normalized),
+    if person:
+        return person
+    person = session.query(Person).filter(
+        Person.aliases.any(normalized),
     ).first()
-    if entity:
-        return entity
-    if entity_type == "team":
-        canonical_team = _TEAM_NAMES.get(normalized.lower())
-        if canonical_team:
-            entity = session.query(Entity).filter(
-                Entity.entity_type == "team",
-                func.lower(Entity.canonical_name) == canonical_team.lower(),
-            ).first()
-            if entity:
-                return entity
-            normalized = canonical_team
-    entity = Entity(entity_type=entity_type, canonical_name=normalized, aliases=[])
-    session.add(entity)
+    if person:
+        return person
+    person = Person(canonical_name=normalized, aliases=[])
+    session.add(person)
     session.flush()
-    return entity
+    # Open a current player role row for the person.
+    session.add(PersonRole(
+        person_id=person.person_id,
+        role="player",
+        effective_from=date.today(),
+        is_primary=True,
+    ))
+    session.flush()
+    return person
+
+
+def _resolve_team(session: Session, name: str) -> Team | None:
+    """Resolve a team name to a Team row. Returns None if no match."""
+    normalized = normalize_name(name).strip()
+    canonical = _TEAM_NAMES.get(normalized.lower(), normalized)
+    team = session.query(Team).filter(
+        func.lower(Team.name) == canonical.lower(),
+    ).first()
+    if team:
+        return team
+    team = session.query(Team).filter(
+        Team.aliases.any(canonical),
+    ).first()
+    return team
 
 
 def _find_chunks_for_claim(claim_text: str, chunks: list[SourceChunk]) -> list[SourceChunk]:
@@ -393,11 +413,12 @@ def ingest(req: IngestRequest, db: Session = Depends(get_db)):
 
         claims_created = 0
         for claim_data in claims_json:
-            player_entity = None
+            player_person = None
+            team = None
             if claim_data.get("player_name"):
-                player_entity = _resolve_entity(db, claim_data["player_name"], "player")
+                player_person = _resolve_person(db, claim_data["player_name"])
             if claim_data.get("team_name"):
-                _resolve_entity(db, claim_data["team_name"], "team")
+                team = _resolve_team(db, claim_data["team_name"])
 
             matched_chunks: list[SourceChunk] = []
             if claim_data.get("claim_text") and db_chunks:
@@ -408,7 +429,6 @@ def ingest(req: IngestRequest, db: Session = Depends(get_db)):
 
             claim = Claim(
                 document_id=doc.document_id,
-                subject_entity_id=player_entity.entity_id if player_entity else None,
                 claim_type=claim_data["claim_type"],
                 claim_text=claim_data.get("claim_text"),
                 polarity=claim_data.get("polarity"),
@@ -420,6 +440,20 @@ def ingest(req: IngestRequest, db: Session = Depends(get_db)):
             )
             db.add(claim)
             db.flush()
+
+            # Subject association — player if present, otherwise team
+            if player_person:
+                db.add(ClaimAssociation(
+                    claim_id=claim.claim_id,
+                    role="subject",
+                    person_id=player_person.person_id,
+                ))
+            elif team:
+                db.add(ClaimAssociation(
+                    claim_id=claim.claim_id,
+                    role="subject",
+                    team_id=team.team_id,
+                ))
 
             for ordinal, matched_chunk in enumerate(matched_chunks):
                 db.add(ClaimChunk(

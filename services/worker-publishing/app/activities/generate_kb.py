@@ -6,11 +6,15 @@ from datetime import datetime, timezone
 
 from temporalio import activity
 
+from sqlalchemy.orm import joinedload
+
 from jeromelu_shared.db import (
     Claim,
-    Entity,
+    ClaimAssociation,
     Event,
     KnowledgeBase,
+    Person,
+    PersonRole,
     PlayerRound,
     SessionLocal,
     Source,
@@ -74,19 +78,28 @@ async def generate_player_summaries() -> dict:
     """Generate or update player_summary KB entries for players with recent claims."""
     session = SessionLocal()
     try:
-        # Find player entities with claims
-        player_entities = (
-            session.query(Entity)
-            .filter(Entity.entity_type == "player")
+        # Phase 2: people with current player role (replaces Entity[entity_type='player']).
+        player_people = (
+            session.query(Person)
+            .join(PersonRole, PersonRole.person_id == Person.person_id)
+            .filter(
+                PersonRole.role == "player",
+                PersonRole.effective_to.is_(None),
+            )
+            .distinct()
             .all()
         )
 
         generated = 0
-        for entity in player_entities:
-            # Get recent claims for this player
+        for person in player_people:
+            # Get recent claims for this player via claim_associations.
             claims = (
                 session.query(Claim)
-                .filter(Claim.subject_entity_id == entity.entity_id)
+                .join(ClaimAssociation, ClaimAssociation.claim_id == Claim.claim_id)
+                .filter(
+                    ClaimAssociation.person_id == person.person_id,
+                    ClaimAssociation.role == "subject",
+                )
                 .order_by(Claim.extracted_at.desc())
                 .limit(20)
                 .all()
@@ -94,8 +107,12 @@ async def generate_player_summaries() -> dict:
             if not claims:
                 continue
 
-            # Get latest player round stats
-            player_id = entity.metadata_json.get("player_id") if entity.metadata_json else None
+            # supercoach_id was promoted to a column in mig 036; fall back to
+            # legacy metadata_json keys for rows that pre-date the promotion sweep.
+            player_id = person.supercoach_id or (
+                (person.metadata_json or {}).get("player_id")
+                or (person.metadata_json or {}).get("supercoach_id")
+            )
             stats_text = ""
             if player_id:
                 pr = (
@@ -117,12 +134,12 @@ async def generate_player_summaries() -> dict:
                 for c in claims
             )
 
-            user_prompt = f"Player: {entity.canonical_name}\n\n{stats_text}\n\nClaims:\n{claims_text}"
+            user_prompt = f"Player: {person.canonical_name}\n\n{stats_text}\n\nClaims:\n{claims_text}"
 
             try:
                 result = chat_json(PLAYER_SUMMARY_PROMPT, user_prompt)
             except Exception:
-                logger.exception("LLM failed for player summary: %s", entity.canonical_name)
+                logger.exception("LLM failed for player summary: %s", person.canonical_name)
                 continue
 
             claim_ids = [c.claim_id for c in claims]
@@ -132,8 +149,8 @@ async def generate_player_summaries() -> dict:
             _upsert_kb_entry(
                 session,
                 kb_type="player_summary",
-                subject_entity_id=entity.entity_id,
-                title=result.get("title", f"{entity.canonical_name} Summary"),
+                person_id=person.person_id,
+                title=result.get("title", f"{person.canonical_name} Summary"),
                 content=result.get("content", ""),
                 source_claim_ids=claim_ids,
                 effective_round=round_num,
@@ -179,15 +196,31 @@ async def generate_round_briefs() -> dict:
         if not claims:
             return {"round_briefs": 0}
 
-        # Load entity names for context
-        entity_ids = {c.subject_entity_id for c in claims if c.subject_entity_id}
-        entities = {}
-        if entity_ids:
-            for e in session.query(Entity).filter(Entity.entity_id.in_(entity_ids)).all():
-                entities[e.entity_id] = e.canonical_name
+        # Load subject person names via claim_associations (player subjects only).
+        # Eager-load associations to avoid N+1.
+        claims_with_assocs = (
+            session.query(Claim)
+            .filter(Claim.claim_id.in_([c.claim_id for c in claims]))
+            .options(joinedload(Claim.associations))
+            .all()
+        )
+        subject_person_by_claim: dict = {}
+        person_ids: set = set()
+        for c in claims_with_assocs:
+            for a in c.associations:
+                if a.role == "subject" and a.person_id:
+                    subject_person_by_claim[c.claim_id] = a.person_id
+                    person_ids.add(a.person_id)
+
+        people_names: dict = {}
+        if person_ids:
+            for p in session.query(Person).filter(Person.person_id.in_(person_ids)).all():
+                people_names[p.person_id] = p.canonical_name
 
         claims_text = "\n".join(
-            f"- [{c.claim_type}] {entities.get(c.subject_entity_id, 'Unknown')}: {c.claim_text}"
+            f"- [{c.claim_type}] "
+            f"{people_names.get(subject_person_by_claim.get(c.claim_id), 'Unknown')}: "
+            f"{c.claim_text}"
             for c in claims
         )
 
@@ -202,7 +235,7 @@ async def generate_round_briefs() -> dict:
         _upsert_kb_entry(
             session,
             kb_type="round_brief",
-            subject_entity_id=None,
+            person_id=None,
             title=result.get("title", f"Round {round_num} Brief"),
             content=result.get("content", ""),
             source_claim_ids=[c.claim_id for c in claims],
@@ -248,14 +281,19 @@ async def generate_decisions_log() -> dict:
             if title in existing_hashes:
                 continue
 
-            # Try to find outcome data for related entities
+            # Try to find outcome data for related entities. UUIDs in
+            # events.related_entity_ids[] map to people.person_id by mig 036
+            # design (entities is dropped in mig 037; Person is the new lookup).
             outcome_text = ""
             if ev.related_entity_ids:
                 for eid in ev.related_entity_ids[:3]:
-                    entity = session.query(Entity).get(eid)
-                    if not entity:
+                    person = session.query(Person).get(eid)
+                    if not person:
                         continue
-                    player_id = entity.metadata_json.get("player_id") if entity.metadata_json else None
+                    player_id = person.supercoach_id or (
+                        (person.metadata_json or {}).get("player_id")
+                        or (person.metadata_json or {}).get("supercoach_id")
+                    )
                     if player_id:
                         pr = (
                             session.query(PlayerRound)
@@ -265,7 +303,7 @@ async def generate_decisions_log() -> dict:
                             .first()
                         )
                         if pr:
-                            outcome_text += f" {entity.canonical_name} scored {pr.score} in Rd {pr.round}."
+                            outcome_text += f" {person.canonical_name} scored {pr.score} in Rd {pr.round}."
 
             content = ev.display_text
             if outcome_text:
@@ -298,26 +336,44 @@ async def generate_player_opinions() -> dict:
     """Generate opinion KB entries — JeromeLu's opinionated stance on players."""
     session = SessionLocal()
     try:
-        # Find players with enough claims to form an opinion (3+)
+        # Find players with enough claims to form an opinion (3+).
+        # Phase 2: subject lives on claim_associations.person_id.
         from sqlalchemy import func
 
         player_claim_counts = (
-            session.query(Claim.subject_entity_id, func.count(Claim.claim_id))
-            .filter(Claim.subject_entity_id.isnot(None))
-            .group_by(Claim.subject_entity_id)
-            .having(func.count(Claim.claim_id) >= 3)
+            session.query(ClaimAssociation.person_id, func.count(ClaimAssociation.claim_id))
+            .filter(
+                ClaimAssociation.person_id.isnot(None),
+                ClaimAssociation.role == "subject",
+            )
+            .group_by(ClaimAssociation.person_id)
+            .having(func.count(ClaimAssociation.claim_id) >= 3)
             .all()
         )
 
         generated = 0
-        for entity_id, _ in player_claim_counts:
-            entity = session.query(Entity).get(entity_id)
-            if not entity or entity.entity_type != "player":
+        for person_id, _ in player_claim_counts:
+            # Confirm this person currently holds the player role
+            person = (
+                session.query(Person)
+                .join(PersonRole, PersonRole.person_id == Person.person_id)
+                .filter(
+                    Person.person_id == person_id,
+                    PersonRole.role == "player",
+                    PersonRole.effective_to.is_(None),
+                )
+                .first()
+            )
+            if not person:
                 continue
 
             claims = (
                 session.query(Claim)
-                .filter(Claim.subject_entity_id == entity_id)
+                .join(ClaimAssociation, ClaimAssociation.claim_id == Claim.claim_id)
+                .filter(
+                    ClaimAssociation.person_id == person_id,
+                    ClaimAssociation.role == "subject",
+                )
                 .order_by(Claim.extracted_at.desc())
                 .limit(15)
                 .all()
@@ -328,19 +384,19 @@ async def generate_player_opinions() -> dict:
                 for c in claims
             )
 
-            user_prompt = f"Player: {entity.canonical_name}\n\nClaims:\n{claims_text}"
+            user_prompt = f"Player: {person.canonical_name}\n\nClaims:\n{claims_text}"
 
             try:
                 result = chat_json(OPINION_PROMPT, user_prompt)
             except Exception:
-                logger.exception("LLM failed for opinion: %s", entity.canonical_name)
+                logger.exception("LLM failed for opinion: %s", person.canonical_name)
                 continue
 
             _upsert_kb_entry(
                 session,
                 kb_type="opinion",
-                subject_entity_id=entity_id,
-                title=result.get("title", f"Opinion: {entity.canonical_name}"),
+                person_id=person_id,
+                title=result.get("title", f"Opinion: {person.canonical_name}"),
                 content=result.get("content", ""),
                 source_claim_ids=[c.claim_id for c in claims],
                 effective_round=claims[0].effective_round if claims else None,
@@ -406,15 +462,30 @@ async def generate_source_digests() -> dict:
             if not claims:
                 continue
 
-            # Load entity names
-            entity_ids = {c.subject_entity_id for c in claims if c.subject_entity_id}
-            entities = {}
-            if entity_ids:
-                for e in session.query(Entity).filter(Entity.entity_id.in_(entity_ids)).all():
-                    entities[e.entity_id] = e.canonical_name
+            # Load subject person names via claim_associations.
+            claims_with_assocs = (
+                session.query(Claim)
+                .filter(Claim.claim_id.in_([c.claim_id for c in claims]))
+                .options(joinedload(Claim.associations))
+                .all()
+            )
+            subject_person_by_claim: dict = {}
+            person_ids: set = set()
+            for c in claims_with_assocs:
+                for a in c.associations:
+                    if a.role == "subject" and a.person_id:
+                        subject_person_by_claim[c.claim_id] = a.person_id
+                        person_ids.add(a.person_id)
+
+            people_names: dict = {}
+            if person_ids:
+                for p in session.query(Person).filter(Person.person_id.in_(person_ids)).all():
+                    people_names[p.person_id] = p.canonical_name
 
             claims_text = "\n".join(
-                f"- [{c.claim_type}] {entities.get(c.subject_entity_id, 'Unknown')}: {c.claim_text}"
+                f"- [{c.claim_type}] "
+                f"{people_names.get(subject_person_by_claim.get(c.claim_id), 'Unknown')}: "
+                f"{c.claim_text}"
                 for c in claims
             )
 
@@ -501,19 +572,19 @@ async def embed_kb_entries() -> dict:
 def _upsert_kb_entry(
     session,
     kb_type: str,
-    subject_entity_id: uuid.UUID | None,
+    person_id: uuid.UUID | None,
     title: str,
     content: str,
     source_claim_ids: list,
     effective_round: int | None = None,
     season: int | None = None,
 ):
-    """Insert or update a KB entry, matching on kb_type + subject_entity_id + effective_round."""
+    """Insert or update a KB entry, matching on kb_type + person_id + effective_round."""
     existing = (
         session.query(KnowledgeBase)
         .filter(
             KnowledgeBase.kb_type == kb_type,
-            KnowledgeBase.subject_entity_id == subject_entity_id,
+            KnowledgeBase.person_id == person_id,
         )
     )
     if effective_round is not None:
@@ -532,7 +603,7 @@ def _upsert_kb_entry(
     else:
         kb = KnowledgeBase(
             kb_type=kb_type,
-            subject_entity_id=subject_entity_id,
+            person_id=person_id,
             title=title,
             content=content,
             source_claim_ids=[uuid.UUID(str(cid)) for cid in source_claim_ids],

@@ -148,8 +148,8 @@ class SourceSpeaker(Base):
 
     Coarse-grained span layer above ``SourceChunk``. Populated by the
     diarisation pass (Deepgram or equivalent) after document ingest.
-    ``speaker_entity_id`` is NULL until the raw diariser label
-    (``speaker_label``) is resolved to a known entity. See migration 034.
+    ``speaker_person_id`` is NULL until the raw diariser label
+    (``speaker_label``) is resolved to a known person. See migration 034.
     """
 
     __tablename__ = "source_speakers"
@@ -158,8 +158,8 @@ class SourceSpeaker(Base):
     document_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("source_documents.document_id", ondelete="CASCADE"), nullable=False
     )
-    speaker_entity_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("entities.entity_id", ondelete="SET NULL")
+    speaker_person_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("people.person_id", ondelete="SET NULL")
     )
     speaker_label: Mapped[str | None] = mapped_column(Text)
     start_ts: Mapped[float] = mapped_column(Float, nullable=False)
@@ -171,9 +171,9 @@ class SourceSpeaker(Base):
         CheckConstraint("end_ts >= start_ts", name="ck_source_speakers_span"),
         Index("idx_source_speakers_document", "document_id"),
         Index(
-            "idx_source_speakers_entity",
-            "speaker_entity_id",
-            postgresql_where="speaker_entity_id IS NOT NULL",
+            "idx_source_speakers_person",
+            "speaker_person_id",
+            postgresql_where="speaker_person_id IS NOT NULL",
         ),
         Index("idx_source_speakers_doc_start", "document_id", "start_ts"),
     )
@@ -208,76 +208,6 @@ class SourceChapter(Base):
     )
 
 
-class SourceAnnotation(Base):
-    """Generic descriptive overlay over a source document.
-
-    Catch-all for sentiment, sub-topic tags, entity mentions, themes —
-    any enrichment that does not warrant a first-class table. ``kind``
-    is free-form text on purpose so new annotation types can be added
-    without schema changes. NULL ``start_ts``/``end_ts`` indicates a
-    document-level annotation. See migration 034.
-    """
-
-    __tablename__ = "source_annotations"
-
-    annotation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
-    document_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("source_documents.document_id", ondelete="CASCADE"), nullable=False
-    )
-    kind: Mapped[str] = mapped_column(Text, nullable=False)
-    start_ts: Mapped[float | None] = mapped_column(Float)
-    end_ts: Mapped[float | None] = mapped_column(Float)
-    target_entity_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("entities.entity_id", ondelete="SET NULL")
-    )
-    label: Mapped[str | None] = mapped_column(Text)
-    payload_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-    confidence: Mapped[float | None] = mapped_column(Float)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
-
-    __table_args__ = (
-        CheckConstraint(
-            "(start_ts IS NULL AND end_ts IS NULL) "
-            "OR (start_ts IS NOT NULL AND end_ts IS NOT NULL AND end_ts >= start_ts)",
-            name="ck_source_annotations_span",
-        ),
-        Index("idx_source_annotations_document", "document_id"),
-        Index("idx_source_annotations_kind", "kind"),
-        Index("idx_source_annotations_doc_kind", "document_id", "kind"),
-        Index(
-            "idx_source_annotations_target",
-            "target_entity_id",
-            postgresql_where="target_entity_id IS NOT NULL",
-        ),
-    )
-
-
-class Entity(Base):
-    __tablename__ = "entities"
-
-    entity_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
-    entity_type: Mapped[str] = mapped_column(Text, nullable=False)
-    canonical_name: Mapped[str] = mapped_column(Text, nullable=False)
-    aliases: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
-    slug: Mapped[str | None] = mapped_column(Text)
-    metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
-
-    roles: Mapped[list["EntityRole"]] = relationship(back_populates="entity", cascade="all, delete-orphan")
-
-    __table_args__ = (
-        CheckConstraint(
-            "entity_type IN ("
-            "'player', 'team', 'advisor', 'coach', 'referee', "
-            "'commentator', 'journalist', 'match', 'round', 'venue'"
-            ")",
-            name="ck_entity_type",
-        ),
-        Index("idx_entities_type", "entity_type"),
-        Index("idx_entities_name", "canonical_name"),
-    )
-
-
 class Team(Base):
     """Canonical roster of every team across all grades feeding into NRL.
 
@@ -301,9 +231,13 @@ class Team(Base):
     parent_team_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("teams.team_id", ondelete="SET NULL")
     )
-    entity_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("entities.entity_id", ondelete="SET NULL"), unique=True
+    primary_colour: Mapped[str | None] = mapped_column(Text)
+    secondary_colour: Mapped[str | None] = mapped_column(Text)
+    founded_year: Mapped[int | None] = mapped_column(Integer)
+    home_venue_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("venues.venue_id", ondelete="SET NULL")
     )
+    logo_url: Mapped[str | None] = mapped_column(Text)
     metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
@@ -326,43 +260,122 @@ class Team(Base):
         ),
         Index("idx_teams_grade", "grade"),
         Index("idx_teams_parent", "parent_team_id"),
-        Index("idx_teams_entity", "entity_id"),
         Index("idx_teams_active", "active"),
     )
 
 
-class EntityRole(Base):
-    __tablename__ = "entity_roles"
+# ─── Identity tables ────────────────────────────────────────────────────
+# After mig 038, the old Entity / EntityRole / PlayerAttributes tables and
+# their classes are gone. Person + PersonAttributes + PersonRole + Round
+# are the canonical identity layer.
 
-    entity_role_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
-    entity_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("entities.entity_id", ondelete="CASCADE"), nullable=False
+
+class Person(Base):
+    """Unified table for every human actor — players, coaches, advisors,
+    commentators, journalists, referees. Lifetime-stable facts get typed
+    columns; long-tail goes in metadata_json. See migration 036.
+    """
+
+    __tablename__ = "people"
+
+    person_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    canonical_name: Mapped[str] = mapped_column(Text, nullable=False)
+    aliases: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
+    slug: Mapped[str | None] = mapped_column(Text, unique=True)
+
+    dob: Mapped[date | None] = mapped_column(Date)
+    country: Mapped[str | None] = mapped_column(Text)
+    image_url: Mapped[str | None] = mapped_column(Text)
+    supercoach_id: Mapped[int | None] = mapped_column(Integer, unique=True)
+
+    metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+    __table_args__ = (
+        Index("idx_people_name", "canonical_name"),
+        Index("idx_people_country", "country", postgresql_where="country IS NOT NULL"),
+    )
+
+
+class PersonAttributes(Base):
+    """SCD-2 of slow-changing per-person facts. Replaces ``PlayerAttributes``
+    (dropped in mig 037). Closed-and-reopened on change.
+    """
+
+    __tablename__ = "people_attributes"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    person_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("people.person_id", ondelete="CASCADE"), nullable=False
+    )
+    team_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("teams.team_id", ondelete="SET NULL")
+    )
+    primary_position: Mapped[str | None] = mapped_column(Text)
+    height_cm: Mapped[int | None] = mapped_column(Integer)
+    weight_kg: Mapped[int | None] = mapped_column(Integer)
+    contract_until: Mapped[date | None] = mapped_column(Date)
+    real_salary_aud: Mapped[int | None] = mapped_column(Integer)
+    metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+    effective_from: Mapped[date] = mapped_column(Date, nullable=False)
+    effective_to: Mapped[date | None] = mapped_column(Date)
+    is_current: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    source: Mapped[str] = mapped_column(Text, nullable=False, default="seed")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    __table_args__ = (
+        CheckConstraint(
+            "effective_to IS NULL OR effective_to >= effective_from",
+            name="ck_people_attributes_period",
+        ),
+        Index("idx_people_attributes_person_current", "person_id", "is_current"),
+        Index("idx_people_attributes_team_current", "team_id", "is_current"),
+        Index(
+            "uq_people_attributes_current",
+            "person_id",
+            unique=True,
+            postgresql_where="is_current",
+        ),
+    )
+
+
+class PersonRole(Base):
+    """SCD-2 of role tenure per person. Multi-valued at a point in time
+    (e.g. Adam Reynolds = active player + occasional commentator). Renamed
+    from ``EntityRole`` (dropped in mig 037).
+    """
+
+    __tablename__ = "people_roles"
+
+    role_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    person_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("people.person_id", ondelete="CASCADE"), nullable=False
     )
     role: Mapped[str] = mapped_column(Text, nullable=False)
     effective_from: Mapped[date] = mapped_column(Date, nullable=False)
     effective_to: Mapped[date | None] = mapped_column(Date)
     is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
+    metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     source: Mapped[str] = mapped_column(Text, nullable=False, default="seed")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
-
-    entity: Mapped["Entity"] = relationship(back_populates="roles")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
     __table_args__ = (
         CheckConstraint(
             "role IN ('player', 'coach', 'commentator', 'journalist', 'referee', 'advisor')",
-            name="ck_entity_roles_role",
+            name="ck_people_roles_role",
         ),
         CheckConstraint(
             "effective_to IS NULL OR effective_to >= effective_from",
-            name="ck_entity_roles_period",
+            name="ck_people_roles_period",
         ),
-        Index("idx_entity_roles_entity", "entity_id", "effective_to"),
-        Index("idx_entity_roles_role_period", "role", "effective_from", "effective_to"),
+        Index("idx_people_roles_person", "person_id", "effective_to"),
+        Index("idx_people_roles_role_period", "role", "effective_from", "effective_to"),
         Index(
-            "uq_entity_roles_primary_current",
-            "entity_id",
+            "uq_people_roles_primary_current",
+            "person_id",
             unique=True,
             postgresql_where="is_primary AND effective_to IS NULL",
         ),
@@ -375,7 +388,9 @@ class Quote(Base):
     quote_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
     document_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("source_documents.document_id"), nullable=False)
     chunk_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("source_chunks.chunk_id"))
-    speaker_entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("entities.entity_id"))
+    speaker_person_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("people.person_id")
+    )
     quoted_text: Mapped[str] = mapped_column(Text, nullable=False)
     start_offset: Mapped[int | None] = mapped_column(Integer)
     end_offset: Mapped[int | None] = mapped_column(Integer)
@@ -388,7 +403,7 @@ class Quote(Base):
 
     __table_args__ = (
         Index("idx_quotes_document", "document_id"),
-        Index("idx_quotes_speaker", "speaker_entity_id"),
+        Index("idx_quotes_speaker", "speaker_person_id"),
     )
 
 
@@ -413,7 +428,6 @@ class Claim(Base):
     claim_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
     document_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("source_documents.document_id"))
     quote_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("quotes.quote_id"))
-    subject_entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("entities.entity_id"))
     claim_type: Mapped[str] = mapped_column(Text, nullable=False)
     claim_text: Mapped[str | None] = mapped_column(Text)
     polarity: Mapped[float | None] = mapped_column(Float)
@@ -422,21 +436,83 @@ class Claim(Base):
     season: Mapped[int | None] = mapped_column(Integer)
     start_ts: Mapped[float | None] = mapped_column(Float)
     end_ts: Mapped[float | None] = mapped_column(Float)
+    payload_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     extracted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
     document: Mapped["SourceDocument | None"] = relationship()
     quote: Mapped["Quote | None"] = relationship(back_populates="claims")
     chunk_links: Mapped[list["ClaimChunk"]] = relationship(back_populates="claim", cascade="all, delete-orphan")
+    associations: Mapped[list["ClaimAssociation"]] = relationship(
+        back_populates="claim", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         CheckConstraint(
-            "claim_type IN ('buy', 'sell', 'hold', 'captain', 'avoid', 'breakout', 'matchup_edge')",
+            "claim_type IN ("
+            # Fantasy-actionable
+            "'buy', 'sell', 'hold', 'captain', 'avoid', 'breakout', 'matchup_edge', "
+            # Annotation-flavoured (mig 036; absorbed from source_annotations)
+            "'mention', 'theme', 'subtopic', 'sentiment', 'tactical_tag', 'highlight'"
+            ")",
             name="ck_claim_type",
         ),
-        Index("idx_claims_subject", "subject_entity_id"),
         Index("idx_claims_type", "claim_type"),
         Index("idx_claims_document", "document_id"),
         Index("idx_claims_round_season", "effective_round", "season"),
+    )
+
+
+class ClaimAssociation(Base):
+    """Polymorphic many-to-many between claims and typed entities.
+
+    A claim can name a player + team + match all at once with different
+    roles. The CHECK constraint enforces exactly one typed FK is set per
+    row. See migration 036.
+    """
+
+    __tablename__ = "claim_associations"
+
+    association_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    claim_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("claims.claim_id", ondelete="CASCADE"), nullable=False
+    )
+    role: Mapped[str] = mapped_column(Text, nullable=False)
+    person_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("people.person_id", ondelete="CASCADE")
+    )
+    team_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("teams.team_id", ondelete="CASCADE")
+    )
+    match_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("matches.match_id", ondelete="CASCADE")
+    )
+    venue_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("venues.venue_id", ondelete="CASCADE")
+    )
+    round_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("rounds.round_id", ondelete="CASCADE")
+    )
+
+    claim: Mapped["Claim"] = relationship(back_populates="associations")
+
+    __table_args__ = (
+        CheckConstraint(
+            "(person_id IS NOT NULL)::int + (team_id IS NOT NULL)::int + "
+            "(match_id IS NOT NULL)::int + (venue_id IS NOT NULL)::int + "
+            "(round_id IS NOT NULL)::int = 1",
+            name="ck_claim_associations_one_subject",
+        ),
+        UniqueConstraint(
+            "claim_id", "role", "person_id", "team_id", "match_id", "venue_id", "round_id",
+            name="uq_claim_associations",
+            postgresql_nulls_not_distinct=True,
+        ),
+        Index("idx_claim_associations_claim", "claim_id"),
+        Index("idx_claim_associations_person", "person_id", postgresql_where="person_id IS NOT NULL"),
+        Index("idx_claim_associations_team", "team_id", postgresql_where="team_id IS NOT NULL"),
+        Index("idx_claim_associations_match", "match_id", postgresql_where="match_id IS NOT NULL"),
+        Index("idx_claim_associations_venue", "venue_id", postgresql_where="venue_id IS NOT NULL"),
+        Index("idx_claim_associations_round", "round_id", postgresql_where="round_id IS NOT NULL"),
     )
 
 
@@ -444,8 +520,9 @@ class Prediction(Base):
     __tablename__ = "predictions"
 
     prediction_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
-    predictor_entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("entities.entity_id"))
-    subject_entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("entities.entity_id"))
+    predictor_person_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("people.person_id")
+    )
     prediction_type: Mapped[str | None] = mapped_column(Text)
     predicted_value_text: Mapped[str | None] = mapped_column(Text)
     event_window: Mapped[str | None] = mapped_column(Text)
@@ -454,9 +531,63 @@ class Prediction(Base):
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     resolution_status: Mapped[str | None] = mapped_column(Text)
 
+    associations: Mapped[list["PredictionAssociation"]] = relationship(
+        back_populates="prediction", cascade="all, delete-orphan"
+    )
+
     __table_args__ = (
-        Index("idx_predictions_predictor", "predictor_entity_id"),
-        Index("idx_predictions_subject", "subject_entity_id"),
+        Index("idx_predictions_predictor", "predictor_person_id"),
+    )
+
+
+class PredictionAssociation(Base):
+    """Polymorphic many-to-many between predictions and typed entities.
+    See ``ClaimAssociation`` for shape rationale. Migration 036.
+    """
+
+    __tablename__ = "prediction_associations"
+
+    association_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    prediction_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("predictions.prediction_id", ondelete="CASCADE"), nullable=False
+    )
+    role: Mapped[str] = mapped_column(Text, nullable=False)
+    person_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("people.person_id", ondelete="CASCADE")
+    )
+    team_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("teams.team_id", ondelete="CASCADE")
+    )
+    match_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("matches.match_id", ondelete="CASCADE")
+    )
+    venue_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("venues.venue_id", ondelete="CASCADE")
+    )
+    round_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("rounds.round_id", ondelete="CASCADE")
+    )
+
+    prediction: Mapped["Prediction"] = relationship(back_populates="associations")
+
+    __table_args__ = (
+        CheckConstraint(
+            "(person_id IS NOT NULL)::int + (team_id IS NOT NULL)::int + "
+            "(match_id IS NOT NULL)::int + (venue_id IS NOT NULL)::int + "
+            "(round_id IS NOT NULL)::int = 1",
+            name="ck_prediction_associations_one_subject",
+        ),
+        UniqueConstraint(
+            "prediction_id", "role", "person_id", "team_id", "match_id", "venue_id", "round_id",
+            name="uq_prediction_associations",
+            postgresql_nulls_not_distinct=True,
+        ),
+        Index("idx_prediction_associations_prediction", "prediction_id"),
+        Index("idx_prediction_associations_person", "person_id", postgresql_where="person_id IS NOT NULL"),
+        Index("idx_prediction_associations_team", "team_id", postgresql_where="team_id IS NOT NULL"),
+        Index("idx_prediction_associations_match", "match_id", postgresql_where="match_id IS NOT NULL"),
+        Index("idx_prediction_associations_venue", "venue_id", postgresql_where="venue_id IS NOT NULL"),
+        Index("idx_prediction_associations_round", "round_id", postgresql_where="round_id IS NOT NULL"),
     )
 
 
@@ -464,7 +595,11 @@ class ConsensusSnapshot(Base):
     __tablename__ = "consensus_snapshots"
 
     snapshot_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
-    subject_entity_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("entities.entity_id"), nullable=False)
+    person_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("people.person_id"))
+    team_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("teams.team_id"))
+    match_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("matches.match_id"))
+    venue_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("venues.venue_id"))
+    round_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("rounds.round_id"))
     time_bucket: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     buy_count: Mapped[int] = mapped_column(Integer, default=0)
     sell_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -475,7 +610,13 @@ class ConsensusSnapshot(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
     __table_args__ = (
-        Index("idx_consensus_subject_time", "subject_entity_id", "time_bucket"),
+        Index("idx_consensus_subject_time", "person_id", "time_bucket"),
+        CheckConstraint(
+            "(person_id IS NOT NULL)::int + (team_id IS NOT NULL)::int + "
+            "(match_id IS NOT NULL)::int + (venue_id IS NOT NULL)::int + "
+            "(round_id IS NOT NULL)::int = 1",
+            name="ck_consensus_snapshots_subject",
+        ),
     )
 
 
@@ -484,7 +625,6 @@ class Decision(Base):
 
     decision_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
     decision_type: Mapped[str] = mapped_column(Text, nullable=False)
-    subject_entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("entities.entity_id"))
     action_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     rationale_summary: Mapped[str | None] = mapped_column(Text)
     strategy_tag: Mapped[str | None] = mapped_column(Text)
@@ -492,12 +632,67 @@ class Decision(Base):
     executed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     public_flag: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
+    associations: Mapped[list["DecisionAssociation"]] = relationship(
+        back_populates="decision", cascade="all, delete-orphan"
+    )
+
     __table_args__ = (
         CheckConstraint(
             "decision_type IN ('trade', 'captain', 'start_sit', 'squad_structure', 'article_topic', 'reply')",
             name="ck_decision_type",
         ),
         Index("idx_decisions_type", "decision_type"),
+    )
+
+
+class DecisionAssociation(Base):
+    """Polymorphic many-to-many between decisions and typed entities.
+    See ``ClaimAssociation`` for shape rationale. Migration 036.
+    """
+
+    __tablename__ = "decision_associations"
+
+    association_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    decision_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("decisions.decision_id", ondelete="CASCADE"), nullable=False
+    )
+    role: Mapped[str] = mapped_column(Text, nullable=False)
+    person_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("people.person_id", ondelete="CASCADE")
+    )
+    team_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("teams.team_id", ondelete="CASCADE")
+    )
+    match_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("matches.match_id", ondelete="CASCADE")
+    )
+    venue_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("venues.venue_id", ondelete="CASCADE")
+    )
+    round_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("rounds.round_id", ondelete="CASCADE")
+    )
+
+    decision: Mapped["Decision"] = relationship(back_populates="associations")
+
+    __table_args__ = (
+        CheckConstraint(
+            "(person_id IS NOT NULL)::int + (team_id IS NOT NULL)::int + "
+            "(match_id IS NOT NULL)::int + (venue_id IS NOT NULL)::int + "
+            "(round_id IS NOT NULL)::int = 1",
+            name="ck_decision_associations_one_subject",
+        ),
+        UniqueConstraint(
+            "decision_id", "role", "person_id", "team_id", "match_id", "venue_id", "round_id",
+            name="uq_decision_associations",
+            postgresql_nulls_not_distinct=True,
+        ),
+        Index("idx_decision_associations_decision", "decision_id"),
+        Index("idx_decision_associations_person", "person_id", postgresql_where="person_id IS NOT NULL"),
+        Index("idx_decision_associations_team", "team_id", postgresql_where="team_id IS NOT NULL"),
+        Index("idx_decision_associations_match", "match_id", postgresql_where="match_id IS NOT NULL"),
+        Index("idx_decision_associations_venue", "venue_id", postgresql_where="venue_id IS NOT NULL"),
+        Index("idx_decision_associations_round", "round_id", postgresql_where="round_id IS NOT NULL"),
     )
 
 
@@ -668,58 +863,6 @@ class PlayerRound(Base):
     )
 
 
-class PlayerAttributes(Base):
-    """SCD-2 of slow-changing player facts.
-
-    Replaces ``player_team_history`` (migration 005). Carries team
-    affiliation, primary position, physical (height, weight) and contract
-    facts. All change at the same beats — preseason, transfer window,
-    contract renewal — so a single SCD-2 row per current state is cleaner
-    than parallel temporal tables.
-
-    Per-round facts (price, breakeven, score, jersey, grade) live in
-    :class:`PlayerRound`; lifetime constants in ``entities.metadata_json``;
-    cross-entity-type role tenure in :class:`EntityRole`.
-    """
-
-    __tablename__ = "player_attributes"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
-    entity_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("entities.entity_id", ondelete="CASCADE"), nullable=False
-    )
-    team_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("teams.team_id", ondelete="SET NULL")
-    )
-    primary_position: Mapped[str | None] = mapped_column(Text)
-    height_cm: Mapped[int | None] = mapped_column(Integer)
-    weight_kg: Mapped[int | None] = mapped_column(Integer)
-    contract_until: Mapped[date | None] = mapped_column(Date)
-    real_salary_aud: Mapped[int | None] = mapped_column(Integer)
-    metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-    effective_from: Mapped[date] = mapped_column(Date, nullable=False)
-    effective_to: Mapped[date | None] = mapped_column(Date)
-    is_current: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    source: Mapped[str] = mapped_column(Text, nullable=False, default="seed")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
-
-    __table_args__ = (
-        CheckConstraint(
-            "effective_to IS NULL OR effective_to >= effective_from",
-            name="ck_player_attributes_period",
-        ),
-        Index("idx_player_attributes_entity_current", "entity_id", "is_current"),
-        Index("idx_player_attributes_team_current", "team_id", "is_current"),
-        Index(
-            "uq_player_attributes_current",
-            "entity_id",
-            unique=True,
-            postgresql_where="is_current",
-        ),
-    )
-
-
 class Venue(Base):
     """Stadium reference table.
 
@@ -740,9 +883,10 @@ class Venue(Base):
     surface: Mapped[str | None] = mapped_column(Text)
     roof: Mapped[str | None] = mapped_column(Text)
     tz: Mapped[str | None] = mapped_column(Text)
-    entity_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("entities.entity_id", ondelete="SET NULL"), unique=True
-    )
+    latitude: Mapped[float | None] = mapped_column(Numeric(9, 6))
+    longitude: Mapped[float | None] = mapped_column(Numeric(9, 6))
+    opened_year: Mapped[int | None] = mapped_column(Integer)
+    image_url: Mapped[str | None] = mapped_column(Text)
     metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
@@ -759,6 +903,33 @@ class Venue(Base):
         ),
         Index("idx_venues_active", "active"),
         Index("idx_venues_country_state", "country", "state"),
+    )
+
+
+class Round(Base):
+    """Round identity. Replaces ``entity_type='round'`` rows on ``entities``.
+
+    Linked to from ``claim_associations`` / ``prediction_associations`` /
+    ``decision_associations`` when an opinion is round-level rather than
+    player- or match-level. See migration 036.
+    """
+
+    __tablename__ = "rounds"
+
+    round_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    season: Mapped[int] = mapped_column(Integer, nullable=False)
+    round_number: Mapped[int | None] = mapped_column(Integer)
+    round_label: Mapped[str] = mapped_column(Text, nullable=False)
+    starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    is_magic_round: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_rep_weekend: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_finals: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+    __table_args__ = (
+        UniqueConstraint("season", "round_number", name="uq_rounds_season_round"),
+        Index("idx_rounds_season", "season"),
     )
 
 
@@ -785,8 +956,10 @@ class Match(Base):
     home_team_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("teams.team_id", ondelete="RESTRICT"), nullable=False
     )
-    away_team_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("teams.team_id", ondelete="RESTRICT"), nullable=False
+    # Nullable since mig 036: bye rows have status='bye' and away_team_id IS NULL.
+    # `home_team_id` for bye rows is overloaded — it just means "the team in question."
+    away_team_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("teams.team_id", ondelete="RESTRICT")
     )
     venue_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("venues.venue_id", ondelete="SET NULL")
@@ -801,9 +974,8 @@ class Match(Base):
     weather: Mapped[str | None] = mapped_column(Text)
     referee_name: Mapped[str | None] = mapped_column(Text)
     broadcast: Mapped[str | None] = mapped_column(Text)
-    entity_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("entities.entity_id", ondelete="SET NULL"), unique=True
-    )
+    is_magic_round: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_rep_weekend: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
 
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -820,8 +992,13 @@ class Match(Base):
             name="ck_matches_grade",
         ),
         CheckConstraint(
-            "status IN ('scheduled', 'live', 'final', 'postponed', 'cancelled', 'forfeit')",
+            "status IN ('scheduled', 'live', 'final', 'postponed', 'cancelled', 'forfeit', 'bye')",
             name="ck_matches_status",
+        ),
+        CheckConstraint(
+            "(status='bye' AND away_team_id IS NULL) "
+            "OR (status<>'bye' AND away_team_id IS NOT NULL)",
+            name="ck_matches_bye_no_opponent",
         ),
         CheckConstraint(
             "home_team_id <> away_team_id",
@@ -870,13 +1047,14 @@ class MatchTeamList(Base):
     team_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("teams.team_id", ondelete="RESTRICT"), nullable=False
     )
-    player_entity_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("entities.entity_id", ondelete="RESTRICT"), nullable=False
+    player_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("people.person_id", ondelete="RESTRICT"), nullable=False
     )
 
     jersey_number: Mapped[int | None] = mapped_column(Integer)
     named_position: Mapped[str | None] = mapped_column(Text)
     sc_position: Mapped[str | None] = mapped_column(Text)
+    is_captain: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     list_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     status: Mapped[str] = mapped_column(Text, nullable=False, default="named")
@@ -899,13 +1077,13 @@ class MatchTeamList(Base):
         UniqueConstraint(
             "match_id",
             "team_id",
-            "player_entity_id",
+            "player_id",
             "list_version",
             name="uq_match_team_lists_match_team_player_version",
         ),
         Index("idx_match_team_lists_match", "match_id"),
         Index("idx_match_team_lists_team", "team_id"),
-        Index("idx_match_team_lists_player", "player_entity_id"),
+        Index("idx_match_team_lists_player", "player_id"),
         Index(
             "idx_match_team_lists_match_team_version",
             "match_id",
@@ -926,8 +1104,8 @@ class Injury(Base):
     __tablename__ = "injuries"
 
     injury_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
-    player_entity_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("entities.entity_id", ondelete="CASCADE"), nullable=False
+    player_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("people.person_id", ondelete="CASCADE"), nullable=False
     )
     team_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("teams.team_id", ondelete="SET NULL")
@@ -967,7 +1145,7 @@ class Injury(Base):
             "'concussion_protocol', 'suspension', 'unknown')",
             name="ck_injuries_mechanism",
         ),
-        Index("idx_injuries_player_reported", "player_entity_id", "reported_at"),
+        Index("idx_injuries_player_reported", "player_id", "reported_at"),
         Index(
             "idx_injuries_team_status",
             "team_id",
@@ -983,7 +1161,11 @@ class KnowledgeBase(Base):
 
     kb_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
     kb_type: Mapped[str] = mapped_column(Text, nullable=False)
-    subject_entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("entities.entity_id"))
+    person_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("people.person_id"))
+    team_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("teams.team_id"))
+    match_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("matches.match_id"))
+    venue_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("venues.venue_id"))
+    round_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("rounds.round_id"))
     title: Mapped[str] = mapped_column(Text, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     embedding = mapped_column(Vector(1536))
@@ -1003,7 +1185,13 @@ class KnowledgeBase(Base):
             name="ck_kb_type",
         ),
         Index("idx_kb_type", "kb_type"),
-        Index("idx_kb_entity", "subject_entity_id"),
+        Index("idx_kb_person", "person_id"),
+        CheckConstraint(
+            "(person_id IS NOT NULL)::int + (team_id IS NOT NULL)::int + "
+            "(match_id IS NOT NULL)::int + (venue_id IS NOT NULL)::int + "
+            "(round_id IS NOT NULL)::int <= 1",
+            name="ck_knowledge_base_subject",
+        ),
         Index("idx_kb_round_season", "effective_round", "season"),
     )
 
@@ -1012,8 +1200,12 @@ class WikiPage(Base):
     __tablename__ = "wiki_pages"
 
     page_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
-    entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("entities.entity_id"))
     channel_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("channels.channel_id"))
+    person_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("people.person_id"))
+    team_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("teams.team_id"))
+    match_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("matches.match_id"))
+    venue_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("venues.venue_id"))
+    round_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("rounds.round_id"))
     page_type: Mapped[str] = mapped_column(Text, nullable=False)
     slug: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     title: Mapped[str] = mapped_column(Text, nullable=False)
@@ -1033,13 +1225,13 @@ class WikiPage(Base):
         ),
         CheckConstraint("status IN ('stub', 'draft', 'published')", name="ck_wiki_status"),
         CheckConstraint(
-            "(entity_id IS NOT NULL AND channel_id IS NULL) "
-            "OR (entity_id IS NULL AND channel_id IS NOT NULL)",
+            "(person_id IS NOT NULL)::int + (team_id IS NOT NULL)::int + "
+            "(match_id IS NOT NULL)::int + (venue_id IS NOT NULL)::int + "
+            "(round_id IS NOT NULL)::int + (channel_id IS NOT NULL)::int = 1",
             name="ck_wiki_page_subject",
         ),
         Index("idx_wiki_pages_type", "page_type"),
         Index("idx_wiki_pages_slug", "slug"),
-        Index("idx_wiki_pages_entity", "entity_id"),
         Index("idx_wiki_pages_channel", "channel_id"),
         Index("idx_wiki_pages_updated", "updated_at"),
         Index("idx_wiki_pages_status", "status"),
@@ -1160,7 +1352,8 @@ class SquadSlot(Base):
     slot_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
     position: Mapped[str] = mapped_column(Text, nullable=False)
     slot_index: Mapped[int] = mapped_column(Integer, nullable=False)
-    player_entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("entities.entity_id"))
+    # player FK dropped with entities (mig 038). Returns as `player_id` → people
+    # when the SuperCoach squad feature is built.
     player_name: Mapped[str] = mapped_column(Text, nullable=False)
     is_captain: Mapped[bool] = mapped_column(Boolean, default=False)
     is_vice_captain: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -1178,7 +1371,6 @@ class SquadSlot(Base):
             "position IN ('FLB', 'CTW', '5/8', 'HFB', 'HOK', 'FRF', '2RF', 'FLX')",
             name="ck_squad_position",
         ),
-        Index("idx_squad_player", "player_entity_id"),
         Index("idx_squad_season", "season"),
     )
 
@@ -1190,9 +1382,10 @@ class SquadTrade(Base):
     decision_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("decisions.decision_id"))
     round: Mapped[int] = mapped_column(Integer, nullable=False)
     season: Mapped[int] = mapped_column(Integer, default=2026)
-    player_out_entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("entities.entity_id"))
+    # Player FKs were dropped with entities (mig 038). Squad tables are planned-
+    # not-built; the typed FKs (e.g. player_out_id → people) get added back
+    # when the SuperCoach squad feature ships.
     player_out_name: Mapped[str] = mapped_column(Text, nullable=False)
-    player_in_entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("entities.entity_id"))
     player_in_name: Mapped[str] = mapped_column(Text, nullable=False)
     rationale: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)

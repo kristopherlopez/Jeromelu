@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from jeromelu_shared.db import Entity, Event, Prediction, Source
+from jeromelu_shared.db import Event, Person, Prediction, Source
 from jeromelu_shared.rag import ask_jeromelu
 
 from ..deps import get_db
@@ -39,16 +39,21 @@ FILTER_MAP = {
 
 
 def _event_to_item(ev: Event, entities: dict, sources: dict, predictions: dict) -> dict:
-    """Serialize an Event to a feed item dict."""
-    # Player refs
+    """Serialize an Event to a feed item dict.
+
+    Post-mig-038: entities maps person_id → Person. The "player filter" loosens
+    to "any person" since person rows aren't typed by role at this layer; events
+    is deferred for full redesign so this is acceptable.
+    """
+    # Person/player refs
     players = []
     if ev.related_entity_ids:
         for eid in ev.related_entity_ids:
-            entity = entities.get(eid)
-            if entity and entity.entity_type == "player":
+            person = entities.get(eid)
+            if person and person.canonical_name:
                 players.append({
-                    "name": entity.canonical_name,
-                    "entityId": str(entity.entity_id),
+                    "name": person.canonical_name,
+                    "entityId": str(person.person_id),
                 })
 
     # Source ref (single, from FK)
@@ -149,10 +154,10 @@ def get_feed(
         if ev.related_entity_ids:
             all_entity_ids.update(ev.related_entity_ids)
 
-    entities: dict[uuid.UUID, Entity] = {}
+    entities: dict[uuid.UUID, Person] = {}
     if all_entity_ids:
-        for e in db.query(Entity).filter(Entity.entity_id.in_(all_entity_ids)).all():
-            entities[e.entity_id] = e
+        for p in db.query(Person).filter(Person.person_id.in_(all_entity_ids)).all():
+            entities[p.person_id] = p
 
     # Batch-load related sources
     source_ids = {ev.related_source_id for ev in events if ev.related_source_id}
@@ -223,11 +228,11 @@ def feed_ask(body: FeedAskRequest, db: Session = Depends(get_db)):
     db.add(answer_event)
     db.commit()
 
-    # 4. Load entities for serialization
-    entities: dict[uuid.UUID, Entity] = {}
+    # 4. Load people for serialization (player_entity_ids == person_ids by mig 036).
+    entities: dict[uuid.UUID, object] = {}
     if player_entity_ids:
-        for e in db.query(Entity).filter(Entity.entity_id.in_(player_entity_ids)).all():
-            entities[e.entity_id] = e
+        for p in db.query(Person).filter(Person.person_id.in_(player_entity_ids)).all():
+            entities[p.person_id] = p
 
     return {
         "question_item": _event_to_item(question_event, entities, {}, {}),

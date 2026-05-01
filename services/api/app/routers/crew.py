@@ -14,9 +14,10 @@ from sqlalchemy.orm import Session
 from jeromelu_shared.db import (
     AgentRun,
     Claim,
+    ClaimAssociation,
+    Person,
     Source,
     SourceDocument,
-    Entity,
 )
 from ..deps import get_db
 
@@ -90,17 +91,22 @@ def round_overview(
     )
     round_status = "complete" if has_claims else "pending"
 
-    # 3. Claims for this round — consensus
+    # 3. Claims for this round — consensus, joined via claim_associations
     claim_rows = (
         db.query(
             Claim.claim_type,
-            Entity.canonical_name,
-            Entity.entity_id,
+            Person.canonical_name,
+            Person.person_id,
             func.count().label("cnt"),
         )
-        .join(Entity, Claim.subject_entity_id == Entity.entity_id)
-        .filter(Claim.effective_round == round_num, Claim.season == season)
-        .group_by(Claim.claim_type, Entity.canonical_name, Entity.entity_id)
+        .join(ClaimAssociation, ClaimAssociation.claim_id == Claim.claim_id)
+        .join(Person, ClaimAssociation.person_id == Person.person_id)
+        .filter(
+            ClaimAssociation.role == "subject",
+            Claim.effective_round == round_num,
+            Claim.season == season,
+        )
+        .group_by(Claim.claim_type, Person.canonical_name, Person.person_id)
         .all()
     )
 

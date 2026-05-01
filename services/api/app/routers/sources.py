@@ -6,8 +6,9 @@ from sqlalchemy.orm import Session, joinedload
 
 from jeromelu_shared.db import (
     Claim,
+    ClaimAssociation,
     ClaimChunk,
-    Entity,
+    Person,
     Source,
     SourceChunk,
     SourceDocument,
@@ -112,24 +113,40 @@ def get_source(source_id: uuid.UUID, db: Session = Depends(get_db)):
         .all()
     )
 
-    # Get claims with their linked chunks and subject entity
+    # Get claims with their linked chunks and subject associations
     claims = (
         db.query(Claim)
         .filter(Claim.document_id == doc.document_id)
-        .options(joinedload(Claim.chunk_links).joinedload(ClaimChunk.chunk))
+        .options(
+            joinedload(Claim.chunk_links).joinedload(ClaimChunk.chunk),
+            joinedload(Claim.associations),
+        )
         .all()
     )
 
-    # Batch-load subject entities
-    entity_ids = {c.subject_entity_id for c in claims if c.subject_entity_id}
-    entities = {}
-    if entity_ids:
-        for e in db.query(Entity).filter(Entity.entity_id.in_(entity_ids)).all():
-            entities[e.entity_id] = e
+    # Phase 2: claim subject lives on claim_associations (one row, role='subject').
+    # For source-document claim views the subject is almost always a player —
+    # only person_id is dispatched here. team/match/venue/round subjects render
+    # without a name today; extend if needed.
+    person_ids = {
+        a.person_id
+        for c in claims
+        for a in c.associations
+        if a.role == "subject" and a.person_id
+    }
+    people = {}
+    if person_ids:
+        for p in db.query(Person).filter(Person.person_id.in_(person_ids)).all():
+            people[p.person_id] = p
 
     claims_data = []
     for claim in claims:
-        entity = entities.get(claim.subject_entity_id)
+        subject_assoc = next((a for a in claim.associations if a.role == "subject"), None)
+        entity = (
+            people.get(subject_assoc.person_id)
+            if subject_assoc and subject_assoc.person_id
+            else None
+        )
         claim_chunks = sorted(claim.chunk_links, key=lambda cl: cl.ordinal)
         claims_data.append(
             {

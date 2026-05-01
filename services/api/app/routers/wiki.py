@@ -8,7 +8,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from jeromelu_shared.db import Channel, Entity, WikiPage, WikiRevision
+from jeromelu_shared.db import (
+    Channel,
+    Match,
+    Person,
+    Round,
+    Team,
+    Venue,
+    WikiPage,
+    WikiRevision,
+)
 
 from ..deps import get_db
 
@@ -152,17 +161,72 @@ def get_page(slug: str, db: Session = Depends(get_db)):
     if not page:
         raise HTTPException(status_code=404, detail="Wiki page not found")
 
-    # Load the subject — entity for entity-backed pages, channel for channel pages
-    entity = (
-        db.query(Entity).filter(Entity.entity_id == page.entity_id).first()
-        if page.entity_id
-        else None
+    # Phase 2: dispatch on whichever typed FK is set. wiki_pages now has typed
+    # FKs (person_id, team_id, match_id, venue_id, round_id) alongside the legacy
+    # entity_id (dropped in mig 037). Build a uniform `entity` response from
+    # whichever typed row is loaded.
+    person = (
+        db.query(Person).filter(Person.person_id == page.person_id).first()
+        if page.person_id else None
+    )
+    team = (
+        db.query(Team).filter(Team.team_id == page.team_id).first()
+        if page.team_id else None
+    )
+    match = (
+        db.query(Match).filter(Match.match_id == page.match_id).first()
+        if page.match_id else None
+    )
+    venue = (
+        db.query(Venue).filter(Venue.venue_id == page.venue_id).first()
+        if page.venue_id else None
+    )
+    round_row = (
+        db.query(Round).filter(Round.round_id == page.round_id).first()
+        if page.round_id else None
     )
     channel = (
         db.query(Channel).filter(Channel.channel_id == page.channel_id).first()
-        if page.channel_id
-        else None
+        if page.channel_id else None
     )
+
+    if person:
+        entity_block = {
+            "entity_id": str(person.person_id),
+            "canonical_name": person.canonical_name,
+            "entity_type": page.page_type,
+            "metadata_json": person.metadata_json,
+        }
+    elif team:
+        entity_block = {
+            "entity_id": str(team.team_id),
+            "canonical_name": team.name,
+            "entity_type": "team",
+            "metadata_json": team.metadata_json,
+        }
+    elif match:
+        entity_block = {
+            "entity_id": str(match.match_id),
+            "canonical_name": f"Round {match.round}, {match.season}",
+            "entity_type": "match",
+            "metadata_json": match.metadata_json,
+        }
+    elif venue:
+        entity_block = {
+            "entity_id": str(venue.venue_id),
+            "canonical_name": venue.name,
+            "entity_type": "venue",
+            "metadata_json": venue.metadata_json,
+        }
+    elif round_row:
+        entity_block = {
+            "entity_id": str(round_row.round_id),
+            "canonical_name": round_row.round_label,
+            "entity_type": "round",
+            "metadata_json": round_row.metadata_json,
+        }
+    else:
+        entity_block = None
 
     # Recent revisions
     revisions = (
@@ -203,12 +267,7 @@ def get_page(slug: str, db: Session = Depends(get_db)):
             "summary": page.summary,
             "status": page.status,
             "metadata_json": page.metadata_json,
-            "entity": {
-                "entity_id": str(entity.entity_id),
-                "canonical_name": entity.canonical_name,
-                "entity_type": entity.entity_type,
-                "metadata_json": entity.metadata_json,
-            } if entity else None,
+            "entity": entity_block,
             "channel": {
                 "channel_id": str(channel.channel_id),
                 "slug": channel.slug,

@@ -7,11 +7,14 @@ import uuid
 
 from temporalio import activity
 
+from sqlalchemy.orm import joinedload
+
 from jeromelu_shared.db import (
     Claim,
+    ClaimAssociation,
     ClaimChunk,
-    Entity,
     Event,
+    Person,
     SessionLocal,
     Source,
     SourceDocument,
@@ -84,13 +87,18 @@ async def fetch_unprocessed_claims() -> dict:
             .subquery()
         )
 
-        # Find unprocessed claims
+        # Find unprocessed claims (with subject person via claim_associations).
         unprocessed = (
             session.query(Claim)
+            .join(ClaimAssociation, ClaimAssociation.claim_id == Claim.claim_id)
             .filter(~Claim.claim_id.in_(
                 session.query(processed_ids_sq.c.cid)
             ))
-            .filter(Claim.subject_entity_id.isnot(None))
+            .filter(
+                ClaimAssociation.role == "subject",
+                ClaimAssociation.person_id.isnot(None),
+            )
+            .options(joinedload(Claim.associations))
             .order_by(Claim.extracted_at)
             .all()
         )
@@ -98,15 +106,22 @@ async def fetch_unprocessed_claims() -> dict:
         if not unprocessed:
             return {"claims": [], "entity_map": {}, "source_map": {}}
 
-        # Collect entity and source IDs
-        entity_ids = {c.subject_entity_id for c in unprocessed if c.subject_entity_id}
+        # Build claim → subject person_id map
+        subject_person_by_claim: dict = {}
+        person_ids: set = set()
+        for c in unprocessed:
+            for a in c.associations:
+                if a.role == "subject" and a.person_id:
+                    subject_person_by_claim[c.claim_id] = a.person_id
+                    person_ids.add(a.person_id)
+
         doc_ids = {c.document_id for c in unprocessed if c.document_id}
 
-        # Load entities
-        entity_map = {}
-        if entity_ids:
-            for e in session.query(Entity).filter(Entity.entity_id.in_(entity_ids)).all():
-                entity_map[str(e.entity_id)] = e.canonical_name
+        # Load people (subjects)
+        entity_map: dict = {}
+        if person_ids:
+            for p in session.query(Person).filter(Person.person_id.in_(person_ids)).all():
+                entity_map[str(p.person_id)] = p.canonical_name
 
         # Load sources via documents
         source_map = {}
@@ -126,14 +141,15 @@ async def fetch_unprocessed_claims() -> dict:
         claims_data = []
         for c in unprocessed:
             doc_info = source_map.get(str(c.document_id), {})
+            subject_pid = subject_person_by_claim.get(c.claim_id)
             claims_data.append({
                 "claim_id": str(c.claim_id),
                 "claim_type": c.claim_type,
                 "claim_text": c.claim_text,
                 "polarity": c.polarity,
                 "strength": c.strength,
-                "player_name": entity_map.get(str(c.subject_entity_id), "Unknown"),
-                "entity_id": str(c.subject_entity_id) if c.subject_entity_id else None,
+                "player_name": entity_map.get(str(subject_pid), "Unknown") if subject_pid else "Unknown",
+                "entity_id": str(subject_pid) if subject_pid else None,
                 "source_id": doc_info.get("source_id"),
                 "source_title": doc_info.get("title"),
                 "source_creator": doc_info.get("creator_name"),
