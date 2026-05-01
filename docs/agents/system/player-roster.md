@@ -51,13 +51,13 @@ SuperCoach players-cf API   ──▶ scripts/data/scraped_players_api_raw.json
                                              team_id → teams)
 ```
 
-The `teams` table is a precondition — populated locally by
-`scripts/data/seed_teams.py` (`make seed-teams`) from `data/teams.yaml`,
-and in prod via the parallel admin endpoint `POST /api/admin/teams/seed`
-(`make prod-seed-teams`) which takes the same yaml content as JSON. The
-roster module looks up Team rows by slug; if any of the 17 NRL clubs are
-missing it raises a clear precondition error rather than creating shadow
-rows.
+The `teams` table is a precondition — baseline seed of all NRL/NRLW
+clubs plus reserve grades lives in migration `039_seed_teams_2026.sql`
+and applies to local and prod via the standard `make migrate` /
+`migrate.sh` path. Incremental top-ups go through the admin endpoint
+`POST /api/admin/teams/seed` (`make prod-seed-teams`). The roster module
+looks up Team rows by slug; if any of the 17 NRL clubs are missing it
+raises a clear precondition error rather than creating shadow rows.
 
 ---
 
@@ -87,7 +87,7 @@ Response shape:
 ```json
 {
   "ok": true,
-  "counts": {"nrl": 17, "nsw_cup": 12, "qld_cup": 5, "nrlw": 12, "entities_linked_this_run": 0}
+  "counts": {"nrl": 17, "nsw_cup": 12, "qld_cup": 5, "nrlw": 12}
 }
 ```
 

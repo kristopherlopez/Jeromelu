@@ -35,9 +35,6 @@ Behaviour:
 - Reserve-grade rows are upserted next, with ``parent_team_id`` resolved
   to the just-inserted NRL row by ``parent_slug``.
 - NRLW rows similarly resolve ``parent_team_id`` to the NRL parent.
-- Finally, any ``teams`` row in grade ``nrl``/``nrlw`` whose
-  ``entity_id`` is NULL is opportunistically linked to a matching
-  ``entities`` row by case-insensitive ``canonical_name``.
 
 Idempotent: re-running with the same payload is a no-op except for
 ``updated_at`` bumps.
@@ -48,7 +45,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -145,7 +142,6 @@ def _upsert_batch(
             "parent_team_id": (
                 slug_to_id.get(r["parent_slug"]) if r["parent_slug"] else None
             ),
-            "entity_id": None,
         })
     stmt = pg_insert(Team).values(values)
     stmt = stmt.on_conflict_do_update(
@@ -157,24 +153,10 @@ def _upsert_batch(
             "grade": stmt.excluded.grade,
             "competition": stmt.excluded.competition,
             "parent_team_id": stmt.excluded.parent_team_id,
-            # entity_id is preserved across upserts — never overwritten
-            # to NULL once linked.
             "updated_at": func.now(),
         },
     )
     session.execute(stmt)
-
-
-_LINK_ENTITY_SQL = text("""
-    UPDATE teams t
-       SET entity_id = e.entity_id,
-           updated_at = now()
-      FROM entities e
-     WHERE e.entity_type = 'team'
-       AND lower(e.canonical_name) = lower(t.name)
-       AND t.entity_id IS NULL
-       AND t.grade IN ('nrl', 'nrlw')
-""")
 
 
 def seed_teams(
@@ -183,8 +165,7 @@ def seed_teams(
 ) -> dict[str, int]:
     """Idempotently seed the ``teams`` table from a yaml-shaped dict.
 
-    Returns counts of rows in each grade after the operation, plus the
-    number of opportunistically-linked entity rows.
+    Returns counts of rows in each grade after the operation.
     """
     nrl_rows, feeder_rows, nrlw_rows = _build_rows(payload)
 
@@ -203,11 +184,6 @@ def seed_teams(
     # Phase 2 + 3 — feeders + NRLW (both reference NRL parents)
     _upsert_batch(session, feeder_rows, slug_to_id=nrl_slug_to_id)
     _upsert_batch(session, nrlw_rows, slug_to_id=nrl_slug_to_id)
-    session.flush()
-
-    # Phase 4 — opportunistic entity linkage
-    link_result = session.execute(_LINK_ENTITY_SQL)
-    linked = link_result.rowcount or 0
 
     session.commit()
 
@@ -216,5 +192,4 @@ def seed_teams(
         select(Team.grade, func.count()).group_by(Team.grade)
     ).all():
         counts[grade] = int(n)
-    counts["entities_linked_this_run"] = int(linked)
     return counts

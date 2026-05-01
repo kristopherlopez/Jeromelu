@@ -214,9 +214,10 @@ class Team(Base):
     Covers NRL, NRLW, and the male pathway feeders (NSW Cup, QLD Cup,
     Jersey Flegg, Mal Meninga, SG Ball, Cyril Connell, Harold Matthews).
     `parent_team_id` self-references to link a feeder team to its senior
-    NRL/NRLW side; `entity_id` links senior rows to the canonical
-    `entities` row so existing claims/predictions/wiki pages keep
-    working without duplication.
+    NRL/NRLW side. After mig 038, teams are referenced directly by
+    typed FK (`team_id`) from association junctions and other tables —
+    the polymorphic `entity_id` link to the dropped `entities` table is
+    gone.
     """
 
     __tablename__ = "teams"
@@ -231,12 +232,7 @@ class Team(Base):
     parent_team_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("teams.team_id", ondelete="SET NULL")
     )
-    primary_colour: Mapped[str | None] = mapped_column(Text)
-    secondary_colour: Mapped[str | None] = mapped_column(Text)
     founded_year: Mapped[int | None] = mapped_column(Integer)
-    home_venue_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("venues.venue_id", ondelete="SET NULL")
-    )
     logo_url: Mapped[str | None] = mapped_column(Text)
     metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
