@@ -63,15 +63,23 @@ raises a clear precondition error rather than creating shadow rows.
 
 ## Endpoints
 
-Three admin endpoints, all behind the same `X-Admin-Key` auth:
+Five admin endpoints, all behind the same `X-Admin-Key` auth:
 
 - `POST /api/admin/teams/seed`     — `services/api/app/routers/teams.py`
 - `POST /api/admin/players/seed`   — `services/api/app/routers/players.py`
 - `POST /api/admin/players/refresh` — `services/api/app/routers/players.py`
+- `POST /api/admin/players/fetch-and-refresh` — `services/api/app/routers/players.py`
+- `POST /api/admin/players/refresh-nrlcom` — `services/api/app/routers/players.py`
 
-The team and player endpoints reuse the same logic as their local seed
-scripts — `seed_teams()` from `jeromelu_shared.teams`, and
+The team / seed / refresh endpoints reuse the same logic as their local
+seed scripts — `seed_teams()` from `jeromelu_shared.teams`, and
 `seed_roster()` / `refresh_roster()` from `jeromelu_shared.players.roster`.
+The `/fetch-and-refresh` endpoint composes `fetch_supercoach_roster()`
+(from `jeromelu_shared.players.supercoach`) with `refresh_roster()` so
+prod can run the whole weekly job in a single no-payload call. The
+`/refresh-nrlcom` endpoint walks the existing `people` rows and enriches
+them from nrl.com profile pages (dob, image, height, weight,
+birthplace) — see [nrl.com enrichment](#nrlcom-enrichment) below.
 
 ### `POST /api/admin/teams/seed`
 
@@ -144,6 +152,130 @@ Response shape:
 The transitions list is the input the feed/wiki layer uses to surface
 "Brisbane added Player Y, dropped Player X" cards.
 
+### `POST /api/admin/players/fetch-and-refresh`
+
+Server-side equivalent of `/refresh`: the API container fetches the SC
+roster directly from `supercoach.com.au`'s unauthenticated `players-cf`
+endpoint, validates the response covers all 17 NRL clubs and ≥400
+players, then runs the same SCD-2 diff. **No body** — just the admin
+key plus an optional `?season=YYYY` query param.
+
+```bash
+make prod-fetch-and-refresh-players ADMIN_KEY=$ADMIN_KEY
+```
+
+Response shape — same as `/refresh` plus a `fetched` count:
+```json
+{
+  "ok": true,
+  "fetched": 550,
+  "counts": { "...": "as above" },
+  "transitions": [ "..." ]
+}
+```
+
+Errors:
+- `502 Bad Gateway` — SC fetch failed validation (truncated payload,
+  missing teams, non-list response). Refresh is NOT run; current state
+  is untouched.
+- `409 Conflict` — teams not seeded yet (`make prod-seed-teams` first).
+
+This is the **preferred weekly path**. Cron-friendly because nothing
+needs to be shipped between machines — wire one crontab line on the
+Lightsail box and the refresh runs unattended.
+
+### `POST /api/admin/players/refresh-nrlcom`
+
+<a name="nrlcom-enrichment"></a>
+**Enrichment, not enumeration.** Walks every player row that has a
+current `people_attributes` row, derives a profile URL
+(`https://www.nrl.com/players/nrl-premiership/{team_short}/{slug}/`),
+fetches it, and parses the embedded `<script type="application/ld+json">`
+JSON-LD block. Promotes:
+
+| Field | Target | Update rule |
+|---|---|---|
+| `birthDate` | `people.dob` | Set if currently null (lifetime constant) |
+| `image.url` | `people.image_url` | Always update (photos refresh seasonally) |
+| `birthPlace.address` | `people.metadata_json.birthplace_text` | Set if empty (raw text — no normalisation in v1) |
+| `height.value` (cm) | `people_attributes.height_cm` | In-place update on diff (re-measurements aren't SCD-2 transitions) |
+| `weight.value` (kg) | `people_attributes.weight_kg` | In-place update on diff |
+
+Ignored in v1: `jobTitle` (captaincy is per-match — see
+`match_team_lists.is_captain`).
+
+```bash
+make prod-refresh-players-nrlcom ADMIN_KEY=$ADMIN_KEY
+# Single-club test:
+make prod-refresh-players-nrlcom ADMIN_KEY=$ADMIN_KEY TEAM=Broncos
+# Throttled (if upstream rate-limits):
+make prod-refresh-players-nrlcom ADMIN_KEY=$ADMIN_KEY RATE_LIMIT_MS=200
+```
+
+Sequential by design — ~80s for a full 17-club run, ~5s per club.
+
+Empirical hit rate (2026-05 first run, no overrides): **85%** (469 / 550).
+The remaining 15% break down as:
+- Name shortenings nrl.com uses but SC doesn't (Thomas → Tom, Daniel → Dan)
+- Recently-transferred players without a published profile yet
+- Censored source data (SC has e.g. ``Jack *** Bird``)
+
+All are addressable via per-person overrides; the override system is
+designed for exactly this long tail.
+
+#### Team URL slugs
+
+`Team.short_name` maps to a per-club URL slug. Most clubs use the bare
+nickname; two keep the full prefix. Encoded in
+``NRLCOM_TEAM_OVERRIDES`` in ``nrlcom.py``:
+
+| Team.short_name | nrl.com URL slug |
+|---|---|
+| Tigers | `wests-tigers` |
+| Rabbitohs | `south-sydney-rabbitohs` |
+| Sea Eagles | `sea-eagles` (default rule handles it) |
+| All others | lowercase short_name (`broncos`, `sharks`, ...) |
+
+If a future club rebrand changes the slug, update the override map.
+
+#### Per-person overrides
+
+Slug derivation (`lower(canonical_name).replace(' ', '-')`) misses ~5–10%
+of names: apostrophes, accents, recently-traded players still on the
+old club's nrl.com page, or nrl.com typos. Override on
+`people.metadata_json.nrlcom`:
+
+```json
+{
+  "slug":       "kontoni-staggs",   // alternative slug (nrl.com has a typo for Kotoni)
+  "team_short": "raiders",          // alternative team_short (rare, e.g. mid-season trade)
+  "skip":       true                // skip this player entirely (retired, won't have a profile)
+}
+```
+
+Bookkeeping keys are written by the refresh itself and survive the
+operator-supplied keys above:
+
+| Key | Set when | Meaning |
+|---|---|---|
+| `last_checked` | every run | ISO date of the most recent attempt |
+| `last_status` | every run | `"ok"`, `"404"`, or `"error"` |
+| `tried_url` | every run | What URL was actually fetched |
+| `last_error` | error path only | upstream HTTP error text; cleared on next OK |
+
+#### Finding mismatches
+
+```sql
+SELECT canonical_name,
+       metadata_json->'nrlcom'->>'tried_url' AS tried_url
+FROM people
+WHERE metadata_json->'nrlcom'->>'last_status' = '404'
+ORDER BY canonical_name;
+```
+
+Set the override (`UPDATE people SET metadata_json = jsonb_set(...)`),
+re-run the refresh, the row flips to `last_status = 'ok'`.
+
 ---
 
 ## SCD-2 transition pattern
@@ -173,17 +305,39 @@ fail rather than silently create a duplicate.
 
 ## Cadence
 
-Weekly during season. Trigger by hand on Tuesdays after team-list
-announcements:
+Weekly during season, Tuesdays after team-list announcements. Off-season:
+monthly is plenty.
 
-1. Run `/scrape-supercoach` locally (interactive 2FA blocks unattended
-   automation).
-2. `make prod-refresh-players ADMIN_KEY=$ADMIN_KEY` posts the JSON.
+**Preferred (cron):**
 
-Off-season: monthly is plenty.
+```bash
+make prod-fetch-and-refresh-players ADMIN_KEY=$ADMIN_KEY
+```
+
+The API container fetches the SC roster itself and runs the diff. Wire
+this to crontab on the Lightsail box for unattended weekly runs — the
+SC `players-cf` endpoint is unauthenticated, so no manual login is
+needed. Suggested crontab line (Tuesday 09:00 AEST):
+
+```
+0 22 * * 1   ADMIN_KEY=... make -C /opt/jeromelu prod-fetch-and-refresh-players >> /var/log/jeromelu/refresh-players.log 2>&1
+```
+(Cron runs in UTC; 22:00 Mon UTC = 09:00 Tue AEST.)
+
+**Manual / legacy paths:**
+
+- `/scrape-supercoach` skill + `make prod-refresh-players ADMIN_KEY=...`
+  — older pre-endpoint flow, still works when you want the YAML
+  regenerated locally for transcript-cleaning. The skill itself runs an
+  interactive Playwright + Google OAuth flow; the modern unauthenticated
+  fetcher (`scripts/data/fetchers/fetch_supercoach_players.py`) is a
+  drop-in replacement that doesn't need it.
+- `make fetch-players` — local-dev helper that fetches the JSON and
+  regenerates `data/players.yaml` (used by transcript cleaning). No
+  production side-effects.
 
 A daily diff job that polls `nrl.com/news` for transfer announcements
-between weekly refreshes is a v2 candidate — see [v2 expansion](#v2-multi-source-rosters)
+between weekly refreshes is a v2 candidate — see [v2 expansion](#sources-today-vs-tomorrow)
 below.
 
 ---
@@ -216,5 +370,9 @@ represented yet.
 - `packages/db/migrations/027_consolidate_player_scd.sql` — schema
 - `packages/db/migrations/026_teams.sql` — teams table this FKs into
 - `packages/shared/jeromelu_shared/players/roster.py` — seed + refresh
+- `packages/shared/jeromelu_shared/players/supercoach.py` — SC fetcher
+- `packages/shared/jeromelu_shared/players/nrlcom.py` — nrl.com profile fetcher
+- `packages/shared/jeromelu_shared/players/nrlcom_refresh.py` — enrichment loop
+- `scripts/data/fetchers/fetch_supercoach_players.py` — local CLI fetch
 - `services/api/app/routers/players.py` — admin endpoints
-- `.claude/skills/scrape-supercoach/skill.md` — how to produce the SC roster JSON
+- `.claude/skills/scrape-supercoach/skill.md` — legacy local-only scraper

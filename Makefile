@@ -1,4 +1,4 @@
-.PHONY: up down db-shell migrate migrate-status seed-teams seed-venues seed-players api web logs clean prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all prod-refresh-videos prod-seed-teams prod-seed-players prod-refresh-players deploy-prod prod-shell prod-logs
+.PHONY: up down db-shell migrate migrate-status seed-teams seed-venues fetch-players seed-players api web logs clean prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all prod-refresh-videos prod-seed-teams prod-seed-players prod-refresh-players prod-fetch-and-refresh-players prod-refresh-players-nrlcom deploy-prod prod-shell prod-logs
 
 # Start local infrastructure
 up:
@@ -25,9 +25,20 @@ seed-teams:
 seed-venues:
 	python scripts/data/seed_venues.py
 
-# Seed entities + player_attributes locally from a SC roster JSON dump.
+# Fetch the SC player roster (unauthenticated GET) and regenerate the
+# yaml registry consumed by the transcript-cleaning pipeline. Output:
+# scripts/data/scraped_players_api_raw.json + data/players.yaml.
+# Cron-safe — no browser, no OAuth, no interactive 2FA.
+# Usage: make fetch-players [SEASON=2026]
+SEASON ?= $(shell python -c "from datetime import date; print(date.today().year)")
+fetch-players:
+	python scripts/data/fetchers/fetch_supercoach_players.py --season $(SEASON)
+	node scripts/data/generate_players_yaml.js
+
+# Seed people + people_attributes locally from a SC roster JSON dump.
 # Reads scripts/data/scraped_players_api_raw.json (or the file passed as
-# the first arg). Requires teams to be seeded first.
+# the first arg). Requires teams to be seeded first. Run `make fetch-players`
+# beforehand if the JSON is stale.
 # Usage: make seed-players
 seed-players:
 	python scripts/data/seed_players_prod.py
@@ -147,6 +158,27 @@ prod-refresh-players:
 		-H "Content-Type: application/json" \
 		-H "X-Admin-Key: $(ADMIN_KEY)" \
 		--data-binary @$(ROSTER_FILE) | python -m json.tool
+
+# Server-side weekly refresh — the API container fetches the SC roster
+# itself (unauthenticated GET) and applies the SCD-2 diff in one call.
+# Preferred over prod-refresh-players because it removes the "ship the
+# JSON from a laptop" step. Cron-friendly. Wire to crontab on the
+# Lightsail box for the weekly Tuesday refresh.
+# Usage: make prod-fetch-and-refresh-players ADMIN_KEY=xxx [SEASON=2026]
+prod-fetch-and-refresh-players:
+	curl -s -X POST "$(PROD_API)/api/admin/players/fetch-and-refresh$(if $(SEASON),?season=$(SEASON))" \
+		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
+
+# nrl.com profile-page enrichment — walks every current player row,
+# fetches their nrl.com profile, parses the JSON-LD, and promotes dob /
+# image_url / birthplace_text / height_cm / weight_kg. Sequential, ~2-3
+# min for a full run. Pass TEAM=Broncos for a single-club test, or
+# RATE_LIMIT_MS=200 to slow down if you hit upstream throttling.
+# Usage: make prod-refresh-players-nrlcom ADMIN_KEY=xxx [TEAM=Broncos] [RATE_LIMIT_MS=200]
+prod-refresh-players-nrlcom:
+	curl -sS --max-time 600 -X POST \
+		"$(PROD_API)/api/admin/players/refresh-nrlcom?$(if $(TEAM),team=$(TEAM)&)$(if $(RATE_LIMIT_MS),rate_limit_ms=$(RATE_LIMIT_MS))" \
+		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
 
 # Sync raw transcripts from local MinIO to production S3
 # Requires: Docker running (MinIO) + AWS credentials configured
