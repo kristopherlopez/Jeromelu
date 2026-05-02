@@ -62,6 +62,42 @@ def _channel_meta_for_pages(
     return {pid: (logo, platform, url) for pid, logo, platform, url in rows}
 
 
+def _team_logos_for_pages(
+    db: Session, pages: list[WikiPage]
+) -> dict[uuid.UUID, str | None]:
+    """Bulk-load logo_url for team-backed pages. One query regardless of count."""
+    team_page_ids = [p.page_id for p in pages if p.team_id]
+    if not team_page_ids:
+        return {}
+    rows = (
+        db.query(WikiPage.page_id, Team.logo_url)
+        .join(Team, Team.team_id == WikiPage.team_id)
+        .filter(WikiPage.page_id.in_(team_page_ids))
+        .all()
+    )
+    return {pid: logo for pid, logo in rows}
+
+
+def _person_logos_for_pages(
+    db: Session, pages: list[WikiPage]
+) -> dict[uuid.UUID, str | None]:
+    """Bulk-load image_url for person-backed pages.
+
+    Sources nrl.com headshots populated by the
+    ``/admin/players/refresh-nrlcom`` endpoint. One query regardless of count.
+    """
+    person_page_ids = [p.page_id for p in pages if p.person_id]
+    if not person_page_ids:
+        return {}
+    rows = (
+        db.query(WikiPage.page_id, Person.image_url)
+        .join(Person, Person.person_id == WikiPage.person_id)
+        .filter(WikiPage.page_id.in_(person_page_ids))
+        .all()
+    )
+    return {pid: img for pid, img in rows}
+
+
 def _revision_item(rev: WikiRevision) -> dict:
     return {
         "revision_id": str(rev.revision_id),
@@ -106,13 +142,17 @@ def list_pages(
     next_before = pages[-1].updated_at.isoformat() if pages and has_more else None
 
     channel_meta = _channel_meta_for_pages(db, pages)
-    return {
-        "items": [
-            _page_summary(p, *channel_meta.get(p.page_id, (None, None, None)))
-            for p in pages
-        ],
-        "next_before": next_before,
-    }
+    team_logos = _team_logos_for_pages(db, pages)
+    person_logos = _person_logos_for_pages(db, pages)
+
+    items = []
+    for p in pages:
+        logo, platform, url = channel_meta.get(p.page_id, (None, None, None))
+        if logo is None:
+            logo = team_logos.get(p.page_id) or person_logos.get(p.page_id)
+        items.append(_page_summary(p, logo, platform, url))
+
+    return {"items": items, "next_before": next_before}
 
 
 @router.get("/wiki/recent-changes")

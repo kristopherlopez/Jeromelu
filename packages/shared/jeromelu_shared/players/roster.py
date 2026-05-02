@@ -36,6 +36,7 @@ from jeromelu_shared.db.models import (
     PersonAttributes,
     PersonRole,
     Team,
+    WikiPage,
 )
 
 
@@ -173,6 +174,50 @@ def _primary_and_secondary_positions(sc_player: dict[str, Any]) -> tuple[str | N
     return names[0], names[1:]
 
 
+def _ensure_player_wiki_page(
+    session: Session,
+    person: Person,
+    team: Team,
+    primary_position: str | None,
+) -> bool:
+    """Idempotently create a stub ``wiki_pages`` row for this player.
+
+    Returns True if a new row was inserted, False if the page already
+    existed (matched by ``person_id``).
+
+    Slug uses ``Person.slug`` (lowercased-hyphenated form, e.g.
+    ``adam-reynolds``). Won't collide with team slugs (which use
+    underscores) or channel slugs.
+    """
+    if person.slug is None:
+        return False
+    existing = session.execute(
+        select(WikiPage.page_id).where(WikiPage.person_id == person.person_id)
+    ).scalar_one_or_none()
+    if existing is not None:
+        return False
+
+    summary_parts: list[str] = []
+    if primary_position:
+        summary_parts.append(primary_position)
+    if team.short_name:
+        summary_parts.append(team.short_name)
+    summary = " - ".join(summary_parts) or None
+
+    session.add(
+        WikiPage(
+            page_type="player",
+            slug=person.slug,
+            title=person.canonical_name,
+            content="",
+            summary=summary,
+            status="stub",
+            person_id=person.person_id,
+        )
+    )
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Public: seed (first-run) and refresh (diff-and-transition)
 # ---------------------------------------------------------------------------
@@ -193,6 +238,7 @@ def seed_roster(
         "entities_created": 0,
         "attributes_inserted": 0,
         "attributes_noop": 0,
+        "wiki_pages_created": 0,
         "skipped_unknown_team": 0,
     }
 
@@ -216,6 +262,12 @@ def seed_roster(
 
         _ensure_player_role(session, entity, source=source, effective_from=effective_from)
 
+        primary, secondary = _primary_and_secondary_positions(sc_player)
+        # Backfill wiki page for every player we see, even when attrs are a
+        # noop. Idempotent — only inserts if missing.
+        if _ensure_player_wiki_page(session, entity, team, primary):
+            counts["wiki_pages_created"] += 1
+
         existing_attrs = session.execute(
             select(PersonAttributes).where(
                 PersonAttributes.person_id == entity.person_id,
@@ -226,7 +278,6 @@ def seed_roster(
             counts["attributes_noop"] += 1
             continue
 
-        primary, secondary = _primary_and_secondary_positions(sc_player)
         session.add(
             PersonAttributes(
                 person_id=entity.person_id,
@@ -262,6 +313,7 @@ def refresh_roster(
         "team_changes": 0,
         "position_changes": 0,
         "unchanged": 0,
+        "wiki_pages_created": 0,
         "skipped_unknown_team": 0,
     }
     transitions: list[dict[str, Any]] = []
@@ -278,6 +330,8 @@ def refresh_roster(
 
         entity = _ensure_player_entity(session, sc_player)
         _ensure_player_role(session, entity, source=source, effective_from=today)
+        if _ensure_player_wiki_page(session, entity, team, primary):
+            counts["wiki_pages_created"] += 1
 
         current = session.execute(
             select(PersonAttributes).where(
