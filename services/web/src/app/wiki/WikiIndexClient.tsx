@@ -8,7 +8,6 @@ import {
   FileText,
   Users,
   Calendar,
-  ChevronDown,
   Mic,
   ArrowRight,
   ArrowLeft,
@@ -19,6 +18,7 @@ import {
 } from "lucide-react";
 import type { WikiPageSummary, WikiPageType } from "./wiki-data";
 import VoicesView from "./VoicesView";
+import PlayersIndexView from "./PlayersIndexView";
 import "./wiki.css";
 
 /* ── Constants ── */
@@ -54,10 +54,6 @@ function pageHref(page: { page_type: WikiPageType; slug: string }): string {
     if (match) return `/wiki/round/${match[1]}/${match[2]}`;
   }
   return `/wiki/${page.page_type}/${page.slug}`;
-}
-
-function getTeam(page: WikiPageSummary): string | null {
-  return (page.metadata_json?.team as string) ?? null;
 }
 
 function pagesByEntity(pages: WikiPageSummary[], key: EntityKey): WikiPageSummary[] {
@@ -146,6 +142,9 @@ function EntityView({
   if (entityKey === "voices") {
     return <VoicesView pages={pages} />;
   }
+  if (entityKey === "player") {
+    return <PlayersIndexView pages={pages} />;
+  }
 
   const label = ENTITY_CONFIG[entityKey].label;
 
@@ -189,11 +188,7 @@ function EntityView({
       >
         {pages.length} {pages.length === 1 ? "page" : "pages"}
       </p>
-      {entityKey === "player" ? (
-        <PlayersTab pages={pages} search="" />
-      ) : (
-        <PaginatedGrid pages={pages} />
-      )}
+      <PaginatedGrid pages={pages} />
       {pages.length === 0 && (
         <div
           style={{
@@ -1272,287 +1267,6 @@ function SectionSubtitle({ children }: { children: React.ReactNode }) {
     >
       {children}
     </p>
-  );
-}
-
-/* ══════════════════════════════════════════════════════
-   Players Tab — grouped by team or alphabetically
-   (used by EntityView for type=player)
-   ══════════════════════════════════════════════════════ */
-
-function PlayersTab({
-  pages,
-  search,
-}: {
-  pages: WikiPageSummary[];
-  search: string;
-}) {
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
-    new Set(),
-  );
-
-  const { groups, groupKeys } = useMemo(() => {
-    const hasTeams = pages.some((p) => getTeam(p));
-
-    if (hasTeams) {
-      const map = new Map<string, WikiPageSummary[]>();
-      const noTeam: WikiPageSummary[] = [];
-      for (const p of pages) {
-        const team = getTeam(p);
-        if (team) {
-          if (!map.has(team)) map.set(team, []);
-          map.get(team)!.push(p);
-        } else {
-          noTeam.push(p);
-        }
-      }
-      const sorted = [...map.entries()].sort((a, b) =>
-        a[0].localeCompare(b[0]),
-      );
-      if (noTeam.length > 0) sorted.push(["Other", noTeam]);
-      const groups = new Map(sorted);
-      return { groups, groupKeys: [...groups.keys()] };
-    } else {
-      const map = new Map<string, WikiPageSummary[]>();
-      for (const p of pages) {
-        const letter = p.title[0]?.toUpperCase() || "#";
-        if (!map.has(letter)) map.set(letter, []);
-        map.get(letter)!.push(p);
-      }
-      const sorted = new Map(
-        [...map.entries()].sort((a, b) => a[0].localeCompare(b[0])),
-      );
-      return { groups: sorted, groupKeys: [...sorted.keys()] };
-    }
-  }, [pages]);
-
-  const toggleGroup = (key: string) => {
-    setCollapsedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
-
-  const collapseAll = () => setCollapsedGroups(new Set(groupKeys));
-  const expandAll = () => setCollapsedGroups(new Set());
-
-  const activeLetters = useMemo(() => {
-    return new Set(groupKeys.map((k) => k[0]?.toUpperCase()));
-  }, [groupKeys]);
-
-  return (
-    <>
-      <div className="flex items-center justify-end mb-3">
-        {groupKeys.length > 3 && (
-          <div className="flex gap-2">
-            <button
-              onClick={expandAll}
-              style={{
-                fontSize: "11px",
-                color: v.accent,
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                fontWeight: 500,
-              }}
-            >
-              Expand all
-            </button>
-            <button
-              onClick={collapseAll}
-              style={{
-                fontSize: "11px",
-                color: v.inkFaint,
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                fontWeight: 500,
-              }}
-            >
-              Collapse all
-            </button>
-          </div>
-        )}
-      </div>
-
-      {!search && groupKeys.length > 5 && (
-        <div className="flex flex-wrap gap-0.5 mb-4">
-          {"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((letter) => {
-            const active = activeLetters.has(letter);
-            return (
-              <button
-                key={letter}
-                disabled={!active}
-                onClick={() => {
-                  const target = groupKeys.find(
-                    (k) => k[0]?.toUpperCase() === letter,
-                  );
-                  if (target) {
-                    document
-                      .getElementById(`group-${target}`)
-                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  }
-                }}
-                style={{
-                  width: 28,
-                  height: 28,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  color: active ? v.inkMuted : v.inkFaint,
-                  borderRadius: "4px",
-                  border: "none",
-                  background: "none",
-                  cursor: active ? "pointer" : "default",
-                  opacity: active ? 1 : 0.3,
-                }}
-              >
-                {letter}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {groupKeys.map((key) => {
-        const groupPages = groups.get(key) || [];
-        const isCollapsed = collapsedGroups.has(key);
-
-        return (
-          <div key={key} id={`group-${key}`} style={{ marginBottom: "1.5rem" }}>
-            <button
-              onClick={() => toggleGroup(key)}
-              className="flex items-center gap-2 w-full text-left"
-              style={{
-                padding: "0.6rem 0",
-                cursor: "pointer",
-                background: "none",
-                border: "none",
-                borderBottom: `1px solid ${v.border}`,
-                marginBottom: isCollapsed ? 0 : "0.5rem",
-                fontFamily: "inherit",
-              }}
-            >
-              <ChevronDown
-                size={14}
-                style={{
-                  color: v.inkFaint,
-                  transition: "transform 0.2s",
-                  transform: isCollapsed ? "rotate(-90deg)" : "rotate(0)",
-                  flexShrink: 0,
-                }}
-              />
-              <span
-                style={{
-                  fontFamily: v.serif,
-                  fontSize: "1rem",
-                  fontWeight: 700,
-                  color: v.ink,
-                }}
-              >
-                {key}
-              </span>
-              <span
-                style={{
-                  fontSize: "12px",
-                  color: v.inkFaint,
-                  marginLeft: "auto",
-                }}
-              >
-                {groupPages.length}{" "}
-                {groupPages.length === 1 ? "player" : "players"}
-              </span>
-            </button>
-
-            {!isCollapsed && (
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
-                  gap: "1px",
-                  background: v.border,
-                  border: `1px solid ${v.border}`,
-                }}
-              >
-                {groupPages.map((page) => (
-                  <Link
-                    key={page.page_id}
-                    href={pageHref(page)}
-                    className="group block transition-colors"
-                    style={{ background: v.surface, padding: "0.8rem 1rem" }}
-                  >
-                    <div className="flex items-center gap-2">
-                      {typeof page.metadata_json?.position === "string" && (
-                        <span
-                          style={{
-                            fontSize: "10px",
-                            fontWeight: 600,
-                            letterSpacing: "0.06em",
-                            padding: "0.1rem 0.35rem",
-                            borderRadius: "2px",
-                            background: v.amberBg,
-                            color: v.amber,
-                            flexShrink: 0,
-                          }}
-                        >
-                          {page.metadata_json.position}
-                        </span>
-                      )}
-                      <span
-                        className="group-hover:underline"
-                        style={{
-                          fontSize: "14px",
-                          fontWeight: 500,
-                          color: v.ink,
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
-                        {page.title}
-                      </span>
-                      {page.status !== "published" && (
-                        <span
-                          style={{
-                            fontSize: "10px",
-                            fontWeight: 600,
-                            letterSpacing: "0.08em",
-                            textTransform: "uppercase",
-                            padding: "0.1rem 0.35rem",
-                            borderRadius: "2px",
-                            background: v.amberBg,
-                            color: v.amber,
-                            flexShrink: 0,
-                          }}
-                        >
-                          {page.status}
-                        </span>
-                      )}
-                      {page.metadata_json?.price != null && (
-                        <span
-                          style={{
-                            fontSize: "12px",
-                            color: v.inkFaint,
-                            marginLeft: "auto",
-                            flexShrink: 0,
-                          }}
-                        >
-                          ${(page.metadata_json.price as number).toLocaleString()}
-                        </span>
-                      )}
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </>
   );
 }
 

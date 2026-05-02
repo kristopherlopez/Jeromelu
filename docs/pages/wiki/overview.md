@@ -55,6 +55,17 @@ have authoritative records and are seeded from the `channels` table; advisor
 pages are deferred until speaker diarisation provides confident person-level
 attribution. In the index, both surface under the **Voices** tab.
 
+### Index entry views
+
+`/wiki?type=<entity>` lands on a per-entity index. Two of these have bespoke
+shells; the rest fall back to a paginated grid:
+
+| Entity | Component | Notes |
+|--------|-----------|-------|
+| Player | `PlayersIndexView.tsx` | Hero (title, search, Compare players), 5-stat knowledge row, three themed knowledge highlights (featured player, weekly activity, open ground), filter chips, sortable card grid, low-evidence callout, ask box |
+| Voices | `VoicesView.tsx` | Combines `advisor` + `channel` pages |
+| Team / Round | `WikiIndexClient.PaginatedGrid` | Generic paginated card grid |
+
 `wiki_pages.entity_id` is now nullable; the new `channel_id` FK points to
 `channels` for channel-typed pages. Exactly one of `entity_id` / `channel_id` is
 set per row, enforced by `ck_wiki_page_subject`.
@@ -177,7 +188,12 @@ Implemented via new `display_mode='wiki_update'` on the Event table.
 | `packages/shared/jeromelu_shared/db/models.py` | WikiPage, WikiRevision models |
 | `services/api/app/routers/wiki.py` | API router |
 | `services/web/src/app/wiki/` | All frontend wiki pages and components |
+| `services/web/src/app/wiki/PlayersIndexView.tsx` | Bespoke `/wiki?type=player` index — stats, highlights, filterable card grid |
+| `services/web/src/app/wiki/VoicesView.tsx` | `/wiki?type=voices` index — advisors + channels |
+| `services/web/src/app/wiki/WikiIndexClient.tsx` | Wiki dashboard + per-entity entry-point routing |
 | `scripts/data/seed_wiki.py` | One-time seed from existing KB entries |
+| `scripts/data/backfill_wiki_team_pages.py` | One-shot backfill of `wiki_pages` rows for every `Team` (gap left by `seed_teams.py`, which only writes to `teams`) |
+| `scripts/data/backfill_team_logos_from_parents.py` | Copies `logo_url` from each NRL parent to its NRLW / reserve-grade children. Independent QLD Cup clubs and PNG Chiefs NRL still need hand-curated URLs. |
 
 ---
 
