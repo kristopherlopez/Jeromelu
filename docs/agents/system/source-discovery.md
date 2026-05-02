@@ -353,6 +353,84 @@ Cron suggestion (Lightsail box, weekly Monday 09:00 AET):
             -H "X-Admin-Key: $ADMIN_KEY" >/dev/null
 ```
 
+## Daily channel stats refresh
+
+Lightweight cousin of the weekly video refresh. Snapshots subscriber /
+video / view counts for every active YouTube channel into
+`channel_metrics`:
+
+```
+POST /api/admin/scout/refresh-channel-stats
+  Header: X-Admin-Key
+```
+
+Or via Make: `make prod-refresh-channel-stats ADMIN_KEY=xxx`.
+
+Backed by `refresh_all_channel_stats()` in `app/scout/refresh.py`. Walks
+every `channel` where `platform='youtube'` and `active=true`, batches the
+external_ids 50 at a time into `channels.list`, and writes one
+`channel_metrics` row per channel using the canonical shape from migration
+023 (`subscribers`, `videos`, `views`, `country`, `channel_published_at`).
+Identity fields (`handle`, `avatar_url`) are also synced onto the
+`channels` row when the API returns them.
+
+**Quota:** 1 unit per 50 channels — 3 units per pass at the projected ~150
+channel scale. Cheap enough to run daily (10,000 units/day on the free
+tier). Decoupled from the weekly video refresh because per-video stats are
+~200× more expensive and don't need daily cadence.
+
+Cron suggestion (Lightsail box, daily 09:00 AET):
+
+```
+0 9 * * * curl -s -X POST https://api.jeromelu.ai/api/admin/scout/refresh-channel-stats \
+            -H "X-Admin-Key: $ADMIN_KEY" >/dev/null
+```
+
+## Channel coverage audit
+
+Per-channel funnel showing how far each channel's videos have travelled
+through the pipeline — surfaces both ingestion gaps and downstream
+processing dropoffs.
+
+**UI:** dev-only at [http://localhost:3000/admin](http://localhost:3000/admin)
+— "Channel Coverage" tab. Each row colours the downstream stage relative
+to its parent (green ≥95%, yellow ≥50%, red below). Toggle "Only gaps" to
+filter to channels where Tracked < Reported.
+
+**Raw API:**
+
+```
+GET /api/admin/scout/channel-coverage
+  ?only_gaps=true         # filter to channels where tracked < reported
+```
+
+(Read-only inspection endpoint — no admin key required, matching
+`/admin/pipeline` and `/admin/sync-status`.)
+
+**Make target** (prod, with key):
+`make prod-channel-coverage ADMIN_KEY=xxx [ONLY_GAPS=1]`.
+
+Backed by `audit_channel_coverage()` in `app/scout/refresh.py`. Per-channel
+funnel stages:
+
+| Column | Definition |
+|---|---|
+| `reported_videos`  | Latest `channel_metrics.metrics->>'videos'` — what YouTube reports |
+| `tracked_videos`   | Rows in `sources` for the channel |
+| `extracted_videos` | Sources whose transcript has been saved (a `source_documents` row exists with `s3_key` or chunks) |
+| `processed_videos` | Sources with at least one `claims` row |
+
+Plus rollup totals (`channels_with_gap`, `total_gap`) where `gap = reported - tracked`. Pure DB read, no API quota cost.
+
+> **Naming clash with `/admin/pipeline`:** that view uses 'collected' for
+> "transcript saved" and 'extracted' for "claims exist". This view uses
+> 'extracted' / 'processed' instead — clearer in a channel-level funnel
+> but read column definitions, not stage names, when comparing the two.
+
+Freshness of `reported_videos` depends on the
+[daily channel stats refresh](#daily-channel-stats-refresh) cron keeping
+`channel_metrics` current.
+
 ## Influence ranking
 
 Once `video_metrics` has 2+ samples per video you can compute view-velocity:

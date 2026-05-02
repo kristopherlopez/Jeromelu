@@ -62,9 +62,31 @@ shells; the rest fall back to a paginated grid:
 
 | Entity | Component | Notes |
 |--------|-----------|-------|
-| Player | `PlayersIndexView.tsx` | Hero (title, search, Compare players), 5-stat knowledge row, three themed knowledge highlights (featured player, weekly activity, open ground), filter chips, sortable card grid, low-evidence callout, ask box |
+| Player | `PlayersIndexView.tsx` | Hero (title + tagline, mirrors Voices), 5-stat knowledge row, three themed knowledge highlights (featured player, weekly activity, open ground), `All players (N)` heading with filter chips and sort pill inline, `By team` / `By position` / `By price` chips each toggle a horizontal `FilterDrawer` (multi-select — click chips to add/remove, click again to clear; team chips carry team logos plus a search input; position labels are humanised — SuperCoach `CTW` renders as `Centre / Wing` so wingers aren't hidden; price chips are fixed buckets — `<$300K`, `$300K–$500K`, `$500K–$700K`, `$700K–$900K`, `$900K+`) that filters the grid live with one footer pill per active selection, gapped card grid with 84×84 thumbnails matching `VoiceCard`, low-evidence callout, ask box |
 | Voices | `VoicesView.tsx` | Combines `advisor` + `channel` pages |
 | Team / Round | `WikiIndexClient.PaginatedGrid` | Generic paginated card grid |
+
+**Per-page detail views.** Most page types render through the generic
+`WikiPageClient` (markdown hero + body). Channel pages have a bespoke
+`ChannelView.tsx` shell — main column with hero card (logo, title, "Voice"
+badge, description, tag pills, platform CTA) and a Latest-episodes panel;
+sidebar with About / Coverage / Related-voices cards. The route page fetches
+the page payload and a small batch of sibling channels in parallel for the
+related-voices sidebar.
+
+Episode rows in the Latest-episodes panel deep-link internally to
+`/stream/[sourceId]` (the source review page — video player + episode timeline
++ transcript + claims) **only when `ingestion_status = 'completed'`**, since
+`/api/sources/{id}` 404s for sources without a `SourceDocument`. Pending rows
+fall back to opening the platform URL (e.g. YouTube) directly. Either way the
+platform URL also appears as a small secondary icon on the right of each row.
+
+The source review page renders an `EpisodeTimeline` strip beneath the video:
+filter chips per claim type (with a disabled "Speaker changes" placeholder
+chip for diarisation, which lands later), a horizontal bar with click-to-seek
+markers per claim coloured by `CLAIM_TYPE_COLORS`, and a live playhead tied to
+`currentTime`. Duration is derived from the furthest chunk/claim end-timestamp
+since `sources.duration_seconds` isn't on the source detail API yet.
 
 `wiki_pages.entity_id` is now nullable; the new `channel_id` FK points to
 `channels` for channel-typed pages. Exactly one of `entity_id` / `channel_id` is
@@ -140,10 +162,11 @@ Migrations:
 
 | Endpoint | Purpose |
 |----------|---------|
-| `GET /api/wiki/pages` | List pages. Filters: `page_type`, `status`, `q`. Cursor pagination. Returns `metadata_json` per page for team/position/price grouping. For channel-backed pages, also bulk-loads `logo_url`, `platform` and `channel_url` from the `channels` table (one extra query regardless of page count). |
+| `GET /api/wiki/pages` | List pages. Filters: `page_type`, `status`, `q`. Cursor pagination. Returns `metadata_json` per page for team/position/price grouping. For channel-backed pages, also bulk-loads `logo_url`, `platform` and `channel_url` from the `channels` table. For player-backed pages, bulk-loads current `team`, `team_short` and `position` from `people_attributes` (`is_current = true`) into `metadata_json` so the Players index can render and filter by team without a per-row stub payload. One extra query per join, regardless of page count. |
 | `GET /api/wiki/pages/{slug}` | Full page detail + revisions + `linked_pages` map |
 | `GET /api/wiki/pages/{slug}/revisions` | Full revision history |
 | `GET /api/wiki/recent-changes` | Recent revisions across all pages |
+| `GET /api/wiki/channels/{slug}/episodes` | Latest sources (episodes) for a channel-backed page, ordered by `published_at` desc. Returns title, thumbnail, duration, canonical URL, ingestion status. Powers the "Latest episodes" panel in `ChannelView`. |
 
 The `linked_pages` response field maps each `[[slug]]` found in the content to `{title, page_type}`, enabling the frontend to render wiki-links with correct display names and routes without extra API calls.
 
@@ -190,6 +213,7 @@ Implemented via new `display_mode='wiki_update'` on the Event table.
 | `services/web/src/app/wiki/` | All frontend wiki pages and components |
 | `services/web/src/app/wiki/PlayersIndexView.tsx` | Bespoke `/wiki?type=player` index — stats, highlights, filterable card grid |
 | `services/web/src/app/wiki/VoicesView.tsx` | `/wiki?type=voices` index — advisors + channels |
+| `services/web/src/app/wiki/channel/[slug]/ChannelView.tsx` | Bespoke channel detail page — hero card + sidebar (About / Coverage / Related voices) |
 | `services/web/src/app/wiki/WikiIndexClient.tsx` | Wiki dashboard + per-entity entry-point routing |
 | `scripts/data/seed_wiki.py` | One-time seed from existing KB entries |
 | `scripts/data/backfill_wiki_team_pages.py` | One-shot backfill of `wiki_pages` rows for every `Team` (gap left by `seed_teams.py`, which only writes to `teams`) |

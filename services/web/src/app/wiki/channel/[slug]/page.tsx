@@ -1,6 +1,7 @@
 import { apiFetch } from "@/lib/api";
-import WikiPageClient from "../../components/WikiPageClient";
-import type { WikiPageResponse } from "../../wiki-data";
+import ChannelView from "./ChannelView";
+import type { ChannelEpisodesResponse } from "./episodes";
+import type { WikiPageResponse, WikiPagesResponse } from "../../wiki-data";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -23,15 +24,20 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function ChannelWikiPage({ params }: Props) {
   const { slug } = await params;
-  const data = await apiFetch<WikiPageResponse>(
-    `/api/wiki/pages/${slug}`
-  );
+  const [data, related, episodes] = await Promise.all([
+    apiFetch<WikiPageResponse>(`/api/wiki/pages/${slug}`),
+    apiFetch<WikiPagesResponse>(`/api/wiki/pages?page_type=channel&limit=12`)
+      .catch(() => ({ items: [], next_before: null }) as WikiPagesResponse),
+    apiFetch<ChannelEpisodesResponse>(`/api/wiki/channels/${slug}/episodes?limit=6`)
+      .catch(() => ({ items: [] }) as ChannelEpisodesResponse),
+  ]);
 
   return (
-    <WikiPageClient
+    <ChannelView
       page={data.page}
       revisions={data.revisions}
-      linkedPages={data.linked_pages}
+      relatedChannels={related.items}
+      episodes={episodes.items}
     />
   );
 }

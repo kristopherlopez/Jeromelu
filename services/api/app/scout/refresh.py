@@ -28,11 +28,18 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import Integer, distinct, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from jeromelu_shared.db import Channel, Source, VideoMetric
+from jeromelu_shared.db import (
+    Channel,
+    ChannelMetric,
+    Claim,
+    Source,
+    SourceDocument,
+    VideoMetric,
+)
 
 from . import youtube_api
 
@@ -305,6 +312,247 @@ def refresh_all_video_stats(session: Session) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Combined weekly job — used by the admin endpoint
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Daily channel stats refresh
+# ---------------------------------------------------------------------------
+
+def refresh_all_channel_stats(session: Session) -> dict[str, Any]:
+    """Snapshot subscriber / video / view counts for every active YouTube
+    channel and append a row to `channel_metrics`.
+
+    Cheap: 1 quota unit per 50 channels (channels.list batches up to 50).
+    ~150 channels = 3 units per pass — safe to run daily.
+
+    Two outcomes per channel, both paid for in the same channels.list call:
+      1. New row in `channel_metrics` with the time-varying popularity
+         fields (subscribers, videos, views). Use `channel_latest_metrics`
+         for current state and the table itself for trend analysis.
+      2. Identity fields (handle, avatar_url) synced onto the `channels`
+         row when the API returns them — keeps the wiki UI in sync without
+         a separate fetch.
+    """
+    channels = list(session.scalars(
+        select(Channel)
+        .where(Channel.platform == "youtube")
+        .where(Channel.active.is_(True))
+        .where(Channel.external_id.is_not(None))
+    ))
+    if not channels:
+        return {
+            "channels_total": 0,
+            "metrics_recorded": 0,
+            "channels_synced": 0,
+            "batches": 0,
+        }
+
+    by_external_id = {c.external_id: c for c in channels}
+    external_ids = list(by_external_id.keys())
+    sampled_at = datetime.now(timezone.utc)
+
+    metrics_recorded = 0
+    channels_synced = 0
+    batches = 0
+    for i in range(0, len(external_ids), 50):
+        batch = external_ids[i : i + 50]
+        stats = youtube_api.get_channel_stats(batch)
+        batches += 1
+        for entry in stats:
+            channel = by_external_id.get(entry["channel_id"])
+            if not channel:
+                continue
+
+            # Sync identity fields onto the channels row when the API gives
+            # us something different from what we have. Only overwrite when
+            # we got a non-empty value back — defensive against the API
+            # dropping a field we already have stored.
+            channel_updates: dict[str, Any] = {}
+            new_handle = entry.get("handle")
+            if new_handle and new_handle != channel.handle:
+                channel_updates["handle"] = new_handle
+            new_avatar = entry.get("avatar_url")
+            if new_avatar and new_avatar != channel.logo_url:
+                channel_updates["logo_url"] = new_avatar
+            if channel_updates:
+                session.execute(
+                    update(Channel)
+                    .where(Channel.channel_id == channel.channel_id)
+                    .values(**channel_updates)
+                )
+                channels_synced += 1
+
+            # Time-varying popularity fields → channel_metrics. Match the
+            # canonical shape established in migration 023 + recon.py
+            # _normalised_youtube_metrics: subscribers / videos / views /
+            # country / channel_published_at.
+            metric_payload: dict[str, Any] = {}
+            if entry.get("subs") is not None:
+                metric_payload["subscribers"] = entry["subs"]
+            if entry.get("video_count"):
+                metric_payload["videos"] = entry["video_count"]
+            if entry.get("view_count"):
+                metric_payload["views"] = entry["view_count"]
+            if entry.get("country"):
+                metric_payload["country"] = entry["country"]
+            if entry.get("published_at"):
+                metric_payload["channel_published_at"] = entry["published_at"]
+
+            if metric_payload:
+                session.add(
+                    ChannelMetric(
+                        channel_id=channel.channel_id,
+                        platform="youtube",
+                        sampled_at=sampled_at,
+                        source="youtube_api",
+                        metrics=metric_payload,
+                    )
+                )
+                metrics_recorded += 1
+
+    session.commit()
+    logger.info(
+        "Refreshed channel stats: %d channels in %d API batches, "
+        "%d identity-synced",
+        metrics_recorded,
+        batches,
+        channels_synced,
+    )
+
+    return {
+        "channels_total": len(channels),
+        "metrics_recorded": metrics_recorded,
+        "channels_synced": channels_synced,
+        "batches": batches,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Coverage audit — reported vs ingested
+# ---------------------------------------------------------------------------
+
+def audit_channel_coverage(session: Session) -> dict[str, Any]:
+    """Per-channel funnel — how far each channel's videos have travelled
+    through the pipeline. Surfaces both ingestion gaps and downstream
+    processing dropoffs.
+
+    Stages (per channel):
+      - reported   YouTube's video count (channel_metrics latest snapshot)
+      - tracked    rows in `sources` for this channel
+      - extracted  sources whose transcript has been saved (a SourceDocument
+                   row exists with s3_key OR chunks)
+      - processed  sources that have at least one Claim row
+
+    `gap = reported - tracked` is preserved for the headline summary line.
+
+    Naming note: the existing /admin/pipeline endpoint uses 'collected' for
+    "transcript saved" and 'extracted' for "claims exist". This view uses
+    'extracted' / 'processed' instead because they're more intuitive in a
+    channel-level funnel — read column docstrings, not stage names, when
+    comparing the two views.
+
+    Pure DB read — no YouTube API calls. Reported-count freshness depends
+    on the daily `refresh_all_channel_stats()` cron.
+    """
+    tracked_subq = (
+        select(
+            Source.channel_id,
+            func.count().label("tracked_videos"),
+        )
+        .where(Source.source_type == "youtube")
+        .group_by(Source.channel_id)
+        .subquery()
+    )
+    # "Extracted" — count distinct sources that have at least one
+    # SourceDocument with either an s3_key or non-zero chunk_count.
+    # Mirrors the /admin/pipeline 'collected' check at the channel level.
+    extracted_subq = (
+        select(
+            Source.channel_id,
+            func.count(distinct(Source.source_id)).label("extracted_videos"),
+        )
+        .join(SourceDocument, SourceDocument.source_id == Source.source_id)
+        .where(Source.source_type == "youtube")
+        .where(or_(SourceDocument.s3_key.is_not(None), SourceDocument.chunk_count > 0))
+        .group_by(Source.channel_id)
+        .subquery()
+    )
+    # "Processed" — count distinct sources that have at least one Claim
+    # row anywhere across their SourceDocuments.
+    processed_subq = (
+        select(
+            Source.channel_id,
+            func.count(distinct(Source.source_id)).label("processed_videos"),
+        )
+        .join(SourceDocument, SourceDocument.source_id == Source.source_id)
+        .join(Claim, Claim.document_id == SourceDocument.document_id)
+        .where(Source.source_type == "youtube")
+        .group_by(Source.channel_id)
+        .subquery()
+    )
+    latest_subq = (
+        select(
+            ChannelMetric.channel_id,
+            ChannelMetric.sampled_at,
+            ChannelMetric.metrics["videos"].astext.cast(Integer).label("reported_videos"),
+        )
+        .distinct(ChannelMetric.channel_id)
+        .order_by(ChannelMetric.channel_id, ChannelMetric.sampled_at.desc())
+        .subquery()
+    )
+    stmt = (
+        select(
+            Channel.channel_id,
+            Channel.slug,
+            Channel.name,
+            Channel.external_id,
+            tracked_subq.c.tracked_videos,
+            extracted_subq.c.extracted_videos,
+            processed_subq.c.processed_videos,
+            latest_subq.c.reported_videos,
+            latest_subq.c.sampled_at,
+        )
+        .select_from(Channel)
+        .outerjoin(tracked_subq, tracked_subq.c.channel_id == Channel.channel_id)
+        .outerjoin(extracted_subq, extracted_subq.c.channel_id == Channel.channel_id)
+        .outerjoin(processed_subq, processed_subq.c.channel_id == Channel.channel_id)
+        .outerjoin(latest_subq, latest_subq.c.channel_id == Channel.channel_id)
+        .where(Channel.platform == "youtube")
+        .where(Channel.active.is_(True))
+        .order_by(Channel.name)
+    )
+
+    per_channel: list[dict[str, Any]] = []
+    channels_with_gap = 0
+    total_gap = 0
+    for r in session.execute(stmt).all():
+        tracked = int(r.tracked_videos or 0)
+        extracted = int(r.extracted_videos or 0)
+        processed = int(r.processed_videos or 0)
+        reported = int(r.reported_videos) if r.reported_videos is not None else None
+        gap = (reported - tracked) if reported is not None else None
+        if gap is not None and gap > 0:
+            total_gap += gap
+            channels_with_gap += 1
+        per_channel.append({
+            "channel_id": str(r.channel_id),
+            "slug": r.slug,
+            "name": r.name,
+            "external_id": r.external_id,
+            "reported_videos": reported,
+            "tracked_videos": tracked,
+            "extracted_videos": extracted,
+            "processed_videos": processed,
+            "gap": gap,
+            "metrics_sampled_at": r.sampled_at.isoformat() if r.sampled_at else None,
+        })
+
+    return {
+        "channels_total": len(per_channel),
+        "channels_with_gap": channels_with_gap,
+        "total_gap": total_gap,
+        "per_channel": per_channel,
+    }
+
 
 def refresh_all_channels_incremental(session: Session) -> dict[str, Any]:
     """Walk every active YouTube channel and pull any new videos. Cheap:

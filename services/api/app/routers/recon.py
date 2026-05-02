@@ -30,6 +30,8 @@ from jeromelu_shared.db import Channel, ChannelMetric, ScoutCandidate, Source, W
 
 from ..deps import get_db
 from ..scout.refresh import (
+    audit_channel_coverage,
+    refresh_all_channel_stats,
     refresh_all_channels_incremental,
     refresh_all_video_stats,
     refresh_channel_videos,
@@ -482,3 +484,51 @@ def refresh_videos(
         "enumerate": enumerate_result,
         "stats": stats_result,
     }
+
+
+# ---------------------------------------------------------------------------
+# POST — daily channel stats refresh
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/admin/scout/refresh-channel-stats",
+    dependencies=[Depends(require_admin)],
+)
+def refresh_channel_stats(db: Session = Depends(get_db)):
+    """Daily cron entry point — snapshot channel popularity into channel_metrics.
+
+    Cheap (~1 quota unit per 50 channels — 3 units for the projected ~150
+    channel scale). Decoupled from the weekly /admin/scout/refresh-videos
+    job because the per-video stats refresh is ~200x more expensive and
+    doesn't need daily cadence.
+    """
+    result = refresh_all_channel_stats(db)
+    return {"ok": True, **result}
+
+
+# ---------------------------------------------------------------------------
+# GET — channel coverage audit
+# ---------------------------------------------------------------------------
+
+@router.get("/admin/scout/channel-coverage")
+def channel_coverage(
+    only_gaps: bool = Query(default=False),
+    db: Session = Depends(get_db),
+):
+    """Per-channel reconciliation: YouTube's reported video count (from the
+    most recent `channel_metrics` snapshot) vs the number of `sources` rows
+    we've ingested per channel.
+
+    `?only_gaps=true` filters to channels where ingested < reported. Pure DB
+    read — no YouTube API calls. Freshness depends on the daily
+    /admin/scout/refresh-channel-stats cron keeping channel_metrics current.
+
+    Read-only — matches the unauthenticated pattern of other inspection
+    endpoints (/admin/pipeline, /admin/sync-status) so the dev-only admin UI
+    can fetch without juggling X-Admin-Key.
+    """
+    result = audit_channel_coverage(db)
+    if only_gaps:
+        filtered = [r for r in result["per_channel"] if (r.get("gap") or 0) > 0]
+        result["per_channel"] = filtered
+    return {"ok": True, **result}

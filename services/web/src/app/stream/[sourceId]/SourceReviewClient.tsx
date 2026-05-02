@@ -7,6 +7,7 @@ import type { SourceDetailResponse, SourceListItem } from "@/lib/types";
 import YouTubePlayer, { type YouTubePlayerHandle } from "../../components/YouTubePlayer";
 import ClaimsList from "../../components/ClaimsList";
 import TranscriptPanel from "../../components/TranscriptPanel";
+import EpisodeTimeline from "../../components/EpisodeTimeline";
 
 interface Props {
   data: SourceDetailResponse;
@@ -104,6 +105,14 @@ export default function SourceReviewClient({ data, allSources }: Props) {
               No video URL available
             </div>
           )}
+
+          {/* Episode timeline */}
+          <EpisodeTimeline
+            claims={claims}
+            chunks={chunks}
+            currentTime={currentTime}
+            onSeek={handleSeek}
+          />
 
           {/* Source metadata */}
           <div className="flex items-center gap-4 rounded-lg border px-4 py-3" style={{ borderColor: "var(--border)", backgroundColor: "var(--background-deep)" }}>

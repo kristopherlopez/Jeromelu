@@ -12,7 +12,9 @@ from jeromelu_shared.db import (
     Channel,
     Match,
     Person,
+    PersonAttributes,
     Round,
+    Source,
     Team,
     Venue,
     WikiPage,
@@ -29,7 +31,13 @@ def _page_summary(
     logo_url: str | None = None,
     platform: str | None = None,
     channel_url: str | None = None,
+    extra_meta: dict | None = None,
 ) -> dict:
+    metadata = dict(page.metadata_json or {})
+    if extra_meta:
+        # Page-level metadata wins so an explicit override on the row is preserved.
+        for k, val in extra_meta.items():
+            metadata.setdefault(k, val)
     return {
         "page_id": str(page.page_id),
         "slug": page.slug,
@@ -37,7 +45,7 @@ def _page_summary(
         "page_type": page.page_type,
         "summary": page.summary,
         "status": page.status,
-        "metadata_json": page.metadata_json or {},
+        "metadata_json": metadata,
         "updated_at": page.updated_at.isoformat(),
         "logo_url": logo_url,
         "platform": platform,
@@ -98,6 +106,43 @@ def _person_logos_for_pages(
     return {pid: img for pid, img in rows}
 
 
+def _person_meta_for_pages(
+    db: Session, pages: list[WikiPage]
+) -> dict[uuid.UUID, dict[str, str | None]]:
+    """Bulk-load current team + position for person-backed pages.
+
+    Joins ``WikiPage → people_attributes (is_current) → teams`` so the
+    Players index can render and filter by team/position without a stub
+    metadata payload. One query regardless of count.
+    """
+    person_page_ids = [p.page_id for p in pages if p.person_id]
+    if not person_page_ids:
+        return {}
+    rows = (
+        db.query(
+            WikiPage.page_id,
+            Team.name,
+            Team.short_name,
+            Team.logo_url,
+            PersonAttributes.primary_position,
+        )
+        .join(PersonAttributes, PersonAttributes.person_id == WikiPage.person_id)
+        .outerjoin(Team, Team.team_id == PersonAttributes.team_id)
+        .filter(WikiPage.page_id.in_(person_page_ids))
+        .filter(PersonAttributes.is_current.is_(True))
+        .all()
+    )
+    return {
+        pid: {
+            "team": team_name,
+            "team_short": team_short,
+            "team_logo": team_logo,
+            "position": position,
+        }
+        for pid, team_name, team_short, team_logo, position in rows
+    }
+
+
 def _revision_item(rev: WikiRevision) -> dict:
     return {
         "revision_id": str(rev.revision_id),
@@ -144,13 +189,15 @@ def list_pages(
     channel_meta = _channel_meta_for_pages(db, pages)
     team_logos = _team_logos_for_pages(db, pages)
     person_logos = _person_logos_for_pages(db, pages)
+    person_meta = _person_meta_for_pages(db, pages)
 
     items = []
     for p in pages:
         logo, platform, url = channel_meta.get(p.page_id, (None, None, None))
         if logo is None:
             logo = team_logos.get(p.page_id) or person_logos.get(p.page_id)
-        items.append(_page_summary(p, logo, platform, url))
+        extra = person_meta.get(p.page_id)
+        items.append(_page_summary(p, logo, platform, url, extra_meta=extra))
 
     return {"items": items, "next_before": next_before}
 
@@ -326,6 +373,56 @@ def get_page(slug: str, db: Session = Depends(get_db)):
         },
         "revisions": [_revision_item(r) for r in revisions],
         "linked_pages": linked_pages,
+    }
+
+
+@router.get("/wiki/channels/{slug}/episodes")
+def get_channel_episodes(
+    slug: str,
+    limit: int = Query(default=8, ge=1, le=50),
+    db: Session = Depends(get_db),
+):
+    """Latest sources (episodes) for a channel-backed wiki page.
+
+    Powers the "Latest episodes" panel on `/wiki/channel/[slug]`. Returns
+    sources for the channel ordered by `published_at` desc, regardless of
+    ingestion status — even un-transcribed videos count as catalogued
+    episodes for the listing.
+    """
+    page = (
+        db.query(WikiPage)
+        .filter(WikiPage.slug == slug, WikiPage.page_type == "channel")
+        .first()
+    )
+    if not page or not page.channel_id:
+        raise HTTPException(status_code=404, detail="Channel page not found")
+
+    sources = (
+        db.query(Source)
+        .filter(Source.channel_id == page.channel_id)
+        .order_by(
+            Source.published_at.desc().nullslast(),
+            Source.created_at.desc(),
+        )
+        .limit(limit)
+        .all()
+    )
+
+    return {
+        "items": [
+            {
+                "source_id": str(s.source_id),
+                "title": s.title,
+                "description": s.description,
+                "thumbnail_url": s.thumbnail_url,
+                "duration_seconds": s.duration_seconds,
+                "canonical_url": s.canonical_url,
+                "published_at": s.published_at.isoformat() if s.published_at else None,
+                "is_short": bool(s.is_short),
+                "ingestion_status": s.ingestion_status,
+            }
+            for s in sources
+        ]
     }
 
 

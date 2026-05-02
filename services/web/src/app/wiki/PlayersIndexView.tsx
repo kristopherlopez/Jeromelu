@@ -5,8 +5,6 @@ import Link from "next/link";
 import {
   ArrowLeft,
   ArrowRight,
-  Search,
-  GitCompareArrows,
   Users,
   TrendingUp,
   CheckCircle2,
@@ -19,6 +17,8 @@ import {
   MapPin,
   Activity,
   Clock,
+  X,
+  Search,
 } from "lucide-react";
 import type { WikiPageSummary } from "./wiki-data";
 import "./wiki.css";
@@ -94,13 +94,21 @@ function formatRelative(iso: string): string {
 
 /* ── Filter / sort options ─────────────────────────── */
 
-type FilterKey = "all" | "position" | "price" | "recent" | "depth";
+type FilterKey = "all" | "position" | "price" | "team" | "recent" | "depth";
 type SortKey = "name" | "recent" | "price" | "depth";
+
+interface FilterOption {
+  key: string;
+  label: string;
+  count: number;
+  logo?: string | null;
+}
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "all", label: "All" },
   { key: "position", label: "By position" },
   { key: "price", label: "By price" },
+  { key: "team", label: "By team" },
   { key: "recent", label: "Recently spotted" },
   { key: "depth", label: "Knowledge depth" },
 ];
@@ -111,6 +119,44 @@ const SORTS: { key: SortKey; label: string }[] = [
   { key: "price", label: "Price (high → low)" },
   { key: "depth", label: "Knowledge depth" },
 ];
+
+interface PriceBucket {
+  key: string;
+  label: string;
+  min: number;
+  max: number;
+}
+
+const PRICE_BUCKETS: PriceBucket[] = [
+  { key: "u300", label: "Under $300K", min: 0, max: 300_000 },
+  { key: "300-500", label: "$300K – $500K", min: 300_000, max: 500_000 },
+  { key: "500-700", label: "$500K – $700K", min: 500_000, max: 700_000 },
+  { key: "700-900", label: "$700K – $900K", min: 700_000, max: 900_000 },
+  { key: "900-plus", label: "$900K+", min: 900_000, max: Number.POSITIVE_INFINITY },
+];
+
+function priceBucketFor(price: number | null): PriceBucket | null {
+  if (price == null) return null;
+  return PRICE_BUCKETS.find((b) => price >= b.min && price < b.max) ?? null;
+}
+
+// SuperCoach position codes are cryptic, and `CTW` covers both centres and
+// wingers — wingers don't get their own filter chip. Map to friendly labels
+// so the bundling is visible.
+const POSITION_LABELS: Record<string, string> = {
+  CTW: "Centre / Wing",
+  FRF: "Front-row forward",
+  "2RF": "Second-row forward",
+  HOK: "Hooker",
+  HFB: "Halfback",
+  "5/8": "Five-eighth",
+  FLB: "Fullback",
+};
+
+function positionLabel(code: string): string {
+  return POSITION_LABELS[code] ?? code;
+}
+
 
 /* ── Stats derivation ─────────────────────────────── */
 
@@ -140,24 +186,109 @@ export default function PlayersIndexView({
 }: {
   pages: WikiPageSummary[];
 }) {
-  const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
+  const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
+  const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
+  const [selectedPriceBuckets, setSelectedPriceBuckets] = useState<string[]>([]);
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortOpen, setSortOpen] = useState(false);
 
   const stats = useMemo(() => derivePlayerStats(pages), [pages]);
 
+  const teamOptions = useMemo<FilterOption[]>(() => {
+    const map = new Map<string, FilterOption>();
+    for (const p of pages) {
+      const name = getMetaString(p, "team");
+      if (!name) continue;
+      const existing = map.get(name);
+      if (existing) {
+        existing.count += 1;
+        if (!existing.logo) existing.logo = getMetaString(p, "team_logo");
+      } else {
+        map.set(name, {
+          key: name,
+          label: name,
+          logo: getMetaString(p, "team_logo"),
+          count: 1,
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [pages]);
+
+  const positionOptions = useMemo<FilterOption[]>(() => {
+    const map = new Map<string, FilterOption>();
+    for (const p of pages) {
+      const pos = getMetaString(p, "position");
+      if (!pos) continue;
+      const existing = map.get(pos);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        map.set(pos, { key: pos, label: positionLabel(pos), count: 1 });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [pages]);
+
+  const priceOptions = useMemo<FilterOption[]>(() => {
+    const counts = new Map<string, number>();
+    for (const p of pages) {
+      const bucket = priceBucketFor(getMetaNumber(p, "price"));
+      if (!bucket) continue;
+      counts.set(bucket.key, (counts.get(bucket.key) ?? 0) + 1);
+    }
+    return PRICE_BUCKETS.filter((b) => counts.has(b.key)).map((b) => ({
+      key: b.key,
+      label: b.label,
+      count: counts.get(b.key) ?? 0,
+    }));
+  }, [pages]);
+
+  const toggleInArray = (current: string[], key: string): string[] =>
+    current.includes(key) ? current.filter((k) => k !== key) : [...current, key];
+
+  const handleFilterSelect = (k: FilterKey) => {
+    const isDrawerFilter = k === "team" || k === "position" || k === "price";
+    if (isDrawerFilter && activeFilter === k) {
+      setActiveFilter("all");
+      setSelectedTeams([]);
+      setSelectedPositions([]);
+      setSelectedPriceBuckets([]);
+      return;
+    }
+    setActiveFilter(k);
+    setSelectedTeams([]);
+    setSelectedPositions([]);
+    setSelectedPriceBuckets([]);
+  };
+
   const visible = useMemo(() => {
-    const q = search.trim().toLowerCase();
     let list = pages.slice();
 
-    if (q) {
-      list = list.filter(
-        (p) =>
-          p.title.toLowerCase().includes(q) ||
-          (getMetaString(p, "team")?.toLowerCase().includes(q) ?? false) ||
-          (getMetaString(p, "position")?.toLowerCase().includes(q) ?? false),
+    if (selectedTeams.length > 0) {
+      list = list.filter((p) => {
+        const t = getMetaString(p, "team");
+        return t != null && selectedTeams.includes(t);
+      });
+    }
+
+    if (selectedPositions.length > 0) {
+      list = list.filter((p) => {
+        const pos = getMetaString(p, "position");
+        return pos != null && selectedPositions.includes(pos);
+      });
+    }
+
+    if (selectedPriceBuckets.length > 0) {
+      const buckets = PRICE_BUCKETS.filter((b) =>
+        selectedPriceBuckets.includes(b.key),
       );
+      list = list.filter((p) => {
+        const price = getMetaNumber(p, "price");
+        if (price == null) return false;
+        return buckets.some((b) => price >= b.min && price < b.max);
+      });
     }
 
     switch (sortKey) {
@@ -184,7 +315,7 @@ export default function PlayersIndexView({
         list.sort((a, b) => a.title.localeCompare(b.title));
     }
     return list;
-  }, [pages, search, sortKey]);
+  }, [pages, selectedTeams, selectedPositions, selectedPriceBuckets, sortKey]);
 
   const lowEvidence = useMemo(() => {
     return pages
@@ -212,21 +343,33 @@ export default function PlayersIndexView({
         <ArrowLeft size={14} /> Back to the Wiki
       </Link>
 
-      <PageHeader
-        search={search}
-        onSearch={setSearch}
-        total={stats.total}
-      />
+      <PageHeader />
 
       <KnowledgeStats stats={stats} />
 
       <KnowledgeHighlights pages={pages} />
 
-      <BrowseChips active={activeFilter} onSelect={setActiveFilter} />
-
       <AllPlayers
         pages={visible}
-        total={stats.total}
+        total={visible.length}
+        activeFilter={activeFilter}
+        onFilterSelect={handleFilterSelect}
+        teamOptions={teamOptions}
+        selectedTeams={selectedTeams}
+        onTeamToggle={(k) => setSelectedTeams((cur) => toggleInArray(cur, k))}
+        onTeamClear={() => setSelectedTeams([])}
+        positionOptions={positionOptions}
+        selectedPositions={selectedPositions}
+        onPositionToggle={(k) =>
+          setSelectedPositions((cur) => toggleInArray(cur, k))
+        }
+        onPositionClear={() => setSelectedPositions([])}
+        priceOptions={priceOptions}
+        selectedPriceBuckets={selectedPriceBuckets}
+        onPriceToggle={(k) =>
+          setSelectedPriceBuckets((cur) => toggleInArray(cur, k))
+        }
+        onPriceClear={() => setSelectedPriceBuckets([])}
         sortKey={sortKey}
         sortOpen={sortOpen}
         onSortToggle={() => setSortOpen((o) => !o)}
@@ -245,104 +388,34 @@ export default function PlayersIndexView({
 
 /* ── Page header ───────────────────────────────────── */
 
-function PageHeader({
-  search,
-  onSearch,
-  total,
-}: {
-  search: string;
-  onSearch: (s: string) => void;
-  total: number;
-}) {
+function PageHeader() {
   return (
     <header style={{ marginBottom: "2.5rem" }}>
-      <div
-        className="grid grid-cols-1 md:grid-cols-[1fr_auto] md:items-end"
-        style={{ gap: "1.5rem" }}
+      <h1
+        style={{
+          fontFamily: v.serif,
+          fontSize: "clamp(2rem, 4.4vw, 2.9rem)",
+          fontWeight: 700,
+          color: v.ink,
+          lineHeight: 1.05,
+          marginBottom: "0.5rem",
+        }}
       >
-        <div>
-          <h1
-            style={{
-              fontFamily: v.serif,
-              fontSize: "clamp(2.2rem, 4.6vw, 3rem)",
-              fontWeight: 700,
-              color: v.ink,
-              lineHeight: 1.05,
-              marginBottom: "0.55rem",
-            }}
-          >
-            Players
-          </h1>
-          <p
-            style={{
-              fontFamily: v.serif,
-              fontStyle: "italic",
-              fontSize: "1.05rem",
-              color: v.inkMuted,
-              lineHeight: 1.5,
-              maxWidth: 580,
-            }}
-          >
-            Profile cards across positions, sources, and match context — every
-            player Jaromelu has met on the page.
-          </p>
-        </div>
-
-        <div
-          className="flex flex-col sm:flex-row"
-          style={{ gap: "0.6rem", alignItems: "stretch" }}
-        >
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              padding: "0.45rem 0.85rem",
-              border: `1px solid ${v.border}`,
-              background: v.surface,
-              borderRadius: 6,
-              minWidth: 220,
-            }}
-          >
-            <Search size={14} style={{ color: v.inkFaint }} />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => onSearch(e.target.value)}
-              placeholder={`Search ${total ? `${total} players` : "players"}…`}
-              style={{
-                flex: 1,
-                border: "none",
-                background: "transparent",
-                outline: "none",
-                fontSize: "13px",
-                color: v.ink,
-                fontFamily: "inherit",
-              }}
-            />
-          </label>
-          <button
-            type="button"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "0.4rem",
-              padding: "0.55rem 1rem",
-              fontSize: "13px",
-              fontWeight: 600,
-              color: v.accent,
-              background: "transparent",
-              border: `1px solid ${v.accent}`,
-              borderRadius: 6,
-              cursor: "pointer",
-              fontFamily: "inherit",
-              whiteSpace: "nowrap",
-            }}
-          >
-            <GitCompareArrows size={14} /> Compare players
-          </button>
-        </div>
-      </div>
+        Players
+      </h1>
+      <p
+        style={{
+          fontFamily: v.serif,
+          fontStyle: "italic",
+          fontSize: "1.1rem",
+          color: v.inkMuted,
+          lineHeight: 1.5,
+          maxWidth: 560,
+        }}
+      >
+        Profile cards across positions, sources, and match context — every
+        player Jaromelu has met on the page.
+      </p>
     </header>
   );
 }
@@ -697,59 +770,25 @@ function RingScore({ value }: { value: number }) {
   );
 }
 
-/* ── Browse filter chips ────────────────────────── */
-
-function BrowseChips({
-  active,
-  onSelect,
-}: {
-  active: FilterKey;
-  onSelect: (k: FilterKey) => void;
-}) {
-  return (
-    <section style={{ marginBottom: "1.5rem" }}>
-      <SectionLabel>Browse the knowledge base</SectionLabel>
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "0.5rem",
-          marginTop: "0.75rem",
-        }}
-      >
-        {FILTERS.map((f) => {
-          const isActive = active === f.key;
-          return (
-            <button
-              key={f.key}
-              onClick={() => onSelect(f.key)}
-              style={{
-                fontSize: "12px",
-                fontWeight: 600,
-                padding: "0.45rem 0.95rem",
-                borderRadius: 999,
-                border: `1px solid ${isActive ? v.accent : v.border}`,
-                background: isActive ? v.accentBg : v.surface,
-                color: isActive ? v.accent : v.inkMuted,
-                cursor: "pointer",
-                fontFamily: "inherit",
-                transition: "background 0.15s, color 0.15s, border-color 0.15s",
-              }}
-            >
-              {f.label}
-            </button>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
 /* ── All players grid ───────────────────────────── */
 
 function AllPlayers({
   pages,
   total,
+  activeFilter,
+  onFilterSelect,
+  teamOptions,
+  selectedTeams,
+  onTeamToggle,
+  onTeamClear,
+  positionOptions,
+  selectedPositions,
+  onPositionToggle,
+  onPositionClear,
+  priceOptions,
+  selectedPriceBuckets,
+  onPriceToggle,
+  onPriceClear,
   sortKey,
   sortOpen,
   onSortToggle,
@@ -757,6 +796,20 @@ function AllPlayers({
 }: {
   pages: WikiPageSummary[];
   total: number;
+  activeFilter: FilterKey;
+  onFilterSelect: (k: FilterKey) => void;
+  teamOptions: FilterOption[];
+  selectedTeams: string[];
+  onTeamToggle: (k: string) => void;
+  onTeamClear: () => void;
+  positionOptions: FilterOption[];
+  selectedPositions: string[];
+  onPositionToggle: (k: string) => void;
+  onPositionClear: () => void;
+  priceOptions: FilterOption[];
+  selectedPriceBuckets: string[];
+  onPriceToggle: (k: string) => void;
+  onPriceClear: () => void;
   sortKey: SortKey;
   sortOpen: boolean;
   onSortToggle: () => void;
@@ -765,24 +818,67 @@ function AllPlayers({
   return (
     <section style={{ marginBottom: "2.75rem" }}>
       <div
-        className="flex items-center justify-between"
-        style={{ marginBottom: "1rem", gap: "1rem", flexWrap: "wrap" }}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "1rem",
+          flexWrap: "wrap",
+          marginBottom: "1rem",
+        }}
       >
         <h2
           style={{
             fontFamily: v.serif,
-            fontSize: "1.6rem",
+            fontSize: "1.4rem",
             fontWeight: 700,
             color: v.ink,
-            lineHeight: 1.2,
           }}
         >
           All players{" "}
-          <span style={{ color: v.inkFaint, fontWeight: 600 }}>
+          <span
+            style={{
+              fontSize: "13px",
+              fontWeight: 400,
+              color: v.inkFaint,
+              marginLeft: "0.4rem",
+            }}
+          >
             ({total})
           </span>
         </h2>
-        <div style={{ position: "relative" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            flexWrap: "wrap",
+          }}
+        >
+          {FILTERS.map((f) => {
+            const isActive = activeFilter === f.key;
+            return (
+              <button
+                key={f.key}
+                onClick={() => onFilterSelect(f.key)}
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  padding: "0.4rem 0.85rem",
+                  borderRadius: 999,
+                  border: `1px solid ${isActive ? v.accent : v.border}`,
+                  background: isActive ? v.accentBg : v.surface,
+                  color: isActive ? v.accent : v.inkMuted,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  transition: "background 0.15s, color 0.15s, border-color 0.15s",
+                }}
+              >
+                {f.label}
+              </button>
+            );
+          })}
+          <div style={{ position: "relative" }}>
           <button
             onClick={onSortToggle}
             style={{
@@ -842,21 +938,52 @@ function AllPlayers({
               ))}
             </div>
           )}
+          </div>
         </div>
       </div>
+
+      {activeFilter === "team" && (
+        <FilterDrawer
+          title="Filter by team"
+          searchable
+          searchPlaceholder="Search teams…"
+          options={teamOptions}
+          selectedKeys={selectedTeams}
+          onToggle={onTeamToggle}
+          onClear={onTeamClear}
+          allLabel="All teams"
+          allIcon={<Users size={13} />}
+        />
+      )}
+      {activeFilter === "position" && (
+        <FilterDrawer
+          title="Filter by position"
+          options={positionOptions}
+          selectedKeys={selectedPositions}
+          onToggle={onPositionToggle}
+          onClear={onPositionClear}
+          allLabel="All positions"
+          allIcon={<MapPin size={13} />}
+        />
+      )}
+      {activeFilter === "price" && (
+        <FilterDrawer
+          title="Filter by price"
+          options={priceOptions}
+          selectedKeys={selectedPriceBuckets}
+          onToggle={onPriceToggle}
+          onClear={onPriceClear}
+          allLabel="All prices"
+          allIcon={<DollarSign size={13} />}
+        />
+      )}
 
       {pages.length === 0 ? (
         <EmptyPlayers />
       ) : (
         <div
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-          style={{
-            gap: "1px",
-            background: v.border,
-            border: `1px solid ${v.border}`,
-            borderRadius: 6,
-            overflow: "hidden",
-          }}
+          style={{ gap: "1rem" }}
         >
           {pages.map((p) => (
             <PlayerCard key={p.page_id} page={p} />
@@ -873,58 +1000,130 @@ function PlayerCard({ page }: { page: WikiPageSummary }) {
   const price = getMetaNumber(page, "price");
   const sourceCount = getMetaNumber(page, "source_count");
   const claimCount = getMetaNumber(page, "claim_count");
+  const updated = formatRelative(page.updated_at);
 
   return (
     <Link
       href={pageHref(page)}
       style={{
-        background: v.surface,
-        padding: "1.1rem 1.2rem",
         display: "flex",
-        gap: "0.85rem",
-        textDecoration: "none",
+        gap: "1.1rem",
+        background: v.surface,
+        border: `1px solid ${v.border}`,
+        borderRadius: 8,
+        padding: "1.1rem",
         color: "inherit",
+        textDecoration: "none",
+        transition: "border-color 0.15s",
       }}
-      className="group"
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = v.accent;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = "var(--wiki-border)";
+      }}
     >
-      <Avatar logoUrl={page.logo_url} title={page.title} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          className="group-hover:underline"
+      <div style={{ flexShrink: 0 }}>
+        {page.logo_url ? (
+          <img
+            src={page.logo_url}
+            alt=""
+            width={84}
+            height={84}
+            style={{
+              width: 84,
+              height: 84,
+              borderRadius: 6,
+              objectFit: "cover",
+              background: v.bg,
+            }}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div
+            style={{
+              width: 84,
+              height: 84,
+              borderRadius: 6,
+              background: v.bg,
+              color: v.inkMuted,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontFamily: v.serif,
+              fontSize: "1.4rem",
+              fontWeight: 700,
+              border: `1px solid ${v.border}`,
+            }}
+          >
+            {initials(page.title)}
+          </div>
+        )}
+      </div>
+
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <h3
           style={{
             fontFamily: v.serif,
-            fontSize: "1rem",
+            fontSize: "1.15rem",
             fontWeight: 700,
             color: v.ink,
-            marginBottom: "0.2rem",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
+            lineHeight: 1.25,
+            margin: 0,
+            marginBottom: "0.35rem",
           }}
         >
           {page.title}
-        </div>
-        <div
+        </h3>
+        {(position || team) && (
+          <div
+            style={{
+              fontSize: "12px",
+              color: v.inkFaint,
+              marginBottom: "0.45rem",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {position ? <span style={{ color: v.amber }}>{position}</span> : null}
+            {position && team ? " · " : null}
+            {team ?? (position ? null : "Unaffiliated")}
+          </div>
+        )}
+        <p
           style={{
-            fontSize: "12px",
-            color: v.inkFaint,
-            marginBottom: "0.55rem",
-            whiteSpace: "nowrap",
+            fontSize: "13px",
+            color: v.inkMuted,
+            lineHeight: 1.5,
+            display: "-webkit-box",
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: "vertical",
             overflow: "hidden",
-            textOverflow: "ellipsis",
+            margin: 0,
+            flex: 1,
           }}
         >
-          {position ? <span style={{ color: v.amber }}>{position}</span> : null}
-          {position && team ? " · " : null}
-          {team ?? (position ? null : "Unaffiliated")}
-        </div>
+          {page.summary || "No summary yet."}
+        </p>
+
         <div
           style={{
+            marginTop: "0.75rem",
             display: "flex",
             alignItems: "center",
-            gap: "0.5rem",
+            gap: "0.75rem",
             fontSize: "11px",
             color: v.inkFaint,
+            flexWrap: "wrap",
           }}
         >
           {price != null && (
@@ -933,7 +1132,7 @@ function PlayerCard({ page }: { page: WikiPageSummary }) {
               style={{
                 display: "inline-flex",
                 alignItems: "center",
-                gap: "0.2rem",
+                gap: "0.3rem",
                 color: v.green,
               }}
             >
@@ -946,7 +1145,7 @@ function PlayerCard({ page }: { page: WikiPageSummary }) {
               style={{
                 display: "inline-flex",
                 alignItems: "center",
-                gap: "0.2rem",
+                gap: "0.3rem",
               }}
             >
               <Mic size={11} /> {sourceCount}
@@ -958,22 +1157,24 @@ function PlayerCard({ page }: { page: WikiPageSummary }) {
               style={{
                 display: "inline-flex",
                 alignItems: "center",
-                gap: "0.2rem",
+                gap: "0.3rem",
               }}
             >
               <Activity size={11} /> {claimCount}
             </span>
           )}
-          <span
-            style={{
-              marginLeft: "auto",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "0.2rem",
-            }}
-          >
-            <Clock size={11} /> {formatRelative(page.updated_at)}
-          </span>
+          {updated && (
+            <span
+              style={{
+                marginLeft: "auto",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.3rem",
+              }}
+            >
+              <Clock size={11} /> {updated}
+            </span>
+          )}
         </div>
       </div>
     </Link>
@@ -1275,6 +1476,297 @@ function AskAboutPlayer() {
         </button>
       </form>
     </section>
+  );
+}
+
+/* ── Filter drawer (team / position / price) ──── */
+
+function FilterDrawer({
+  title,
+  options,
+  selectedKeys,
+  onToggle,
+  onClear,
+  allLabel,
+  allIcon,
+  searchable,
+  searchPlaceholder,
+}: {
+  title: string;
+  options: FilterOption[];
+  selectedKeys: string[];
+  onToggle: (key: string) => void;
+  onClear: () => void;
+  allLabel: string;
+  allIcon: React.ReactNode;
+  searchable?: boolean;
+  searchPlaceholder?: string;
+}) {
+  const [search, setSearch] = useState("");
+
+  const filtered = useMemo(() => {
+    if (!searchable) return options;
+    const q = search.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter((o) => o.label.toLowerCase().includes(q));
+  }, [options, search, searchable]);
+
+  const selectedOptions =
+    selectedKeys.length === 0
+      ? []
+      : selectedKeys
+          .map((k) => options.find((o) => o.key === k))
+          .filter((o): o is FilterOption => o != null);
+
+  return (
+    <div
+      style={{
+        marginBottom: "1rem",
+        padding: "1rem 1.1rem",
+        background: v.surface,
+        border: `1px solid ${v.border}`,
+        borderRadius: 8,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.85rem",
+          flexWrap: "wrap",
+          marginBottom: "0.85rem",
+        }}
+      >
+        <span
+          style={{
+            fontSize: "11px",
+            fontWeight: 600,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            color: v.inkFaint,
+          }}
+        >
+          {title}
+        </span>
+        {searchable && (
+          <label
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.4rem",
+              background: v.bg,
+              border: `1px solid ${v.border}`,
+              borderRadius: 6,
+              padding: "0.3rem 0.65rem",
+              flex: 1,
+              maxWidth: 240,
+              minWidth: 180,
+            }}
+          >
+            <Search size={12} style={{ color: v.inkFaint }} />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={searchPlaceholder ?? "Search…"}
+              style={{
+                border: "none",
+                background: "transparent",
+                outline: "none",
+                fontSize: "12px",
+                color: v.ink,
+                fontFamily: "inherit",
+                flex: 1,
+                minWidth: 0,
+              }}
+            />
+          </label>
+        )}
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "0.4rem",
+        }}
+      >
+        <FilterDrawerChip
+          active={selectedKeys.length === 0}
+          onClick={onClear}
+          label={allLabel}
+          icon={allIcon}
+        />
+        {filtered.map((o) => (
+          <FilterDrawerChip
+            key={o.key}
+            active={selectedKeys.includes(o.key)}
+            onClick={() => onToggle(o.key)}
+            label={o.label}
+            count={o.count}
+            logo={o.logo}
+          />
+        ))}
+        {filtered.length === 0 && (
+          <span
+            style={{
+              fontSize: "12px",
+              color: v.inkFaint,
+              padding: "0.4rem 0.2rem",
+            }}
+          >
+            No matches.
+          </span>
+        )}
+      </div>
+
+      {selectedOptions.length > 0 && (
+        <div
+          style={{
+            marginTop: "0.85rem",
+            paddingTop: "0.85rem",
+            borderTop: `1px solid ${v.border}`,
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            flexWrap: "wrap",
+            fontSize: "12px",
+            color: v.inkFaint,
+          }}
+        >
+          <span style={{ fontWeight: 600 }}>Showing:</span>
+          {selectedOptions.map((o) => (
+            <button
+              key={o.key}
+              type="button"
+              onClick={() => onToggle(o.key)}
+              aria-label={`Remove ${o.label} from filter`}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.35rem",
+                padding: "0.25rem 0.6rem",
+                borderRadius: 999,
+                border: `1px solid ${v.accent}`,
+                background: v.accentBg,
+                color: v.accent,
+                fontSize: "12px",
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              {o.label}
+              <X size={11} />
+            </button>
+          ))}
+          {selectedOptions.length > 1 && (
+            <button
+              type="button"
+              onClick={onClear}
+              style={{
+                fontSize: "11px",
+                fontWeight: 600,
+                color: v.inkFaint,
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontFamily: "inherit",
+                textDecoration: "underline",
+                padding: 0,
+              }}
+            >
+              Clear all
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FilterDrawerChip({
+  active,
+  onClick,
+  label,
+  count,
+  logo,
+  icon,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  count?: number;
+  logo?: string | null;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "0.45rem",
+        padding: "0.35rem 0.7rem 0.35rem 0.45rem",
+        borderRadius: 999,
+        border: `1px solid ${active ? v.accent : v.border}`,
+        background: active ? v.accentBg : v.bg,
+        color: active ? v.accent : v.inkMuted,
+        fontSize: "12px",
+        fontWeight: 600,
+        cursor: "pointer",
+        fontFamily: "inherit",
+        transition: "background 0.15s, color 0.15s, border-color 0.15s",
+      }}
+    >
+      {logo ? (
+        <img
+          src={logo}
+          alt=""
+          width={20}
+          height={20}
+          style={{
+            width: 20,
+            height: 20,
+            borderRadius: 4,
+            objectFit: "contain",
+            background: "rgba(255,255,255,0.04)",
+            flexShrink: 0,
+          }}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+        />
+      ) : icon ? (
+        <span
+          style={{
+            width: 20,
+            height: 20,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 4,
+            background: active ? "rgba(255,255,255,0.04)" : v.surface,
+            color: active ? v.accent : v.inkFaint,
+            flexShrink: 0,
+          }}
+        >
+          {icon}
+        </span>
+      ) : null}
+      <span>{label}</span>
+      {count != null && (
+        <span
+          style={{
+            fontSize: "11px",
+            fontWeight: 700,
+            color: active ? v.accent : v.inkFaint,
+            marginLeft: "0.15rem",
+          }}
+        >
+          {count}
+        </span>
+      )}
+    </button>
   );
 }
 

@@ -1,4 +1,4 @@
-.PHONY: up down db-shell migrate migrate-status seed-teams seed-venues fetch-players seed-players api web logs clean prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all prod-refresh-videos prod-seed-teams prod-seed-players prod-refresh-players prod-fetch-and-refresh-players prod-refresh-players-nrlcom deploy-prod prod-shell prod-logs
+.PHONY: up down db-shell migrate migrate-status seed-teams seed-venues fetch-players seed-players api web logs clean prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all prod-refresh-videos prod-refresh-channel-stats prod-channel-coverage prod-seed-teams prod-seed-players prod-refresh-players prod-fetch-and-refresh-players prod-refresh-players-nrlcom deploy-prod prod-shell prod-logs
 
 # Start local infrastructure
 up:
@@ -122,6 +122,23 @@ prod-update-clean:
 # Usage: make prod-refresh-videos ADMIN_KEY=xxx
 prod-refresh-videos:
 	curl -s -X POST $(PROD_API)/api/admin/scout/refresh-videos \
+		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
+
+# Daily channel stats refresh — snapshot subscriber/video/view counts for
+# every active YouTube channel into channel_metrics. ~1 quota unit per 50
+# channels, safe to run daily. Wire to cron alongside prod-refresh-videos.
+# Usage: make prod-refresh-channel-stats ADMIN_KEY=xxx
+prod-refresh-channel-stats:
+	curl -s -X POST $(PROD_API)/api/admin/scout/refresh-channel-stats \
+		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
+
+# Channel coverage audit — for each active YouTube channel, compare
+# YouTube's reported video count (from channel_metrics) against how many
+# `sources` rows we have. Pure DB read, no API quota cost.
+# Usage: make prod-channel-coverage ADMIN_KEY=xxx [ONLY_GAPS=1]
+prod-channel-coverage:
+	curl -s -G $(PROD_API)/api/admin/scout/channel-coverage \
+		$(if $(ONLY_GAPS),--data-urlencode "only_gaps=true",) \
 		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
 
 # First-run prod team seed — converts local data/teams.yaml to JSON in
