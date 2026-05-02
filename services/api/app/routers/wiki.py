@@ -118,7 +118,7 @@ def list_pages(
     page_type: str | None = Query(default=None),
     status: str | None = Query(default=None),
     q: str | None = Query(default=None),
-    limit: int = Query(default=100, ge=1, le=500),
+    limit: int = Query(default=100, ge=1, le=2000),
     before: datetime | None = Query(default=None),
     db: Session = Depends(get_db),
 ):

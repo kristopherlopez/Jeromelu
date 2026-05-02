@@ -18,7 +18,7 @@ export default async function WikiPage({
 
   try {
     const pagesData = await apiFetch<WikiPagesResponse>(
-      "/api/wiki/pages?limit=500",
+      "/api/wiki/pages?limit=2000",
     );
     pages = pagesData.items;
   } catch {
