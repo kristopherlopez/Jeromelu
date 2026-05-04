@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     s3_access_key: str = "minioadmin"
     s3_secret_key: str = "minioadmin"
     s3_raw_bucket: str = "jeromelu-raw-transcripts"
+    s3_audio_bucket: str = "jeromelu-raw-audio"
     s3_clean_bucket: str = "jeromelu-clean-documents"
     s3_assets_bucket: str = "jeromelu-public-assets"
     s3_player_data_bucket: str = "jeromelu-player-data"
@@ -23,6 +24,22 @@ class Settings(BaseSettings):
     youtube_api_key: str = ""
     webshare_proxy_username: str = ""
     webshare_proxy_password: str = ""
+    deepgram_api_key: str = ""
+    deepgram_model: str = "nova-3"
+    huggingface_api_key: str = ""  # required for pyannote (gated model)
+    pyannote_model: str = "pyannote/speaker-diarization-3.1"
+
+    # Phase 5.5 — Lineup on SageMaker Async. When `lineup_remote` is true,
+    # diarize.py / visual_id.py dispatch to the remote endpoint instead
+    # of running ML inference locally. Defaults off so dev without
+    # GPU/AWS still works.
+    lineup_remote: bool = False
+    lineup_endpoint_name: str = "jeromelu-lineup-async"
+    lineup_aws_region: str = "ap-southeast-2"
+    lineup_ecr_repo: str = "jeromelu/lineup-gpu"
+    lineup_sagemaker_role_arn: str = ""  # arn:aws:iam::ACCOUNT:role/JeromeluSagemakerLineup
+    lineup_input_prefix: str = "sagemaker/lineup/input"
+    lineup_output_prefix: str = "sagemaker/lineup/output"
 
     model_config = {"env_prefix": "", "env_file": ".env", "extra": "ignore"}
 

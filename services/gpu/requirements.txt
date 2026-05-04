@@ -1,0 +1,21 @@
+# Lineup GPU container — extra Python deps installed on top of the
+# AWS DLC pytorch-inference base image (which already provides
+# torch==2.4 + CUDA + the SageMaker inference toolkit).
+#
+# Pins mirror services/api/requirements.txt where it matters:
+#   - pyannote.audio 3.4 needs huggingface_hub<1.0 (use_auth_token kwarg)
+#     and speechbrain<1.1 (k2_fsa lazy-import bug)
+#   - InsightFace `buffalo_l` runs on onnxruntime-gpu for CUDA inference
+pyannote.audio>=3.1,<4
+huggingface_hub<1.0
+speechbrain<1.1
+insightface>=0.7,<0.8
+onnxruntime-gpu>=1.17,<2
+opencv-python-headless>=4.8,<5
+boto3>=1.36,<2
+sqlalchemy==2.0.*
+psycopg[binary]==3.2.*
+pydantic==2.10.*
+pydantic-settings==2.7.*
+deepgram-sdk>=3.7,<4
+pgvector>=0.3,<1

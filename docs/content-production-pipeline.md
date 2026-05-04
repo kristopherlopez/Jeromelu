@@ -50,18 +50,22 @@ Same visual setup each week, different content. Production cost is per-clip, not
 
 Build a pipeline to isolate individual speaker audio from YouTube podcast sources, creating a growing library of voice data per expert.
 
-**Pipeline:**
-1. **YouTube ingestion** — already exists (IntelSweepWorkflow collects transcripts and stores to S3)
-2. **Audio extraction** — download audio tracks alongside transcripts
-3. **Speaker diarisation** — use Deepgram (or equivalent) to segment audio by speaker
-4. **Manual speaker tagging** — human-in-the-loop step to map diarised segments to known expert entities (e.g., "Speaker 2 = KingOfSC")
-5. **Audio isolation** — extract and store clean audio segments per tagged speaker
-6. **Accumulation** — over weeks/months, build hours of isolated audio per expert
+**What's already in place** (since [extraction-method.md](sources/extraction-method.md) shipped 2026-05-02):
+
+1. **Audio retention** — every Scout audio pull (`app/scout/audio.py`) downloads the audio via yt-dlp and persists it to `s3://jeromelu-raw-audio/youtube/{channel_id}/{video_id}.m4a`. Long-term storage; never deleted.
+2. **Speaker diarisation** — Deepgram nova-3 with `diarize=true` is the canonical extract (`app/analyst/transcribe.py`). Each video produces `source_speakers` *turns* (one row per contiguous speaker span — multiple per speaker, all sharing the raw `speaker_label`) and `source_chunks` rows linked to their turn via FK.
+3. **Speaker rename UI** — operators can name a speaker via `PATCH /api/sources/speakers/{segment_id}` (rename cascades to every turn sharing the current label). Visible in the transcript panel on `/stream/{source_id}` — click any speaker label to rename inline.
+
+**What's still to build:**
+
+4. **Speaker → Person resolution** — populate `source_speakers.speaker_person_id`. Two complementary signals: (a) voice-fingerprint clustering across episodes (a recurring speaker on the same podcast should converge), and (b) LLM-assisted attribution from contextual cues ("Hey Pat, what do you reckon?"). Manual override UI builds on the rename endpoint above.
+5. **Per-speaker audio isolation** — once a `Person` is mapped, slice the m4a into per-speaker WAVs using the `source_speakers` turn spans. Store as `s3://jeromelu-raw-audio/by-person/{person_id}/{document_id}_{segment_id}.wav`.
+5. **Accumulation** — over weeks/months, hours of isolated audio per expert build up automatically as new episodes are extracted.
 
 **Storage:**
-- Raw audio: S3 alongside existing transcript JSON
-- Diarised segments: S3 with speaker labels
-- Tagged/isolated audio: S3 organised by entity_id
+- Raw audio: `s3://jeromelu-raw-audio/youtube/{channel_id}/{video_id}.m4a` (full episode, kept long-term)
+- Deepgram JSON: `s3://jeromelu-raw-transcripts/youtube/{channel_id}/{video_id}.deepgram.json` (re-processable)
+- Per-person isolated clips (future): `s3://jeromelu-raw-audio/by-person/{person_id}/...`
 
 **Tagging UI:**
 - Minimal admin interface: play segment, assign to expert entity, confirm

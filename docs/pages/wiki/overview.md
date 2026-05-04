@@ -88,6 +88,16 @@ markers per claim coloured by `CLAIM_TYPE_COLORS`, and a live playhead tied to
 `currentTime`. Duration is derived from the furthest chunk/claim end-timestamp
 since `sources.duration_seconds` isn't on the source detail API yet.
 
+The `TranscriptPanel` to the right of the video is **turn-grouped**: chunks
+with the same `speaker_segment_id` collapse into a single block, prefixed with
+a click-to-rename speaker label and a `[mm:ss]` click-to-seek timestamp.
+Speaker labels are colour-stable across turns (hashed off the label string,
+so renames preserve colour). Renaming a label inline issues
+`PATCH /api/sources/speakers/{segment_id}` and cascades the new name to every
+turn from the same speaker in the document. Within a turn, a chunk with
+`paragraph_break=true` (set at extract time when the within-turn pause
+exceeds 1.5s) renders as a paragraph break — useful for long monologues.
+
 `wiki_pages.entity_id` is now nullable; the new `channel_id` FK points to
 `channels` for channel-typed pages. Exactly one of `entity_id` / `channel_id` is
 set per row, enforced by `ck_wiki_page_subject`.

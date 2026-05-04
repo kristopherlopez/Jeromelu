@@ -83,6 +83,12 @@ class Source(Base):
     canonical_url: Mapped[str | None] = mapped_column(Text, unique=True)
     approved_flag: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     ingestion_status: Mapped[str] = mapped_column(Text, nullable=False, default="pending")
+    transcription_status: Mapped[str | None] = mapped_column(Text)
+    extraction_method: Mapped[str | None] = mapped_column(Text)
+    diarization_method: Mapped[str | None] = mapped_column(Text)
+    audio_s3_key: Mapped[str | None] = mapped_column(Text)
+    video_s3_key: Mapped[str | None] = mapped_column(Text)
+    video_format: Mapped[str | None] = mapped_column(Text)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ingested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
@@ -92,6 +98,19 @@ class Source(Base):
 
     __table_args__ = (
         CheckConstraint("source_type IN ('youtube', 'podcast', 'web', 'radio', 'manual')", name="ck_source_type"),
+        CheckConstraint(
+            "extraction_method IS NULL OR extraction_method IN ("
+            "'deepgram_v1', 'deepgram_words+pyannote_v1', 'youtube_captions')",
+            name="ck_sources_extraction_method",
+        ),
+        CheckConstraint(
+            "transcription_status IS NULL OR transcription_status IN ('transcribed', 'failed')",
+            name="ck_sources_transcription_status",
+        ),
+        CheckConstraint(
+            "video_format IS NULL OR video_format IN ('multi_cam', 'single_cam', 'audio_only')",
+            name="ck_sources_video_format",
+        ),
         Index("idx_sources_type", "source_type"),
         Index("idx_sources_approved", "approved_flag"),
     )
@@ -121,25 +140,53 @@ class SourceDocument(Base):
 
 
 class SourceChunk(Base):
+    """Utterance-grained transcript chunk.
+
+    After migration 044 (audio-first extract), chunks are produced one-per
+    Deepgram utterance and link to a `SourceSpeaker` segment via
+    `speaker_segment_id`. Column order mirrors the new schema:
+    identifiers → time → space → text → semantic.
+    """
+
     __tablename__ = "source_chunks"
 
     chunk_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
-    document_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("source_documents.document_id"), nullable=False)
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("source_documents.document_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    speaker_segment_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("source_speakers.segment_id", ondelete="SET NULL"),
+    )
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
-    raw_text: Mapped[str] = mapped_column(Text, nullable=False)
-    clean_text: Mapped[str | None] = mapped_column(Text)
-    start_offset: Mapped[int | None] = mapped_column(Integer)
-    end_offset: Mapped[int | None] = mapped_column(Integer)
     start_ts: Mapped[float | None] = mapped_column(Float)
     end_ts: Mapped[float | None] = mapped_column(Float)
+    start_offset: Mapped[int | None] = mapped_column(Integer)
+    end_offset: Mapped[int | None] = mapped_column(Integer)
+    raw_text: Mapped[str] = mapped_column(Text, nullable=False)
+    clean_text: Mapped[str | None] = mapped_column(Text)
+    paragraph_break: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     embedding = mapped_column(Vector(1536))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
     document: Mapped["SourceDocument"] = relationship(back_populates="chunks")
+    speaker_segment: Mapped["SourceSpeaker | None"] = relationship()
     claim_links: Mapped[list["ClaimChunk"]] = relationship(back_populates="chunk")
 
     __table_args__ = (
+        CheckConstraint(
+            "start_ts IS NULL OR end_ts IS NULL OR end_ts >= start_ts",
+            name="ck_source_chunks_ts_span",
+        ),
+        UniqueConstraint("document_id", "chunk_index", name="uq_source_chunks_doc_index"),
         Index("idx_source_chunks_document", "document_id"),
+        Index(
+            "idx_source_chunks_speaker",
+            "speaker_segment_id",
+            postgresql_where="speaker_segment_id IS NOT NULL",
+        ),
     )
 
 
@@ -165,10 +212,26 @@ class SourceSpeaker(Base):
     start_ts: Mapped[float] = mapped_column(Float, nullable=False)
     end_ts: Mapped[float] = mapped_column(Float, nullable=False)
     confidence: Mapped[float | None] = mapped_column(Float)
+    embedding = mapped_column(Vector(256))
+    embedding_model: Mapped[str | None] = mapped_column(Text)
+    audio_match_person_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("people.person_id", ondelete="SET NULL"),
+    )
+    audio_match_score: Mapped[float | None] = mapped_column(Float)
+    visual_match_person_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("people.person_id", ondelete="SET NULL"),
+    )
+    visual_match_score: Mapped[float | None] = mapped_column(Float)
+    match_method: Mapped[str | None] = mapped_column(Text)
+    match_confidence: Mapped[float | None] = mapped_column(Float)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
     __table_args__ = (
         CheckConstraint("end_ts >= start_ts", name="ck_source_speakers_span"),
+        CheckConstraint(
+            "match_method IS NULL OR match_method IN ('voice', 'face', 'voice+face', 'manual')",
+            name="ck_source_speakers_match_method",
+        ),
         Index("idx_source_speakers_document", "document_id"),
         Index(
             "idx_source_speakers_person",
@@ -176,6 +239,109 @@ class SourceSpeaker(Base):
             postgresql_where="speaker_person_id IS NOT NULL",
         ),
         Index("idx_source_speakers_doc_start", "document_id", "start_ts"),
+        Index(
+            "idx_source_speakers_audio_match",
+            "audio_match_person_id",
+            postgresql_where="audio_match_person_id IS NOT NULL",
+        ),
+        Index(
+            "idx_source_speakers_visual_match",
+            "visual_match_person_id",
+            postgresql_where="visual_match_person_id IS NOT NULL",
+        ),
+    )
+
+
+class PersonFaceEmbedding(Base):
+    """Face fingerprint registry — Phase 4 visual identification.
+
+    Sibling table to ``PersonVoiceprint``. Each row is one ArcFace
+    embedding (512-dim, InsightFace `buffalo_l`) from a frame
+    explicitly attributed to a Person. Multiple rows per Person let
+    the registry capture visual variation (angles, lighting, age) and
+    compound over time via Phase 5 cross-modal auto-confirmation.
+
+    See migration 049.
+    """
+
+    __tablename__ = "person_face_embeddings"
+
+    face_embedding_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=_new_uuid,
+    )
+    person_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("people.person_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    source_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sources.source_id", ondelete="SET NULL"),
+    )
+    frame_ts: Mapped[float | None] = mapped_column(Float)
+    embedding = mapped_column(Vector(512), nullable=False)
+    embedding_model: Mapped[str] = mapped_column(Text, nullable=False)
+    created_by: Mapped[str] = mapped_column(Text, nullable=False, default="manual")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow,
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "created_by IN ('manual', 'headshot', 'auto-confirmed')",
+            name="ck_person_face_embeddings_created_by",
+        ),
+        Index("idx_person_face_embeddings_person", "person_id"),
+        Index(
+            "idx_person_face_embeddings_source",
+            "source_id",
+            postgresql_where="source_id IS NOT NULL",
+        ),
+    )
+
+
+class PersonVoiceprint(Base):
+    """Voice fingerprint registry — Phase 3 of speaker identification.
+
+    Each row is one sliding-window embedding (2 s window, 0.5 s hop)
+    from a span of audio explicitly attributed to a Person. Multiple
+    rows per enrollment session and multiple sessions per Person, so
+    the registry compounds over time (Phase 5 cross-modal auto-confirm).
+
+    See migration 048.
+    """
+
+    __tablename__ = "person_voiceprints"
+
+    voiceprint_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=_new_uuid,
+    )
+    person_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("people.person_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    source_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sources.source_id", ondelete="SET NULL"),
+    )
+    start_ts: Mapped[float] = mapped_column(Float, nullable=False)
+    end_ts: Mapped[float] = mapped_column(Float, nullable=False)
+    embedding = mapped_column(Vector(256), nullable=False)
+    embedding_model: Mapped[str] = mapped_column(Text, nullable=False)
+    created_by: Mapped[str] = mapped_column(Text, nullable=False, default="manual")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow,
+    )
+
+    __table_args__ = (
+        CheckConstraint("end_ts >= start_ts", name="ck_person_voiceprints_span"),
+        CheckConstraint(
+            "created_by IN ('manual', 'auto-confirmed')",
+            name="ck_person_voiceprints_created_by",
+        ),
+        Index("idx_person_voiceprints_person", "person_id"),
+        Index(
+            "idx_person_voiceprints_source",
+            "source_id",
+            postgresql_where="source_id IS NOT NULL",
+        ),
     )
 
 

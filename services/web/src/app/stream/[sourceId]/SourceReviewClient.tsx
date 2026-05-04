@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, User, Calendar, Video, PenLine } from "lucide-react";
 import type { SourceDetailResponse, SourceListItem } from "@/lib/types";
 import YouTubePlayer, { type YouTubePlayerHandle } from "../../components/YouTubePlayer";
+import VideoOverlay, { type VideoOverlayHandle } from "../../components/VideoOverlay";
 import ClaimsList from "../../components/ClaimsList";
 import TranscriptPanel from "../../components/TranscriptPanel";
 import EpisodeTimeline from "../../components/EpisodeTimeline";
@@ -15,15 +16,26 @@ interface Props {
 }
 
 export default function SourceReviewClient({ data, allSources }: Props) {
-  const { source, claims, chunks } = data;
+  const { source, claims, chunks, speakers } = data;
   const [currentTime, setCurrentTime] = useState(0);
   const [activeTab, setActiveTab] = useState<"transcript" | "claims">("transcript");
+  // Phase 4b: prefer the local video + face overlay when both URLs are
+  // present; otherwise fall back to the YouTube embed.
+  const useOverlay = Boolean(source.video_url && source.face_track_url);
+  const overlayRef = useRef<VideoOverlayHandle>(null);
   const playerRef = useRef<YouTubePlayerHandle>(null);
 
-  const handleSeek = useCallback((seconds: number) => {
-    playerRef.current?.seekTo(seconds);
-    setCurrentTime(seconds);
-  }, []);
+  const handleSeek = useCallback(
+    (seconds: number) => {
+      if (useOverlay) {
+        overlayRef.current?.seekTo(seconds);
+      } else {
+        playerRef.current?.seekTo(seconds);
+      }
+      setCurrentTime(seconds);
+    },
+    [useOverlay],
+  );
 
   // Derive active claim: prefer precise claim-level timestamps, fall back to chunk
   const activeClaimId = useMemo(() => {
@@ -94,7 +106,15 @@ export default function SourceReviewClient({ data, allSources }: Props) {
       <div className="flex flex-col lg:flex-row lg:h-[calc(100vh-49px)]">
         {/* Left: Video + Metadata (sticky) */}
         <div className="w-full lg:w-[50%] p-4 lg:p-6 flex flex-col gap-4 lg:sticky lg:top-0 lg:self-start lg:max-h-[calc(100vh-49px)] lg:overflow-y-auto custom-scrollbar">
-          {source.canonical_url ? (
+          {useOverlay ? (
+            <VideoOverlay
+              ref={overlayRef}
+              videoUrl={source.video_url!}
+              faceTrackUrl={source.face_track_url}
+              speakers={speakers ?? []}
+              onTimeUpdate={setCurrentTime}
+            />
+          ) : source.canonical_url ? (
             <YouTubePlayer
               ref={playerRef}
               videoUrl={source.canonical_url}
@@ -229,6 +249,7 @@ export default function SourceReviewClient({ data, allSources }: Props) {
               <TranscriptPanel
                 chunks={chunks}
                 claims={claims}
+                speakers={speakers ?? []}
                 currentTime={currentTime}
                 onSeek={handleSeek}
               />

@@ -37,7 +37,7 @@ The system is powered by multiple agents, but the audience experiences them as *
 
 **Voice:** Efficient, factual, no opinion. Scout reports what's out there without editorialising.
 
-**Maps to:** Ingestion workers (IntelSweepWorkflow — channel discovery, transcript collection, document indexing).
+**Maps to:** Scout module in the api container — discovery loop (`app/scout/loop.py`), enumeration / refresh (`app/scout/refresh.py`), and audio acquisition (`app/scout/audio.py`). The legacy Temporal `IntelSweepWorkflow` under `services/worker-ingestion/` is superseded. Transcription itself is Analyst's responsibility (`app/analyst/transcribe.py` + Deepgram) — see [extraction-method.md](../sources/extraction-method.md).
 
 ### Analyst
 
@@ -50,7 +50,7 @@ The system is powered by multiple agents, but the audience experiences them as *
 
 **Voice:** Precise, measured, presents both sides. Analyst surfaces the tension without resolving it.
 
-**Maps to:** Extraction and publishing workers (claim extraction, consensus snapshots, knowledge base generation).
+**Maps to:** Analyst module in the api container — transcription (`app/analyst/transcribe.py`, Deepgram-driven diarisation + chunking), plus the cleaning / claim extraction / consensus surfaces (skill-driven today, workerised version pending). See [analyst.md](../agents/crew/analyst.md).
 
 ### Jaromelu
 

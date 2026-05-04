@@ -40,6 +40,26 @@ import {
 }
 
 import {
+  to = aws_s3_bucket.raw_audio
+  id = "jeromelu-raw-audio"
+}
+
+import {
+  to = aws_s3_bucket_versioning.raw_audio
+  id = "jeromelu-raw-audio"
+}
+
+import {
+  to = aws_s3_bucket_server_side_encryption_configuration.raw_audio
+  id = "jeromelu-raw-audio"
+}
+
+import {
+  to = aws_s3_bucket_public_access_block.raw_audio
+  id = "jeromelu-raw-audio"
+}
+
+import {
   to = aws_s3_bucket.clean_documents
   id = "jeromelu-clean-documents"
 }

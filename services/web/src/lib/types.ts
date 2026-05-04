@@ -41,6 +41,28 @@ export interface TranscriptChunk {
   start_ts: number | null;
   end_ts: number | null;
   has_claims: boolean;
+  speaker_segment_id: string | null;
+  paragraph_break: boolean;
+}
+
+export type MatchMethod = "voice" | "face" | "voice+face" | "manual" | null;
+
+export interface Speaker {
+  segment_id: string;
+  speaker_label: string | null;
+  speaker_person_id: string | null;
+  speaker_person_name: string | null;
+  start_ts: number;
+  end_ts: number;
+  // Phase 4 provenance — see source_speakers (mig 050).
+  match_method: MatchMethod;
+  match_confidence: number | null;
+  audio_match_person_id: string | null;
+  audio_match_person_name: string | null;
+  audio_match_score: number | null;
+  visual_match_person_id: string | null;
+  visual_match_person_name: string | null;
+  visual_match_score: number | null;
 }
 
 export interface SourceDetailResponse {
@@ -51,7 +73,40 @@ export interface SourceDetailResponse {
     published_at: string | null;
     creator_name: string | null;
     source_type: string;
+    // Phase 4 visual identification: presigned S3 URLs (1h TTL).
+    // When both are present the review UI swaps the YouTube embed for
+    // the local video + face overlay.
+    video_url: string | null;
+    face_track_url: string | null;
+    video_format: "multi_cam" | "single_cam" | "audio_only" | null;
   };
   claims: ClaimDetail[];
   chunks: TranscriptChunk[];
+  speakers: Speaker[];
+}
+
+// Phase 4 face-track JSON (persisted to S3 by visual_id.py). Fetched
+// directly from `face_track_url` by the VideoOverlay.
+export interface FaceTrackFace {
+  bbox: [number, number, number, number];  // [x1, y1, x2, y2] in source pixel coords
+  det_score: number;
+  person_id: string | null;
+  similarity: number | null;
+  mouth_opening: number | null;
+}
+
+export interface FaceTrackFrame {
+  ts: number;
+  faces: FaceTrackFace[];
+}
+
+export interface FaceTrack {
+  json_version: number;
+  embedding_model: string;
+  embedding_dim: number;
+  sample_rate: number;
+  video_s3_key: string;
+  video_format: "multi_cam" | "single_cam" | "audio_only";
+  duration_seconds: number;
+  frames: FaceTrackFrame[];
 }

@@ -9,3 +9,32 @@ openai==1.65.*
 anthropic==0.42.*
 python-dotenv==1.0.*
 temporalio==1.9.*
+deepgram-sdk>=3.7,<4
+# Phase 1 speaker-identification work — pyannote diarization run side-by-side
+# with Deepgram. Heavy: pulls torch (~2 GB). Requires HUGGINGFACE_API_KEY in
+# .env and the user to accept the gated-model license at
+# https://huggingface.co/pyannote/speaker-diarization-3.1
+#
+# torch / torchaudio pinned to 2.4.* — pyannote 3.4 still references
+# torchaudio.AudioMetaData, which was removed in torchaudio 2.6+. The 2.4
+# series is the last stable pairing for pyannote 3.x.
+#
+# huggingface_hub pinned to <1.0 — pyannote 3.4 internally calls
+# hf_hub_download(use_auth_token=...), a kwarg that hf_hub 1.x removed in
+# favour of `token`. The 0.x series is the last compatible release for
+# pyannote 3.x. Future Phase 1.5 (community-1 / pyannote 4.x) can drop this.
+#
+# speechbrain pinned to <1.1 — 1.1.0 added a lazy `speechbrain.integrations.k2_fsa`
+# module that fails to import without the heavy `k2` C++ dep (tricky on Windows).
+# pyannote 3.4's embedding loader trips this lazy import. 1.0.x is fine.
+pyannote.audio>=3.1,<4
+torch==2.4.*
+torchaudio==2.4.*
+huggingface_hub<1.0
+speechbrain<1.1
+# Phase 4 visual identification — InsightFace `buffalo_l` (RetinaFace +
+# ArcFace, 512-dim face embeddings). Bundled with onnxruntime CPU build.
+# opencv-python for the frame loader. Models auto-download on first use.
+insightface>=0.7,<0.8
+onnxruntime>=1.17,<2
+opencv-python-headless>=4.8,<5

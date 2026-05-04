@@ -74,6 +74,7 @@ Three problems this system needs to solve:
 | Doc | Covers |
 |-----|--------|
 | [types.md](types.md) | Source types (YouTube, article, podcast, radio, stats), fields per type, access categories |
+| [extraction-method.md](extraction-method.md) | How raw bytes become `source_documents` + `source_chunks` + `source_speakers`. Audio-first via Deepgram (canonical), `youtube_captions` legacy tier, keyterm vocabulary, cost model. |
 | [cleaning.md](cleaning.md) | The cleaning workbench: current pipeline, quality evaluation, iteration loop |
 | [patterns.md](patterns.md) | The correction catalogue — player-name garbles, protected slang, etc. |
 

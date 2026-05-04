@@ -1,4 +1,4 @@
-.PHONY: up down db-shell migrate migrate-status seed-teams seed-venues fetch-players seed-players api web logs clean prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all prod-refresh-videos prod-refresh-channel-stats prod-channel-coverage prod-seed-teams prod-seed-players prod-refresh-players prod-fetch-and-refresh-players prod-refresh-players-nrlcom deploy-prod prod-shell prod-logs
+.PHONY: up down db-shell migrate migrate-status seed-teams seed-venues fetch-players seed-players api web logs clean collect-audio collect-video transcribe extract-transcript diarize diarize-compare enroll-voice enroll-face lineup-build lineup-deploy lineup-status lineup-delete prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all prod-refresh-videos prod-refresh-channel-stats prod-channel-coverage prod-seed-teams prod-seed-players prod-refresh-players prod-fetch-and-refresh-players prod-refresh-players-nrlcom deploy-prod prod-shell prod-logs
 
 # Start local infrastructure
 up:
@@ -43,13 +43,121 @@ fetch-players:
 seed-players:
 	python scripts/data/seed_players_prod.py
 
+# Scout — acquire audio for one source (yt-dlp → s3://jeromelu-raw-audio).
+# Sets sources.audio_s3_key and ingestion_status='collected'. Idempotent on
+# the S3 object — safe to re-run.
+# Usage: make collect-audio SOURCE_ID=<uuid>
+collect-audio:
+	@test -n "$(SOURCE_ID)" || (echo "SOURCE_ID is required: make collect-audio SOURCE_ID=<uuid>" && exit 2)
+	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.scout.audio_cli $(SOURCE_ID)
+
+# Scout — acquire low-res video for one source (yt-dlp 360p by default →
+# s3://jeromelu-raw-audio with .video.mp4 suffix). Used by Phase 4 visual
+# identification. Independent of audio acquisition; idempotent.
+# Usage: make collect-video SOURCE_ID=<uuid> [QUALITY=240|360|480|720]
+collect-video:
+	@test -n "$(SOURCE_ID)" || (echo "SOURCE_ID is required: make collect-video SOURCE_ID=<uuid>" && exit 2)
+	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.scout.video_cli $(SOURCE_ID) $(if $(QUALITY),--quality $(QUALITY))
+
+# Analyst — transcribe a collected source via Deepgram (diarisation + keyterm).
+# Requires audio_s3_key to be set (run collect-audio first). Writes the
+# Deepgram JSON to s3://jeromelu-raw-transcripts and source_documents +
+# source_speakers + source_chunks rows. Sets transcription_status='transcribed'.
+# Usage: make transcribe SOURCE_ID=<uuid> [FORCE=1]
+transcribe:
+	@test -n "$(SOURCE_ID)" || (echo "SOURCE_ID is required: make transcribe SOURCE_ID=<uuid>" && exit 2)
+	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.analyst.transcribe_cli $(SOURCE_ID) $(if $(FORCE),--force)
+
+# Convenience target: run Scout (collect-audio) then Analyst (transcribe) in
+# sequence for a single source. The two steps stay independent — a Deepgram
+# failure leaves the audio in S3 for retry without re-downloading.
+# Usage: make extract-transcript SOURCE_ID=<uuid> [FORCE=1]
+extract-transcript: collect-audio transcribe
+
+# Phase 1 speaker-identification — run pyannote/speaker-diarization-3.1 on a
+# Source's audio and persist the JSON to s3://jeromelu-raw-transcripts. NO DB
+# writes; this is the side-by-side decision-gate experiment that informs
+# whether we proceed to Phase 2 (replace Deepgram's diarizer). Requires
+# HUGGINGFACE_TOKEN in .env and `pip install -r services/api/requirements.txt`.
+# Usage: make diarize SOURCE_ID=<uuid> [FORCE=1]
+diarize:
+	@test -n "$(SOURCE_ID)" || (echo "SOURCE_ID is required: make diarize SOURCE_ID=<uuid>" && exit 2)
+	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.analyst.diarize_cli $(SOURCE_ID) $(if $(FORCE),--force)
+
+# Print a side-by-side comparison of Deepgram and pyannote diarization for
+# a single source: speaker counts, confusion matrix, label alignment, and
+# agreement %. Read-only. Use to evaluate the Phase 1 decision-gate.
+# Usage: make diarize-compare SOURCE_ID=<uuid> [INTERVAL=2.0] [SHOW_ALL=1]
+diarize-compare:
+	@test -n "$(SOURCE_ID)" || (echo "SOURCE_ID is required: make diarize-compare SOURCE_ID=<uuid>" && exit 2)
+	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.analyst.diarize_compare $(SOURCE_ID) $(if $(INTERVAL),--interval $(INTERVAL)) $(if $(SHOW_ALL),--show-all-rows)
+
+# Phase 3 voice enrollment — extract sliding-window embeddings from a
+# known span of source audio and write one PersonVoiceprint row per
+# window. Used during bootstrap to seed the voice registry. Recommended:
+# >=10s of clean monologue per enrollment, 2-3 non-contiguous spans per
+# Person to capture acoustic variation.
+# Usage: make enroll-voice PERSON_ID=<uuid> SOURCE_ID=<uuid> START_TS=<sec> END_TS=<sec>
+enroll-voice:
+	@test -n "$(PERSON_ID)" || (echo "PERSON_ID is required" && exit 2)
+	@test -n "$(SOURCE_ID)" || (echo "SOURCE_ID is required" && exit 2)
+	@test -n "$(START_TS)" || (echo "START_TS is required" && exit 2)
+	@test -n "$(END_TS)" || (echo "END_TS is required" && exit 2)
+	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.analyst.enroll_voice_cli $(PERSON_ID) $(SOURCE_ID) $(START_TS) $(END_TS)
+
+# Phase 4 face enrollment — write a person_face_embeddings row from a
+# still image or a frame extracted from a source's video. Two modes:
+#   make enroll-face PERSON_ID=<uuid> IMAGE=path/to/headshot.jpg
+#   make enroll-face PERSON_ID=<uuid> SOURCE_ID=<uuid> FRAME_TS=<sec>
+enroll-face:
+	@test -n "$(PERSON_ID)" || (echo "PERSON_ID is required" && exit 2)
+	@if [ -n "$(IMAGE)" ]; then \
+		. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.analyst.enroll_face_cli $(PERSON_ID) --image "$(IMAGE)"; \
+	elif [ -n "$(SOURCE_ID)" ] && [ -n "$(FRAME_TS)" ]; then \
+		. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.analyst.enroll_face_cli $(PERSON_ID) --source-id $(SOURCE_ID) --frame-ts $(FRAME_TS); \
+	else \
+		echo "Need IMAGE=path OR (SOURCE_ID=<uuid> FRAME_TS=<sec>)" && exit 2; \
+	fi
+
+# Phase 5.5 — Lineup on SageMaker Async. Build the GPU container and push
+# to ECR. Reads HUGGINGFACE_API_KEY from .env and passes it as a Buildkit
+# secret (so the token doesn't land in image layers). One-time AWS setup
+# is in services/gpu/SETUP.md.
+# Usage: make lineup-build [TAG=v2]
+lineup-build:
+	@test -n "$(HUGGINGFACE_API_KEY)" || (set -a; . .env; set +a; bash services/gpu/build_and_push.sh $(TAG)) || bash services/gpu/build_and_push.sh $(TAG)
+
+# Deploy / update the SageMaker model + endpoint config + endpoint.
+# Idempotent — first run creates, subsequent runs roll forward.
+# Usage: make lineup-deploy [TAG=v2]
+lineup-deploy:
+	. services/api/.venv/Scripts/activate && export S3_ENDPOINT="" && PYTHONPATH=services/api:packages/shared python services/gpu/deploy.py $(TAG)
+
+# Inspect the endpoint state.
+lineup-status:
+	. services/api/.venv/Scripts/activate && export S3_ENDPOINT="" && PYTHONPATH=services/api:packages/shared python -c "import boto3; from jeromelu_shared.config import settings; sm = boto3.client('sagemaker', region_name=settings.lineup_aws_region); info = sm.describe_endpoint(EndpointName=settings.lineup_endpoint_name); print('status:', info['EndpointStatus']); print('config:', info['EndpointConfigName']); print('updated:', info['LastModifiedTime'])"
+
+# Tear down the endpoint when you're done iterating (no idle cost on
+# Async, but explicit cleanup avoids surprise charges from leftover
+# endpoint configs / models).
+# Usage: make lineup-delete
+lineup-delete:
+	. services/api/.venv/Scripts/activate && PYTHONPATH=services/api:packages/shared python -c "import boto3; from jeromelu_shared.config import settings; sm = boto3.client('sagemaker', region_name=settings.lineup_aws_region); name = settings.lineup_endpoint_name; print(f'deleting endpoint {name}'); sm.delete_endpoint(EndpointName=name); print('done')"
+
 # Open database shell
 db-shell:
 	docker exec -it jeromelu-postgres psql -U jeromelu_admin -d jeromelu
 
-# Run API locally
+# Run API locally. S3_ENDPOINT="" flips to real AWS — matches the
+# transcribe / scout / analyst CLIs so presigned URLs (Phase 4b video
+# overlay, Phase 1+ Deepgram URL handoff) point at the actual buckets
+# the data lives in.
+#
+# `export VAR=...; cmd` rather than the inline `VAR=... cmd` form because
+# the latter doesn't propagate reliably to `uvicorn`'s reloader child
+# processes under Git Bash + GNU Make on Windows.
 api:
-	cd services/api && source .venv/bin/activate && uvicorn app.main:app --reload --port 8000
+	. services/api/.venv/Scripts/activate && export S3_ENDPOINT="" && export PYTHONPATH=services/api && uvicorn app.main:app --reload --port 8000
 
 # Run web locally
 web:

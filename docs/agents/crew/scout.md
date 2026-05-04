@@ -17,7 +17,7 @@ Scope is everything from *we don't know about this source* to *raw transcripts p
 | **Scope**             | Discovery · post-approval enumeration · metadata refresh · raw transcript pull                                                                               |
 | **Status**            | **Shipped:** agentic discovery, recon API, post-approval enumeration, weekly video-stats refresh. **In design:** deterministic discovery surface.            |
 | **Platform coverage** | YouTube only today. Schema (`scout_candidates.platform`, `sources.platform`) is platform-agnostic; podcasts (RSS), Twitter/X, blogs, and Reddit are backlog. |
-| **Code**              | `services/api/app/scout/` (discovery agent), `services/worker-ingestion/` (transcript pull)                                                                  |
+| **Code**              | `services/api/app/scout/` — discovery agent (`loop.py`, `prompt.py`, `tools.py`), enumeration / refresh (`refresh.py`), audio acquisition (`audio.py`). Transcription / diarisation is Analyst's surface — `services/api/app/analyst/transcribe.py`. Legacy: `services/worker-ingestion/` (Temporal, superseded).                                                                  |
 | **Trigger**           | Manual CLI: `python -m app.scout.cli`. Scheduled runs and live SSE stream are planned.                                                                       |
 | **Model**             | `claude-sonnet-4-6` via Claude Agent SDK (agentic surface only)                                                                                              |
 | **Audit**             | `agent_runs` + `agent_events` + S3 JSONL, `agent_id='scout'` ([pattern](../system/agent-audit.md))                                                           |
@@ -47,7 +47,7 @@ Scout       →  Analyst    →  Bookkeeper + Critic  →  Jaromelu
 1. **Discovering new channels** across platforms — deterministic YouTube-native search (§3.1, in design) for the bulk case; agentic web hunt today (§3.2, shipped) for off-platform / long-tail. YouTube only today; podcasts / Twitter / blogs / Reddit on backlog.
 2. **Enumerating new sources from approved channels** — synchronous uploads-playlist walk on approval (§3.3, shipped) plus incremental weekly enumeration of fresh uploads on tracked channels (§3.4, shipped).
 3. **Refreshing per-video metadata** — weekly snapshot of views / likes / comments into `video_metrics` (§3.4, shipped). Enables view-velocity ranking and breakout detection.
-4. **Extracting raw content (transcripts)** — `IntelSweepWorkflow` pulls YouTube transcripts and chunks them into `source_chunks` (§3.5, dev-only). Production rebuild as cron-driven Python is planned.
+4. **Extracting raw audio** — `acquire_audio()` pulls the m4a for an approved source and lands it in S3 (§3.5, shipped). Diarised transcription of that audio is downstream — owned by Analyst, not Scout.
 5. **Refreshing channel-level metadata** — sub count, total views, video count, name changes, active/inactive detection. *Planned* — currently `channel_metrics` is only written at approval time, not periodically refreshed.
 6. **Source health / liveness monitoring** — detecting stalled channels, 404 sources, transcript fetch failures, caption regenerations. *Backlog* — not built.
 7. **Multi-platform expansion** — instantiate the same shape (discovery → approval → enumerate → refresh → extract) for podcasts (RSS), Twitter/X, blogs/news, Reddit. *Backlog* — schema is platform-agnostic; code is YouTube-only.
@@ -57,7 +57,8 @@ Scout       →  Analyst    →  Bookkeeper + Critic  →  Jaromelu
 Per the **Extract-only** rule, anything that interprets, structures, or enriches the raw bytes is downstream:
 
 - **Transcript cleaning** — fixing mangled player names, garbled words, auto-caption errors. Scout writes `raw_text`; the cleaning pass writes `cleaned_text` / `clean_text`. Owned by the [transcript pipeline](../skills/transcript-pipeline.md) / [Analyst](analyst.md).
-- **Diarisation** — speaker turn detection, populating `source_speakers`. Owned by the content-production / Deepgram pipeline downstream of Scout.
+- **Diarisation + transcription** — turning Scout's audio into `source_documents`, `source_speakers` (turn-level), and `source_chunks` (per-utterance) is owned by [Analyst](analyst.md). Scout stops at the m4a in S3.
+- **Speaker → Person resolution** — mapping a `source_speakers.speaker_label` like `speaker_0` to a known `Person`. Downstream of Analyst's transcription pass — voice-fingerprint clustering across episodes plus LLM-assisted attribution from contextual cues.
 - **Embedding** — `source_chunks.embedding`, `knowledge_base.embedding`. Owned by the indexer.
 - **Semantic chapters** (`source_chapters`) — produced by the analyse-transcript pipeline to scope claim extraction.
 - **Annotations** (`source_annotations`) — sentiment, sub-topic tags, entity mentions, themes.
@@ -75,11 +76,10 @@ Scout's outputs are raw inventory rows only — Extract + Load, never Transform.
 | `scout_candidates` | Full row at discovery (kind, title, score, content_categories, score_reasons, run_id, `status='pending'`) | — |
 | `channels` | Full row at approval | — |
 | `sources` | Full row at enumeration (`source_type`, title, canonical_url, `approved_flag=true`, `ingestion_status='pending'`) | — |
-| `source_documents` | `s3_key`, `raw_text`, `transcript_available`, `language`, `checksum`, `chunk_count` | `cleaned_text` (Transform: cleaning pass) |
-| `source_chunks` | `raw_text`, `chunk_index`, `start_offset`, `end_offset`, `start_ts`, `end_ts` (preserves original caption boundaries) | `clean_text`, `embedding` (Transform: cleaning + embedding) |
+| `sources.audio_s3_key` + `ingestion_status='collected'` | Set on successful audio acquisition (§3.5) | `transcription_status`, `extraction_method` (Transform: Analyst transcription) |
 | `channel_metrics` / `video_metrics` | Full row per snapshot | — |
 
-Scout writes **nothing** to `source_speakers` (diarisation), `source_chapters` (semantic chapters), `source_annotations` (sentiment, mentions, themes), `quotes`, `claims`, `claim_chunks`, or any reasoning/output table. If a Scout-voiced UI line mentions parsed content (e.g. *"deep dive on Munster"*), that content was generated by a downstream agent and is being *surfaced through* Scout's voice mode — not produced by Scout itself.
+Scout writes **nothing** to `source_documents`, `source_speakers`, `source_chunks` (those are Analyst's transcription writes), `source_chapters` (semantic chapters), `source_annotations` (sentiment, mentions, themes), `quotes`, `claims`, `claim_chunks`, or any reasoning/output table. If a Scout-voiced UI line mentions parsed content (e.g. *"deep dive on Munster"*), that content was generated by a downstream agent and is being *surfaced through* Scout's voice mode — not produced by Scout itself.
 
 ---
 
@@ -189,8 +189,11 @@ flowchart LR
       Refresh["§3.4<br/>refresh-videos endpoint<br/>incremental enumerate + stats"]
     end
 
-    subgraph Dev["Dev only — Temporal"]
-      Sweep["§3.5<br/>IntelSweepWorkflow<br/>transcript pull"]
+    subgraph AudioStep["Scout § 3.5 — audio acquisition"]
+      Sweep["acquire_audio<br/>yt-dlp"]
+    end
+    subgraph Trans["Analyst (downstream)"]
+      Tx["transcribe<br/>Deepgram diarisation + chunks"]
     end
 
     Channels[("channels")]
@@ -207,7 +210,9 @@ flowchart LR
     Refresh --> Sources
     Refresh --> VM
     Sources --> Sweep
-    Sweep   --> Chunks
+    Sweep   --> Sources
+    Sources --> Tx
+    Tx      --> Chunks
 ```
 
 **Legend:** rounded ovals = external systems · cylinders = DB tables · hexagon = upstream gate · subgraphs = cadence (sync / weekly / dev-only).
@@ -215,7 +220,7 @@ flowchart LR
 **Trace:**
 1. **Sync enumeration** (§3.3) — recon-approval handler commits `channels`, then synchronously calls `refresh_channel_videos(full_backfill=True)`. The channel's uploads playlist is walked (capped 200), each video inserted as a `sources` row, and a discovery-time `video_metrics` snapshot is written per video.
 2. **Weekly cron keeps things current** (§3.4) — `POST /admin/scout/refresh-videos` walks each channel for new uploads using the last known `video_id` as cursor (typically 1 quota unit / channel / week) and re-snapshots stats for every YouTube source. ~750 quota units / pass.
-3. **Transcripts get pulled** (§3.5) — `IntelSweepWorkflow` (Temporal, dev-only) fetches and chunks transcripts for new `sources` rows into `source_chunks`. Production rebuild as a cron-driven Python job is on the roadmap.
+3. **Audio gets collected** (§3.5) — `acquire_audio()` pulls m4a via yt-dlp and lands it in `s3://jeromelu-raw-audio/...`, setting `audio_s3_key` and `ingestion_status='collected'`. Transcription is the next step (Analyst, [transcription](../system/transcription.md)). Recurring drain job over `ingestion_status='pending'` sources is on the backlog.
 
 ---
 
@@ -314,22 +319,30 @@ Keeps every tracked YouTube channel's video list and per-video popularity number
 
 **Audit** — endpoint return value reports counts; no `agent_runs` row.
 
-### 3.5 Tracked-channel ingestion `[deterministic, dev-only]`
+### 3.5 Audio acquisition `[deterministic, shipped]`
 
-Pulls raw transcripts from already-approved channels' videos. **Extract only** — writes raw fields and preserves source structure; no cleaning, diarisation, embedding, or interpretation.
+Scout's last Extract step. Pulls audio from approved-but-pending YouTube sources and lands it in S3. **Extract only** — does not interpret the audio. Transcription / diarisation belongs to [Analyst](analyst.md) (see [analyst/transcription](../system/transcription.md)).
 
-**Trigger** — `IntelSweepWorkflow` on Temporal worker (`services/worker-ingestion/`). Dev environment only.
+**Trigger** — Manual CLI: `python -m app.scout.audio_cli <source_id>` or `make collect-audio SOURCE_ID=<uuid>`. The recurring drain job (APScheduler / cron over `ingestion_status='pending'`) is on the backlog.
 
-**Processing** — for each new video on a tracked channel:
-1. Fetch the auto-caption transcript (raw bytes from YouTube)
-2. Persist the full transcript: write `source_documents` row with `s3_key`, `raw_text`, `transcript_available=true`, `language`, `checksum`, `chunk_count`
-3. Split the transcript at the original YouTube caption boundaries and persist each segment: write `source_chunks` rows with `raw_text`, `chunk_index`, `start_offset`, `end_offset`, `start_ts`, `end_ts`
+**Module** — `services/api/app/scout/audio.py` · `acquire_audio(session, source)`.
 
-**Status** — Temporal-based; dev-only. Production rebuild as cron-driven Python is on the roadmap per the [no-Temporal-in-prod rule](../system/scraper.md#fixture--match--injury-sync-planned).
+**Processing** — for one approved-but-pending video:
+1. `yt-dlp` audio download (m4a, audio-only) → `s3://jeromelu-raw-audio/youtube/{channel_id}/{video_id}.m4a`. Idempotent: skipped if the S3 object already exists.
+2. `sources.audio_s3_key` set; `sources.ingestion_status='collected'`.
 
-**Outputs** — `source_documents` row + N `source_chunks` rows per video. **Raw fields only** — `cleaned_text` / `clean_text` / `embedding` are left NULL for the cleaning and indexing passes downstream.
+**Status** — Shipped 2026-05-03 (split out from the combined extract module on 2026-05-02). The legacy Temporal-shaped `IntelSweepWorkflow` (`services/worker-ingestion/`) is superseded; files remain in tree but nothing invokes them.
 
-**Hand-off boundary** — once `source_documents.transcript_available=true` and `source_chunks` rows exist for a source, Scout's job is done. The cleaning pass (Transform), diarisation pass (`source_speakers`), embedding pass (`source_chunks.embedding`), and claim extraction (`claims`) are all downstream and may run in any order.
+**Outputs** — m4a in S3, `audio_s3_key` populated, `ingestion_status='collected'`. **No** `source_documents`, `source_speakers`, or `source_chunks` rows — those are Analyst's writes.
+
+**Failure mode** — no fallback chain. On `yt-dlp` failure: `sources.ingestion_status='failed'`, `AudioError` raised. Operator inspects and re-runs.
+
+**Hand-off boundary** — Scout is done when the source row has `ingestion_status='collected'` and `audio_s3_key` set. Analyst picks it up from there:
+- Transcription + diarisation + chunking ([analyst/transcription](../system/transcription.md))
+- Cleaning pass (`source_documents.cleaned_text`, `source_chunks.clean_text`)
+- Embedding pass (`source_chunks.embedding`)
+- Speaker → Person resolution (`source_speakers.speaker_person_id`)
+- Claim / quote extraction
 
 ---
 
@@ -353,8 +366,10 @@ Grouped by theme. Status labels:
 | Scheduled Scout runs (cron / APScheduler) for the agentic surface | Planned | Manual CLI only today |
 | **Weekly channel-metadata refresh** — periodic re-snapshot of subs/views/video count and active/inactive detection (extends §3.4) | Planned | Channel metadata only written at approval today |
 | **Source health / liveness monitoring** — detect stalled channels, 404 sources, transcript fetch failures, caption regenerations | Backlog | Not built |
-| Transcript-ingestion automation for newly-enumerated videos | Backlog | Videos land `ingestion_status='pending'`; `make prod-ingest` still manual per video |
-| Production ingestion off Temporal | Planned | `IntelSweepWorkflow` is dev-only; rebuild as cron-driven Python per the [no-Temporal-in-prod rule](../system/scraper.md#fixture--match--injury-sync-planned) |
+| Audio acquisition surface (Scout owns yt-dlp → S3) | Shipped (2026-05-03) | `make collect-audio SOURCE_ID=...`. Diarised transcription split out to Analyst. |
+| Recurring drain job for `ingestion_status='pending'` sources | Backlog | Single-source CLI today; APScheduler / cron driver is the next slice. |
+| Backfill of legacy `source_chunks_v1` (221k auto-caption chunks) | Backlog | Re-extract via Scout audio + Analyst transcribe on highest-leverage channels first; ~$50 for top-5. |
+| Production ingestion off Temporal | Shipped | `IntelSweepWorkflow` superseded by Scout `audio.py` + Analyst `transcribe.py`. Worker code remains in tree for reference but is not invoked. |
 | `agent_runs` rows for deterministic jobs (3.2, 3.3, 3.4) | Backlog | Currently logged as plain HTTP requests / cron output; standardising would unify cost/health dashboards across agentic + deterministic components |
 
 ### Multi-platform expansion

@@ -1,12 +1,29 @@
 ---
-tags: [area/todo, status/planning]
+tags: [area/todo, status/superseded]
 ---
 
-# 1.2 Ingestion Worker
+# 1.2 Ingestion Worker — SUPERSEDED 2026-05-02
+
+The Temporal-shaped worker described below was never deployed. The audio-first replacement now lives at `services/api/app/scout/transcripts.py` (yt-dlp + Deepgram, one source per CLI invocation). See:
+
+- [docs/agents/system/ingestion.md](../agents/system/ingestion.md) — current spec
+- [docs/sources/extraction-method.md](../sources/extraction-method.md) — tier definitions, keyterm strategy, cost model
+- [docs/agents/crew/scout.md § 3.5](../agents/crew/scout.md#35-tracked-channel-ingestion-deterministic-audio-first)
+
+What's still outstanding (now tracked in scout.md roadmap, not here):
+
+- Recurring drain job over `ingestion_status='pending'` sources (APScheduler / cron). Single-source CLI today.
+- Player alias backfill (`people.aliases`) so the keyterm pool covers nicknames.
+- Backfill of `source_chunks_v1` (221k auto-caption chunks archived in mig 044) via Deepgram on the highest-leverage channels first.
+- `agent_runs` rows for deterministic ingest, to unify the cost / latency dashboard with Scout's agentic surface.
+
+The original task list is preserved below for archaeological reference.
+
+---
 
 **Phase:** 1 — Prove the Brain (Intelligence Layer)
 **Priority:** 3 — Data in = everything else possible
-**Service:** `services/worker-ingestion`
+**Service:** `services/worker-ingestion` *(legacy — Temporal, dev-only, no longer driven)*
 
 ## Architecture
 

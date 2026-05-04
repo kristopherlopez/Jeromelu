@@ -2,63 +2,85 @@
 tags: [area/agents, subarea/system, status/live]
 ---
 
-# Ingestion
+# Audio Ingestion (Scout § 3.5)
 
 | | |
 |---|---|
-| **Worker** | `services/worker-ingestion/app/main.py` |
-| **Task Queue** | `ingestion` |
-| **Crew counterpart** | [Scout](../crew/scout.md) — this is Scout's transcript-pull surface (one component of Scout's broader Extract role) |
-| **ETL role** | **Extract only.** Pulls raw transcripts and persists them as `source_documents` + `source_chunks`. No Transform. |
+| **Module** | `services/api/app/scout/audio.py` |
+| **Driver** | `python -m app.scout.audio_cli <source_id>` · `make collect-audio SOURCE_ID=<uuid>` |
+| **Crew counterpart** | [Scout](../crew/scout.md) — this is Scout's audio-pull surface (§3.5). |
+| **ETL role** | **Extract only.** Pulls audio bytes via yt-dlp and persists to S3. No interpretation. |
+| **Status** | Single-source CLI shipped. Recurring drain job not yet built. |
 
-### Extract-only boundary
+Replaces the legacy Temporal-based `IntelSweepWorkflow` (under `services/worker-ingestion/`, dev-only). Sits at the boundary between Scout's discovery + enumeration surface and Analyst's transcription surface.
 
-Per Scout's [ETL role](../crew/scout.md), this worker writes **raw transcript fields only**:
-
-| Table | Fields written | Fields left NULL (for Transform downstream) |
-|---|---|---|
-| `source_documents` | `s3_key`, `raw_text`, `transcript_available`, `language`, `checksum`, `chunk_count` | `cleaned_text` |
-| `source_chunks` | `raw_text`, `chunk_index`, `start_offset`, `end_offset`, `start_ts`, `end_ts` (preserves YouTube caption boundaries as-is) | `clean_text`, `embedding` |
-
-It does not write `source_speakers` (diarisation — Deepgram pass), `source_chapters` (analyse-transcript pipeline), `source_annotations` (sentiment, mentions, themes), `quotes`, or `claims`. Those are all Transform stages downstream.
+> **For transcription / diarisation** — see [transcription.md](transcription.md). That's a separate Analyst-owned pass that runs on Scout's audio after it's in S3.
 
 ---
 
-## IntelSweepWorkflow
+## What it does
 
-| | |
-|---|---|
-| **Workflow** | `services/worker-ingestion/app/workflows/intel_sweep.py` |
-| **Schedule** | Daily 10 PM AEST |
-| **Purpose** | Discover new videos on whitelisted channels and pull their raw transcripts. Writes `Source` + `SourceDocument` (+ `source_chunks` at the original caption boundaries) to DB; raw JSON to S3. **Extract only — no cleaning, diarisation, or embedding.** |
+For one approved-but-pending YouTube source:
 
-**Steps:**
-1. `discover_new_videos` — poll channels, deduplicate by watermark
-2. For each new video:
-   - `collect_transcript` — fetch via YouTube API, store raw JSON in S3
-   - `index_document` — write `Source` + `SourceDocument` rows (raw fields only) and the per-caption `source_chunks` rows
+1. Resolve `video_id` from `source.canonical_url`.
+2. `yt-dlp` audio-only download (m4a, ~96 kbps) to a temp dir.
+3. Upload to `s3://jeromelu-raw-audio/youtube/{channel_id}/{video_id}.m4a`. Idempotent — skipped if the S3 object already exists.
+4. Write back: `sources.audio_s3_key`, `sources.ingestion_status='collected'`.
 
-**Retry policy:** 3 attempts, 5s initial interval, 2× backoff. Non-retryable: `RateLimitError`, `NoTranscriptFound`, `TranscriptsDisabled`.
+That's it. No Deepgram, no DB writes beyond the source row. Cost per source: $0 (yt-dlp + S3 storage rounding to noise).
 
-**Returns:** `{discovered, collected, indexed, errors}`
+On failure (yt-dlp DownloadError, video deleted, members-only): `sources.ingestion_status='failed'`, `AudioError` raised. Operator inspects and re-runs.
 
 ---
 
-## Ingestion Utilities
+## Hand-off contract
 
-Scripts and endpoints that support the pipeline but aren't Temporal workflows:
-
-| Utility | Location | Purpose |
+| Table | Fields written | Fields left for downstream |
 |---|---|---|
-| `backfill.py` | `services/worker-ingestion/app/` | One-time backfill: uses `yt-dlp` to discover ALL videos from whitelisted channels, collect transcripts, upload to S3, index in DB |
-| `trigger_sweep.py` | `services/worker-ingestion/app/` | Manually trigger IntelSweepWorkflow (testing/debugging) |
-| `seed_channels.py` | `services/worker-ingestion/app/` | Load channels from `sources.yaml` and upsert to DB |
-| `POST /admin/ingest` | `services/api/app/routers/admin.py` | Ingest transcript + claims from S3 — creates Source, SourceDocument, SourceChunks, Claims, ClaimChunks with entity resolution |
-| `POST /admin/ingest-raw` | `services/api/app/routers/admin.py` | Ingest raw transcript without claims |
-| `GET /admin/pipeline` | `services/api/app/routers/admin.py` | View pipeline stage for every source (discovered → collected → indexed → cleaned → extracted) |
-| `GET /admin/sync-status` | `services/api/app/routers/admin.py` | Cross-reference local files, S3, and DB for mismatches |
+| `sources` | `audio_s3_key`, `ingestion_status='collected'` | `transcription_status`, `extraction_method`, `ingested_at` (Analyst sets these once the transcript materialises) |
+
+Scout writes **nothing** to `source_documents`, `source_speakers`, `source_chunks`. Those are Analyst's writes — see [transcription.md](transcription.md).
+
+---
+
+## Running
+
+```bash
+make collect-audio SOURCE_ID=<uuid>
+```
+
+The Make target sets `S3_ENDPOINT=''` (real AWS, not local MinIO — the audio bucket only exists on AWS) and `PYTHONPATH=services/api`.
+
+Expected output:
+
+```
+OK
+  audio_s3_key:    youtube/<channel>/<vid>.m4a
+  bytes_uploaded:  43,742,310
+```
+
+Or, if the audio is already in S3 (re-run / idempotent):
+
+```
+OK
+  audio_s3_key:    youtube/<channel>/<vid>.m4a
+  bytes_uploaded:  (skipped — already in S3)
+```
+
+---
+
+## Backlog
+
+- **Recurring drain job** — APScheduler / cron over `ingestion_status='pending'`. Single-source CLI today.
+- **Backfill of `source_chunks_v1`** — 215 prod sources still ingested under the legacy auto-caption path. Re-collect audio + transcribe via the new flow on highest-leverage channels first.
+- **Member-only / paywalled video handling** — yt-dlp can't reach these. Options: cookies file, manual upload, or skip + log.
+
+---
 
 ## Related
 
-- Full workflow doc: [`daily-intel-sweep.md`](daily-intel-sweep.md)
-- Tasks and architecture: [`../../todo/ingestion-worker.md`](../../todo/ingestion-worker.md)
+- [Scout — § 3.5 audio acquisition](../crew/scout.md#35-audio-acquisition-deterministic-shipped)
+- [Transcription (Analyst)](transcription.md) — what runs on Scout's audio next
+- [Source discovery](source-discovery.md) — Scout's discovery + enumeration; produces the `sources` rows that this module drains
+- [Sources § extraction method](../../sources/extraction-method.md) — full pipeline cost model
+- [Migration 044](../../../packages/db/migrations/044_audio_first_extract.sql), [Migration 045](../../../packages/db/migrations/045_split_ingestion_transcription.sql), [Migration 046](../../../packages/db/migrations/046_chunk_paragraph_break.sql)

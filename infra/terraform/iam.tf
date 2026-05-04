@@ -120,6 +120,8 @@ data "aws_iam_policy_document" "instance" {
     resources = [
       "arn:aws:s3:::jeromelu-raw-transcripts",
       "arn:aws:s3:::jeromelu-raw-transcripts/*",
+      "arn:aws:s3:::jeromelu-raw-audio",
+      "arn:aws:s3:::jeromelu-raw-audio/*",
       "arn:aws:s3:::jeromelu-clean-documents",
       "arn:aws:s3:::jeromelu-clean-documents/*",
       "arn:aws:s3:::jeromelu-public-assets",

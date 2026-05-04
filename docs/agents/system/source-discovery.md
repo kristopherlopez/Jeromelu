@@ -424,21 +424,16 @@ GET /api/admin/scout/channel-coverage
 `make prod-channel-coverage ADMIN_KEY=xxx [ONLY_GAPS=1]`.
 
 Backed by `audit_channel_coverage()` in `app/scout/refresh.py`. Per-channel
-funnel stages:
+funnel stages — same vocabulary as `/admin/pipeline`:
 
 | Column | Definition |
 |---|---|
 | `reported_videos`  | Latest `channel_metrics.metrics->>'videos'` — what YouTube reports |
 | `tracked_videos`   | Rows in `sources` for the channel |
-| `extracted_videos` | Sources whose transcript has been saved (a `source_documents` row exists with `s3_key` or chunks) |
-| `processed_videos` | Sources with at least one `claims` row |
+| `collected_videos` | Sources whose transcript has been saved (a `source_documents` row exists with `s3_key` or chunks) |
+| `cleaned_videos`   | Sources with at least one `source_chunks.clean_text` populated |
 
 Plus rollup totals (`channels_with_gap`, `total_gap`) where `gap = reported - tracked`. Pure DB read, no API quota cost.
-
-> **Naming clash with `/admin/pipeline`:** that view uses 'collected' for
-> "transcript saved" and 'extracted' for "claims exist". This view uses
-> 'extracted' / 'processed' instead — clearer in a channel-level funnel
-> but read column definitions, not stage names, when comparing the two.
 
 Freshness of `reported_videos` depends on the
 [daily channel stats refresh](#daily-channel-stats-refresh) cron keeping
@@ -482,9 +477,11 @@ LIMIT 50;
 - Live Recon stream in `/pulse` (SSE) — Slice 3
 - Scheduled Scout runs (cron / APScheduler) — Slice 4
 - `Event` rows for the agent's reasoning trace — TBD when the live stream lands
-- Transcript-ingestion automation for newly-enumerated videos — videos land
-  in `sources` with `ingestion_status='pending'`; the existing
-  `make prod-ingest` flow still expects manual triggering per video
+- Transcript-ingestion automation for newly-enumerated videos — single-source
+  CLI shipped (`make extract-transcript SOURCE_ID=...`, audio-first via
+  Deepgram — see [`ingestion.md`](ingestion.md) and
+  [`sources/extraction-method.md`](../../sources/extraction-method.md)).
+  Recurring drain over `ingestion_status='pending'` is the next slice.
 
 ## Future improvements — Tier 2 and Tier 3
 
