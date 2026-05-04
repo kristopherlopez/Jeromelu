@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAdminApiBase } from "./apiBase";
 
@@ -11,8 +11,9 @@ interface ChannelRow {
   external_id: string | null;
   reported_videos: number | null;
   tracked_videos: number;
-  // Optional — older deployed APIs (prod, pre-rename) don't return these.
-  collected_videos?: number;
+  // Optional — older deployed APIs may not return these (legacy
+  // `collected_videos` was renamed to `transcribed_videos`).
+  transcribed_videos?: number;
   cleaned_videos?: number;
   gap: number | null;
   metrics_sampled_at: string | null;
@@ -29,7 +30,7 @@ type SortField =
   | "name"
   | "reported"
   | "tracked"
-  | "collected"
+  | "transcribed"
   | "cleaned"
   | "sampled";
 type SortDir = "asc" | "desc";
@@ -57,7 +58,12 @@ function funnelClass(value: number | undefined, parent: number | null | undefine
 
 export default function ChannelCoveragePanel() {
   const { base } = useAdminApiBase();
-  const [data, setData] = useState<CoverageResponse | null>(null);
+  // Per-target cache: toggling LOCAL ↔ PROD shows previously-fetched data
+  // instantly. First visit per target auto-fetches.
+  const [cache, setCache] = useState<Map<string, CoverageResponse>>(() => new Map());
+  const data = cache.get(base) ?? null;
+  const fetchedTargets = useRef<Set<string>>(new Set());
+
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [onlyGaps, setOnlyGaps] = useState(false);
@@ -65,25 +71,34 @@ export default function ChannelCoveragePanel() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const fetchCoverage = useCallback(async () => {
+    fetchedTargets.current.add(base);
     setLoading(true);
     setError(null);
     try {
-      const url = `${base}/api/admin/scout/channel-coverage${
-        onlyGaps ? "?only_gaps=true" : ""
-      }`;
+      // onlyGaps is filtered client-side so toggling it doesn't refetch.
+      const url = `${base}/api/admin/scout/channel-coverage`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-      setData(await res.json());
+      const json: CoverageResponse = await res.json();
+      setCache((prev) => new Map(prev).set(base, json));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, [base, onlyGaps]);
+  }, [base]);
 
+  // Auto-fetch coverage once per target on first visit.
   useEffect(() => {
-    fetchCoverage();
-  }, [fetchCoverage]);
+    if (!fetchedTargets.current.has(base)) {
+      fetchCoverage();
+    }
+  }, [fetchCoverage, base]);
+
+  // Reset error when toggling target (so an old error doesn't linger).
+  useEffect(() => {
+    setError(null);
+  }, [base]);
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -94,10 +109,13 @@ export default function ChannelCoveragePanel() {
     }
   };
 
-  const sortedRows = useMemo(() => {
+  const visibleRows = useMemo(() => {
     if (!data) return [];
     const dir = sortDir === "asc" ? 1 : -1;
-    return [...data.per_channel].sort((a, b) => {
+    const rows = onlyGaps
+      ? data.per_channel.filter((r) => (r.gap ?? 0) > 0)
+      : data.per_channel;
+    return [...rows].sort((a, b) => {
       switch (sortField) {
         case "name":
           return dir * a.name.localeCompare(b.name);
@@ -105,8 +123,8 @@ export default function ChannelCoveragePanel() {
           return dir * ((a.reported_videos ?? -1) - (b.reported_videos ?? -1));
         case "tracked":
           return dir * (a.tracked_videos - b.tracked_videos);
-        case "collected":
-          return dir * ((a.collected_videos ?? -1) - (b.collected_videos ?? -1));
+        case "transcribed":
+          return dir * ((a.transcribed_videos ?? -1) - (b.transcribed_videos ?? -1));
         case "cleaned":
           return dir * ((a.cleaned_videos ?? -1) - (b.cleaned_videos ?? -1));
         case "sampled": {
@@ -122,7 +140,7 @@ export default function ChannelCoveragePanel() {
           return 0;
       }
     });
-  }, [data, sortField, sortDir]);
+  }, [data, onlyGaps, sortField, sortDir]);
 
   const sortIndicator = (field: SortField) =>
     sortField === field ? (sortDir === "asc" ? " ▲" : " ▼") : "";
@@ -157,15 +175,21 @@ export default function ChannelCoveragePanel() {
         <button
           onClick={fetchCoverage}
           disabled={loading}
-          className="rounded bg-zinc-800 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-700 disabled:opacity-50"
+          className="rounded bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-500 disabled:opacity-50"
         >
-          {loading ? "Loading..." : "Refresh"}
+          {loading ? "Loading..." : data ? "Refresh" : "Load coverage"}
         </button>
       </div>
 
       {error && (
         <div className="border-t border-zinc-800 px-4 py-3 text-sm text-red-400">
           Error: {error}
+        </div>
+      )}
+
+      {!data && !error && !loading && (
+        <div className="border-t border-zinc-800 px-4 py-6 text-center text-sm text-zinc-500">
+          No data loaded. Click <span className="text-orange-400">Load coverage</span> to fetch.
         </div>
       )}
 
@@ -196,10 +220,10 @@ export default function ChannelCoveragePanel() {
                 </th>
                 <th
                   className="cursor-pointer select-none px-3 py-2 text-right hover:text-zinc-300"
-                  title="Sources whose transcript has been saved (s3_key or chunks present)"
-                  onClick={() => toggleSort("collected")}
+                  title="Sources whose transcript has been saved (s3_key set on document)"
+                  onClick={() => toggleSort("transcribed")}
                 >
-                  Collected{sortIndicator("collected")}
+                  Transcribed{sortIndicator("transcribed")}
                 </th>
                 <th
                   className="cursor-pointer select-none px-3 py-2 text-right hover:text-zinc-300"
@@ -217,7 +241,7 @@ export default function ChannelCoveragePanel() {
               </tr>
             </thead>
             <tbody>
-              {sortedRows.map((row) => (
+              {visibleRows.map((row) => (
                 <tr
                   key={row.channel_id}
                   className="border-b border-zinc-800/50 hover:bg-zinc-900/50"
@@ -250,18 +274,18 @@ export default function ChannelCoveragePanel() {
                   </td>
                   <td
                     className={`px-3 py-2 text-right ${funnelClass(
-                      row.collected_videos,
+                      row.transcribed_videos,
                       row.tracked_videos,
                     )}`}
                   >
-                    {row.collected_videos !== undefined
-                      ? row.collected_videos.toLocaleString()
+                    {row.transcribed_videos !== undefined
+                      ? row.transcribed_videos.toLocaleString()
                       : "—"}
                   </td>
                   <td
                     className={`px-3 py-2 text-right ${funnelClass(
                       row.cleaned_videos,
-                      row.collected_videos,
+                      row.transcribed_videos,
                     )}`}
                   >
                     {row.cleaned_videos !== undefined
@@ -273,7 +297,7 @@ export default function ChannelCoveragePanel() {
                   </td>
                 </tr>
               ))}
-              {sortedRows.length === 0 && (
+              {visibleRows.length === 0 && (
                 <tr>
                   <td
                     colSpan={6}

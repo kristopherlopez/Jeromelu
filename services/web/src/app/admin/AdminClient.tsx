@@ -8,9 +8,9 @@ import { ADMIN_API_TARGETS, AdminApiTarget, useAdminApiBase } from "./apiBase";
 // --- Types ---
 
 interface PipelineStages {
-  discovered: boolean;
-  collected: boolean;
-  indexed: boolean;
+  registered: boolean;
+  transcribed: boolean;
+  chunked: boolean;
   cleaned: boolean;
   extracted: boolean;
 }
@@ -46,7 +46,18 @@ interface SyncResponse {
 }
 
 type StageKey = keyof PipelineStages;
-const STAGES: StageKey[] = ["discovered", "collected", "indexed", "cleaned", "extracted"];
+const STAGES: StageKey[] = ["registered", "transcribed", "chunked", "cleaned", "extracted"];
+// Per-row column set excludes "registered" — it's true for every source so
+// the checkmark is always on, adding noise without information.
+const TABLE_STAGES: StageKey[] = STAGES.filter((s) => s !== "registered");
+
+const STAGE_DESCRIPTIONS: Record<StageKey, string> = {
+  registered: "Source row exists in the DB",
+  transcribed: "Transcript saved (s3_key set on document)",
+  chunked: "Chunks loaded into DB (chunk_count > 0)",
+  cleaned: "At least one chunk has clean_text populated",
+  extracted: "At least one Claim row has been extracted",
+};
 
 interface TestFile {
   filename: string;
@@ -287,11 +298,19 @@ export default function AdminClient() {
   const { base, target, setTarget } = useAdminApiBase();
   const [activeTab, setActiveTab] = useState<AdminTab>("video");
 
-  const [pipeline, setPipeline] = useState<PipelineResponse | null>(null);
+  // Per-target caches: toggling LOCAL ↔ PROD shows previously-fetched data
+  // instantly without re-hitting the API. First visit per target auto-fetches.
+  const [pipelineCache, setPipelineCache] = useState<Map<string, PipelineResponse>>(
+    () => new Map(),
+  );
+  const [syncCache, setSyncCache] = useState<Map<string, SyncResponse>>(() => new Map());
+  const pipeline = pipelineCache.get(base) ?? null;
+  const sync = syncCache.get(base) ?? null;
+  const fetchedPipelineTargets = useRef<Set<string>>(new Set());
+
   const [pipelineError, setPipelineError] = useState<string | null>(null);
   const [pipelineLoading, setPipelineLoading] = useState(false);
 
-  const [sync, setSync] = useState<SyncResponse | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [syncLoading, setSyncLoading] = useState(false);
   const [syncOpen, setSyncOpen] = useState(false);
@@ -302,12 +321,14 @@ export default function AdminClient() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const fetchPipeline = useCallback(async () => {
+    fetchedPipelineTargets.current.add(base);
     setPipelineLoading(true);
     setPipelineError(null);
     try {
       const res = await fetch(`${base}/api/admin/pipeline`);
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-      setPipeline(await res.json());
+      const data: PipelineResponse = await res.json();
+      setPipelineCache((prev) => new Map(prev).set(base, data));
     } catch (e) {
       setPipelineError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -321,7 +342,8 @@ export default function AdminClient() {
     try {
       const res = await fetch(`${base}/api/admin/sync-status`);
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-      setSync(await res.json());
+      const data: SyncResponse = await res.json();
+      setSyncCache((prev) => new Map(prev).set(base, data));
     } catch (e) {
       setSyncError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -329,12 +351,19 @@ export default function AdminClient() {
     }
   }, [base]);
 
-  // Auto-fetch pipeline on mount and whenever the target changes; also clear
-  // any stale sync data so the panel re-fetches when reopened against the new target.
+  // Auto-fetch the pipeline once per target on first visit. Manual Refresh
+  // overrides the cache for the current target.
   useEffect(() => {
-    fetchPipeline();
-    setSync(null);
-  }, [fetchPipeline]);
+    if (!fetchedPipelineTargets.current.has(base)) {
+      fetchPipeline();
+    }
+  }, [fetchPipeline, base]);
+
+  // Reset transient errors when toggling target (so an old error doesn't linger).
+  useEffect(() => {
+    setPipelineError(null);
+    setSyncError(null);
+  }, [base]);
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -349,7 +378,7 @@ export default function AdminClient() {
   const filteredItems = (pipeline?.items ?? [])
     .filter((item) => {
       if (stageFilter !== "all") {
-        let current: StageKey = "discovered";
+        let current: StageKey = "registered";
         for (const s of STAGES) {
           if (item.stages[s]) current = s;
         }
@@ -436,13 +465,25 @@ export default function AdminClient() {
 
       {/* Tab: Video Processing — keep mounted to preserve filter/sort state */}
       <div className={activeTab === "video" ? "space-y-8" : "hidden"}>
+      {/* Always-visible refresh strip */}
+      <div className="flex items-center justify-end">
+        <button
+          onClick={fetchPipeline}
+          disabled={pipelineLoading}
+          className="rounded bg-orange-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-orange-500 disabled:opacity-50"
+        >
+          {pipelineLoading ? "Loading..." : pipeline ? "Refresh" : "Load pipeline"}
+        </button>
+      </div>
+
       {/* Section 1: Summary Cards */}
       {pipeline && (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
           {STAGES.map((stage) => (
             <div
               key={stage}
-              className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 text-center"
+              title={STAGE_DESCRIPTIONS[stage]}
+              className="cursor-help rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 text-center"
             >
               <div className="text-2xl font-bold text-white">
                 {pipeline.summary.by_stage[stage] ?? 0}
@@ -453,6 +494,26 @@ export default function AdminClient() {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Stage legend */}
+      {pipeline && (
+        <div className="grid grid-cols-1 gap-1 rounded-lg border border-zinc-800 bg-zinc-900/30 p-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
+          {STAGES.map((s) => (
+            <div key={s} className="flex gap-2">
+              <span className="w-20 shrink-0 font-medium capitalize text-zinc-300">
+                {s}
+              </span>
+              <span className="text-zinc-500">{STAGE_DESCRIPTIONS[s]}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!pipeline && !pipelineError && !pipelineLoading && (
+        <p className="text-sm text-zinc-500">
+          No data loaded. Click <span className="text-orange-400">Load pipeline</span> to fetch from {base}.
+        </p>
       )}
 
       {pipelineError && (
@@ -482,13 +543,6 @@ export default function AdminClient() {
               onChange={(e) => setSearch(e.target.value)}
               className="rounded border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-white placeholder:text-zinc-600 focus:border-orange-500 focus:outline-none"
             />
-            <button
-              onClick={fetchPipeline}
-              disabled={pipelineLoading}
-              className="ml-auto rounded bg-zinc-800 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-700 disabled:opacity-50"
-            >
-              {pipelineLoading ? "Loading..." : "Refresh"}
-            </button>
           </div>
 
           <div className="overflow-x-auto rounded-lg border border-zinc-800">
@@ -497,8 +551,12 @@ export default function AdminClient() {
                 <tr className="border-b border-zinc-800 text-left text-xs text-zinc-500">
                   <SortHeader field="title" label="Title" current={sortField} dir={sortDir} onSort={toggleSort} />
                   <SortHeader field="published_at" label="Published" current={sortField} dir={sortDir} onSort={toggleSort} />
-                  {STAGES.map((s) => (
-                    <th key={s} className="px-3 py-2 text-center capitalize">
+                  {TABLE_STAGES.map((s) => (
+                    <th
+                      key={s}
+                      title={STAGE_DESCRIPTIONS[s]}
+                      className="cursor-help px-3 py-2 text-center capitalize"
+                    >
                       {s.slice(0, 4)}
                     </th>
                   ))}
@@ -525,7 +583,7 @@ export default function AdminClient() {
                         ? new Date(item.published_at).toLocaleDateString("en-AU", { day: "2-digit", month: "2-digit", year: "numeric" })
                         : "—"}
                     </td>
-                    {STAGES.map((s) => (
+                    {TABLE_STAGES.map((s) => (
                       <td key={s} className="px-3 py-2 text-center">
                         <StageCell done={item.stages[s]} />
                       </td>
@@ -541,7 +599,7 @@ export default function AdminClient() {
                 {filteredItems.length === 0 && (
                   <tr>
                     <td
-                      colSpan={2 + STAGES.length + 2}
+                      colSpan={2 + TABLE_STAGES.length + 2}
                       className="px-3 py-6 text-center text-zinc-600"
                     >
                       No sources match.
@@ -672,10 +730,14 @@ export default function AdminClient() {
       </div>
       </div>
 
-      {/* Tab: Channel Coverage */}
-      {activeTab === "coverage" && <ChannelCoveragePanel />}
+      {/* Tab: Channel Coverage — keep mounted to preserve fetched data */}
+      <div className={activeTab === "coverage" ? "" : "hidden"}>
+        <ChannelCoveragePanel />
+      </div>
 
-      {/* Tab: Transcript Diff */}
+      {/* Tab: Transcript Diff — conditional render so it doesn't fetch
+          transcript-test-files on every base change while another tab is
+          active. No per-target cache here, so re-fetch on tab re-entry is fine. */}
       {activeTab === "diff" && <TranscriptDiffPanel />}
     </div>
   );

@@ -486,9 +486,16 @@ def ingest(req: IngestRequest, db: Session = Depends(get_db)):
 def pipeline_status(db: Session = Depends(get_db)):
     """Return pipeline stage for every source (DB-only, fast).
 
+    Stages (each a boolean per source):
+      - registered:  Source row exists in the DB
+      - transcribed: SourceDocument.s3_key is set (transcript saved)
+      - chunked:     chunk_count > 0 (chunks loaded into DB)
+      - cleaned:     at least one chunk has clean_text populated
+      - extracted:   at least one Claim row exists for the source
+
     `summary.by_stage` counts how many sources have **reached** each stage
-    (cumulative funnel). A source that has chunks counts toward `discovered`,
-    `collected`, and `indexed` simultaneously — not just the furthest one.
+    (cumulative funnel). A source that's chunked counts toward `registered`,
+    `transcribed` (if s3_key is set), and `chunked` simultaneously.
     """
     # Subquery: claim count per source
     claim_count_sq = (
@@ -527,7 +534,7 @@ def pipeline_status(db: Session = Depends(get_db)):
         .all()
     )
 
-    by_stage = {"discovered": 0, "collected": 0, "indexed": 0, "cleaned": 0, "extracted": 0}
+    by_stage = {"registered": 0, "transcribed": 0, "chunked": 0, "cleaned": 0, "extracted": 0}
     items = []
 
     for src, s3_key, chunk_count, claim_count, has_clean in rows:
@@ -536,9 +543,9 @@ def pipeline_status(db: Session = Depends(get_db)):
         has_clean = bool(has_clean)
 
         stages = {
-            "discovered": True,
-            "collected": s3_key is not None or chunk_count > 0,
-            "indexed": chunk_count > 0,
+            "registered": True,
+            "transcribed": s3_key is not None,
+            "chunked": chunk_count > 0,
             "cleaned": has_clean,
             "extracted": claim_count > 0,
         }

@@ -28,7 +28,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Integer, distinct, func, or_, select, update
+from sqlalchemy import Integer, distinct, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -436,12 +436,12 @@ def audit_channel_coverage(session: Session) -> dict[str, Any]:
     processing dropoffs.
 
     Stages (per channel) — same vocabulary as /admin/pipeline:
-      - reported   YouTube's video count (channel_metrics latest snapshot)
-      - tracked    rows in `sources` for this channel
-      - collected  sources whose transcript has been saved (a SourceDocument
-                   row exists with s3_key OR chunks)
-      - cleaned    sources with at least one SourceChunk where clean_text
-                   IS NOT NULL
+      - reported    YouTube's video count (channel_metrics latest snapshot)
+      - tracked     rows in `sources` for this channel
+      - transcribed sources whose transcript has been saved
+                    (SourceDocument.s3_key IS NOT NULL)
+      - cleaned     sources with at least one SourceChunk where clean_text
+                    IS NOT NULL
 
     `gap = reported - tracked` is preserved for the headline summary line.
 
@@ -457,16 +457,16 @@ def audit_channel_coverage(session: Session) -> dict[str, Any]:
         .group_by(Source.channel_id)
         .subquery()
     )
-    # "Collected" — distinct sources with at least one SourceDocument that
-    # has an s3_key or non-zero chunk_count. Mirrors /admin/pipeline.
-    collected_subq = (
+    # "Transcribed" — distinct sources with at least one SourceDocument that
+    # has an s3_key (transcript saved). Mirrors /admin/pipeline.
+    transcribed_subq = (
         select(
             Source.channel_id,
-            func.count(distinct(Source.source_id)).label("collected_videos"),
+            func.count(distinct(Source.source_id)).label("transcribed_videos"),
         )
         .join(SourceDocument, SourceDocument.source_id == Source.source_id)
         .where(Source.source_type == "youtube")
-        .where(or_(SourceDocument.s3_key.is_not(None), SourceDocument.chunk_count > 0))
+        .where(SourceDocument.s3_key.is_not(None))
         .group_by(Source.channel_id)
         .subquery()
     )
@@ -501,14 +501,14 @@ def audit_channel_coverage(session: Session) -> dict[str, Any]:
             Channel.name,
             Channel.external_id,
             tracked_subq.c.tracked_videos,
-            collected_subq.c.collected_videos,
+            transcribed_subq.c.transcribed_videos,
             cleaned_subq.c.cleaned_videos,
             latest_subq.c.reported_videos,
             latest_subq.c.sampled_at,
         )
         .select_from(Channel)
         .outerjoin(tracked_subq, tracked_subq.c.channel_id == Channel.channel_id)
-        .outerjoin(collected_subq, collected_subq.c.channel_id == Channel.channel_id)
+        .outerjoin(transcribed_subq, transcribed_subq.c.channel_id == Channel.channel_id)
         .outerjoin(cleaned_subq, cleaned_subq.c.channel_id == Channel.channel_id)
         .outerjoin(latest_subq, latest_subq.c.channel_id == Channel.channel_id)
         .where(Channel.platform == "youtube")
@@ -521,7 +521,7 @@ def audit_channel_coverage(session: Session) -> dict[str, Any]:
     total_gap = 0
     for r in session.execute(stmt).all():
         tracked = int(r.tracked_videos or 0)
-        collected = int(r.collected_videos or 0)
+        transcribed = int(r.transcribed_videos or 0)
         cleaned = int(r.cleaned_videos or 0)
         reported = int(r.reported_videos) if r.reported_videos is not None else None
         gap = (reported - tracked) if reported is not None else None
@@ -535,7 +535,7 @@ def audit_channel_coverage(session: Session) -> dict[str, Any]:
             "external_id": r.external_id,
             "reported_videos": reported,
             "tracked_videos": tracked,
-            "collected_videos": collected,
+            "transcribed_videos": transcribed,
             "cleaned_videos": cleaned,
             "gap": gap,
             "metrics_sampled_at": r.sampled_at.isoformat() if r.sampled_at else None,
