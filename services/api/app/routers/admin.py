@@ -484,7 +484,12 @@ def ingest(req: IngestRequest, db: Session = Depends(get_db)):
 
 @router.get("/admin/pipeline")
 def pipeline_status(db: Session = Depends(get_db)):
-    """Return pipeline stage for every source (DB-only, fast)."""
+    """Return pipeline stage for every source (DB-only, fast).
+
+    `summary.by_stage` counts how many sources have **reached** each stage
+    (cumulative funnel). A source that has chunks counts toward `discovered`,
+    `collected`, and `indexed` simultaneously — not just the furthest one.
+    """
     # Subquery: claim count per source
     claim_count_sq = (
         db.query(
@@ -538,12 +543,9 @@ def pipeline_status(db: Session = Depends(get_db)):
             "extracted": claim_count > 0,
         }
 
-        # Derive current stage (highest completed)
-        current = "discovered"
-        for stage in ("collected", "indexed", "cleaned", "extracted"):
-            if stages[stage]:
-                current = stage
-        by_stage[current] += 1
+        for stage_key, reached in stages.items():
+            if reached:
+                by_stage[stage_key] += 1
 
         # Extract video_id from canonical_url
         video_id = None

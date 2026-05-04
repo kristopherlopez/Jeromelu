@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL!;
+import ChannelCoveragePanel from "./ChannelCoveragePanel";
+import { ADMIN_API_TARGETS, AdminApiTarget, useAdminApiBase } from "./apiBase";
 
 // --- Types ---
 
@@ -159,6 +160,7 @@ function formatTs(seconds: number): string {
 }
 
 function TranscriptDiffPanel() {
+  const { base } = useAdminApiBase();
   const [files, setFiles] = useState<TestFile[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [diff, setDiff] = useState<DiffResponse | null>(null);
@@ -166,7 +168,7 @@ function TranscriptDiffPanel() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/admin/transcript-test-files`)
+    fetch(`${base}/api/admin/transcript-test-files`)
       .then((r) => r.json())
       .then((data) => {
         setFiles(data.files ?? []);
@@ -175,14 +177,14 @@ function TranscriptDiffPanel() {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [base]);
 
   useEffect(() => {
     if (!selectedFile) return;
     setLoading(true);
     setError(null);
     setDiff(null);
-    fetch(`${API_BASE}/api/admin/transcript-diff/${encodeURIComponent(selectedFile)}`)
+    fetch(`${base}/api/admin/transcript-diff/${encodeURIComponent(selectedFile)}`)
       .then((r) => {
         if (!r.ok) throw new Error(`${r.status}`);
         return r.json();
@@ -190,7 +192,7 @@ function TranscriptDiffPanel() {
       .then((data) => setDiff(data))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [selectedFile]);
+  }, [base, selectedFile]);
 
   if (files.length === 0) return null;
 
@@ -273,7 +275,18 @@ function TranscriptDiffPanel() {
 
 // --- Component ---
 
+type AdminTab = "video" | "coverage" | "diff";
+
+const TABS: { id: AdminTab; label: string }[] = [
+  { id: "video", label: "Video Processing" },
+  { id: "coverage", label: "Channel Coverage" },
+  { id: "diff", label: "Transcript Diff" },
+];
+
 export default function AdminClient() {
+  const { base, target, setTarget } = useAdminApiBase();
+  const [activeTab, setActiveTab] = useState<AdminTab>("video");
+
   const [pipeline, setPipeline] = useState<PipelineResponse | null>(null);
   const [pipelineError, setPipelineError] = useState<string | null>(null);
   const [pipelineLoading, setPipelineLoading] = useState(false);
@@ -292,7 +305,7 @@ export default function AdminClient() {
     setPipelineLoading(true);
     setPipelineError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/admin/pipeline`);
+      const res = await fetch(`${base}/api/admin/pipeline`);
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
       setPipeline(await res.json());
     } catch (e) {
@@ -300,13 +313,13 @@ export default function AdminClient() {
     } finally {
       setPipelineLoading(false);
     }
-  }, []);
+  }, [base]);
 
   const fetchSync = useCallback(async () => {
     setSyncLoading(true);
     setSyncError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/admin/sync-status`);
+      const res = await fetch(`${base}/api/admin/sync-status`);
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
       setSync(await res.json());
     } catch (e) {
@@ -314,11 +327,13 @@ export default function AdminClient() {
     } finally {
       setSyncLoading(false);
     }
-  }, []);
+  }, [base]);
 
-  // Auto-fetch pipeline on mount
+  // Auto-fetch pipeline on mount and whenever the target changes; also clear
+  // any stale sync data so the panel re-fetches when reopened against the new target.
   useEffect(() => {
     fetchPipeline();
+    setSync(null);
   }, [fetchPipeline]);
 
   const toggleSort = (field: SortField) => {
@@ -372,7 +387,55 @@ export default function AdminClient() {
     });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* API target toggle */}
+      <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-2">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-medium text-zinc-400">API target</span>
+          <div className="flex overflow-hidden rounded border border-zinc-700">
+            {(Object.keys(ADMIN_API_TARGETS) as AdminApiTarget[]).map((t) => {
+              const active = target === t;
+              return (
+                <button
+                  key={t}
+                  onClick={() => setTarget(t)}
+                  className={`px-3 py-1 text-xs font-medium uppercase tracking-wider transition-colors ${
+                    active
+                      ? "bg-orange-600 text-white"
+                      : "bg-zinc-900 text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  {t}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <span className="font-mono text-[11px] text-zinc-500">{base}</span>
+      </div>
+
+      {/* Tab nav */}
+      <div className="flex gap-1 border-b border-zinc-800">
+        {TABS.map((t) => {
+          const active = activeTab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+                active
+                  ? "border-orange-500 text-orange-400"
+                  : "border-transparent text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab: Video Processing — keep mounted to preserve filter/sort state */}
+      <div className={activeTab === "video" ? "space-y-8" : "hidden"}>
       {/* Section 1: Summary Cards */}
       {pipeline && (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
@@ -494,10 +557,7 @@ export default function AdminClient() {
         </div>
       )}
 
-      {/* Section 3: Transcript Diff Viewer */}
-      <TranscriptDiffPanel />
-
-      {/* Section 4: Sync Status (expandable) */}
+      {/* Section 3: Sync Status (expandable) */}
       <div className="rounded-lg border border-zinc-800">
         <button
           onClick={() => {
@@ -610,6 +670,13 @@ export default function AdminClient() {
           </div>
         )}
       </div>
+      </div>
+
+      {/* Tab: Channel Coverage */}
+      {activeTab === "coverage" && <ChannelCoveragePanel />}
+
+      {/* Tab: Transcript Diff */}
+      {activeTab === "diff" && <TranscriptDiffPanel />}
     </div>
   );
 }
