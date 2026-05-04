@@ -34,13 +34,14 @@ docker compose -f docker-compose.prod.yml --env-file /opt/jeromelu/.env up -d we
 # Prune old images to free disk (keeps the current ones — they're tagged in compose)
 docker image prune -f
 
-# Sync the checked-in cron schedule into /etc/cron.d/. Requires the deploy
-# user to have a NOPASSWD sudoers entry for `install` on these two paths;
-# see docs/operations/iac-runbook.md. -n forces non-interactive sudo so a
-# missing entry fails the deploy loudly rather than blocking on a prompt.
+# Sync the checked-in cron schedule into /etc/cron.d/. The `ubuntu` deploy
+# user has NOPASSWD:ALL via cloud-init's /etc/sudoers.d/90-cloud-init-users,
+# so this just works. -n forces non-interactive sudo — if the sudoers
+# config is ever tightened, a missing rule will fail the deploy loudly
+# rather than blocking on a prompt.
 sudo -n install -m 0644 -o root -g root \
 	/opt/jeromelu/scripts/cron.d/jeromelu \
 	/etc/cron.d/jeromelu
-chmod +x /opt/jeromelu/scripts/scout-refresh.sh
+chmod +x /opt/jeromelu/scripts/scout-refresh.sh /opt/jeromelu/scripts/pg-backup.sh
 
 echo "deployed IMAGE_TAG=$IMAGE_TAG at $(date -u +%FT%TZ)"
