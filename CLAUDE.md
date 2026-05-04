@@ -23,3 +23,13 @@ You are extremely disciplined about keeping documentation in perfect sync with t
    - Never mark a task as "done" or propose final code until docs are current and consistent.
 
 Stale or missing documentation is not acceptable. Treat docs as production code.
+
+## Testing
+
+Three tiers under `tests/` — see `tests/README.md` for the full layout map:
+
+- `tests/unit/` — fast, no IO, no env vars. Default tier; mirrors the source tree (`shared/`, `api/`, `gpu/`, `scripts/`). Run with `make test`.
+- `tests/integration/` — DB / S3 / external infra required. Empty placeholder for now.
+- `tests/evals/` — DeepEval LLM-graded suites. Costs $$ per run. Run with `make test-eval`.
+
+When adding a test, mirror the source path under the matching tier. Pytest's `pythonpath` is preconfigured in `pytest.ini` for `services/api` and `packages/shared`, so imports like `from app.routers.admin import _stitch_segments` and `from jeromelu_shared.scraping.nrl import normalize_team` resolve without further setup. Dev-only deps live in the root `requirements-dev.txt`.

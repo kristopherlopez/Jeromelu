@@ -1,4 +1,4 @@
-.PHONY: up down db-shell migrate migrate-status seed-teams seed-venues fetch-players seed-players api web logs clean collect-audio collect-video transcribe extract-transcript diarize diarize-compare enroll-voice enroll-face lineup-build lineup-deploy lineup-status lineup-delete prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all prod-refresh-videos prod-refresh-channel-stats prod-channel-coverage prod-seed-teams prod-seed-players prod-refresh-players prod-fetch-and-refresh-players prod-refresh-players-nrlcom deploy-prod prod-shell prod-logs
+.PHONY: up down db-shell migrate migrate-status seed-teams seed-venues fetch-players seed-players api web logs clean collect-audio collect-video transcribe extract-transcript diarize diarize-compare enroll-voice enroll-face lineup-build lineup-deploy lineup-status lineup-delete test test-eval prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all prod-refresh-videos prod-refresh-channel-stats prod-channel-coverage prod-seed-teams prod-seed-players prod-refresh-players prod-fetch-and-refresh-players prod-refresh-players-nrlcom deploy-prod prod-shell prod-logs
 
 # Start local infrastructure
 up:
@@ -170,6 +170,17 @@ logs:
 # Clean everything (removes data volumes)
 clean:
 	cd docker && docker compose down -v
+
+# Run unit tests (tests/unit/) — fast, no env vars, no IO. The pythonpath
+# in pytest.ini covers services/api and packages/shared so imports resolve
+# without activating any service-specific venv. See tests/README.md.
+test:
+	. services/api/.venv/Scripts/activate && python -m pytest
+
+# Run DeepEval LLM-graded evals (tests/evals/). Requires OPENAI_API_KEY
+# and DATABASE_URL — costs $$ per run, slower, non-deterministic.
+test-eval:
+	. services/api/.venv/Scripts/activate && python -m pytest tests/evals
 
 # --- Production ---
 
