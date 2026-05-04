@@ -64,6 +64,11 @@ services:
       # so jeromelu_shared.s3.get_s3_client() falls through to real AWS S3 in
       # ap-southeast-2 with the AWS_* creds above.
       S3_ENDPOINT: ""
+      # Visual ID inference runs on the GPU service via SageMaker Async; the
+      # API container has no insightface/onnxruntime/cv2 installed. Default
+      # to remote here so even if /opt/jeromelu/.env doesn't set it, prod
+      # never tries to load the missing inline path.
+      LINEUP_REMOTE: ${LINEUP_REMOTE:-1}
       ENV: production
     depends_on:
       postgres:

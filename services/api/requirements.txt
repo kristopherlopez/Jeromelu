@@ -32,9 +32,10 @@ torch==2.4.*
 torchaudio==2.4.*
 huggingface_hub<1.0
 speechbrain<1.1
-# Phase 4 visual identification — InsightFace `buffalo_l` (RetinaFace +
-# ArcFace, 512-dim face embeddings). Bundled with onnxruntime CPU build.
-# opencv-python for the frame loader. Models auto-download on first use.
-insightface>=0.7,<0.8
-onnxruntime>=1.17,<2
-opencv-python-headless>=4.8,<5
+# Phase 4 visual identification deps (insightface, onnxruntime, opencv) live
+# in services/gpu — the API dispatches via `visual_identify_remote` (SageMaker
+# async) when LINEUP_REMOTE=1 (default in docker-compose.prod.yml).
+# `from insightface.app import FaceAnalysis` in visual_id.py:_get_face_app is
+# lazy and unreachable when remote is on, so the API container doesn't need
+# the runtime deps. Reverting to inline (LINEUP_REMOTE=0) requires reinstating
+# these and adding gcc/g++ to the API Dockerfile (insightface ships source-only).
