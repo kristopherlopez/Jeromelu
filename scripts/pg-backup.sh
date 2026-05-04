@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Nightly Postgres backup → S3.
 #
-# Install on Lightsail as a cron entry (runs 02:30 Sydney = 16:30 UTC):
-#   30 16 * * * /opt/jeromelu/scripts/pg-backup.sh >> /var/log/jeromelu-backup.log 2>&1
+# Scheduled via scripts/cron.d/jeromelu (installed by lightsail-deploy.sh).
+# Runs daily at 16:30 UTC = 02:30 AEST. Logs to /var/log/jeromelu/pg-backup.log.
 #
 # Retention: S3 lifecycle on jeromelu-public-assets/backups/ deletes after 30 days.
 # Storage cost at 30d × ~5MB/day ≈ $0.003/mo.

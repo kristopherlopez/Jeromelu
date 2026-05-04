@@ -346,12 +346,7 @@ The job is idempotent and does two things:
 
 Total weekly quota cost: ~750 units against a 10,000-unit daily free tier.
 
-Cron suggestion (Lightsail box, weekly Monday 09:00 AET):
-
-```
-0 9 * * 1 curl -s -X POST https://api.jeromelu.ai/api/admin/scout/refresh-videos \
-            -H "X-Admin-Key: $ADMIN_KEY" >/dev/null
-```
+Wired to cron — see [Production schedule](#production-schedule) below.
 
 ## Daily channel stats refresh
 
@@ -379,12 +374,30 @@ channel scale. Cheap enough to run daily (10,000 units/day on the free
 tier). Decoupled from the weekly video refresh because per-video stats are
 ~200× more expensive and don't need daily cadence.
 
-Cron suggestion (Lightsail box, daily 09:00 AET):
+Wired to cron — see [Production schedule](#production-schedule) below.
 
-```
-0 9 * * * curl -s -X POST https://api.jeromelu.ai/api/admin/scout/refresh-channel-stats \
-            -H "X-Admin-Key: $ADMIN_KEY" >/dev/null
-```
+## Production schedule
+
+Both refreshes run on the Lightsail box via a checked-in cron file:
+
+- **Schedule:** [`scripts/cron.d/jeromelu`](../../../scripts/cron.d/jeromelu)
+  — daily channel-stats at 09:00 AEST (23:00 UTC), weekly videos Monday
+  09:15 AEST (Sun 23:15 UTC). DST drifts the local hour to 10:00 / 10:15
+  AEDT during summer; accepted.
+- **Wrapper:** [`scripts/scout-refresh.sh`](../../../scripts/scout-refresh.sh)
+  — sources `/opt/jeromelu/.env` for `ADMIN_KEY`, hits the API, appends
+  status + body to `/var/log/jeromelu/scout-refresh.log`, exits non-zero
+  on non-2xx so cron / monitoring can surface failures.
+- **Install:** `lightsail-deploy.sh` runs `sudo install` on every deploy
+  to sync the cron file into `/etc/cron.d/jeromelu`. Edit the source file
+  in this repo and redeploy — never hand-edit on the box. The same cron
+  file also schedules the nightly `pg-backup.sh` at 02:30 AEST.
+
+To inspect: `ssh jeromelu-prod 'tail -n 50 /var/log/jeromelu/scout-refresh.log'`.
+
+To trigger a one-off run by hand (e.g. after fixing a quota error):
+`make prod-refresh-channel-stats ADMIN_KEY=xxx` or
+`make prod-refresh-videos ADMIN_KEY=xxx`.
 
 ## Channel coverage audit
 
