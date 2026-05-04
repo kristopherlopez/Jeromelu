@@ -295,7 +295,7 @@ Runs synchronously inside the recon-approval HTTP handler. Pulls a freshly-appro
 
 **Outputs** — `sources` rows (videos), `video_metrics` snapshot rows.
 
-**Failure mode** — approval still commits if YouTube API fails; channel is in `channels`, admin can re-trigger via the weekly refresh endpoint.
+**Failure mode** — approval still commits if YouTube API fails; channel is in `channels`, admin can re-trigger via the per-channel endpoint (§3.4 — `POST /admin/scout/channels/{ref}/refresh-videos?full_backfill=true`) without waiting for the weekly cron.
 
 **Audit** — currently logged through the recon endpoint's standard request log (no `agent_runs` row — this is a deterministic post-processing step, not an agent run).
 
@@ -312,6 +312,8 @@ Keeps every tracked YouTube channel's video list and per-video popularity number
 2. **Stats refresh** (`refresh_all_video_stats`) — pulls every YouTube source, batches `videos.list` 50 ids at a time, appends one `video_metrics` row per video. ~1 quota unit per 50 videos.
 
 **Outputs** — new `sources` rows for fresh uploads + new `video_metrics` rows. Total ~750 YouTube quota units per pass against a 10,000-unit free tier.
+
+**Per-channel ad-hoc variant** — `POST /api/admin/scout/channels/{ref}/refresh-videos[?full_backfill=true]` runs `refresh_channel_videos()` for a single channel on demand. Path param accepts UUID or slug. Use to recover a channel whose approval-time enumerate (§3.3) failed (`full_backfill=true`), or to force-pull one channel's new uploads between weekly runs (incremental). Make wrapper: `make prod-refresh-channel-videos CHANNEL=<uuid-or-slug> [FULL_BACKFILL=1] ADMIN_KEY=xxx`.
 
 **Downstream** — once `video_metrics` has 2+ samples per video, view-velocity ranking becomes available (SQL in [the spec](../system/source-discovery.md#influence-ranking)).
 

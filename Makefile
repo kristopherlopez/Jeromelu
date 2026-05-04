@@ -232,6 +232,16 @@ prod-refresh-videos:
 	curl -s -X POST $(PROD_API)/api/admin/scout/refresh-videos \
 		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
 
+# Per-channel ad-hoc refresh — enumerate uploads + snapshot stats for one
+# channel. Accepts a UUID or a slug (e.g. CHANNEL=bloke-in-a-bar). Defaults
+# to incremental; pass FULL_BACKFILL=1 to ignore the cursor and re-pull up
+# to 200 videos. Used to recover from a failed approval-time enumerate or
+# to force-pull a single channel without waiting for the weekly cron.
+# Usage: make prod-refresh-channel-videos CHANNEL=<uuid-or-slug> [FULL_BACKFILL=1] ADMIN_KEY=xxx
+prod-refresh-channel-videos:
+	curl -s -X POST "$(PROD_API)/api/admin/scout/channels/$(CHANNEL)/refresh-videos$(if $(FULL_BACKFILL),?full_backfill=true,)" \
+		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
+
 # Daily channel stats refresh — snapshot subscriber/video/view counts for
 # every active YouTube channel into channel_metrics. ~1 quota unit per 50
 # channels, safe to run daily. Wire to cron alongside prod-refresh-videos.

@@ -487,6 +487,47 @@ def refresh_videos(
 
 
 # ---------------------------------------------------------------------------
+# POST — per-channel ad-hoc refresh
+# ---------------------------------------------------------------------------
+
+def _resolve_channel(db: Session, channel_ref: str) -> Channel:
+    """Resolve a channel by UUID or slug; 404 if neither matches."""
+    try:
+        ch = db.get(Channel, UUID(channel_ref))
+        if ch:
+            return ch
+    except ValueError:
+        pass
+    ch = db.execute(
+        select(Channel).where(Channel.slug == channel_ref)
+    ).scalar_one_or_none()
+    if not ch:
+        raise HTTPException(
+            status_code=404, detail=f"Channel not found: {channel_ref}"
+        )
+    return ch
+
+
+@router.post(
+    "/admin/scout/channels/{channel_ref}/refresh-videos",
+    dependencies=[Depends(require_admin)],
+)
+def refresh_one_channel_videos(
+    channel_ref: str,
+    full_backfill: bool = Query(default=False),
+    db: Session = Depends(get_db),
+):
+    """Enumerate one channel's uploads and snapshot per-video stats.
+
+    `channel_ref` accepts UUID or slug. `full_backfill=true` ignores the
+    incremental cursor and re-enumerates up to 200 videos.
+    """
+    channel = _resolve_channel(db, channel_ref)
+    result = refresh_channel_videos(db, channel, full_backfill=full_backfill)
+    return {"ok": True, **result}
+
+
+# ---------------------------------------------------------------------------
 # POST — daily channel stats refresh
 # ---------------------------------------------------------------------------
 

@@ -316,8 +316,38 @@ This:
    discovery-time snapshot.
 
 If the YouTube API call fails the approval still commits — the channel is in
-the canonical tables, and the admin can re-trigger enumeration via the weekly
-refresh endpoint (below).
+the canonical tables, and the admin can re-trigger enumeration on just that
+channel via the per-channel endpoint (below) without waiting for the weekly
+refresh.
+
+## Per-channel ad-hoc refresh
+
+Re-runs `refresh_channel_videos()` for a single channel on demand:
+
+```
+POST /api/admin/scout/channels/{channel_ref}/refresh-videos
+  ?full_backfill=true     # ignore the incremental cursor (default: false)
+  Header: X-Admin-Key
+```
+
+`{channel_ref}` accepts the channel UUID or its slug
+(e.g. `bloke-in-a-bar`). Returns the same shape as one entry in the
+weekly refresh's `enumerate.per_channel` list — `videos_listed`,
+`videos_inserted`, `metrics_recorded`.
+
+Or via Make: `make prod-refresh-channel-videos CHANNEL=<uuid-or-slug> [FULL_BACKFILL=1] ADMIN_KEY=xxx`.
+
+Two situations call for this:
+
+1. **Approval-time enumerate failed.** The recon endpoint commits the
+   channel even if YouTube's API hiccupped, leaving the channel
+   approved with zero `sources` rows. Run with `FULL_BACKFILL=1` to
+   pull the full uploads playlist (capped 200) instead of waiting for
+   Monday's incremental cron.
+2. **Force-pull a single channel between weekly runs** (e.g. a tracked
+   channel just published a video and you want it ingested now). Run
+   without `FULL_BACKFILL` so the incremental cursor stops at the
+   newest known video — typically 1 quota unit.
 
 ## Weekly video refresh
 
