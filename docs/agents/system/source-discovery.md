@@ -327,7 +327,7 @@ Re-runs `refresh_channel_videos()` for a single channel on demand:
 ```
 POST /api/admin/scout/channels/{channel_ref}/refresh-videos
   ?full_backfill=true     # ignore the incremental cursor (default: false)
-  ?max_results=N          # walker cap, range [1, 5000] (default: 200)
+  ?max_results=N          # walker cap, range [1, 15000] (default: 200)
   Header: X-Admin-Key
 ```
 
@@ -338,9 +338,10 @@ weekly refresh's `enumerate.per_channel` list — `videos_listed`,
 layer: `sources` INSERTs use `ON CONFLICT DO NOTHING` on `canonical_url`,
 and `video_metrics` snapshots only fire for newly-inserted sources.
 
-`max_results` is hard-capped at 5000 by `youtube_api.list_channel_videos`
-— a defensive safety net that covers any realistic whale (~100 quota
-units max for the worst case).
+`max_results` is hard-capped at 15000 by `youtube_api.list_channel_videos`
+— sized for broadcaster archives (NRL / Wide World of Sports / NRL on
+Nine each have ~11-12k uploads going back a decade). ~300 quota units
+max for the worst case.
 
 Or via Make: `make prod-refresh-channel-videos CHANNEL=<uuid-or-slug> [FULL_BACKFILL=1] [MAX_RESULTS=1000] ADMIN_KEY=xxx`.
 
@@ -465,12 +466,16 @@ funnel stages — same vocabulary as `/admin/pipeline`:
 
 | Column | Definition |
 |---|---|
-| `reported_videos`  | Latest `channel_metrics.metrics->>'videos'` — what YouTube reports |
-| `tracked_videos`   | Rows in `sources` for the channel |
-| `collected_videos` | Sources whose transcript has been saved (a `source_documents` row exists with `s3_key` or chunks) |
-| `cleaned_videos`   | Sources with at least one `source_chunks.clean_text` populated |
+| `reported_videos`    | Latest `channel_metrics.metrics->>'videos'` — what YouTube reports (rendered as **Discovered** in the admin UI) |
+| `tracked_videos`     | Rows in `sources` for the channel |
+| `transcribed_videos` | Sources whose transcript has been saved (`source_documents.s3_key` IS NOT NULL) |
+| `chunked_videos`     | Sources with `source_documents.chunk_count > 0` |
+| `cleaned_videos`     | Sources with at least one `source_chunks.clean_text` populated |
+| `extracted_videos`   | Sources with at least one `claims` row |
+| `chunks_total`       | SUM(`source_documents.chunk_count`) across the channel |
+| `claims_total`       | COUNT(`claims`) across the channel |
 
-Plus rollup totals (`channels_with_gap`, `total_gap`) where `gap = reported - tracked`. Pure DB read, no API quota cost.
+Plus rollup totals (`channels_with_gap`, `total_gap`) where `gap = reported - tracked`. Pure DB read, no API quota cost. Stages mirror `/admin/pipeline` so a channel-level funnel and a per-video funnel use the same vocabulary.
 
 Freshness of `reported_videos` depends on the
 [daily channel stats refresh](#daily-channel-stats-refresh) cron keeping

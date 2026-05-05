@@ -515,14 +515,15 @@ def _resolve_channel(db: Session, channel_ref: str) -> Channel:
 def refresh_one_channel_videos(
     channel_ref: str,
     full_backfill: bool = Query(default=False),
-    max_results: int = Query(default=200, ge=1, le=5000),
+    max_results: int = Query(default=200, ge=1, le=15000),
     db: Session = Depends(get_db),
 ):
     """Enumerate one channel's uploads and snapshot per-video stats.
 
     `channel_ref` accepts UUID or slug. `full_backfill=true` ignores the
     incremental cursor and walks newest-first up to `max_results` videos.
-    `max_results` clamps to [1, 5000] (the youtube_api helper's hard cap).
+    `max_results` clamps to [1, 15000] (the youtube_api helper's hard cap,
+    sized for broadcaster archives).
     """
     channel = _resolve_channel(db, channel_ref)
     result = refresh_channel_videos(

@@ -405,9 +405,10 @@ def list_channel_videos(
     """
     playlist_id = _uploads_playlist_id(channel_external_id)
     # Defensive safety net — bounds the worst case if a caller passes a
-    # ridiculous max_results. 5000 covers any realistic whale (Bloke in a
-    # Bar = 1091, the largest tracked channel) at ~100 quota units max.
-    target = max(min(max_results, 5000), 1)
+    # ridiculous max_results. 15000 covers the broadcaster archives (nrl /
+    # wwos / nrl-on-nine each have ~11-12k uploads going back a decade) at
+    # ~300 quota units max per channel.
+    target = max(min(max_results, 15000), 1)
     out: list[dict[str, Any]] = []
     page_token: str | None = None
     while len(out) < target:
