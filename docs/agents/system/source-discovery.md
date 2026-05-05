@@ -327,15 +327,22 @@ Re-runs `refresh_channel_videos()` for a single channel on demand:
 ```
 POST /api/admin/scout/channels/{channel_ref}/refresh-videos
   ?full_backfill=true     # ignore the incremental cursor (default: false)
+  ?max_results=N          # walker cap, range [1, 1000] (default: 200)
   Header: X-Admin-Key
 ```
 
 `{channel_ref}` accepts the channel UUID or its slug
 (e.g. `bloke-in-a-bar`). Returns the same shape as one entry in the
 weekly refresh's `enumerate.per_channel` list — `videos_listed`,
-`videos_inserted`, `metrics_recorded`.
+`videos_inserted`, `metrics_recorded`. Re-runs are idempotent at the DB
+layer: `sources` INSERTs use `ON CONFLICT DO NOTHING` on `canonical_url`,
+and `video_metrics` snapshots only fire for newly-inserted sources.
 
-Or via Make: `make prod-refresh-channel-videos CHANNEL=<uuid-or-slug> [FULL_BACKFILL=1] ADMIN_KEY=xxx`.
+`max_results` is hard-capped at 1000 by `youtube_api.list_channel_videos`
+— channels with more than 1000 uploads only expose their newest 1000
+through this endpoint today.
+
+Or via Make: `make prod-refresh-channel-videos CHANNEL=<uuid-or-slug> [FULL_BACKFILL=1] [MAX_RESULTS=1000] ADMIN_KEY=xxx`.
 
 Two situations call for this:
 
