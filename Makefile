@@ -1,4 +1,4 @@
-.PHONY: up down db-shell migrate migrate-status seed-teams seed-venues fetch-players seed-players api web logs clean collect-audio collect-video transcribe extract-transcript diarize diarize-compare enroll-voice enroll-face lineup-build lineup-deploy lineup-status lineup-delete test test-eval prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all prod-refresh-videos prod-refresh-channel-stats prod-channel-coverage prod-seed-teams prod-seed-players prod-refresh-players prod-fetch-and-refresh-players prod-refresh-players-nrlcom deploy-prod prod-shell prod-logs
+.PHONY: up down db-shell migrate migrate-status seed-teams seed-venues fetch-players seed-players api web logs clean collect-audio collect-video transcribe extract-transcript diarize diarize-compare enroll-voice enroll-face scout-presenters lineup-build lineup-deploy lineup-status lineup-delete test test-eval prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all prod-refresh-videos prod-refresh-channel-stats prod-channel-coverage prod-seed-teams prod-seed-players prod-refresh-players prod-fetch-and-refresh-players prod-refresh-players-nrlcom deploy-prod prod-shell prod-logs
 
 # Start local infrastructure
 up:
@@ -118,6 +118,20 @@ enroll-face:
 	else \
 		echo "Need IMAGE=path OR (SOURCE_ID=<uuid> FRAME_TS=<sec>)" && exit 2; \
 	fi
+
+# Presenter Scout — research a channel's regular presenters via web search
+# and file findings into scout_presenter_candidates for human review. Pass
+# either CHANNEL_ID directly or SOURCE_ID (resolved to its channel server-
+# side). DRY_RUN=1 streams the research without writing rows.
+# Usage: make scout-presenters CHANNEL_ID=<uuid> [DRY_RUN=1] [MODEL=claude-opus-4-7]
+#        make scout-presenters SOURCE_ID=<uuid>
+scout-presenters:
+	@test -n "$(CHANNEL_ID)$(SOURCE_ID)" || (echo "Need CHANNEL_ID=<uuid> or SOURCE_ID=<uuid>" && exit 2)
+	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.scout.presenters_cli \
+		$(if $(CHANNEL_ID),--channel-id $(CHANNEL_ID)) \
+		$(if $(SOURCE_ID),--source-id $(SOURCE_ID)) \
+		$(if $(MODEL),--model $(MODEL)) \
+		$(if $(DRY_RUN),--dry-run)
 
 # Phase 5.5 — Lineup on SageMaker Async. Build the GPU container and push
 # to ECR. Reads HUGGINGFACE_API_KEY from .env and passes it as a Buildkit
