@@ -1677,3 +1677,91 @@ class VideoMetric(Base):
         Index("idx_video_metrics_source_time", "source_id", "sampled_at"),
         Index("idx_video_metrics_sampled_at", "sampled_at"),
     )
+
+
+class ScoutPresenterCandidate(Base):
+    """Presenter Scout's staging inbox.
+
+    The Presenter Scout agent researches a channel's regular presenters via
+    web search and files each finding here. Humans confirm/reject in the
+    admin review surface; confirmation creates (or links) a `people` row
+    and writes a `source_presenters` association. See migration 052 and
+    docs/todo/source-presenters.md.
+    """
+
+    __tablename__ = "scout_presenter_candidates"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    channel_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("channels.channel_id", ondelete="CASCADE"), nullable=False
+    )
+
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    role: Mapped[str] = mapped_column(Text, nullable=False)
+    evidence_json: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    llm_confidence: Mapped[float | None] = mapped_column(Float)
+    notes: Mapped[str | None] = mapped_column(Text)
+    existing_person_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("people.person_id", ondelete="SET NULL")
+    )
+
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="pending")
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reviewed_by: Mapped[str | None] = mapped_column(Text)
+    confirmed_person_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("people.person_id", ondelete="SET NULL")
+    )
+
+    run_id: Mapped[str | None] = mapped_column(Text)
+    discovered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('host','co-host','regular','frequent-guest')",
+            name="ck_scout_pres_role",
+        ),
+        CheckConstraint(
+            "status IN ('pending','confirmed','rejected')",
+            name="ck_scout_pres_status",
+        ),
+        Index("idx_scout_pres_channel_status", "channel_id", "status"),
+    )
+
+
+class SourcePresenter(Base):
+    """Confirmed presenter ↔ channel association.
+
+    Anchored at channel level — presenters are a property of the show, not
+    the episode. A guest on one source is not a presenter; they only land
+    here once a reviewer confirms them as a regular. See migration 052.
+    """
+
+    __tablename__ = "source_presenters"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    channel_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("channels.channel_id", ondelete="CASCADE"), nullable=False
+    )
+    person_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("people.person_id", ondelete="CASCADE"), nullable=False
+    )
+
+    role: Mapped[str] = mapped_column(Text, nullable=False)
+    is_regular: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    since_ts: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    confirmed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    confirmed_by: Mapped[str | None] = mapped_column(Text)
+    candidate_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("scout_presenter_candidates.id", ondelete="SET NULL"),
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('host','co-host','regular','frequent-guest')",
+            name="ck_src_pres_role",
+        ),
+        UniqueConstraint("channel_id", "person_id", name="uq_src_pres_channel_person"),
+        Index("idx_src_pres_person", "person_id"),
+    )
