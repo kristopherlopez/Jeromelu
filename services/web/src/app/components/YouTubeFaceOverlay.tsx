@@ -180,14 +180,16 @@ const YouTubeFaceOverlay = forwardRef<YouTubeFaceOverlayHandle, Props>(
     const draw = useCallback(() => {
       const canvas = canvasRef.current;
       const player = playerRef.current;
-      const host = playerHostRef.current;
-      if (!canvas || !player || !host || !playerReady) return;
+      const wrap = wrapRef.current;
+      if (!canvas || !player || !wrap || !playerReady) return;
       if (typeof player.getCurrentTime !== "function") return;
 
-      // The iframe is sized to fill `host` (absolute inset-0). Match the
-      // canvas pixel buffer to the host's rendered dimensions so 1 canvas
-      // pixel == 1 screen pixel — keeps strokes crisp regardless of HiDPI.
-      const rect = host.getBoundingClientRect();
+      // YT.Player replaces playerHostRef's div with an iframe at init,
+      // leaving the ref pointing at a detached node — its bounding rect
+      // is 0×0. The wrapper div is the stable parent; both the iframe
+      // and the canvas fill it via `inset-0 absolute`, so its rect is
+      // also the canvas's render size.
+      const rect = wrap.getBoundingClientRect();
       if (canvas.width !== rect.width || canvas.height !== rect.height) {
         canvas.width = rect.width;
         canvas.height = rect.height;
