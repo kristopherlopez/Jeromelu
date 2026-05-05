@@ -4,7 +4,7 @@ tags: [area/todo, status/in-progress]
 
 # Presenter Scout — Auto-discover the regular presenters of a channel
 
-> **Status:** Plan accepted 2026-05-05. Migration + agent + review surface staged for incremental ship.
+> **Status:** Phase 1 ✅ + Phase 2 ✅ shipped 2026-05-05. Verified end-to-end on `Bloke In A Bar` — 3 candidates filed (Denan Kemp host + Tyson Jackson and Blake Austin regulars), 7 turns, $0.148, agent_runs + S3 forensic upload populated. Confirm/reject endpoints exercised via TestClient. Phase 3 (Lineup priors) and post-ingestion auto-trigger remain.
 
 **Phase:** Scout extension / identification feeder
 **Priority:** Compounds with speaker-identification — confirmed presenters become strong priors for the voice/face fusion matchers, so each new channel goes from "cold start" to "first turn auto-resolved" much faster.

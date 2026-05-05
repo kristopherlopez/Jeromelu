@@ -46,7 +46,10 @@ Layer 2 — STRUCTURED WORLD ─────────────────
                                     └────────────────────┘
 
 Layer 3 — CONTENT & CLAIMS ─────────────────────────────────────────────────────
-   scout_candidates ──(promote)──▶ channels / sources    (Scout's review queue)
+   scout_candidates           ──(promote)──▶ channels / sources    (Scout's review queue)
+   scout_presenter_candidates ──(confirm)──▶ source_presenters     (Presenter Scout's queue)
+                                              │
+                                              └─▶ people  (created on confirm if no link)
    channels ──▶ sources ──▶ source_documents
       │           │              ├──▶ source_chunks       (atomic caption-level segments)
       │           │              ├──▶ source_speakers     (diarised turns)
@@ -446,6 +449,50 @@ Distinct from `sources` so unapproved noise does not pollute the main pipeline. 
 **Unique:** (platform, kind, external_id)
 **Indexes:** status, kind, run_id, discovered_at DESC
 **FK:** promoted_channel_id → channels.channel_id
+
+### scout_presenter_candidates
+
+Presenter Scout's staging inbox. Distinct from `scout_candidates` (which discovers *channels* and *videos*) — this one discovers *people who present* a known channel. The Presenter Scout agent files findings here; humans confirm/reject in the admin "Presenters" tab. Confirmation creates (or links to) a `people` row and writes a `source_presenters` association. See migration 052 and [docs/agents/system/presenter-scout.md](../agents/system/presenter-scout.md).
+
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| id | UUID | PK | uuid4 | |
+| channel_id | UUID | no | | FK → channels (CASCADE) |
+| name | text | no | | "Denan Kemp" |
+| role | text | no | | `host`, `co-host`, `regular`, `frequent-guest` |
+| evidence_json | jsonb | no | [] | Array of `{url, snippet}`. Snippet must mention the name (auto-validated at insert). |
+| llm_confidence | float | yes | | Agent's own 0.0–1.0 score |
+| notes | text | yes | | Free-form agent commentary; reviewer notes appended on reject |
+| existing_person_id | UUID | yes | | FK → people. Best-effort dupe hint when `lookup_existing_people` returned a match |
+| status | text | no | `pending` | `pending`, `confirmed`, `rejected` |
+| reviewed_at | timestamptz | yes | | |
+| reviewed_by | text | yes | | |
+| confirmed_person_id | UUID | yes | | FK → people. Set on confirm — the Person this candidate became |
+| run_id | text | yes | | Groups all candidates from one Presenter Scout run |
+| discovered_at | timestamptz | no | now() | |
+
+**Indexes:** (channel_id, status); partial unique on (channel_id, lower(name)) WHERE status='pending' — re-runs don't double-file pending names but a previously-rejected name CAN re-surface.
+**FK:** channel_id → channels (CASCADE); existing_person_id, confirmed_person_id → people (SET NULL).
+
+### source_presenters
+
+Confirmed `(channel_id, person_id, role)` association. Anchored at channel level — presenters are a property of the show, not the episode. Created by `POST /api/admin/presenters/candidates/{id}/confirm`. See migration 052.
+
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| id | UUID | PK | uuid4 | |
+| channel_id | UUID | no | | FK → channels (CASCADE) |
+| person_id | UUID | no | | FK → people (CASCADE) |
+| role | text | no | | `host`, `co-host`, `regular`, `frequent-guest`. May differ from the originating candidate's role if the reviewer overrode on confirm. |
+| is_regular | bool | no | true | Convenience flag — true for host/co-host/regular, false for frequent-guest |
+| since_ts | timestamptz | yes | | Optional join date if known |
+| confirmed_at | timestamptz | no | now() | |
+| confirmed_by | text | yes | | Reviewer identity |
+| candidate_id | UUID | yes | | FK → scout_presenter_candidates (SET NULL). Provenance pointer. |
+
+**Unique:** (channel_id, person_id) — one row per (show, person). Re-confirming the same candidate is idempotent on this constraint.
+**Indexes:** person_id (for "what shows is X on?" queries).
+**FK:** channel_id → channels (CASCADE); person_id → people (CASCADE); candidate_id → scout_presenter_candidates (SET NULL).
 
 ### channels
 
