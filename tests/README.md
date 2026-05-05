@@ -18,7 +18,9 @@ tests/
       scout/
         test_refresh_helpers.py  # _video_id_from_url, _parse_published_at
       analyst/
-        test_transcribe_helpers.py  # S3 key, NaN guard, overlap picker
+        test_transcribe_helpers.py  # imports from transcribe_helpers.py —
+                                    # NEVER import transcribe.py directly
+                                    # (drags in pyannote/torch)
     gpu/
       test_deploy_helpers.py  # ECR URI, model/config name constructors
     scripts/         # placeholder — scripts/data/* helpers
@@ -45,6 +47,24 @@ make test
 # DeepEval suite — needs OPENAI_API_KEY and DATABASE_URL
 make test-eval
 ```
+
+## CI
+
+`tests/unit/` runs on every PR and on push to master via
+`.github/workflows/tests.yml`. The workflow installs only
+`requirements-test.txt` — a lightweight subset that **deliberately
+excludes** the ML stack (torch, pyannote, deepgram, insightface,
+opencv, anthropic, openai, temporalio). Total install + run is well
+under a minute.
+
+The pyannote/torch boundary is preserved by splitting `transcribe.py`
+into two modules: `transcribe.py` (the pipeline, heavy deps) and
+`transcribe_helpers.py` (pure functions, lightweight). Tests import
+from `transcribe_helpers` so CI never has to install torch.
+
+CI is currently warning-only — failing tests show a red status check
+but do NOT block `deploy.yml`. Promote to a hard gate by adding
+`needs: tests` to the deploy job once the workflow has proven stable.
 
 Or invoke pytest directly:
 

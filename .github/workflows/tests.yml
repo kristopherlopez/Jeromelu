@@ -1,0 +1,51 @@
+name: Tests
+
+# Runs the unit tier (tests/unit/) on every PR and on push to master.
+#
+# Lightweight by design: requirements-test.txt deliberately excludes the
+# ML stack (torch, pyannote, deepgram, insightface, opencv, anthropic,
+# openai, temporalio). The transcribe pipeline's pure helpers live in
+# app.analyst.transcribe_helpers — that module avoids the diarize ->
+# pyannote -> torch chain so this CI runs in seconds, not minutes.
+#
+# This workflow does NOT gate deploy.yml. Failing tests show as a red
+# status check + email; deploy.yml runs independently. Once this proves
+# stable, add `needs: tests` to the deploy-lightsail job to make it a
+# hard gate. See tests/README.md for the tier split.
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  # Cancel only superseded PR runs — on master, every commit deserves
+  # its own green/red status check.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  unit:
+    name: pytest tests/unit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-test.txt
+
+      - name: Install minimum test deps
+        run: pip install -r requirements-test.txt
+
+      - name: Run unit tests
+        run: pytest

@@ -1,0 +1,23 @@
+# Minimum deps to run tests/unit/. Deliberately excludes the heavy ML
+# stack (torch, pyannote, torchaudio, speechbrain, insightface,
+# onnxruntime, opencv) and the network SDKs (deepgram-sdk, anthropic,
+# openai, temporalio) so CI installs in seconds rather than minutes.
+#
+# The transcribe pipeline's pure helpers live in
+# app.analyst.transcribe_helpers — that module deliberately does NOT
+# import diarize/pyannote so this lightweight install can collect every
+# test without dragging the GPU stack onto CI.
+#
+# If you add a unit test that needs a new dep, list it here. If a test
+# would require torch/pyannote/etc, it belongs in tests/integration/
+# instead.
+
+fastapi==0.115.*
+sqlalchemy==2.0.*
+psycopg[binary]==3.2.*
+pgvector>=0.3
+pydantic==2.10.*
+pydantic-settings==2.7.*
+boto3==1.36.*
+httpx
+pytest>=8.0

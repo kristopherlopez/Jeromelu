@@ -29,10 +29,8 @@ exception re-raised. Operator inspects and re-runs with `--force`.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
-import math
 from dataclasses import dataclass
 from typing import Any
 
@@ -47,6 +45,18 @@ from .diarize import diarize as run_pyannote
 from .fusion import fuse_per_turn
 from .identify_voice import identify_pyannote_turns
 from .keyterms import build_keyterms
+# Aliased to underscore-prefixed names because two of the helpers
+# (`utterances`, `checksum`) would otherwise collide with the local
+# variable / SourceDocument keyword arg of the same name in transcribe().
+from .transcribe_helpers import (
+    audio_duration as _audio_duration,
+    checksum as _checksum,
+    max_overlap_turn as _max_overlap_turn,
+    request_id as _request_id,
+    safe_embedding as _safe_embedding,
+    transcript_s3_key_from_audio as _transcript_s3_key_from_audio,
+    utterances as _utterances,
+)
 from .visual_id import VisualIdError, visual_identify
 
 logger = logging.getLogger(__name__)
@@ -104,13 +114,6 @@ class MissingAudioError(TranscriptionError):
 # Helpers — Deepgram
 # ---------------------------------------------------------------------------
 
-def _transcript_s3_key_from_audio(audio_s3_key: str) -> str:
-    """Mirror the audio S3 path under raw-transcripts as a Deepgram JSON."""
-    if audio_s3_key.endswith(".m4a"):
-        return audio_s3_key[: -len(".m4a")] + ".deepgram.json"
-    return audio_s3_key + ".deepgram.json"
-
-
 def _call_deepgram(audio_url: str, keyterms: list[str]) -> dict[str, Any]:
     """Run a Deepgram prerecorded transcription on a presigned audio URL.
 
@@ -143,55 +146,6 @@ def _call_deepgram(audio_url: str, keyterms: list[str]) -> dict[str, Any]:
         raise TranscriptionError(f"Deepgram transcription failed: {exc}") from exc
 
     return response.to_dict()
-
-
-def _checksum(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
-
-def _utterances(deepgram_response: dict[str, Any]) -> list[dict[str, Any]]:
-    return deepgram_response.get("results", {}).get("utterances", []) or []
-
-
-def _audio_duration(deepgram_response: dict[str, Any]) -> float | None:
-    return deepgram_response.get("metadata", {}).get("duration")
-
-
-def _request_id(deepgram_response: dict[str, Any]) -> str | None:
-    return deepgram_response.get("metadata", {}).get("request_id")
-
-
-# ---------------------------------------------------------------------------
-# Helpers — merge
-# ---------------------------------------------------------------------------
-
-def _safe_embedding(medoid: list[float] | None) -> list[float] | None:
-    """Reject embeddings containing NaN/inf — pgvector won't store them.
-
-    Mirrors the diarize-side filter; this is a belt-and-braces check so old
-    pyannote JSONs that leaked NaNs (pre-fix) still ingest cleanly: their
-    bad rows get a NULL embedding instead of failing the whole transaction.
-    """
-    if medoid is None:
-        return None
-    if not all(isinstance(v, (int, float)) and math.isfinite(v) for v in medoid):
-        return None
-    return medoid
-
-
-def _max_overlap_turn(
-    utt_start: float, utt_end: float, turn_rows: list[SourceSpeaker],
-) -> SourceSpeaker | None:
-    """Pick the SourceSpeaker turn with maximum temporal overlap with the
-    utterance span. Linear scan — fine for the sample sizes here."""
-    best: SourceSpeaker | None = None
-    best_overlap = 0.0
-    for t in turn_rows:
-        overlap = max(0.0, min(utt_end, t.end_ts) - max(utt_start, t.start_ts))
-        if overlap > best_overlap:
-            best_overlap = overlap
-            best = t
-    return best
 
 
 # ---------------------------------------------------------------------------
