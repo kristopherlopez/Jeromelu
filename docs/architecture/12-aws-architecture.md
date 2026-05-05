@@ -96,11 +96,12 @@ ECR
 
 ### CI/CD — GitHub Actions
 - `.github/workflows/deploy.yml`:
-  1. Detect changed paths.
+  1. Detect changed paths (api / web / db only — see the workflow header for what is *not* in scope, e.g. `services/gpu`).
   2. Build + push `web` / `api` images to ECR (tagged with git SHA + `latest`).
-  3. SSH into Lightsail, run `scripts/lightsail-deploy.sh` with the new SHA.
+  3. Run `scripts/lightsail-deploy.sh` on the Lightsail box via a **self-hosted GitHub Actions runner** installed there (label `jeromelu-prod`). No inbound SSH from GitHub — the runner connects outbound. See [`docs/ops/ci-cd.md`](../ops/ci-cd.md) for the full pipeline overview.
   4. Invalidate CloudFront if `web` changed.
-- Secrets needed: `LIGHTSAIL_HOST`, `LIGHTSAIL_USER`, `LIGHTSAIL_SSH_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`.
+  5. `db` changes trigger a notify-only `migrate` job; the operator applies migrations from the box.
+- Secrets needed: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`. The old SSH-based secrets (`LIGHTSAIL_HOST`, `LIGHTSAIL_USER`, `LIGHTSAIL_SSH_KEY`) are no longer used.
 
 ### IAM
 - One IAM user (`jeromelu-cicd`) with: `ECR push/pull`, `CloudFront create-invalidation`, `S3 read/write` on the three buckets, `SSM GetParameter*`.
@@ -170,7 +171,7 @@ The image format, ECR repos, GitHub Actions structure, and CloudFront distributi
 | `docker/Caddyfile` | TLS + reverse proxy config. |
 | `scripts/lightsail-deploy.sh` | Pull images and restart on the Lightsail box. |
 | `scripts/pg-backup.sh` | Cron'd nightly Postgres dump → S3. |
-| `.github/workflows/deploy.yml` | CI: build → push to ECR → SSH deploy. |
+| `.github/workflows/deploy.yml` | CI: build → push to ECR → deploy via self-hosted runner on the Lightsail box. |
 | `Makefile` | `deploy-prod`, `prod-shell`, `prod-logs`. |
 | `docs/operations/aws-setup-guide.md` | One-time provisioning runbook (manual fallback / historical). |
 | `docs/operations/aws-resource-inventory.md` | Live inventory of provisioned AWS resources. |

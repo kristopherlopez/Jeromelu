@@ -2,61 +2,90 @@
 tags: [area/architecture]
 ---
 
-# Recommended Technology Stack
+# Technology Stack
+
+Current as of 2026-05-05. Reflects the post-Lightsail, audio-first reality
+(see [12-aws-architecture](12-aws-architecture.md) and
+[../sources/extraction-method.md](../sources/extraction-method.md)). For
+the full status of each module, see
+[../agents/system/README.md](../agents/system/README.md).
 
 ## Frontend
-- **Next.js + TypeScript**
+- **Next.js 16 + TypeScript**
 - Tailwind CSS
-- server-rendered pages for SEO
-- dynamic modules for feed, dashboard, explorer, and chat
+- Server-rendered pages for SEO
+- Dynamic modules for feed, wiki, ledger, analysis, ask-me
 
 ## Public / Admin API
 - **FastAPI + Python**
 - Pydantic for typed schemas
-- SSE or WebSockets only where near-real-time updates matter
+- SSE for streamed agentic events (Scout, Analyst); plain JSON otherwise
+- Admin endpoints gated by `X-Admin-Key`
 
-## Workflow Orchestration
-- **Temporal**
-- separate worker processes for ingestion, extraction, decisioning, and publishing
+## Pipelines
+Most production pipelines are CLI / cron-driven Python modules inside the `api`
+container. The two surfaces:
+
+- **Scout** (`services/api/app/scout/`) — agentic discovery via the Claude Agent SDK; deterministic enumeration / refresh; yt-dlp-based audio + low-res video acquisition.
+- **Analyst** (`services/api/app/analyst/`) — Deepgram + pyannote transcription, voice / visual speaker identification, cross-modal fusion. Heavy inference can offload to the `services/gpu/` SageMaker Async endpoint when `LINEUP_REMOTE=1`.
+
+**Workflow orchestration:** Temporal exists in `docker-compose.yml` for local
+dev only (publishing, scraper, orchestrator workers). Not deployed to
+Lightsail. New production pipelines run as cron jobs (`scripts/cron.d/jeromelu`)
+or one-shot CLI invocations driven via `make` targets.
 
 ## Data Layer
-- **PostgreSQL** as the system of record
-- **pgvector** inside PostgreSQL for embeddings and semantic retrieval
-- PostgreSQL full-text search for lexical retrieval
-- S3-compatible object storage for raw transcripts and artefacts
+- **PostgreSQL 16** with `pgvector` extension (`pgvector/pgvector:pg16` image, on the Lightsail box)
+- pgvector for embeddings (text chunks, voiceprints, face embeddings)
+- Postgres full-text search for lexical retrieval
+- **Object storage** — S3 in `ap-southeast-2`:
+  - `jeromelu-raw-audio` — full-episode m4a from yt-dlp
+  - `jeromelu-raw-transcripts` — Deepgram + pyannote JSON, face-track JSON
+  - `jeromelu-clean-documents` — cleaned transcripts (when cleaning pass exists)
+  - `jeromelu-public-assets` — Postgres backups under `backups/postgres/`, public images
+- Backups: nightly `pg_dump` to S3 with 30-day lifecycle expiry
+- Migrations: hand-numbered SQL under `packages/db/migrations/`, applied via `make migrate`
 
-## AI Layer
-- OpenAI API for:
-  - extraction
-  - synthesis
-  - character rendering
-  - embeddings
+## AI / ML Layer
+- **LLM** — Anthropic (`claude-sonnet-4-6` for the Scout agentic loop today; broader use as more pipelines come online). Some legacy code still references OpenAI; migration in progress.
+- **ASR** — Deepgram nova-3, batch prerecorded API, `language=en-AU`, keyterm vocabulary built from the canonical roster.
+- **Diarisation** — `pyannote/speaker-diarization-3.1` (HuggingFace) — primary diarizer.
+- **Voice embeddings** — `pyannote/wespeaker-voxceleb-resnet34-LM` (256-dim, bundled with the diarization pipeline).
+- **Face detection / recognition** — InsightFace `buffalo_l` (RetinaFace + ArcFace, 512-dim).
+- **Active speaker detection (ASD)** — mouth-opening heuristic from InsightFace `landmark_3d_68`. Real audio-sync ASD (Light-ASD / TalkNet / LoCoNet) is on the backlog.
+- **Audio / video acquisition** — `yt-dlp` + `ffmpeg`.
+- **Remote GPU** — SageMaker Async on `ml.g4dn.xlarge`, scale-to-zero. Container under `services/gpu/` bakes pyannote + InsightFace model weights at build time.
 
 ## Runtime / Infra
-- Dockerised services
-- managed PostgreSQL
-- object storage
-- Temporal workers as separate services
+- **Single Lightsail VM** (`micro_3_2`, Ubuntu 22.04) running Docker Compose: postgres, caddy, web, api.
+- **CloudFront** in front of `jeromelu.ai` and `www`; `api.jeromelu.ai` direct to Lightsail.
+- **Route 53** hosted zone; **ACM** in `us-east-1` for the CloudFront viewer cert.
+- **GitHub Actions** for CI: build → push to ECR → self-hosted runner on the Lightsail box runs `scripts/lightsail-deploy.sh` (which also syncs `scripts/cron.d/jeromelu` into `/etc/cron.d/`). Full pipeline overview in [`docs/ops/ci-cd.md`](../ops/ci-cd.md).
+- **Terraform** under `infra/terraform/` is the source of truth for AWS resources (S3, ECR, IAM, Route 53, CloudFront, Lightsail instance + IP + firewall).
+- **Container registry** — ECR, two repos: `jeromelu/web`, `jeromelu/api`. Lifecycle keeps last 10 tagged + drops untagged after 14d.
 
 ## Observability
-- structured logs
-- tracing
-- error monitoring
-- Postgres-backed audit tables for operator actions
+- Structured logs via Python `logging`; container logs to `journald` on Lightsail.
+- `agent_runs` + `agent_events` Postgres tables for every Claude-Agent-SDK run (see [agent-audit.md](../agents/system/agent-audit.md)).
+- S3 JSONL audit trail per run.
+- No CloudWatch agent in V1; alarms deliberately deferred until there are real users.
 
-## Recommended Service Split
-- `web` — Next.js public experience
-- `api` — FastAPI experience backend
-- `worker-ingestion` — source discovery and ingestion
-- `worker-extraction` — entities, quotes, claims, predictions, embeddings
-- `worker-decision` — consensus, planning, decisioning
-- `worker-publishing` — feed events, voice rendering, public state updates
-- `worker-scraper` — SuperCoach stats, prices, team lists
-- `temporal` — orchestration layer
-- `postgres` — core data store
-- `object-store` — transcript and artefact storage
+## Service split (current)
 
-For what each worker actually does today (including status and workflow inventory), see [`docs/agents/system/`](../agents/system/README.md).
+| Service | Status | Location |
+|---|---|---|
+| `web` (Next.js) | Live | Lightsail container, image `jeromelu/web` |
+| `api` (FastAPI — Scout + Analyst + admin) | Live | Lightsail container, image `jeromelu/api` |
+| `postgres` | Live | Lightsail container, named volume |
+| `caddy` | Live | Lightsail container, ACME via Let's Encrypt |
+| `services/gpu/` (lineup remote inference) | Live (on-demand) | SageMaker Async, `ml.g4dn.xlarge`, scale-to-zero |
+| `worker-publishing`, `worker-scraper`, `worker-orchestrator` | Dev-only (Temporal) | Local docker-compose, not deployed |
+| `worker-ingestion` | Superseded | Replaced by Scout `audio.py` + Analyst `transcribe.py` |
+| `worker-extraction`, `worker-decision` | Not built | — |
+
+For per-module detail (driver, schedule, status), see
+[../agents/system/README.md](../agents/system/README.md).
 
 ## Key Technical Principle
-Keep the **public experience** and the **intelligence engine** separate, but keep the **data layer unified**.
+Keep the **public experience** and the **intelligence engine** separate, but
+keep the **data layer unified**.

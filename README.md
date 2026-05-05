@@ -58,7 +58,7 @@ Global tokens, typography, and component conventions: [docs/design-system/](docs
 
 ## Deployment
 
-Production runs on a single AWS Lightsail instance ($5/mo) at `jeromelu.ai` and `api.jeromelu.ai`. Push to `master` builds via GitHub Actions, pushes to ECR, and SSHes to the Lightsail box to restart the compose stack. See [docs/architecture/12-aws-architecture.md](docs/architecture/12-aws-architecture.md) and [docs/operations/aws-setup-guide.md](docs/operations/aws-setup-guide.md).
+Production runs on a single AWS Lightsail instance ($7/mo) at `jeromelu.ai` and `api.jeromelu.ai`. Push to `master` builds via GitHub Actions, pushes to ECR, and a self-hosted runner on the Lightsail box itself restarts the compose stack — no inbound SSH from GitHub. See [docs/ops/ci-cd.md](docs/ops/ci-cd.md) for the full CI/CD picture, [docs/architecture/12-aws-architecture.md](docs/architecture/12-aws-architecture.md) for the AWS shape, and [docs/operations/aws-setup-guide.md](docs/operations/aws-setup-guide.md) for the provisioning runbook.
 
 ```bash
 make deploy-prod IMAGE_TAG=<sha>   # manual deploy

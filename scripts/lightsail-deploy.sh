@@ -42,6 +42,9 @@ docker image prune -f
 sudo -n install -m 0644 -o root -g root \
 	/opt/jeromelu/scripts/cron.d/jeromelu \
 	/etc/cron.d/jeromelu
-chmod +x /opt/jeromelu/scripts/scout-refresh.sh /opt/jeromelu/scripts/pg-backup.sh
+# Belt-and-braces: most scripts/*.sh are committed with mode 0755, but new
+# files added from a Windows checkout default to 0644. Re-asserting the bit
+# every deploy means a freshly added cron script never silently fails to run.
+chmod +x /opt/jeromelu/scripts/*.sh
 
 echo "deployed IMAGE_TAG=$IMAGE_TAG at $(date -u +%FT%TZ)"

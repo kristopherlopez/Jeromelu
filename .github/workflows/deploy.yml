@@ -14,6 +14,13 @@ permissions:
   contents: read
 
 jobs:
+  # Path filters scope this pipeline to the Lightsail compose stack only:
+  # api + web (built and deployed) and db (notify-only migrations).
+  # Out of scope by design:
+  #   - services/gpu — deployed separately via services/gpu/deploy.py +
+  #     services/gpu/build_and_push.sh (different runtime, different cadence).
+  #   - Anything else under services/ — add a filter + matrix entry here if
+  #     a new service should ride this pipeline.
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
@@ -82,7 +89,7 @@ jobs:
     if: needs.detect-changes.outputs.api == 'true' || needs.detect-changes.outputs.web == 'true'
     # Runs on the self-hosted runner installed on the Lightsail box itself —
     # no inbound SSH from GitHub required, so the firewall can keep port 22
-    # locked to the operator's IP. See docs/ops/ci-runner.md.
+    # locked to the operator's IP. See docs/ops/ci-cd.md.
     runs-on: [self-hosted, jeromelu-prod]
     steps:
       - name: Pull master and redeploy
