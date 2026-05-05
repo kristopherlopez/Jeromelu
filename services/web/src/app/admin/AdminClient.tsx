@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import ChannelCoveragePanel from "./ChannelCoveragePanel";
 import { ADMIN_API_TARGETS, AdminApiTarget, useAdminApiBase } from "./apiBase";
@@ -18,6 +18,7 @@ interface PipelineStages {
 interface PipelineItem {
   source_id: string;
   title: string;
+  channel_name: string | null;
   video_id: string | null;
   published_at: string | null;
   stages: PipelineStages;
@@ -25,9 +26,16 @@ interface PipelineItem {
   claim_count: number;
 }
 
-interface PipelineResponse {
-  summary: { total: number; by_stage: Record<string, number> };
+interface PipelineSummary {
+  total: number;
+  by_stage: Record<string, number>;
+}
+
+interface PipelineItemsResponse {
   items: PipelineItem[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 interface SyncItem {
@@ -79,15 +87,8 @@ interface DiffResponse {
   diffs: DiffEntry[];
 }
 
-type SortField = "title" | "published_at" | "stage" | "chunk_count" | "claim_count";
+type SortField = "title" | "published_at" | "chunk_count" | "claim_count";
 type SortDir = "asc" | "desc";
-
-function getHighestStage(stages: PipelineStages): number {
-  for (let i = STAGES.length - 1; i >= 0; i--) {
-    if (stages[STAGES[i]]) return i;
-  }
-  return 0;
-}
 
 // --- Helpers ---
 
@@ -298,15 +299,20 @@ export default function AdminClient() {
   const { base, target, setTarget } = useAdminApiBase();
   const [activeTab, setActiveTab] = useState<AdminTab>("video");
 
-  // Per-target caches: toggling LOCAL ↔ PROD shows previously-fetched data
-  // instantly without re-hitting the API. First visit per target auto-fetches.
-  const [pipelineCache, setPipelineCache] = useState<Map<string, PipelineResponse>>(
+  // Per-target cache for the cheap summary endpoint (5 SQL counts, ~50 bytes).
+  // Items are NOT cached per-target — paginated payloads are small (~25 KB)
+  // and the cache invalidation rules across (base, stage, search, sort, page)
+  // aren't worth the complexity. Toggle is fast either way.
+  const [summaryCache, setSummaryCache] = useState<Map<string, PipelineSummary>>(
     () => new Map(),
   );
   const [syncCache, setSyncCache] = useState<Map<string, SyncResponse>>(() => new Map());
-  const pipeline = pipelineCache.get(base) ?? null;
+  const summary = summaryCache.get(base) ?? null;
   const sync = syncCache.get(base) ?? null;
-  const fetchedPipelineTargets = useRef<Set<string>>(new Set());
+  const fetchedSummaryTargets = useRef<Set<string>>(new Set());
+
+  const [items, setItems] = useState<PipelineItem[]>([]);
+  const [itemsTotal, setItemsTotal] = useState(0);
 
   const [pipelineError, setPipelineError] = useState<string | null>(null);
   const [pipelineLoading, setPipelineLoading] = useState(false);
@@ -317,24 +323,53 @@ export default function AdminClient() {
 
   const [stageFilter, setStageFilter] = useState<StageKey | "all">("all");
   const [search, setSearch] = useState("");
+  // Debounced mirror of `search` — only this drives fetches, so per-keystroke
+  // typing doesn't spam the API while pagination clicks fire immediately.
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sortField, setSortField] = useState<SortField>("published_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(50);
 
-  const fetchPipeline = useCallback(async () => {
-    fetchedPipelineTargets.current.add(base);
+  const fetchSummary = useCallback(async () => {
+    fetchedSummaryTargets.current.add(base);
+    try {
+      const res = await fetch(`${base}/api/admin/pipeline/summary`);
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      const data: PipelineSummary = await res.json();
+      setSummaryCache((prev) => new Map(prev).set(base, data));
+    } catch (e) {
+      setPipelineError(e instanceof Error ? e.message : String(e));
+    }
+  }, [base]);
+
+  const fetchItems = useCallback(async () => {
     setPipelineLoading(true);
     setPipelineError(null);
     try {
-      const res = await fetch(`${base}/api/admin/pipeline`);
+      const params = new URLSearchParams({
+        sort: `${sortField}:${sortDir}`,
+        limit: String(pageSize),
+        offset: String(page * pageSize),
+      });
+      if (stageFilter !== "all") params.set("stage", stageFilter);
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+      const res = await fetch(`${base}/api/admin/pipeline/items?${params.toString()}`);
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-      const data: PipelineResponse = await res.json();
-      setPipelineCache((prev) => new Map(prev).set(base, data));
+      const data: PipelineItemsResponse = await res.json();
+      setItems(data.items);
+      setItemsTotal(data.total);
     } catch (e) {
       setPipelineError(e instanceof Error ? e.message : String(e));
     } finally {
       setPipelineLoading(false);
     }
-  }, [base]);
+  }, [base, stageFilter, debouncedSearch, sortField, sortDir, page, pageSize]);
+
+  const refreshAll = useCallback(() => {
+    fetchSummary();
+    fetchItems();
+  }, [fetchSummary, fetchItems]);
 
   const fetchSync = useCallback(async () => {
     setSyncLoading(true);
@@ -351,13 +386,29 @@ export default function AdminClient() {
     }
   }, [base]);
 
-  // Auto-fetch the pipeline once per target on first visit. Manual Refresh
-  // overrides the cache for the current target.
+  // Auto-fetch summary once per target on first visit. Always cheap.
   useEffect(() => {
-    if (!fetchedPipelineTargets.current.has(base)) {
-      fetchPipeline();
+    if (!fetchedSummaryTargets.current.has(base)) {
+      fetchSummary();
     }
-  }, [fetchPipeline, base]);
+  }, [fetchSummary, base]);
+
+  // Auto-fetch items immediately on filter / sort / page change. Search is
+  // debounced via the `debouncedSearch` mirror above.
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Reset to page 0 when filter / search / sort / page size changes — sitting
+  // on page 47 of a freshly-filtered 3-row result is not useful.
+  useEffect(() => {
+    setPage(0);
+  }, [stageFilter, debouncedSearch, sortField, sortDir, pageSize]);
 
   // Reset transient errors when toggling target (so an old error doesn't linger).
   useEffect(() => {
@@ -374,46 +425,9 @@ export default function AdminClient() {
     }
   };
 
-  // --- Filtered & sorted items ---
-  const filteredItems = (pipeline?.items ?? [])
-    .filter((item) => {
-      if (stageFilter !== "all") {
-        let current: StageKey = "registered";
-        for (const s of STAGES) {
-          if (item.stages[s]) current = s;
-        }
-        if (current !== stageFilter) return false;
-      }
-      if (search) {
-        const q = search.toLowerCase();
-        if (
-          !item.title?.toLowerCase().includes(q) &&
-          !item.video_id?.toLowerCase().includes(q)
-        )
-          return false;
-      }
-      return true;
-    })
-    .sort((a, b) => {
-      const dir = sortDir === "asc" ? 1 : -1;
-      switch (sortField) {
-        case "title":
-          return dir * (a.title ?? "").localeCompare(b.title ?? "");
-        case "published_at": {
-          const ta = a.published_at ? new Date(a.published_at).getTime() : 0;
-          const tb = b.published_at ? new Date(b.published_at).getTime() : 0;
-          return dir * (ta - tb);
-        }
-        case "stage":
-          return dir * (getHighestStage(a.stages) - getHighestStage(b.stages));
-        case "chunk_count":
-          return dir * (a.chunk_count - b.chunk_count);
-        case "claim_count":
-          return dir * (a.claim_count - b.claim_count);
-        default:
-          return 0;
-      }
-    });
+  const totalPages = Math.max(1, Math.ceil(itemsTotal / pageSize));
+  const showingFrom = itemsTotal === 0 ? 0 : page * pageSize + 1;
+  const showingTo = Math.min(itemsTotal, (page + 1) * pageSize);
 
   return (
     <div className="space-y-6">
@@ -468,16 +482,16 @@ export default function AdminClient() {
       {/* Always-visible refresh strip */}
       <div className="flex items-center justify-end">
         <button
-          onClick={fetchPipeline}
+          onClick={refreshAll}
           disabled={pipelineLoading}
           className="rounded bg-orange-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-orange-500 disabled:opacity-50"
         >
-          {pipelineLoading ? "Loading..." : pipeline ? "Refresh" : "Load pipeline"}
+          {pipelineLoading ? "Loading..." : "Refresh"}
         </button>
       </div>
 
-      {/* Section 1: Summary Cards */}
-      {pipeline && (
+      {/* Section 1: Summary Cards (auto-fetched on tab open from /pipeline/summary) */}
+      {summary && (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
           {STAGES.map((stage) => (
             <div
@@ -486,7 +500,7 @@ export default function AdminClient() {
               className="cursor-help rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 text-center"
             >
               <div className="text-2xl font-bold text-white">
-                {pipeline.summary.by_stage[stage] ?? 0}
+                {summary.by_stage[stage] ?? 0}
               </div>
               <div className="mt-1 text-xs font-medium capitalize text-zinc-400">
                 {stage}
@@ -497,123 +511,155 @@ export default function AdminClient() {
       )}
 
       {/* Stage legend */}
-      {pipeline && (
-        <div className="grid grid-cols-1 gap-1 rounded-lg border border-zinc-800 bg-zinc-900/30 p-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
-          {STAGES.map((s) => (
-            <div key={s} className="flex gap-2">
-              <span className="w-20 shrink-0 font-medium capitalize text-zinc-300">
-                {s}
-              </span>
-              <span className="text-zinc-500">{STAGE_DESCRIPTIONS[s]}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {!pipeline && !pipelineError && !pipelineLoading && (
-        <p className="text-sm text-zinc-500">
-          No data loaded. Click <span className="text-orange-400">Load pipeline</span> to fetch from {base}.
-        </p>
-      )}
+      <div className="grid grid-cols-1 gap-1 rounded-lg border border-zinc-800 bg-zinc-900/30 p-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
+        {STAGES.map((s) => (
+          <div key={s} className="flex gap-2">
+            <span className="w-20 shrink-0 font-medium capitalize text-zinc-300">
+              {s}
+            </span>
+            <span className="text-zinc-500">{STAGE_DESCRIPTIONS[s]}</span>
+          </div>
+        ))}
+      </div>
 
       {pipelineError && (
         <p className="text-red-400 text-sm">Pipeline error: {pipelineError}</p>
       )}
 
-      {/* Section 2: Pipeline Table */}
-      {pipeline && (
-        <div>
-          <div className="mb-3 flex flex-wrap items-center gap-3">
-            <select
-              value={stageFilter}
-              onChange={(e) => setStageFilter(e.target.value as StageKey | "all")}
-              className="rounded border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-white"
-            >
-              <option value="all">All stages</option>
-              {STAGES.map((s) => (
-                <option key={s} value={s}>
-                  {s.charAt(0).toUpperCase() + s.slice(1)}
-                </option>
-              ))}
-            </select>
-            <input
-              type="text"
-              placeholder="Search title..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="rounded border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-white placeholder:text-zinc-600 focus:border-orange-500 focus:outline-none"
-            />
-          </div>
-
-          <div className="overflow-x-auto rounded-lg border border-zinc-800">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-800 text-left text-xs text-zinc-500">
-                  <SortHeader field="title" label="Title" current={sortField} dir={sortDir} onSort={toggleSort} />
-                  <SortHeader field="published_at" label="Published" current={sortField} dir={sortDir} onSort={toggleSort} />
-                  {TABLE_STAGES.map((s) => (
-                    <th
-                      key={s}
-                      title={STAGE_DESCRIPTIONS[s]}
-                      className="cursor-help px-3 py-2 text-center capitalize"
-                    >
-                      {s.slice(0, 4)}
-                    </th>
-                  ))}
-                  <SortHeader field="chunk_count" label="Chunks" current={sortField} dir={sortDir} onSort={toggleSort} className="text-center" />
-                  <SortHeader field="claim_count" label="Claims" current={sortField} dir={sortDir} onSort={toggleSort} className="text-center" />
-                </tr>
-              </thead>
-              <tbody>
-                {filteredItems.map((item) => (
-                  <tr
-                    key={item.source_id}
-                    className="border-b border-zinc-800/50 hover:bg-zinc-900/50"
-                  >
-                    <td className="max-w-xs truncate px-3 py-2">
-                      <a
-                        href={`/stream/${item.source_id}`}
-                        className="text-orange-400 hover:text-orange-300 hover:underline"
-                      >
-                        {item.title}
-                      </a>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-zinc-500">
-                      {item.published_at
-                        ? new Date(item.published_at).toLocaleDateString("en-AU", { day: "2-digit", month: "2-digit", year: "numeric" })
-                        : "—"}
-                    </td>
-                    {TABLE_STAGES.map((s) => (
-                      <td key={s} className="px-3 py-2 text-center">
-                        <StageCell done={item.stages[s]} />
-                      </td>
-                    ))}
-                    <td className="px-3 py-2 text-center text-zinc-400">
-                      {item.chunk_count}
-                    </td>
-                    <td className="px-3 py-2 text-center text-zinc-400">
-                      {item.claim_count}
-                    </td>
-                  </tr>
-                ))}
-                {filteredItems.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={2 + TABLE_STAGES.length + 2}
-                      className="px-3 py-6 text-center text-zinc-600"
-                    >
-                      No sources match.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          <p className="mt-2 text-xs text-zinc-600">
-            {pipeline.summary.total} total sources
-          </p>
+      {/* Section 2: Pipeline Table — server-side filter, sort, paginate */}
+      <div>
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <select
+            value={stageFilter}
+            onChange={(e) => setStageFilter(e.target.value as StageKey | "all")}
+            className="rounded border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-white"
+            title="Stage filter — selects on the highest reached stage exactly (e.g. 'Transcribed' = saved but not yet chunked)"
+          >
+            <option value="all">All stages</option>
+            {STAGES.map((s) => (
+              <option key={s} value={s}>
+                {s.charAt(0).toUpperCase() + s.slice(1)}
+              </option>
+            ))}
+          </select>
+          <input
+            type="text"
+            placeholder="Search title or video id..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="rounded border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-white placeholder:text-zinc-600 focus:border-orange-500 focus:outline-none"
+          />
+          <select
+            value={pageSize}
+            onChange={(e) => setPageSize(Number(e.target.value))}
+            className="ml-auto rounded border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-white"
+            title="Rows per page"
+          >
+            {[50, 100, 200].map((n) => (
+              <option key={n} value={n}>
+                {n} / page
+              </option>
+            ))}
+          </select>
         </div>
-      )}
+
+        <div className="overflow-x-auto rounded-lg border border-zinc-800">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-zinc-800 text-left text-xs text-zinc-500">
+                <th className="px-3 py-2">Channel</th>
+                <SortHeader field="title" label="Title" current={sortField} dir={sortDir} onSort={toggleSort} />
+                <SortHeader field="published_at" label="Published" current={sortField} dir={sortDir} onSort={toggleSort} />
+                {TABLE_STAGES.map((s) => (
+                  <th
+                    key={s}
+                    title={STAGE_DESCRIPTIONS[s]}
+                    className="cursor-help px-3 py-2 text-center capitalize"
+                  >
+                    {s.slice(0, 4)}
+                  </th>
+                ))}
+                <SortHeader field="chunk_count" label="Chunks" current={sortField} dir={sortDir} onSort={toggleSort} className="text-center" />
+                <SortHeader field="claim_count" label="Claims" current={sortField} dir={sortDir} onSort={toggleSort} className="text-center" />
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr
+                  key={item.source_id}
+                  className="border-b border-zinc-800/50 hover:bg-zinc-900/50"
+                >
+                  <td className="max-w-[12rem] truncate px-3 py-2 text-zinc-400">
+                    {item.channel_name ?? "—"}
+                  </td>
+                  <td className="max-w-xs truncate px-3 py-2">
+                    <a
+                      href={`/stream/${item.source_id}`}
+                      className="text-orange-400 hover:text-orange-300 hover:underline"
+                    >
+                      {item.title}
+                    </a>
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 text-zinc-500">
+                    {item.published_at
+                      ? new Date(item.published_at).toLocaleDateString("en-AU", { day: "2-digit", month: "2-digit", year: "numeric" })
+                      : "—"}
+                  </td>
+                  {TABLE_STAGES.map((s) => (
+                    <td key={s} className="px-3 py-2 text-center">
+                      <StageCell done={item.stages[s]} />
+                    </td>
+                  ))}
+                  <td className="px-3 py-2 text-center text-zinc-400">
+                    {item.chunk_count}
+                  </td>
+                  <td className="px-3 py-2 text-center text-zinc-400">
+                    {item.claim_count}
+                  </td>
+                </tr>
+              ))}
+              {items.length === 0 && !pipelineLoading && (
+                <tr>
+                  <td
+                    colSpan={3 + TABLE_STAGES.length + 2}
+                    className="px-3 py-6 text-center text-zinc-600"
+                  >
+                    No sources match.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination strip */}
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-500">
+          <span>
+            {itemsTotal === 0
+              ? "0 results"
+              : `Showing ${showingFrom.toLocaleString()}–${showingTo.toLocaleString()} of ${itemsTotal.toLocaleString()}`}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0 || pipelineLoading}
+              className="rounded border border-zinc-700 bg-zinc-900 px-3 py-1 text-zinc-300 hover:bg-zinc-800 disabled:opacity-40"
+            >
+              ‹ Prev
+            </button>
+            <span className="px-1">
+              Page {page + 1} of {totalPages.toLocaleString()}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={page + 1 >= totalPages || pipelineLoading}
+              className="rounded border border-zinc-700 bg-zinc-900 px-3 py-1 text-zinc-300 hover:bg-zinc-800 disabled:opacity-40"
+            >
+              Next ›
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* Section 3: Sync Status (expandable) */}
       <div className="rounded-lg border border-zinc-800">
