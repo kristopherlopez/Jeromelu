@@ -6,6 +6,9 @@ import { ArrowLeft, User, Calendar, Video, PenLine } from "lucide-react";
 import type { SourceDetailResponse, SourceListItem } from "@/lib/types";
 import YouTubePlayer, { type YouTubePlayerHandle } from "../../components/YouTubePlayer";
 import VideoOverlay, { type VideoOverlayHandle } from "../../components/VideoOverlay";
+import YouTubeFaceOverlay, {
+  type YouTubeFaceOverlayHandle,
+} from "../../components/YouTubeFaceOverlay";
 import ClaimsList from "../../components/ClaimsList";
 import TranscriptPanel from "../../components/TranscriptPanel";
 import EpisodeTimeline from "../../components/EpisodeTimeline";
@@ -19,22 +22,35 @@ export default function SourceReviewClient({ data, allSources }: Props) {
   const { source, claims, chunks, speakers } = data;
   const [currentTime, setCurrentTime] = useState(0);
   const [activeTab, setActiveTab] = useState<"transcript" | "claims">("transcript");
-  // Phase 4b: prefer the local video + face overlay when both URLs are
-  // present; otherwise fall back to the YouTube embed.
-  const useOverlay = Boolean(source.video_url && source.face_track_url);
+  // Three video surfaces, picked in priority order:
+  //   1. YouTubeFaceOverlay — canvas drawn over the YouTube iframe.
+  //      Default for any YouTube source with a face-track JSON. The
+  //      video file itself is no longer persisted (Chunk 2 of the
+  //      ephemeral-video plan).
+  //   2. VideoOverlay — legacy path: HTML5 video element + canvas, used
+  //      when a stored low-res mp4 still exists in S3 (pre-Chunk-2 row).
+  //   3. YouTubePlayer — plain YouTube embed, no overlay (no face-track
+  //      yet, or non-YouTube source with no local video).
+  const isYouTube = source.source_type === "youtube" && Boolean(source.canonical_url);
+  const useYouTubeOverlay = isYouTube && Boolean(source.face_track_url);
+  const useLegacyOverlay =
+    !useYouTubeOverlay && Boolean(source.video_url && source.face_track_url);
+  const ytOverlayRef = useRef<YouTubeFaceOverlayHandle>(null);
   const overlayRef = useRef<VideoOverlayHandle>(null);
   const playerRef = useRef<YouTubePlayerHandle>(null);
 
   const handleSeek = useCallback(
     (seconds: number) => {
-      if (useOverlay) {
+      if (useYouTubeOverlay) {
+        ytOverlayRef.current?.seekTo(seconds);
+      } else if (useLegacyOverlay) {
         overlayRef.current?.seekTo(seconds);
       } else {
         playerRef.current?.seekTo(seconds);
       }
       setCurrentTime(seconds);
     },
-    [useOverlay],
+    [useYouTubeOverlay, useLegacyOverlay],
   );
 
   // Derive active claim: prefer precise claim-level timestamps, fall back to chunk
@@ -106,11 +122,21 @@ export default function SourceReviewClient({ data, allSources }: Props) {
       <div className="flex flex-col lg:flex-row lg:h-[calc(100vh-49px)]">
         {/* Left: Video + Metadata (sticky) */}
         <div className="w-full lg:w-[50%] p-4 lg:p-6 flex flex-col gap-4 lg:sticky lg:top-0 lg:self-start lg:max-h-[calc(100vh-49px)] lg:overflow-y-auto custom-scrollbar">
-          {useOverlay ? (
+          {useYouTubeOverlay ? (
+            <YouTubeFaceOverlay
+              ref={ytOverlayRef}
+              videoUrl={source.canonical_url!}
+              faceTrackUrl={source.face_track_url}
+              sourceId={source.source_id}
+              speakers={speakers ?? []}
+              onTimeUpdate={setCurrentTime}
+            />
+          ) : useLegacyOverlay ? (
             <VideoOverlay
               ref={overlayRef}
               videoUrl={source.video_url!}
               faceTrackUrl={source.face_track_url}
+              sourceId={source.source_id}
               speakers={speakers ?? []}
               onTimeUpdate={setCurrentTime}
             />

@@ -85,6 +85,13 @@ export interface SourceDetailResponse {
   speakers: Speaker[];
 }
 
+export interface PersonSummary {
+  person_id: string;
+  canonical_name: string;
+  slug: string | null;
+  aliases: string[];
+}
+
 // Phase 4 face-track JSON (persisted to S3 by visual_id.py). Fetched
 // directly from `face_track_url` by the VideoOverlay.
 export interface FaceTrackFace {
@@ -108,5 +115,11 @@ export interface FaceTrack {
   video_s3_key: string;
   video_format: "multi_cam" | "single_cam" | "audio_only";
   duration_seconds: number;
+  // Source video pixel dims — bbox coords live in this space. Added in
+  // json_version 4 so the overlay can scale to whatever surface it's
+  // drawing over (HTML5 video uses videoWidth/Height, YouTube iframe
+  // uses these instead). Optional for older v3 JSONs.
+  frame_width?: number;
+  frame_height?: number;
   frames: FaceTrackFrame[];
 }

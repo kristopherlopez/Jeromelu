@@ -4,7 +4,7 @@ tags: [area/todo, status/in-progress]
 
 # Speaker Identification — Voice + Visual Fusion
 
-> **Status:** Phase 1 ✅ + Phase 2 ✅ + Phase 3 ✅ + Phase 4a ✅ + Phase 4-asd ✅ + Phase 4b-display ✅ + Phase 5.5 (remote GPU) ✅ shipped (2026-05-04). Voice + face fusion + clickable face overlay live. Lineup runs on a SageMaker Async endpoint when `LINEUP_REMOTE=1`; ~50 min CPU → ~10–15 min wall time. **Phase 4b-action (click-to-reassign) and Phase 5 (compounding) remain.**
+> **Status:** Phase 1 ✅ + Phase 2 ✅ + Phase 3 ✅ + Phase 4a ✅ + Phase 4-asd ✅ + Phase 4b-display ✅ + Phase 4b-display-v2 (ephemeral video + YouTube overlay) ✅ + Phase 5.5 (remote GPU) ✅ shipped. Voice + face fusion + face overlay live. Lineup runs on a SageMaker Async endpoint in `us-east-1` when `LINEUP_REMOTE=1`; full fresh-source pipeline drops from ~50 min CPU → **~3 min** wall time (pyannote 91 s, visual ID 75 s, Deepgram + DB writes ~30 s). Per-source video files are no longer persisted — overlay draws on the YouTube iframe; visual ID yt-dlps into a 24h-lifecycle staging key and deletes after. **Phase 4b-action (click-to-reassign) and Phase 5 (compounding) remain.**
 
 **Phase:** Analyst quality / identification
 **Priority:** Unlocks per-speaker quote attribution, ledger weighting by host, host-specific consensus.
@@ -251,9 +251,18 @@ Tuning:
 - Higher thresholds (0.050+ or density 0.40+) collapsed precision because too many true-positive frames fell below the bar.
 - Lower thresholds reverted to Phase 4a behavior (face-presence with single-host noise).
 
-### Phase 5.5 — Remote GPU inference via SageMaker Async — **SHIPPED 2026-05-04**
+### Phase 5.5 — Remote GPU inference via SageMaker Async — **SHIPPED 2026-05-05**
 
-Lineup's GPU-bound steps now run on a SageMaker Async endpoint instead of locally. ~50 min CPU iteration loop → ~10–15 min wall time (8 min pyannote + 2 min visual ID + Deepgram + DB writes + small cold-start).
+Lineup's GPU-bound steps run on a SageMaker Async endpoint in `us-east-1` (Sydney g4dn / g5 capacity was exhausted at deploy time). End-to-end ~50 min CPU → **~3 min** wall time on `ml.g5.xlarge` (A10G).
+
+Measured on the audited 45-min source, fresh full run:
+
+| Stage | GPU time | CPU baseline | Speedup |
+|---|---|---|---|
+| Pyannote diarize + embeddings | 91 s | ~40 min | ~26× |
+| Deepgram + Voice ID + DB writes | ~25 s | same | — |
+| Visual ID (frame extraction + InsightFace + ASD) | 75 s | ~7 min | ~5× |
+| **Total wall time** | **3 min 16 s** | ~50 min | **~15×** |
 
 - ✅ `services/gpu/Dockerfile` — multi-stage build on AWS DLC PyTorch base image. Stage 1 downloads pyannote + InsightFace model weights using HF token via Buildkit secret; stage 2 grafts deps + caches + project source onto the runtime image. Token never lands in image layers.
 - ✅ `services/gpu/inference.py` — SageMaker BYOC handler. `model_fn` pre-warms pyannote pipeline + embedding model + InsightFace; `predict_fn` dispatches on `task` (`diarize` / `visual_identify`).
@@ -262,10 +271,23 @@ Lineup's GPU-bound steps now run on a SageMaker Async endpoint instead of locall
 - ✅ `services/api/app/analyst/remote.py` — local-side wrappers (`diarize_remote`, `visual_identify_remote`) that submit to the endpoint, poll the SageMaker output S3 location, reconstruct the local result types from the persisted artefacts.
 - ✅ `diarize.py` and `visual_id.py` short-circuit to the remote wrappers when `settings.lineup_remote` is true. Default off so local-only dev still works.
 - ✅ Module-level caches for pyannote pipeline + embedding model (mirrors visual_id's `_face_app` pattern) so the long-lived inference server amortises the ~30 s load across calls.
+- ✅ InsightFace provider list auto-detected — picks `CUDAExecutionProvider` when available (GPU container), CPU fallback for local dev. Earlier hardcoded CPU was leaving the T4 idle.
 - ✅ Visual ID accepts `registry=(matrix, person_ids)` directly — local-side preloads from Postgres and ships in the SageMaker request, so the GPU container has no DB credentials.
-- ✅ One-time AWS setup runbook at `services/gpu/SETUP.md` (ECR repo, IAM role, `.env` config).
+- ✅ Cross-region split: artefact buckets in Sydney; SageMaker async I/O staging bucket `jeromelu-sagemaker-async` in `us-east-1`. Per-source cross-region transfer is ~$0.001 — rounding error.
+- ✅ One-time AWS setup runbook at `services/gpu/SETUP.md` (ECR repo, IAM role, staging bucket, `.env` config).
 
-Confirmed architectural decisions: one endpoint with task dispatch · `ml.g4dn.xlarge` · models baked at build · Sydney region · single-concurrent invocation. Cost: ~$0.13/source + ~$2/month at typical volume.
+Confirmed architectural decisions: one endpoint with task dispatch · `ml.g5.xlarge` (A10G; switched from `g4dn.xlarge` after capacity issues) · models baked at build · `us-east-1` region · single-concurrent invocation. Cost: ~$0.43/source (≈$0.13 GPU + $0.30 Deepgram + ~$0.001 cross-region) + ECR ~$0.30/month.
+
+#### Bugs fixed during deploy (kept here for archaeology)
+
+| # | Symptom | Root cause | Fix |
+|---|---|---|---|
+| 1 | `pip install -e jeromelu_shared` failed: requires py3.12, base is py3.11 | DLC base image is py3.11 | Loosened `requires-python` to `>=3.11` |
+| 2 | First invoke: HTTP 413 from primary | TorchServe default 6 MB request limit | `TS_MAX_REQUEST_SIZE` + `SAGEMAKER_TS_MAX_REQUEST_SIZE` env on model |
+| 3 | Container hit MinIO `localhost:9000` | SageMaker silently dropped empty-string `S3_ENDPOINT` env, default kicked in | Flipped `s3_endpoint` default in `config.py` from `"http://localhost:9000"` to `""` |
+| 4 | Visual ID returned in 20 min on T4 (no speedup) | `_get_face_app` hardcoded `["CPUExecutionProvider"]` | Auto-detect via `onnxruntime.get_available_providers()` |
+| 5 | `ml.g4dn.xlarge` and `ml.g5.xlarge` `InsufficientInstanceCapacity` | Sydney region capacity exhausted | Migrated endpoint to `us-east-1` |
+| 6 | SageMaker create-endpoint failed: "Please check the specified bucket's configurations" | AsyncInferenceConfig validates same-region S3 paths | Created `jeromelu-sagemaker-async` bucket in `us-east-1` for SageMaker's internal I/O staging |
 
 ### Phase 4b-display — Read-only review-UI overlay — **SHIPPED 2026-05-04**
 
@@ -273,6 +295,19 @@ Confirmed architectural decisions: one endpoint with task dispatch · `ml.g4dn.x
 - ✅ Face boxes drawn on `timeupdate` from a face-track JSON proxied through the API (`/api/sources/{id}/face-track`) — bypasses S3 CORS.
 - ✅ Box colour by `match_method`: green = `voice+face`, amber = `face`-only, blue = on-screen-but-not-speaker, grey = unknown.
 - ✅ `services/web/src/app/components/VideoOverlay.tsx` wired into `SourceReviewClient.tsx`. Falls back to the YouTube embed when `video_url` / `face_track_url` aren't set.
+
+### Phase 4b-display-v2 — Ephemeral video + canvas-on-iframe overlay — **SHIPPED 2026-05-05**
+
+Driver: at 100K+ catalogue scale, persisting a 360p mp4 per source is wasted hot storage — the only consumer that needed durable video was the review UI's overlay, and the overlay can read the same face-track JSON over the YouTube iframe just as well.
+
+- ✅ `services/api/app/analyst/video_staging.py` — `acquire_video_temp` / `staged_video` (yt-dlp + upload to `staging/video/<uuid>.mp4`, delete on context exit) and `staged_video_local` (yt-dlp into a `tempfile.TemporaryDirectory` for in-process consumers like the reassign endpoint).
+- ✅ `transcribe.py` wraps `visual_identify` in `staged_video(...)` — three regimes (legacy persistent key, ephemeral staging, no-video voice-only) handled by one context manager. `sources.video_s3_key` is no longer written for new sources.
+- ✅ Reassign endpoint (`POST /api/sources/{source_id}/speakers/{segment_id}/reassign`) drops the hard-fail-on-missing-video; falls back to `staged_video_local` when the row has no persistent video. ~10–30 s extra latency per reassign, paid only when an operator clicks a face.
+- ✅ Face-track JSON v4 carries `frame_width` + `frame_height` so overlays can scale bboxes to whatever surface they're drawing over (HTML5 video used `videoWidth/Height` intrinsics; the iframe doesn't expose those).
+- ✅ `services/web/src/app/components/YouTubeFaceOverlay.tsx` — canvas + click targets layered over a `YT.Player` iframe. `pointer-events: none` on the canvas; per-face buttons re-enable pointer-events for their bboxes so YouTube's native controls remain clickable elsewhere.
+- ✅ `SourceReviewClient.tsx` priority order: `YouTubeFaceOverlay` (default for any YouTube source with a face-track JSON) → legacy `VideoOverlay` (only for sources where stored video still exists) → `YouTubePlayer` (no overlay).
+- ⏳ S3 lifecycle rule on `staging/video/` prefix (24h expiration) — set in Terraform.
+- ⏳ Manual cleanup of the one persisted video remaining (`e276d3fc…`).
 
 ### Phase 4b-action — Click-to-reassign (3–4 days, **next**)
 

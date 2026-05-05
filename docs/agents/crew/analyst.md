@@ -102,7 +102,8 @@ Lineup is the speaker-identification surface within Analyst's transcript materia
 | **4a** — Visual ID + fusion | Scout video acquisition; InsightFace face detection + 512-dim ArcFace; `person_face_embeddings` registry; voice/face fusion table on `source_speakers`. | ✅ Shipped 2026-05-03. |
 | **4-asd** — Mouth-opening ASD heuristic | Per-frame "active speaker" picked by `landmark_3d_68` inner-mouth opening; per-turn density gate at 30 %. | ✅ Shipped 2026-05-04. Visual precision 55 % → 77 %. |
 | **4b-display** — Review-UI overlay | HTML5 `<video>` + canvas face-box overlay coloured by `match_method`. Read-only. | ✅ Shipped 2026-05-04. |
-| **5.5** — Remote GPU inference | `services/gpu/` SageMaker Async endpoint hosting pyannote + InsightFace. ~50 min CPU → ~10–15 min wall time when `LINEUP_REMOTE=1`. | ✅ Shipped 2026-05-04. |
+| **4b-display-v2** — Ephemeral video + canvas-on-iframe overlay | Stop persisting per-source video. `video_staging.staged_video` yt-dlps into a 24 h-lifecycle staging key, deletes after `visual_identify` returns. `YouTubeFaceOverlay` draws bboxes on the YouTube iframe directly. | ✅ Shipped 2026-05-05. |
+| **5.5** — Remote GPU inference | `services/gpu/` SageMaker Async endpoint (us-east-1, `ml.g5.xlarge`) hosting pyannote + InsightFace. ~50 min CPU → **~3 min** wall time when `LINEUP_REMOTE=1`. | ✅ Shipped 2026-05-05. |
 | **4b-action** — Click-to-reassign | Click a face box → Person picker modal → writes face + voice embeddings + corrects `speaker_person_id`. | ⏳ Pending (3–4 days). |
 | **5** — Cross-modal compounding | Periodic job auto-promotes high-confidence `voice+face` turns into the registries with `created_by='auto-confirmed'`. The mechanism that grows accuracy without operator effort. | ⏳ Pending (3 days). |
 

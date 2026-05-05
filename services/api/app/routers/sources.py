@@ -1,11 +1,22 @@
 import logging
+import tempfile
 import uuid
+from contextlib import contextmanager
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
+from app.analyst.identify_voice import EnrollmentError, enroll
+from app.analyst.video_staging import (
+    VideoStagingError,
+    download_persistent_video,
+    extract_frame,
+    staged_video_local,
+)
+from app.analyst.visual_id import VisualIdError, enroll_face_from_image
 from jeromelu_shared.db import (
     Claim,
     ClaimAssociation,
@@ -27,6 +38,31 @@ def _face_track_key_from_audio(audio_s3_key: str) -> str:
     if audio_s3_key.endswith(".m4a"):
         return audio_s3_key[: -len(".m4a")] + ".face_track.json"
     return audio_s3_key + ".face_track.json"
+
+
+@contextmanager
+def _acquire_video_for_reassign(source: Source):
+    """Yield a local video Path the reassign endpoint can ffmpeg against.
+
+    Picks persistent-S3 fast-path when ``source.video_s3_key`` is set,
+    falls back to on-demand yt-dlp via ``staged_video_local``. Cleans up
+    its temp dir on exit.
+    """
+    if source.video_s3_key:
+        with tempfile.TemporaryDirectory(prefix="jeromelu-reassign-") as tmp:
+            video_path = Path(tmp) / "video.mp4"
+            download_persistent_video(source.video_s3_key, video_path)
+            yield video_path
+    else:
+        try:
+            with staged_video_local(source.canonical_url) as video_path:
+                yield video_path
+        except VideoStagingError as exc:
+            raise HTTPException(
+                status_code=502,
+                detail=f"yt-dlp acquisition failed: {exc}",
+            )
+
 
 router = APIRouter()
 
@@ -364,4 +400,183 @@ def rename_speaker(
         "renamed": len(updated),
         "speaker_label": new_label,
         "document_id": str(target.document_id),
+    }
+
+
+# ---------------------------------------------------------------------------
+# People search (Phase 4b-action) — for the review-UI Person picker
+# ---------------------------------------------------------------------------
+
+@router.get("/people/search")
+def people_search(q: str = "", limit: int = 30, db: Session = Depends(get_db)):
+    """Prefix + alias search over the people roster.
+
+    Used by the review-UI Person picker (Phase 4b-action) when an operator
+    reassigns a misidentified face to a known Person. Returns the top
+    ``limit`` matches by canonical_name prefix; alias matches are
+    secondary. Empty ``q`` returns the first ``limit`` rows alphabetically
+    (handy for browsing a small registry).
+    """
+    if limit < 1 or limit > 200:
+        limit = 30
+    query = db.query(Person)
+    q = q.strip()
+    if q:
+        like = f"{q}%"
+        contains = f"%{q}%"
+        # Prefix match on canonical_name beats substring beats alias hit.
+        query = query.filter(
+            (Person.canonical_name.ilike(like))
+            | (Person.canonical_name.ilike(contains))
+            | (Person.aliases.any(q))
+        )
+    rows = query.order_by(Person.canonical_name).limit(limit).all()
+    return {
+        "items": [
+            {
+                "person_id": str(p.person_id),
+                "canonical_name": p.canonical_name,
+                "slug": p.slug,
+                "aliases": list(p.aliases or []),
+            }
+            for p in rows
+        ]
+    }
+
+
+# ---------------------------------------------------------------------------
+# Face reassign (Phase 4b-action) — operator overrides a misidentified turn
+# ---------------------------------------------------------------------------
+
+class ReassignRequest(BaseModel):
+    person_id: uuid.UUID
+    frame_ts: float | None = Field(
+        default=None,
+        description=(
+            "Timestamp (seconds) of the video frame that contained the "
+            "clicked face. Used to extract the face crop for an enrollment "
+            "embedding. If null, the speaker turn's mid-point is used."
+        ),
+    )
+    bbox: list[float] | None = Field(
+        default=None,
+        description=(
+            "Optional [x1,y1,x2,y2] hint to disambiguate when multiple "
+            "faces are visible in the frame. If null, the largest detected "
+            "face wins."
+        ),
+    )
+
+
+@router.post("/sources/{source_id}/speakers/{segment_id}/reassign")
+def reassign_speaker(
+    source_id: uuid.UUID,
+    segment_id: uuid.UUID,
+    body: ReassignRequest,
+    db: Session = Depends(get_db),
+):
+    """Operator override: a face on the video overlay was misidentified.
+
+    On save:
+      1. Set ``source_speakers.speaker_person_id = body.person_id`` for the
+         clicked turn (and ``match_method='manual'``, ``match_confidence=1.0``).
+      2. Extract the face from the video frame at ``frame_ts`` and write a
+         new ``person_face_embeddings`` row (``created_by='manual'``).
+      3. Extract a voiceprint from the speaker turn's audio span and write
+         ``person_voiceprints`` rows (``created_by='manual'``). Skipped if
+         the turn is shorter than the embedder's minimum.
+
+    Idempotent on the SourceSpeaker update; embeddings are append-only —
+    repeated clicks add more rows. That's intentional: every correction
+    grows the registry.
+
+    See [identification.md § Manual reassign](../system/identification.md).
+    """
+    # 1. Validate inputs
+    source = db.query(Source).filter(Source.source_id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    # Either a persisted video (legacy) or a YouTube canonical_url we can
+    # re-fetch ephemerally — without one of those, there's no pixels to
+    # crop a face out of.
+    if not source.video_s3_key and not (
+        source.source_type == "youtube" and source.canonical_url
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Source has no video_s3_key and no YouTube URL — face reassign needs pixels",
+        )
+
+    speaker = (
+        db.query(SourceSpeaker)
+        .filter(SourceSpeaker.segment_id == segment_id)
+        .first()
+    )
+    if not speaker:
+        raise HTTPException(status_code=404, detail="Speaker segment not found")
+
+    person = db.query(Person).filter(Person.person_id == body.person_id).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+
+    # 2. Compute the frame timestamp to extract a face from. Default to the
+    #    middle of the speaker turn — that's where the host is most likely
+    #    to be on screen if the format is multi-cam.
+    frame_ts = body.frame_ts
+    if frame_ts is None:
+        frame_ts = (speaker.start_ts + speaker.end_ts) / 2.0
+
+    # 3. Extract face crop from video and enroll. Two acquisition paths
+    #    in `_acquire_video_for_reassign`: persisted S3 mp4 (legacy) or
+    #    on-demand yt-dlp via staged_video_local.
+    face_id_written: uuid.UUID | None = None
+    with _acquire_video_for_reassign(source) as video_path:
+        with tempfile.TemporaryDirectory(prefix="jeromelu-reassign-frame-") as ftmp:
+            frame_path = Path(ftmp) / "frame.jpg"
+            try:
+                extract_frame(video_path, frame_ts, frame_path)
+            except VideoStagingError as exc:
+                raise HTTPException(status_code=500, detail=str(exc))
+            try:
+                face_id_written, det_score, _area = enroll_face_from_image(
+                    db,
+                    person_id=body.person_id,
+                    source_id=source_id,
+                    image_path=frame_path,
+                    frame_ts=frame_ts,
+                    created_by="manual",
+                )
+            except VisualIdError as exc:
+                logger.warning("Face enrollment skipped during reassign: %s", exc)
+
+    # 4. Voiceprint write-back from the speaker turn's audio span. Same
+    #    pattern as `enroll_voice_cli.py`. Skip silently when the turn is
+    #    too short for the embedder.
+    voice_rows_written = 0
+    try:
+        result = enroll(
+            db,
+            person_id=body.person_id,
+            source_id=source_id,
+            start_ts=float(speaker.start_ts),
+            end_ts=float(speaker.end_ts),
+            created_by="manual",
+        )
+        voice_rows_written = result.voiceprints_written
+    except EnrollmentError as exc:
+        logger.warning("Voiceprint enrollment skipped during reassign: %s", exc)
+
+    # 5. Mark the speaker turn as manually corrected.
+    speaker.speaker_person_id = body.person_id
+    speaker.match_method = "manual"
+    speaker.match_confidence = 1.0
+    db.commit()
+
+    return {
+        "segment_id": str(segment_id),
+        "person_id": str(body.person_id),
+        "person_name": person.canonical_name,
+        "face_embedding_id": str(face_id_written) if face_id_written else None,
+        "voiceprints_written": voice_rows_written,
+        "match_method": "manual",
     }

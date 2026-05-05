@@ -41,7 +41,7 @@ from sqlalchemy.orm import Session
 
 from jeromelu_shared.config import settings
 from jeromelu_shared.db import PersonFaceEmbedding
-from jeromelu_shared.s3 import get_s3_client, upload_raw
+from jeromelu_shared.s3 import download_raw, get_s3_client, upload_raw
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +101,12 @@ MIN_ACTIVE_FRACTION = 0.30
 #: indices 100/103 (which weren't the inner mouth — they happened to give
 #: a stable value of ~0.13 regardless of mouth state) to landmark_3d_68
 #: indices 62/66, the well-known Dlib-style inner-mouth top/bottom.
-FACE_TRACK_JSON_VERSION = 3
+#: v4: added ``frame_width`` and ``frame_height`` (source video pixel
+#: dimensions), so the review-UI overlay can scale bboxes correctly when
+#: drawn over an iframe whose render size doesn't match the source — see
+#: ``YouTubeFaceOverlay`` (the canvas substrate is no longer the local
+#: mp4 with intrinsic ``videoWidth``/``videoHeight``).
+FACE_TRACK_JSON_VERSION = 4
 
 
 # ---------------------------------------------------------------------------
@@ -191,6 +196,26 @@ def _frame_iterator(video_path: Path, sample_rate: float):
             i += 1
     finally:
         cap.release()
+
+
+def _video_dimensions(video_path: Path) -> tuple[int, int]:
+    """Return (width, height) of the video at ``video_path`` in pixels.
+
+    Bbox coordinates emitted by InsightFace live in this pixel space,
+    so the overlay needs the same numbers to scale to its render size.
+    """
+    import cv2
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise VisualIdError(f"failed to open video at {video_path}")
+    try:
+        w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+        h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+    finally:
+        cap.release()
+    if w <= 0 or h <= 0:
+        raise VisualIdError(f"could not read video dimensions for {video_path}")
+    return w, h
 
 
 # ---------------------------------------------------------------------------
@@ -460,12 +485,26 @@ _face_app = None
 
 
 def _get_face_app():
-    """Lazy-singleton InsightFace app — model load is ~3 s."""
+    """Lazy-singleton InsightFace app — model load is ~3 s.
+
+    Prefers CUDA when available (Phase 5.5 GPU container) and falls back
+    to CPU otherwise (local dev without onnxruntime-gpu / no NVIDIA GPU).
+    Earlier versions hardcoded CPU which silently nullified the GPU
+    container's speedup — the T4 sat idle while face detection ran on
+    container CPU at ~30 s per source-minute.
+    """
     global _face_app
     if _face_app is not None:
         return _face_app
     from insightface.app import FaceAnalysis
-    app = FaceAnalysis(name="buffalo_l", providers=["CPUExecutionProvider"])
+    import onnxruntime
+    available = set(onnxruntime.get_available_providers())
+    providers: list[str] = []
+    if "CUDAExecutionProvider" in available:
+        providers.append("CUDAExecutionProvider")
+    providers.append("CPUExecutionProvider")
+    logger.info("InsightFace providers: %s", providers)
+    app = FaceAnalysis(name="buffalo_l", providers=providers)
     app.prepare(ctx_id=0, det_size=DETECTION_SIZE)
     _face_app = app
     return app
@@ -532,7 +571,6 @@ def visual_identify(
     # since face-to-Person matching happens at extract time. To force a
     # re-extract: delete the JSON or bump FACE_TRACK_JSON_VERSION.
     if _face_track_object_exists(face_track_key):
-        from jeromelu_shared.s3 import download_raw
         try:
             existing = json.loads(download_raw(face_track_key))
         except Exception:
@@ -575,6 +613,9 @@ def visual_identify(
             settings.s3_audio_bucket, video_s3_key,
         )
         _download_video(video_s3_key, video_path)
+
+        frame_width, frame_height = _video_dimensions(video_path)
+        logger.info("Source video dimensions: %dx%d", frame_width, frame_height)
 
         face_app = _get_face_app()
 
@@ -633,6 +674,8 @@ def visual_identify(
             "video_s3_key": video_s3_key,
             "video_format": video_format,
             "duration_seconds": duration_seconds,
+            "frame_width": frame_width,
+            "frame_height": frame_height,
             "frames": [
                 {
                     "ts": f.ts,

@@ -21,46 +21,20 @@ from __future__ import annotations
 
 import argparse
 import logging
-import shutil
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
 from uuid import UUID
 
-from jeromelu_shared.config import settings
 from jeromelu_shared.db import Person, SessionLocal, Source
-from jeromelu_shared.s3 import get_s3_client
 
+from app.analyst.video_staging import (
+    VideoStagingError,
+    download_persistent_video,
+    extract_frame,
+    staged_video_local,
+)
 from app.analyst.visual_id import VisualIdError, enroll_face_from_image
-
-
-def _extract_video_frame(video_s3_key: str, ts: float, dest: Path) -> None:
-    """Download the video and use ffmpeg to dump one frame at `ts` to dest."""
-    if shutil.which("ffmpeg") is None:
-        raise VisualIdError("ffmpeg not found on PATH")
-
-    with tempfile.TemporaryDirectory(prefix="jeromelu-frame-") as tmp:
-        tmpdir = Path(tmp)
-        video_path = tmpdir / "video.mp4"
-        client = get_s3_client()
-        client.download_file(settings.s3_audio_bucket, video_s3_key, str(video_path))
-        proc = subprocess.run(
-            [
-                "ffmpeg", "-y",
-                "-ss", f"{ts:.3f}",
-                "-i", str(video_path),
-                "-frames:v", "1",
-                "-q:v", "2",
-                str(dest),
-            ],
-            capture_output=True,
-        )
-        if proc.returncode != 0:
-            raise VisualIdError(
-                f"ffmpeg frame extraction failed at ts={ts}: "
-                f"{proc.stderr.decode('utf-8', errors='replace')[:500]}"
-            )
 
 
 def main() -> int:
@@ -135,17 +109,28 @@ def main() -> int:
                 if source is None:
                     print(f"No source with id {source_id}", file=sys.stderr)
                     return 2
-                if not source.video_s3_key:
-                    print(
-                        f"Source {source_id} has no video_s3_key — run "
-                        "`make collect-video SOURCE_ID=...` first.",
-                        file=sys.stderr,
-                    )
-                    return 1
                 image_path = Path(tmp) / "frame.jpg"
+                # Two video acquisition paths:
+                #  1. Legacy: source row carries a persistent video_s3_key.
+                #  2. Default: yt-dlp the canonical_url on demand (~10–30s
+                #     for a 45-min source). New sources never persist
+                #     video, so this is the steady-state path.
                 try:
-                    _extract_video_frame(source.video_s3_key, frame_ts, image_path)
-                except VisualIdError as exc:
+                    if source.video_s3_key:
+                        video_path = Path(tmp) / "video.mp4"
+                        download_persistent_video(source.video_s3_key, video_path)
+                        extract_frame(video_path, frame_ts, image_path)
+                    elif source.source_type == "youtube" and source.canonical_url:
+                        with staged_video_local(source.canonical_url) as video_path:
+                            extract_frame(video_path, frame_ts, image_path)
+                    else:
+                        print(
+                            f"Source {source_id} has no video_s3_key and no YouTube "
+                            "canonical_url — can't acquire a frame.",
+                            file=sys.stderr,
+                        )
+                        return 1
+                except (VisualIdError, VideoStagingError) as exc:
                     print(f"FAILED: {exc}", file=sys.stderr)
                     return 1
 

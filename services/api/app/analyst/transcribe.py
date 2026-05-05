@@ -39,7 +39,7 @@ from sqlalchemy.orm import Session
 
 from jeromelu_shared.config import settings
 from jeromelu_shared.db import Source, SourceChunk, SourceDocument, SourceSpeaker
-from jeromelu_shared.s3 import presign_audio, upload_raw
+from jeromelu_shared.s3 import download_raw, presign_audio, upload_raw
 
 from .diarize import diarize as run_pyannote
 from .fusion import fuse_per_turn
@@ -57,6 +57,7 @@ from .transcribe_helpers import (
     transcript_s3_key_from_audio as _transcript_s3_key_from_audio,
     utterances as _utterances,
 )
+from .video_staging import VideoStagingError, staged_video
 from .visual_id import VisualIdError, visual_identify
 
 logger = logging.getLogger(__name__)
@@ -202,7 +203,6 @@ def transcribe(
         # 2) Build pyannote turn data from the JSON we just persisted.
         #    Re-fetch from S3 so we don't keep the full window-embedding
         #    payload in memory longer than necessary.
-        from jeromelu_shared.s3 import download_raw
         pyannote_doc = json.loads(download_raw(pyannote_result.pyannote_s3_key))
         pyannote_turns = pyannote_doc.get("turns", [])
         if not pyannote_turns:
@@ -291,34 +291,56 @@ def transcribe(
             )
 
         # 4a-ter) Visual identification — face detection + matching over
-        # video frames. Skip silently when Scout hasn't collected video.
+        # video frames. Three input regimes via ``staged_video``:
+        #
+        #   - ``source.video_s3_key`` set (legacy persistent row): use it
+        #     as-is, no cleanup. The one source predating the ephemeral
+        #     plan still flows through this branch until the file is
+        #     manually purged.
+        #   - ``source.video_s3_key`` null + ``canonical_url`` is YouTube:
+        #     yt-dlp into a per-request staging key, run visual_identify
+        #     against it, delete the staging object on exit. Default for
+        #     all new sources.
+        #   - Both null (non-YouTube source, or audio-only): skip visual
+        #     ID entirely, voice-only fusion downstream.
         visual_per_turn: list = [None] * len(turn_rows)
         face_track_s3_key: str | None = None
         video_format: str | None = None
-        if source.video_s3_key:
-            try:
-                visual_result = visual_identify(
-                    session,
-                    audio_s3_key=source.audio_s3_key,
-                    video_s3_key=source.video_s3_key,
-                    pyannote_turns=pyannote_turns,
-                )
-                visual_per_turn = visual_result.per_turn
-                face_track_s3_key = visual_result.face_track_s3_key
-                video_format = visual_result.video_format
-                source.video_format = video_format
-                logger.info(
-                    "Visual ID: video_format=%s, %d / %d turns face-matched",
-                    video_format,
-                    visual_result.turns_visually_matched,
-                    len(turn_rows),
-                )
-            except VisualIdError as exc:
-                logger.warning(
-                    "Visual ID failed: %s — proceeding voice-only", exc,
-                )
-        else:
-            logger.info("No video_s3_key — skipping visual ID, voice-only fusion")
+        try:
+            with staged_video(
+                source.canonical_url,
+                persistent_key=source.video_s3_key,
+            ) as video_key:
+                if video_key is None:
+                    logger.info(
+                        "No video available — skipping visual ID, voice-only fusion"
+                    )
+                else:
+                    try:
+                        visual_result = visual_identify(
+                            session,
+                            audio_s3_key=source.audio_s3_key,
+                            video_s3_key=video_key,
+                            pyannote_turns=pyannote_turns,
+                        )
+                        visual_per_turn = visual_result.per_turn
+                        face_track_s3_key = visual_result.face_track_s3_key
+                        video_format = visual_result.video_format
+                        source.video_format = video_format
+                        logger.info(
+                            "Visual ID: video_format=%s, %d / %d turns face-matched",
+                            video_format,
+                            visual_result.turns_visually_matched,
+                            len(turn_rows),
+                        )
+                    except VisualIdError as exc:
+                        logger.warning(
+                            "Visual ID failed: %s — proceeding voice-only", exc,
+                        )
+        except VideoStagingError as exc:
+            logger.warning(
+                "Video staging failed: %s — proceeding voice-only", exc,
+            )
 
         turns_visual_match = sum(1 for v in visual_per_turn if v is not None)
 

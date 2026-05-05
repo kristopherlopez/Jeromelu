@@ -9,8 +9,8 @@ tags: [area/agents, subarea/system, status/live]
 | **Modules** | `services/api/app/analyst/identify_voice.py` (voice enroll + match), `services/api/app/analyst/visual_id.py` (face detect + match), `services/api/app/analyst/fusion.py` (cross-modal vote), CLIs in `enroll_voice_cli.py` / `enroll_face_cli.py` |
 | **Driver** | Enrollment via `make enroll-voice` / `make enroll-face`. Identification + fusion run inline inside `make transcribe`. |
 | **ETL role** | **Transform.** Populates `source_speakers.speaker_person_id`, `match_method`, `match_confidence` plus the per-modality provenance columns (`audio_match_*`, `visual_match_*`). |
-| **Cost** | Voice: ~10 s of CPU per enrollment span; matching is sub-second per source (in-memory). Visual: ~7 min CPU per 45-min video at 1 fps (face detection on every frame). With Phase 5.5 remote GPU enabled, both pyannote diarization and visual ID move to a SageMaker Async endpoint — ~$0.13/source compute, scale-to-zero idle, ~10–15 min total wall time. |
-| **Status** | Phase 3 (voice) live; Phase 4a (visual + fusion) live; Phase 4-asd (mouth-opening ASD) live; Phase 4b-display (review UI overlay) live; Phase 5.5 (remote GPU on SageMaker Async) live. Click-to-reassign (Phase 4b-action) and cross-modal compounding (Phase 5) remain. |
+| **Cost** | Voice: ~10 s of CPU per enrollment span; matching is sub-second per source (in-memory). Visual: ~7 min CPU per 45-min video at 1 fps (face detection on every frame). With Phase 5.5 remote GPU enabled, both pyannote diarization and visual ID move to a SageMaker Async endpoint on `ml.g5.xlarge` (A10G) — ~$0.13 GPU + ~$0.001 cross-region S3 + $0.30 Deepgram = **~$0.43/source**, scale-to-zero idle, **~3 min total wall time**. |
+| **Status** | Phase 3 (voice) live; Phase 4a (visual + fusion) live; Phase 4-asd (mouth-opening ASD) live; Phase 4b-display (review UI overlay) live; Phase 5.5 (remote GPU on SageMaker Async, `us-east-1`) live. Click-to-reassign (Phase 4b-action) and cross-modal compounding (Phase 5) remain. |
 
 > **Single-cam caveat:** mouth-opening ASD is the current precision-floor (76.7 % vs 55.4 % without it on the test source) but not a substitute for a real audio-sync ASD model. Reaction-shot false positives (smiling at someone else's joke, laughing during their monologue) survive — `voice+face` is still the most trustworthy subset.
 
@@ -60,7 +60,7 @@ The matching is per-window with majority-vote rather than per-turn-medoid becaus
 
 ### Face enrollment — `enroll_face_from_image(person_id, source_id, image_path, frame_ts)`
 
-1. Decode the image (cv2). For video-frame mode the CLI ffmpeg-extracts a single JPEG at the requested timestamp from `sources.video_s3_key` first.
+1. Decode the image (cv2). For video-frame mode the CLI ffmpeg-extracts a single JPEG at the requested timestamp. Source video acquisition: either `sources.video_s3_key` (legacy persistent path) or, when null, an on-demand yt-dlp via `video_staging.staged_video_local` against `sources.canonical_url`.
 2. Run InsightFace `buffalo_l` — RetinaFace + ArcFace bundle. Pick the largest detected face (by bbox area).
 3. Reject NaN/inf embeddings or wrong-dim outputs.
 4. Insert one `person_face_embeddings` row (512-dim ArcFace).
@@ -69,13 +69,15 @@ The matching is per-window with majority-vote rather than per-turn-medoid becaus
 
 ### Visual identification — `visual_identify(audio_s3_key, video_s3_key, pyannote_turns)`
 
+`video_s3_key` here may be either a persistent key (legacy `sources.video_s3_key`) or a per-request **staging key** under `staging/video/` — the contract is unchanged from `visual_identify`'s perspective. Lifetime management is the caller's job: `transcribe.py` wraps the call in `video_staging.staged_video(...)`, which yt-dlps + uploads on entry and deletes the staging object on exit. See [Video lifecycle](#video-lifecycle).
+
 1. **Reuse path**: if a face-track JSON of the current `FACE_TRACK_JSON_VERSION` already exists for this source, skip extraction and re-vote against the persisted frame data. Used for tuning the per-turn vote logic without paying the ~30 min CPU extraction cost. To force re-extract: delete the JSON or bump the version.
 2. Otherwise: download video, sample frames at `FRAME_SAMPLE_RATE` (default 1 fps) via cv2.
 3. Run InsightFace on each frame — multi-face detection + 512-dim embeddings + det_score + `landmark_3d_68`.
 4. For each detected face, k-NN-match against the in-memory face registry (cosine threshold default 0.40, permissive).
 5. Compute `mouth_opening` per face — inner-lip distance from 3d68 indices 62/66, normalised by face-bbox height. The ASD signal.
 6. Detect the source's `video_format`: face-change-rate ≥ 0.10 → `multi_cam`, < 0.05 → `single_cam`, otherwise default `multi_cam`. Stored on `sources.video_format`.
-7. Persist a face-track JSON to S3 alongside the pyannote JSON (drops embeddings, keeps bbox + matched person_id + similarity + mouth_opening).
+7. Persist a face-track JSON to S3 alongside the pyannote JSON (drops embeddings, keeps bbox + matched person_id + similarity + mouth_opening + source `frame_width`/`frame_height` so the review-UI overlay can scale bboxes onto whatever surface it's drawing over). Schema: `FACE_TRACK_JSON_VERSION = 4`.
 8. Aggregate per pyannote turn — see [Per-turn vote with ASD](#per-turn-vote-with-asd) below.
 
 ### Per-turn vote with ASD
@@ -125,18 +127,19 @@ make enroll-voice \
     START_TS=91.97 \
     END_TS=166.98
 
-# 2. Acquire the low-res video for visual ID (~25s for a 45min source).
-make collect-video SOURCE_ID=<source-uuid>
-
-# 3. Enroll the host's face from a frame where they're clearly visible.
+# 2. Enroll the host's face from a frame where they're clearly visible.
+#    `make enroll-face` will yt-dlp the video on-demand if it isn't cached
+#    locally — no `make collect-video` step needed.
 make enroll-face \
     PERSON_ID=<person-uuid> \
     SOURCE_ID=<source-uuid> \
     FRAME_TS=120
 
-# 4. Re-transcribe to apply both modalities + fusion. Pyannote artefact
+# 3. Re-transcribe to apply both modalities + fusion. Pyannote artefact
 #    is reused (no 40min re-run); only Deepgram + visual ID + DB writes
-#    redo. Visual ID adds ~7 min CPU per 45 min of video.
+#    redo. Visual ID adds ~7 min CPU per 45 min of video; the video file
+#    itself is acquired via yt-dlp into a staging S3 key and deleted
+#    after visual_identify returns (see Video lifecycle).
 make transcribe SOURCE_ID=<source-uuid> FORCE=1
 ```
 
@@ -179,14 +182,37 @@ Embedded into both enrollment and matching, in order of importance:
 
 Lineup runs locally by default. To use the SageMaker Async endpoint instead:
 
-1. One-time AWS setup per [services/gpu/SETUP.md](../../../services/gpu/SETUP.md) — ECR repo, IAM role, `.env` config additions.
+1. One-time AWS setup per [services/gpu/SETUP.md](../../../services/gpu/SETUP.md) — ECR repo, staging bucket, IAM role, `.env` config additions.
 2. Build + push the GPU container: `make lineup-build` (uses `HUGGINGFACE_API_KEY` as a Buildkit secret to bake model weights).
-3. Deploy: `make lineup-deploy`. First deploy takes ~5–10 min while SageMaker provisions the `ml.g4dn.xlarge` instance and pulls the image; subsequent deploys roll forward.
-4. Set `LINEUP_REMOTE=1` in `.env` and `make transcribe SOURCE_ID=… FORCE=1`. The CLI prints `[Lineup remote] diarize submitted → s3://…` and end-to-end runs complete in ~10–15 min instead of ~50 min.
+3. Deploy: `make lineup-deploy`. First deploy takes ~5–10 min while SageMaker provisions the `ml.g5.xlarge` instance and pulls the image; subsequent deploys roll forward.
+4. Set `LINEUP_REMOTE=1` in `.env` and `make transcribe SOURCE_ID=… FORCE=1`. The CLI prints `[Lineup remote] diarize submitted → s3://jeromelu-sagemaker-async/…` and end-to-end runs complete in ~3 min instead of ~50 min.
 
-The artefact contracts are unchanged — the GPU container imports the same `app.analyst.diarize` / `app.analyst.visual_id` modules and writes the same S3 keys, so downstream code (transcribe.py merge, fusion, review UI) is oblivious to where inference ran.
+The artefact contracts are unchanged — the GPU container imports the same `app.analyst.diarize` / `app.analyst.visual_id` modules and writes the same S3 keys (in Sydney), so downstream code (transcribe.py merge, fusion, review UI) is oblivious to where inference ran.
 
 To stop iterating, `make lineup-delete` tears down the endpoint. The model + endpoint config remain (negligible cost); re-create the endpoint with another `make lineup-deploy`.
+
+### Deployment topology
+
+- **SageMaker endpoint** in `us-east-1` (Sydney capacity is currently constrained for both g4dn and g5 families). Single `ml.g5.xlarge` (A10G GPU), `MaxConcurrentInvocationsPerInstance=1`.
+- **Artefact buckets** (`jeromelu-raw-audio`, `jeromelu-raw-transcripts`) stay in `ap-southeast-2` (Sydney) — they host audio + the persisted artefacts the rest of the system reads.
+- **Staging bucket** `jeromelu-sagemaker-async` in `us-east-1` carries SageMaker's internal async invoke I/O (small request/response JSONs, ephemeral). SageMaker requires async I/O paths to be in the endpoint's region, hence the split.
+- **ECR repository** `jeromelu/lineup-gpu` in `us-east-1`. Image baked with pyannote + InsightFace weights so cold-start is ~30 s, not ~3 min of HF download.
+
+## Video lifecycle
+
+Video is **ephemeral**. The pipeline holds a low-res mp4 only as long as it takes to extract face data and clean up. There is no persistent per-source video file going forward.
+
+| Stage | Where the bytes live | Lifetime |
+|---|---|---|
+| `transcribe.py` runs visual ID | Per-request staging key `s3://jeromelu-raw-audio/staging/video/<uuid>.mp4` (in-bucket prefix; lifecycle rule expires after 24 h as a safety net) | Until `staged_video` context exits — usually seconds after `visual_identify` returns. |
+| Reassign endpoint extracts a face frame | A local `tempfile.TemporaryDirectory` on the API host (`staged_video_local`) | Until the request handler returns. No S3 hop. |
+| Persistent legacy keys (`sources.video_s3_key` set) | `s3://jeromelu-raw-audio/youtube/<channel>/<video_id>.video.mp4` | One row remaining, predates this design. Will be purged manually; new sources never write here. |
+
+What this buys: the catalogue can grow without per-source storage cost. ~30 MB × 100 K sources = 3 TB of always-hot S3 storage that the system never persistently needs. The cost moves to ~$0.001 worth of cross-region transfer per Lineup run + ~$0.13 GPU time, both already paid.
+
+What persists across runs: the **face-track JSON** (small, durable, the artefact the review UI consumes), the **face embeddings** in `person_face_embeddings`, and the **voiceprints** in `person_voiceprints`. The video file is the transient intermediate that yields all three.
+
+The review UI overlays the face-track JSON directly on the YouTube iframe via `services/web/src/app/components/YouTubeFaceOverlay.tsx`. No local mp4 is required to draw boxes — bboxes scale from the JSON's `frame_width`/`frame_height` to the iframe's render size.
 
 ## Backlog
 
