@@ -327,7 +327,7 @@ Re-runs `refresh_channel_videos()` for a single channel on demand:
 ```
 POST /api/admin/scout/channels/{channel_ref}/refresh-videos
   ?full_backfill=true     # ignore the incremental cursor (default: false)
-  ?max_results=N          # walker cap, range [1, 1000] (default: 200)
+  ?max_results=N          # walker cap, range [1, 5000] (default: 200)
   Header: X-Admin-Key
 ```
 
@@ -338,9 +338,9 @@ weekly refresh's `enumerate.per_channel` list — `videos_listed`,
 layer: `sources` INSERTs use `ON CONFLICT DO NOTHING` on `canonical_url`,
 and `video_metrics` snapshots only fire for newly-inserted sources.
 
-`max_results` is hard-capped at 1000 by `youtube_api.list_channel_videos`
-— channels with more than 1000 uploads only expose their newest 1000
-through this endpoint today.
+`max_results` is hard-capped at 5000 by `youtube_api.list_channel_videos`
+— a defensive safety net that covers any realistic whale (~100 quota
+units max for the worst case).
 
 Or via Make: `make prod-refresh-channel-videos CHANNEL=<uuid-or-slug> [FULL_BACKFILL=1] [MAX_RESULTS=1000] ADMIN_KEY=xxx`.
 

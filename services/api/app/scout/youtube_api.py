@@ -404,7 +404,10 @@ def list_channel_videos(
     appears in the response, so weekly refreshes are typically a single page.
     """
     playlist_id = _uploads_playlist_id(channel_external_id)
-    target = max(min(max_results, 1000), 1)
+    # Defensive safety net — bounds the worst case if a caller passes a
+    # ridiculous max_results. 5000 covers any realistic whale (Bloke in a
+    # Bar = 1091, the largest tracked channel) at ~100 quota units max.
+    target = max(min(max_results, 5000), 1)
     out: list[dict[str, Any]] = []
     page_token: str | None = None
     while len(out) < target:
