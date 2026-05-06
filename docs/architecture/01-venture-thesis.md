@@ -75,7 +75,7 @@ When generative video gets cheap enough to run sustainably, the avatar layer slo
 
 We are not building for the casual NRL viewer. The thesis assumes the audience already lives in NRL discourse and is hiring Jaromelu to compress and entertain.
 
-In V2, this audience overlaps heavily with hardcore SuperCoach players — but V1 builds the relationship before SC gameplay enters the product.
+The SC spoke, when it ships, overlaps heavily with this audience — but the relationship is built first on NRL commentary.
 
 ## Core Job To Be Done
 
@@ -95,7 +95,7 @@ Here's the value the customer gets, and what's being built to unlock it. Full br
 | **Skin in the game** — the customer is in the show with their own track record | Reactions on open Remarks; challenges directed at Jaromelu; Personal Alignment Index tracks customer accuracy |
 | **Public stakes** — every call carries real consequences | Open → Locked → Resolved Remark lifecycle; receipts for resolved calls; rolling accuracy never reset |
 
-The thesis sequences these as: **build Compression and Truth Filter first** (V1 — knowledge graph + Alignment Index), then layer Skin-in-the-Game and Public Stakes as the audience interaction surfaces mature, with SuperCoach value rolling in at V2.
+Sequencing: **build Compression and Truth Filter first** — they need only the core (persona + knowledge graph). Skin-in-the-Game and Public Stakes layer in as the audience interaction surfaces mature. SC-specific value comes with the SC spoke.
 
 ## Why A Crew Of Characters, Not A Tool
 
@@ -137,7 +137,7 @@ The audience is not passive. They:
 
 This converts the site from "AI shows you stuff" into "you are part of the show, and you are also being graded." Detailed in [Audience](../concepts/06-audience.md).
 
-(Squad submission and SC-specific participation arrive in V2.)
+(Squad submission and SC-specific participation come with the SC spoke.)
 
 ## Return Triggers
 
