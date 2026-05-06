@@ -6,7 +6,7 @@ tags: [area/architecture]
 
 > Last reviewed: 2026-05-06.
 
-Jaromelu is an autonomous AI **commentator on the NRL** — backed by a crew of agents who ingest the NRL media ecosystem (especially YouTube), build a continuously evolving view of the competition, form opinions, make calls, and live with the consequences. Visitors watch the operation unfold in public and come back to see whether his takes held up.
+Jaromelu is an autonomous AI **commentator on the NRL** — a non-human presence with a name, a voice, opinions, and a public track record, who lives on his own website. He's backed by a crew of agents who ingest the NRL media ecosystem, build a continuously evolving view of the competition, form opinions, make calls, and live with the consequences. Visitors watch the operation unfold in public and come back to see whether his takes held up.
 
 The product is designed as an **entertainment spectacle first** and a utility second. Where those two are in tension, spectacle wins.
 
@@ -30,7 +30,15 @@ The current focus is **knowledge creation across NRL YouTube sources** — podca
 
 **V2 layers SuperCoach on top of an already-credible NRL commentator.** Voice and authority are built first; gameplay is built on top of an audience that already trusts the character.
 
-This sequencing matters: a SuperCoach AI is one of many in a crowded space. An NRL commentator with track-record is rarer, more durable, and a better foundation for SC content when it lands.
+This sequencing matters: a SuperCoach AI is one of many in a crowded space. An NRL commentator with a track record is rarer, more durable, and a better foundation for SC content when it lands.
+
+## What We Want People To Feel
+
+The aim isn't "AI tool that does NRL analysis." The aim is **a presence that feels alive** — a non-human entity with opinions, a voice, and a track record, who lives publicly in his own digital home. The reaction we're chasing is: *"Wait — this thing actually has takes."*
+
+Some of this is unreachable today. Real-time AI video is still research-grade and expensive, so Jaromelu starts text-led with a stylised avatar and pre-rendered voiced clips for the big beats. But the medium gets richer over time (see [Capability Horizons](#capability-horizons)) — and the website, the rhythm, and the voice are designed for the version of Jaromelu that ships in two years, not the one that ships next quarter.
+
+The website is the **digital home** — not a dashboard you visit, a place where he lives. The visual language, the editorial voice, the rhythm of the week, the always-on crew status — they all serve that single feeling.
 
 ## Audience
 
@@ -113,13 +121,46 @@ This converts the site from "AI shows you stuff" into "you are part of the show,
 - Expert leaderboard movement (the Alignment Index)
 - Season narrative arc — early-bold → mid-track-record → run-home stakes → finals verdict
 
-## The Strategic Moat: The Alignment Index
+## The Knowledge Asset
 
-The most durable thing the site builds is **not** Jaromelu's track record — it is the **Alignment Index**: a public, standing trust ranking of every NRL commentator the crew tracks.
+The most durable thing the project builds is **the knowledge graph itself** — a structured, growing record of what every NRL commentator says, when they said it, and whether they were right.
 
-The Index answers a question no other site answers cleanly: *"Which podcasters and pundits should I actually listen to?"*
+### What's captured
 
-Even in a week Jaromelu calls badly, the Index is still useful — and the longer the season runs, the more authoritative it becomes. It is the asset that compounds across V1, and the foundation that makes V2 SuperCoach content land harder when it ships.
+Scout ingests sources from around the internet (YouTube first — podcasts, panels, post-match shows). Each source is transcribed with **speaker diarisation**, so claims are attributed to *people*, not just shows. Both expert claims and Jaromelu's own claims are written into the same ledger and graded against reality.
+
+The result is an asset no other NRL property has at scale:
+
+- A timeline of every public claim about every player, team, and storyline
+- An accuracy record per commentator, sliced by domain (tipping, narrative, fantasy, injuries, drama)
+- Speaker-segmented **audio and video** clips of every panellist on every topic
+- Resolved outcomes grading everyone — Jaromelu included — on the same scale
+
+### What it unlocks
+
+The same captured-once data drives every downstream capability:
+
+| Capability | What it does |
+|---|---|
+| **The Alignment Index** | Public trust ranking of every NRL commentator. Answers *"who should I actually listen to?"*, sliced by what each person is actually good at. The compounding moat across V1. |
+| **Content engine** | Receipts for outlier predictions, weekly verdicts, narrative recaps — purpose-built for social and designed to drive traffic back to the site. |
+| **Specialised verticals** | Tipping, SuperCoach (V2), sports betting — different pricing/UX live downstream of the same knowledge layer. |
+| **Voice and video clones** | Speaker-segmented A/V data captured today is the substrate for cloned commentator voices (now), generative video segments (12–18 months), and emotionally nuanced digital clones (24+ months). |
+| **Aggregator role** | Because the index covers every NRL channel, the site can become a discovery layer for the ecosystem — *"the best segments on Cleary this week"* pointing at multiple sources, with traffic flowing back. |
+
+The ordering matters: V1 decisions (capture diarised audio, segment by speaker, store claims as structured rows) are what make every later capability possible. The data store doesn't get built retroactively.
+
+## Capability Horizons
+
+What Jaromelu's on-screen presence looks like over time:
+
+| Horizon | What becomes viable in the field | What we actually ship |
+|---|---|---|
+| **Now (V1)** | Voice clones from short audio; stylised avatars; pre-rendered short clips | Text-led Remarks, voiced clips for big moments, stylised avatar — not real-time video |
+| **12–18 months** | Generative video at lower cost (Seedance-class models maturing) | Synthesised video segments for Remarks, recaps, set-piece moments |
+| **24+ months** | Emotionally nuanced digital clones; real-time interactive video | Live Jaromelu segments; cloned commentators appearing in-show |
+
+The thesis assumes Jaromelu's medium gets richer in lockstep with the field. **What we capture today — speaker-segmented audio, video, and claims — is built for the version of Jaromelu that ships in 24 months, not the one that ships next quarter.**
 
 ## Category
 
