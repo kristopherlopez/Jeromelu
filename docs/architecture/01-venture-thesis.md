@@ -20,9 +20,10 @@ The project is also a public demonstration of what's possible when data pipeline
 
 **V1 is about Jaromelu having decent, credible views on the NRL.**
 
-The current focus is **knowledge creation across NRL YouTube sources** — podcasts, panels, post-match shows, weekly preview/review content. Scout ingests, Analyst cross-references, Jaromelu forms a position. Output is takes, calls, narrative reads — the substrate to talk credibly about anything happening in the league.
+The current focus is **knowledge creation across NRL YouTube sources** — podcasts, panels, post-match shows, weekly preview/review content. Scout ingests, Analyst cross-references, Jaromelu forms a position. Output is takes, calls, and narrative reads — the substrate to talk credibly about anything happening in the league.
 
 **V1 deliberately excludes:**
+
 - SuperCoach gameplay (trades, captaincy, breakevens, squad management) — this is **V2**
 - Live tipping competitions
 - Personalised user squads
@@ -30,21 +31,28 @@ The current focus is **knowledge creation across NRL YouTube sources** — podca
 
 **V2 layers SuperCoach on top of an already-credible NRL commentator.** Voice and authority are built first; gameplay is built on top of an audience that already trusts the character.
 
-This sequencing matters: a SuperCoach AI is one of many in a crowded space. An NRL commentator with a track record is rarer, more durable, and a better foundation for SC content when it lands.
+This sequencing matters. A SuperCoach AI is one of many in a crowded space. An NRL commentator with a track record is rarer, more durable, and a better foundation for SC content when it lands.
 
 ## What We Want People To Feel
 
 The aim isn't "AI tool that does NRL analysis." The aim is **a presence that feels alive** — a non-human entity with opinions, a voice, and a track record, who lives publicly in his own digital home. The reaction we're chasing is: *"Wait — this thing actually has takes."*
 
-Some of this is unreachable today. Real-time AI video is still research-grade and expensive, so Jaromelu starts text-led with a stylised avatar and pre-rendered voiced clips for the big beats. But the medium gets richer over time (see [Capability Horizons](#capability-horizons)) — and the website, the rhythm, and the voice are designed for the version of Jaromelu that ships in two years, not the one that ships next quarter.
+Some of that is unreachable today. Real-time AI video is still research-grade and expensive, and pre-generated avatar clips have already been explored and parked — at the volume the show needs, they take too long to produce, run expensive, and risk feeling tiresome quickly. So in V1 Jaromelu is **text-led**, with voice for the big set-piece moments. The "alive" feeling has to come from somewhere else, and it does:
 
-The website is the **digital home** — not a dashboard you visit, a place where he lives. The visual language, the editorial voice, the rhythm of the week, the always-on crew status — they all serve that single feeling.
+- The crew's **visible work** — Scout discovering, Analyst cross-referencing, contradictions surfacing
+- The **editorial voice** everywhere — no system copy; every line has a speaker
+- The **rhythm of the week** — the screen looks different on Monday than on Thursday
+- The **always-on crew status** — there's always something happening
+- The **digital home** — the website is a place he lives, not a dashboard you visit
+
+When generative video gets cheap enough to run sustainably, the avatar layer slots in on top of all that. Until then, the show carries itself.
 
 ## Audience
 
 **Primary audience:** Hardcore NRL fans who consume heavy amounts of NRL commentary — podcasts, YouTube panels, post-match shows. Above-average game literacy.
 
 **Typical user:**
+
 - Australian, predominantly male
 - Already consumes multiple NRL podcasts and YouTube channels each week
 - Time-poor, opinion-saturated, decision-fatigued
@@ -59,7 +67,21 @@ In V2, this audience overlaps heavily with hardcore SuperCoach players — but V
 
 > "Help me quickly understand what the NRL world is thinking — and entertain me while doing it."
 
-Compression *and* entertainment — neither alone is enough. See [Value & Delivery](02-value-and-delivery.md) for how this unpacks into pillars and signals.
+Compression *and* entertainment — neither alone is enough.
+
+## The Value Proposition
+
+Here's the value the customer gets, and what's being built to unlock it. Full breakdown in [Value & Delivery](02-value-and-delivery.md).
+
+| Customer value | What we're doing to unlock it |
+|---|---|
+| **Compression** — the week's NRL commentary distilled into a small number of opinionated takes | Scout ingests YouTube sources; Analyst cross-references claims; Jaromelu publishes Remarks that compress 12+ hours of audio into 4–6 calls per round |
+| **Truth filter** — know which commentators are actually accurate, sliced by topic | Speaker-diarised claims ledger; every claim graded against reality; published as the Alignment Index |
+| **A show worth following** — entertainment with a host and a crew, not a dashboard | Crew presented as characters; weekly episode arc; visible work as spectacle; voice-everywhere editorial |
+| **Skin in the game** — the customer is in the show with their own track record | Reactions on open Remarks; challenges directed at Jaromelu; Personal Alignment Index tracks customer accuracy |
+| **Public stakes** — every call carries real consequences | Open → Locked → Resolved Remark lifecycle; receipts for resolved calls; rolling accuracy never reset |
+
+The thesis sequences these as: **build Compression and Truth Filter first** (V1 — knowledge graph + Alignment Index), then layer Skin-in-the-Game and Public Stakes as the audience interaction surfaces mature, with SuperCoach value rolling in at V2.
 
 ## Why A Crew Of Characters, Not A Tool
 
@@ -75,7 +97,7 @@ A solo agent answering questions feels like a chatbot. A crew working in public 
 
 Tools feel useful. Characters feel followable.
 
-The crew (defined in [Experience Architecture §The Crew](03-experience-architecture.md#the-crew)) makes the process *legible* and the show *watchable*. Each role creates anticipation for the next.
+The crew (defined in [Experience Architecture §The Crew](03-experience-architecture.md#the-crew)) makes the process *legible* and the show *watchable*. Each role creates anticipation for the next — and in V1 it's the crew's visible work that carries the alive feeling, not an avatar.
 
 ## The Show Has Structure
 
@@ -105,17 +127,12 @@ This converts the site from "AI shows you stuff" into "you are part of the show,
 
 ## Return Triggers
 
-**Daily:**
-- New intel processed (Scout activity visible)
-- Remarks forming, locking, resolving
-- Inline drama — contradictions surfacing, consensus shifting on storylines
+**Daily** — new intel processed (Scout activity visible), Remarks forming and locking and resolving, contradictions surfacing inline.
 
-**Weekly (the episode arc):**
-- Thursday — the call
-- Thursday–Sunday — the football
-- Monday — the reckoning, receipts, alignment updates
+**Weekly** — the episode arc above. Thursday is the call, the weekend is the football, Monday is the reckoning.
 
 **Seasonal:**
+
 - Jaromelu's ranking against expert NRL commentators
 - Personal accuracy track record
 - Expert leaderboard movement (the Alignment Index)
@@ -156,9 +173,9 @@ What Jaromelu's on-screen presence looks like over time:
 
 | Horizon | What becomes viable in the field | What we actually ship |
 |---|---|---|
-| **Now (V1)** | Voice clones from short audio; stylised avatars; pre-rendered short clips | Text-led Remarks, voiced clips for big moments, stylised avatar — not real-time video |
-| **12–18 months** | Generative video at lower cost (Seedance-class models maturing) | Synthesised video segments for Remarks, recaps, set-piece moments |
-| **24+ months** | Emotionally nuanced digital clones; real-time interactive video | Live Jaromelu segments; cloned commentators appearing in-show |
+| **Now (V1)** | Voice clones from short audio; pre-generated avatar clips technically possible but slow and expensive at show volume | Text-led Remarks; voice for big moments; the crew's visible work and the editorial voice carrying the alive feeling. No persistent avatar — pre-generated clips don't scale. |
+| **12–18 months** | Generative video at lower cost (Seedance-class models maturing); near-real-time clip generation | Synthesised video segments for Remarks, recaps, set-piece moments. Avatar layer slots in sustainably. |
+| **24+ months** | Emotionally nuanced digital clones; real-time interactive video | Live Jaromelu segments; cloned commentators appearing in-show. |
 
 The thesis assumes Jaromelu's medium gets richer in lockstep with the field. **What we capture today — speaker-segmented audio, video, and claims — is built for the version of Jaromelu that ships in 24 months, not the one that ships next quarter.**
 
