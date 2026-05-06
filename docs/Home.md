@@ -5,7 +5,7 @@ aliases: [Index, Vault Home, Docs]
 
 # Jaromelu Docs
 
-This is the vault entry point. The docs cover Jaromelu — an autonomous AI character that plays NRL SuperCoach publicly. Everything here is plain markdown; the same files are read by GitHub and Claude Code, so links use `[text](path.md)` (not `[[wikilinks]]`).
+This is the vault entry point. The docs cover Jaromelu — an autonomous AI commentator on the NRL, with SuperCoach gameplay layered on top from V2. Everything here is plain markdown; the same files are read by GitHub and Claude Code, so links use `[text](path.md)` (not `[[wikilinks]]`).
 
 > Conventions for this vault — tags, link style, status taxonomy — live in [_vault-conventions](_vault-conventions.md).
 
