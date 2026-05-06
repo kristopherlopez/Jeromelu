@@ -165,7 +165,24 @@ The same captured-once data drives every downstream capability:
 | **Voice and video clones** | Speaker-segmented A/V data captured today is the substrate for cloned commentator voices (now), generative video segments (12–18 months), and emotionally nuanced digital clones (24+ months). |
 | **Aggregator role** | Because the index covers every NRL channel, the site can become a discovery layer for the ecosystem — *"the best segments on Cleary this week"* pointing at multiple sources, with traffic flowing back. |
 
-The ordering matters: V1 decisions (capture diarised audio, segment by speaker, store claims as structured rows) are what make every later capability possible. The data store doesn't get built retroactively.
+### How to monetise
+
+Multiple revenue layers compound; none is make-or-break. V1 builds audience and authority; monetisation lands in stages.
+
+| Revenue stream | What unlocks it | Timing |
+|---|---|---|
+| **Sports-betting affiliate** | Hardcore NRL audience + claims-graded recommendations; high-intent users | V1, once audience scales |
+| **Display + sponsorship** | Audience scale; episode beats give natural ad surfaces ("brought to you by") and sponsored Remarks | V1 |
+| **Subscription tier** | Premium access — full Ledger, deeper Wiki, ad-free, early Remarks, full Alignment Index slices | V1 → V2 |
+| **Content engine → social → traffic** | Receipts and recaps built for social; brings audience back to the owned home | V1 → V2 |
+| **Tipping & SC subscriptions** | Specialised vertical features built on the same knowledge graph | V2 |
+| **Data / index licensing** | Alignment Index becomes a recognised authority; licensed to media, teams, broadcasters | Mid-term, after the Index has a track record |
+| **Voice / video clone services** | Speaker-segmented A/V data + clone tech maturity; license cloned voices back to commentators; B2B media production | 12–24+ months |
+| **Aggregator referral revenue** | Site becomes a discovery layer for NRL channels; YouTube affiliate / partner revenue; channel placements | Mid-term |
+
+The defensible position is **the knowledge asset itself**. Most of these revenue streams draw on the same captured-once data — a competitor has to spend a season catching up before they can monetise the same way.
+
+The ordering matters: V1 decisions (capture diarised audio, segment by speaker, store claims as structured rows) are what make every later capability — and every revenue stream — possible. The data store doesn't get built retroactively.
 
 ## Capability Horizons
 
