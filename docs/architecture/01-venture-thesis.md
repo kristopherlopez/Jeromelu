@@ -14,7 +14,25 @@ The project is also a public demonstration of what's possible when data pipeline
 
 ---
 
-# Strategic Layer
+## The Strategic Bet
+
+The defensible thing is **the persona plus the knowledge graph, captured together over time.**
+
+A character with a name, a voice, opinions, and a public accuracy record is harder to copy than a tool with the same features. A growing ledger of speaker-attributed claims, graded against reality, is harder to copy than a season of stats. Stack the two and a competitor can't catch up by spending money — they need to spend a season.
+
+**What we're betting on:**
+
+- Hardcore NRL fans will follow a non-human personality if it has takes worth following
+- The medium gets richer fast enough that today's text-led show becomes tomorrow's video-rich show on the same captured data
+- Public accuracy *and* public misses build more trust than a polished UI ever could
+
+**What we're trading away:**
+
+- Mass-market reach — we are not for the casual NRL viewer
+- SuperCoach as a wedge — gameplay lands at V2, after the persona is established
+- A polished avatar in V1 — pre-generated clips don't scale; we wait for the medium to mature
+
+**Why now:** LLMs are good enough to hold a voice across thousands of outputs; speaker-diarised transcription is cheap and accurate; generative voice and video are on a clear cost-down curve. The "capture everything now, compose richer later" pattern is finally viable.
 
 ## V1 Scope vs V2
 
