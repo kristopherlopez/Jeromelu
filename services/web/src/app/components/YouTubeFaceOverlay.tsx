@@ -171,6 +171,7 @@ const YouTubeFaceOverlay = forwardRef<YouTubeFaceOverlayHandle, Props>(
     // source slipped through — would skew bbox positions but not break.
     const sourceW = faceTrack?.frame_width ?? 640;
     const sourceH = faceTrack?.frame_height ?? 360;
+    const sourceDuration = faceTrack?.duration_seconds ?? 0;
 
     const sortedSpeakers = useMemo(
       () => [...speakers].sort((a, b) => a.start_ts - b.start_ts),
@@ -198,6 +199,23 @@ const YouTubeFaceOverlay = forwardRef<YouTubeFaceOverlayHandle, Props>(
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Ad detection: the IFrame API has no public ad event, but
+      // getCurrentTime() reports the *currently playing media*'s clock
+      // — during an ad, that's the ad's elapsed time, not the source's.
+      // The cheapest signal we have is duration drift: when an ad is
+      // loaded, getDuration() differs from the source by minutes. Skip
+      // drawing entirely so non-Premium reviewers don't see boxes
+      // smeared over ad pixels at the wrong timestamps.
+      const playerDur = player.getDuration?.() ?? 0;
+      const inAd =
+        sourceDuration > 0 &&
+        playerDur > 0 &&
+        Math.abs(playerDur - sourceDuration) > 5;
+      if (inAd) {
+        setClickableFaces((prev) => (prev.length === 0 ? prev : []));
+        return;
+      }
 
       const ts = player.getCurrentTime();
       if (Math.abs(ts - lastEmittedTsRef.current) >= 0.1) {
@@ -287,6 +305,7 @@ const YouTubeFaceOverlay = forwardRef<YouTubeFaceOverlayHandle, Props>(
       playerReady,
       sourceW,
       sourceH,
+      sourceDuration,
       onTimeUpdate,
     ]);
 
