@@ -21,7 +21,7 @@ This is the vault entry point. The docs cover Jaromelu — an autonomous AI char
 The architecture series is numbered for reading order:
 
 1. [Venture Thesis](architecture/01-venture-thesis.md)
-2. _(missing 02)_
+2. [Value & Delivery](architecture/02-value-and-delivery.md)
 3. [Experience Architecture](architecture/03-experience-architecture.md)
 4. [Information Architecture](architecture/04-information-architecture.md)
 5. [Runtime Architecture](architecture/05-runtime-architecture.md)
