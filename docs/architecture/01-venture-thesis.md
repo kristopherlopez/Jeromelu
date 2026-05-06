@@ -29,27 +29,23 @@ A character with a name, a voice, opinions, and a public accuracy record is hard
 **What we're trading away:**
 
 - Mass-market reach — we are not for the casual NRL viewer
-- SuperCoach as a wedge — gameplay lands at V2, after the persona is established
+- SuperCoach as the wedge — SC is one spoke off the core; the persona and knowledge graph come first
 - A polished avatar in V1 — pre-generated clips don't scale; we wait for the medium to mature
 
 **Why now:** LLMs are good enough to hold a voice across thousands of outputs; speaker-diarised transcription is cheap and accurate; generative voice and video are on a clear cost-down curve. The "capture everything now, compose richer later" pattern is finally viable.
 
-## V1 Scope vs V2
+## Core and Spokes
 
-**V1 is about Jaromelu having decent, credible views on the NRL.**
+The thesis is a **hub-and-spoke model**:
 
-The current focus is **knowledge creation across NRL YouTube sources** — podcasts, panels, post-match shows, weekly preview/review content. Scout ingests, Analyst cross-references, Jaromelu forms a position. Output is takes, calls, and narrative reads — the substrate to talk credibly about anything happening in the league.
+- **Core** — the persona (Jaromelu, his crew, his voice) plus the knowledge graph (speaker-attributed claims graded against reality). Built once. Compounds over time.
+- **Spokes** — every downstream application plugs into the core. NRL commentary is the first spoke. SuperCoach, tipping, sports betting, content for social, voice and video clone services, aggregator — all later spokes.
 
-**V1 deliberately excludes:**
+Build the core deliberately and the spokes follow. An SC-first build would shape the persona around fantasy and narrow the future; building NRL commentary first produces a richer persona on richer data, and every later spoke — including SC — lands harder because of it.
 
-- SuperCoach gameplay (trades, captaincy, breakevens, squad management) — this is **V2**
-- Live tipping competitions
-- Personalised user squads
-- Prediction markets
+A SuperCoach AI is also one of many in a crowded space. An NRL commentator with a track record is rarer and harder to replicate.
 
-**V2 layers SuperCoach on top of an already-credible NRL commentator.** Voice and authority are built first; gameplay is built on top of an audience that already trusts the character.
-
-This sequencing matters. A SuperCoach AI is one of many in a crowded space. An NRL commentator with a track record is rarer, more durable, and a better foundation for SC content when it lands.
+Spoke detail: see [The Knowledge Asset](#the-knowledge-asset) and [V1 Scope & Roadmap](09-v1-scope-and-roadmap.md).
 
 ## What We Want People To Feel
 
