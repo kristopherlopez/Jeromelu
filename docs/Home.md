@@ -63,7 +63,7 @@ The architecture series is numbered for reading order:
 
 - [Sources](sources/README.md) — external content ingestion
 - [Avatar](avatar/README.md) — Jaromelu's on-screen presence
-- [Design System](design-system/theme-and-style.md)
+- [Design System](design-system/theme-and-style.md) · [UI/UX Brief](design-system/ui-ux-brief.md)
 - [Todo / Backlog](todo/TODO.md)
 - [Archive](archive/) — historical specs
 
