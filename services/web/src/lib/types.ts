@@ -79,6 +79,8 @@ export interface SourceDetailResponse {
     video_url: string | null;
     face_track_url: string | null;
     video_format: "multi_cam" | "single_cam" | "audio_only" | null;
+    ingestion_status: string;
+    transcription_status: string | null;
   };
   claims: ClaimDetail[];
   chunks: TranscriptChunk[];

@@ -141,8 +141,35 @@ def get_source(source_id: uuid.UUID, db: Session = Depends(get_db)):
         .filter(SourceDocument.source_id == source_id)
         .first()
     )
+    # No document yet (Scout hasn't ingested or GPU hasn't transcribed): the
+    # viewer still renders — video plays, transcript/claims tabs show an
+    # empty state — so the user can at least watch in-app instead of being
+    # bounced to a 404.
     if not doc:
-        raise HTTPException(status_code=404, detail="No document for source")
+        video_url: str | None = None
+        if source.video_s3_key:
+            try:
+                video_url = presign_video(source.video_s3_key)
+            except Exception:
+                logger.exception("Failed to presign video for source %s", source.source_id)
+        return {
+            "source": {
+                "source_id": str(source.source_id),
+                "title": source.title,
+                "canonical_url": source.canonical_url,
+                "published_at": source.published_at.isoformat() if source.published_at else None,
+                "creator_name": source.creator_name,
+                "source_type": source.source_type,
+                "video_url": video_url,
+                "face_track_url": None,
+                "video_format": source.video_format,
+                "ingestion_status": source.ingestion_status,
+                "transcription_status": source.transcription_status,
+            },
+            "claims": [],
+            "chunks": [],
+            "speakers": [],
+        }
 
     # Get all chunks ordered by start timestamp for contiguous display
     chunks = (
@@ -278,6 +305,8 @@ def get_source(source_id: uuid.UUID, db: Session = Depends(get_db)):
             "video_url": video_url,
             "face_track_url": face_track_url,
             "video_format": source.video_format,
+            "ingestion_status": source.ingestion_status,
+            "transcription_status": source.transcription_status,
         },
         "claims": claims_data,
         "chunks": [

@@ -74,12 +74,15 @@ sidebar with About / Coverage / Related-voices cards. The route page fetches
 the page payload and a small batch of sibling channels in parallel for the
 related-voices sidebar.
 
-Episode rows in the Latest-episodes panel deep-link internally to
+Episode rows in the Latest-episodes panel always deep-link internally to
 `/stream/[sourceId]` (the source review page — video player + episode timeline
-+ transcript + claims) **only when `ingestion_status = 'completed'`**, since
-`/api/sources/{id}` 404s for sources without a `SourceDocument`. Pending rows
-fall back to opening the platform URL (e.g. YouTube) directly. Either way the
-platform URL also appears as a small secondary icon on the right of each row.
++ transcript + claims). When a source hasn't been transcribed yet,
+`/api/sources/{id}` returns the source metadata with empty `claims`/`chunks`/
+`speakers`, and the review page renders the video player plus an
+"awaiting transcription" placeholder in the Transcript/Claims panel rather
+than 404ing. The platform URL (e.g. YouTube) also appears as a small
+secondary icon on the right of each row for users who'd rather watch on the
+source platform.
 
 The source review page renders an `EpisodeTimeline` strip beneath the video:
 filter chips per claim type (with a disabled "Speaker changes" placeholder

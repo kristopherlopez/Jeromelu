@@ -12,6 +12,9 @@ interface Props {
 export default async function SourceDetailPage({ params }: Props) {
   const { sourceId } = await params;
 
+  // The API returns a usable payload (with empty chunks/claims) for sources
+  // that haven't been transcribed yet, so we only fall through to notFound()
+  // for genuinely missing sources / network errors.
   let data: SourceDetailResponse;
   try {
     data = await apiFetch<SourceDetailResponse>(`/api/sources/${sourceId}`);

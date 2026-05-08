@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, User, Calendar, Video, PenLine } from "lucide-react";
+import { ArrowLeft, User, Calendar, Video, PenLine, Hourglass } from "lucide-react";
 import type { SourceDetailResponse, SourceListItem } from "@/lib/types";
 import YouTubePlayer, { type YouTubePlayerHandle } from "../../components/YouTubePlayer";
 import VideoOverlay, { type VideoOverlayHandle } from "../../components/VideoOverlay";
@@ -92,6 +92,20 @@ export default function SourceReviewClient({ data, allSources }: Props) {
 
   const sourceTypeLabel =
     source.source_type === "youtube" ? "YouTube" : source.source_type;
+
+  // Sources without chunks haven't been transcribed yet — the video still
+  // plays, but transcript and claims tabs need a placeholder so the panel
+  // doesn't look broken.
+  const isAwaitingTranscript = chunks.length === 0;
+  const processingMessage = (() => {
+    if (source.transcription_status === "failed") {
+      return "Transcription failed for this episode. The video plays but no transcript or claims are available.";
+    }
+    if (source.ingestion_status !== "completed") {
+      return "Scout hasn't finished ingesting this episode yet. Transcript and claims will appear once it's processed.";
+    }
+    return "This episode is queued for transcription. Transcript and claims will appear once the GPU worker finishes.";
+  })();
 
   return (
     <main className="min-h-screen">
@@ -271,7 +285,19 @@ export default function SourceReviewClient({ data, allSources }: Props) {
 
           {/* Tab content */}
           <div className="flex-1 min-h-0 overflow-hidden mt-4">
-            {activeTab === "transcript" ? (
+            {isAwaitingTranscript ? (
+              <div
+                className="flex h-full flex-col items-center justify-center gap-3 rounded-lg border px-6 py-10 text-center"
+                style={{
+                  borderColor: "var(--border)",
+                  backgroundColor: "var(--background-deep)",
+                  color: "var(--foreground-secondary)",
+                }}
+              >
+                <Hourglass size={22} style={{ color: "var(--foreground-ghost)" }} />
+                <p className="max-w-sm text-sm leading-relaxed">{processingMessage}</p>
+              </div>
+            ) : activeTab === "transcript" ? (
               <TranscriptPanel
                 chunks={chunks}
                 claims={claims}

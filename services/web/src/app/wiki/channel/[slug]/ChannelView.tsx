@@ -704,17 +704,12 @@ function EpisodeRow({ ep, index }: { ep: ChannelEpisode; index: number }) {
   const duration = formatDuration(ep.duration_seconds);
   const ago = formatRelative(ep.published_at);
 
-  // Only processed sources have a SourceDocument and render at /stream/[sourceId].
-  // Pending rows fall back to opening the platform URL directly.
-  const hasInternalPage = ep.ingestion_status === "completed";
+  // Always route to the in-app viewer; the YouTube affordance on the right
+  // stays for users who explicitly want to watch on the platform.
   const onActivate = () => {
-    if (hasInternalPage) {
-      router.push(`/stream/${ep.source_id}`);
-    } else if (ep.canonical_url) {
-      window.open(ep.canonical_url, "_blank", "noopener,noreferrer");
-    }
+    router.push(`/stream/${ep.source_id}`);
   };
-  const isClickable = hasInternalPage || !!ep.canonical_url;
+  const isClickable = true;
 
   return (
     <div
