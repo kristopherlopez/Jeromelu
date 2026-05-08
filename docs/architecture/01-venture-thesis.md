@@ -39,11 +39,7 @@ A character with a name, a voice, opinions, and a public accuracy record is hard
 The thesis is a **hub-and-spoke model**:
 
 - **Core** — the persona (Jaromelu, his crew, his voice) plus the knowledge graph (speaker-attributed claims graded against reality). Built once. Compounds over time.
-- **Spokes** — every downstream application plugs into the core. NRL commentary is the first spoke. SuperCoach, tipping, sports betting, content for social, voice and video clone services, aggregator — all later spokes.
-
-Build the core deliberately and the spokes follow. An SC-first build would shape the persona around fantasy and narrow the future; building NRL commentary first produces a richer persona on richer data, and every later spoke — including SC — lands harder because of it.
-
-A SuperCoach AI is also one of many in a crowded space. An NRL commentator with a track record is rarer and harder to replicate.
+- **Spokes** — every downstream application plugs into the core. NRL commentary is the first spoke — built first because it produces a richer persona on richer data than any narrower opener would. SuperCoach, tipping, sports betting, content for social, voice and video clone services, aggregator — all later spokes.
 
 Spoke detail: see [The Knowledge Asset](#the-knowledge-asset) and [V1 Scope & Roadmap](09-v1-scope-and-roadmap.md).
 
