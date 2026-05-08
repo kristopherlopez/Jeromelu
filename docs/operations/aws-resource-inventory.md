@@ -237,7 +237,8 @@ V0 architecture replaced by a single Lightsail VM running Docker Compose. See `d
 | Static IP | `52.65.91.199` (`jeromelu-ip`, attached) |
 | SSH key pair | `jeromelu-prod` (ED25519, fingerprint `SHA256:SC5vIKcmU0jNXOwEU9ywmXTejOTOIhkKea5lV5sSTb4`) |
 | Private key location | `~/.ssh/jeromelu-prod` on operator workstation |
-| Firewall | TCP 22 from `112.213.139.221/32`, TCP 80 + 443 from `0.0.0.0/0` |
+| Firewall | TCP 22 from operator-only allowlist (see below), TCP 80 + 443 from `0.0.0.0/0` |
+| SSH allowlist | `112.213.155.188/32` (Kris home internet), `49.186.102.61/32` + `49.186.51.170/32` (Kris phone hotspot — carrier reassigns frequently, add new entries as they rotate). Update via `aws lightsail put-instance-public-ports --instance-name jeromelu --region ap-southeast-2 --port-infos '[{"fromPort":22,"toPort":22,"protocol":"tcp","cidrs":[...]}]'` (the call replaces all rules for port 22 — list every CIDR you want kept). |
 | Bootstrap | Docker 29.4.1, Compose v5.1.3, AWS CLI v2, Git installed via cloud-init |
 | Swap | 1 GB at `/swapfile` (persisted in `/etc/fstab`) |
 | SSH alias | `jeromelu-prod` (configured in operator's `~/.ssh/config`) |
@@ -316,10 +317,12 @@ Extensions: `plpgsql`, `uuid-ossp`, `vector 0.8.2` (pgvector) — restored intac
 
 Single benign error during restore: `unrecognized configuration parameter "transaction_timeout"` — RDS-only `SET` at the head of the dump, ignored by open-source pg16; not data-related.
 
-Migration artifacts in S3 (clean up after cutover verified):
-- `s3://jeromelu-public-assets/migration/jeromelu-pre-lightsail-2026-04-25.sql.gz`
+Migration artifacts in S3 (retained — verified present 2026-05-05, 10 days post-cutover):
+- `s3://jeromelu-public-assets/migration/jeromelu-pre-lightsail-2026-04-25.sql.gz` (~16 MB)
 - `s3://jeromelu-public-assets/migration/rowcounts.sql`
 - `s3://jeromelu-public-assets/migration/rds-rowcount.sh`
+
+Storage cost is negligible (~$0.0004/mo). Kept as the only on-account copy of pre-cutover row state now that the RDS final snapshot has been deleted (Phase 11.4). Delete via `aws s3 rm s3://jeromelu-public-assets/migration/ --recursive` if/when no longer wanted.
 
 ### 11.5 — DNS Cutover (COMPLETE 2026-04-25)
 
@@ -380,3 +383,19 @@ The dump from RDS was schema-frozen at migration 009. Migrations 010–016 had n
 Caddy is in ACME retry loop until DNS cuts over (Phase 5) — `jeromelu.ai` and `api.jeromelu.ai` still resolve to CloudFront/ALB. No traffic impact yet; the existing ECS stack still serves users.
 
 Volumes pinned: `jeromelu_postgres_data`, `jeromelu_caddy_data`, `jeromelu_caddy_config`.
+
+### 11.9 — Scheduled Jobs (COMPLETE 2026-05-04)
+
+Cron is repo-managed: schedule lives at `scripts/cron.d/jeromelu`, synced into `/etc/cron.d/jeromelu` by `scripts/lightsail-deploy.sh` on every deploy. Edit in the repo, redeploy — do not hand-edit on the box. All jobs run as `ubuntu`; times in UTC.
+
+| Cron | Wrapper | Purpose | Local time |
+|---|---|---|---|
+| `0 23 * * *` | `scout-refresh.sh channel-stats` | Snapshot subscriber/video/view counts into `channel_metrics` (~3 quota units) | 09:00 AEST / 10:00 AEDT |
+| `15 23 * * 0` | `scout-refresh.sh videos` | Enumerate new videos per channel + snapshot `video_metrics` (~750 quota units, offset 15 min from channel-stats to avoid DB connection contention) | Mon 09:15 AEST / 10:15 AEDT |
+| `30 16 * * *` | `pg-backup.sh` | Stream `pg_dump` from postgres container → `s3://jeromelu-public-assets/backups/postgres/` (S3 lifecycle expires after 30d) | 02:30 AEST / 03:30 AEDT |
+
+Logs:
+- pg-backup → `/var/log/jeromelu/pg-backup.log`
+- scout-refresh → `/var/log/jeromelu/scout-refresh.log`
+
+`scout-refresh.sh` sources `/opt/jeromelu/.env` for `ADMIN_KEY`, calls the matching admin endpoint, and exits non-zero on non-2xx so cron failures are observable. Box is in UTC — schedules target AEST clock times, so jobs drift +1 hour during AEDT.
