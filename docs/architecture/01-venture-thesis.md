@@ -81,15 +81,7 @@ Compression *and* entertainment — neither alone is enough.
 
 ## The Value Proposition
 
-Here's the value the customer gets, and what's being built to unlock it. Full breakdown in [Value & Delivery](02-value-and-delivery.md).
-
-| Customer value | What we're doing to unlock it |
-|---|---|
-| **Compression** — the week's NRL commentary distilled into a small number of opinionated takes | Scout ingests YouTube sources; Analyst cross-references claims; Jaromelu publishes Remarks that compress 12+ hours of audio into 4–6 calls per round |
-| **Truth filter** — know which commentators are actually accurate, sliced by topic | Speaker-diarised claims ledger; every claim graded against reality; published as the Alignment Index |
-| **A show worth following** — entertainment with a host and a crew, not a dashboard | Crew presented as characters; weekly episode arc; visible work as spectacle; voice-everywhere editorial |
-| **Skin in the game** — the customer is in the show with their own track record | Reactions on open Remarks; challenges directed at Jaromelu; Personal Alignment Index tracks customer accuracy |
-| **Public stakes** — every call carries real consequences | Open → Locked → Resolved Remark lifecycle; receipts for resolved calls; rolling accuracy never reset |
+Five pillars unpack the promise — **Compression, Truth Filter, A Show Worth Following, Skin in the Game, Public Stakes.** Each is a job the customer is hiring Jaromelu to do. Full breakdown — mechanisms, customer experience, and signals — in [Value & Delivery](02-value-and-delivery.md).
 
 Sequencing: **build Compression and Truth Filter first** — they need only the core (persona + knowledge graph). Skin-in-the-Game and Public Stakes layer in as the audience interaction surfaces mature. SC-specific value comes with the SC spoke.
 
