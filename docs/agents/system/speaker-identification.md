@@ -59,13 +59,27 @@ The system improves itself over time: every operator confirmation and every high
 
 ## Where it sits in the pipeline
 
+The Transcription stage runs **two parallel branches** on the same audio: pyannote diarization (turn segmentation + voice embeddings) and Deepgram nova-3 (transcript text). Speaker Identification depends on **pyannote and the video stream** — not Deepgram.
+
 ```
-Scout                  Transcription              Speaker Identification         Knowledge Extraction
-(audio + video    →    (pyannote turns +     →    (voice + face + fusion)   →    (claims, quotes,
- in S3)                 Deepgram words)            ← THIS SURFACE                 consensus)
+audio (Scout)  ─┬─> pyannote ───────────> turns + 256-dim voice embeddings  ──┐
+                │                                                              │
+                └─> Deepgram nova-3 ────> words → source_chunks (text)        │  ← not consumed
+                                                                               │
+video (Scout)  ────> InsightFace @ 1 fps > face detections + 512-dim embeds  ─┤
+                                                                               │
+                                                                               ▼
+                                                              Speaker Identification
+                                                              (voice + face + fusion)
+                                                                               │
+                                                                               ▼
+                                                              Knowledge Extraction
+                                                              (claims, quotes, consensus)
 ```
 
-- **Predecessor:** [Transcription](transcription.md) — produces the `source_speakers` rows (one per pyannote turn) with their per-window voice embeddings. This surface fills in `speaker_person_id` and provenance columns on those rows.
+- **Direct inputs:** pyannote's per-turn voice embeddings (`source_speakers.embedding`) **and** 1 fps video frames. Both are required for full coverage; either alone produces partial attribution.
+- **Not an input:** Deepgram's text. Speaker Identification would still populate `speaker_person_id` correctly with Deepgram disabled — you'd just have no readable transcript text to attribute *to*. Deepgram and Speaker ID are parallel: they fill different columns on the same source.
+- **Predecessor:** [Transcription](transcription.md) — owns both audio branches (pyannote + Deepgram) and the merge that creates the `source_speakers` and `source_chunks` rows. Speaker ID reads from `source_speakers` and writes back to it.
 - **Priors source:** [Presenter Scout](presenter-scout.md) — curates *which* hosts are confirmed for a channel, giving Identification a starting roster before manual enrollment is needed (presenter-scout Phase 3, planned).
 - **Consumers:**
   - The in-app stream viewer's face overlay (`YouTubeFaceOverlay.tsx`) — reads the face-track JSON live.
