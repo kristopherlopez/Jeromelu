@@ -200,7 +200,7 @@ No streaming UI in v1. The agent run is fast (~30s); a spinner is fine.
 
 ## Documentation Updates
 
-- **NEW `docs/agents/system/presenter-scout.md`** — surface doc: tools, prompt, bounds, hand-off contract (candidate → Person + source_presenters), running, backlog. Mirrors `transcription.md` shape.
+- **NEW `docs/agents/system/presenter-scout.md`** — surface doc: tools, prompt, bounds, hand-off contract (candidate → Person + source_presenters), running, backlog. Mirrors `transcription-pipeline.md` shape.
 - **`docs/agents/crew/analyst.md`** — note that confirmed `source_presenters` rows are surfaced to the visual_id / voice_id matchers as priors (after Phase 3).
 - **`docs/agents/system/README.md`** — add Presenter Scout to the agent registry.
 - **`docs/operations/data-catalogue.md`** — document `scout_presenter_candidates` and `source_presenters`.

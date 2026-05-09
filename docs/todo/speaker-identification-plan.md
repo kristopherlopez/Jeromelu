@@ -504,9 +504,9 @@ The asymmetry that makes this work: face ID + ASD is *easier to bootstrap* (few 
 
 ## Documentation Updates
 
-- **NEW `docs/agents/system/speaker-identification.md`** — full surface doc: voice + visual + fusion, hand-off contract, running, backlog. Mirrors the shape of `transcription.md`.
+- **NEW `docs/agents/system/speaker-identification.md`** — full surface doc: voice + visual + fusion, hand-off contract, running, backlog. Mirrors the shape of `transcription-pipeline.md`.
 - **NEW `docs/operations/identification-runbook.md`** — operator runbook: how to enroll a host (face + voice), how to clean up bad embeddings, threshold tuning, format heuristic interpretation.
-- **`docs/agents/system/transcription.md`** — rewrite "What it does" steps 3–5 to reflect Deepgram-without-diarize. Move "Speaker → Person resolution" out of Backlog into the active pipeline. Reference migrations 047–050.
+- **`docs/agents/system/transcription-pipeline.md`** — rewrite "What it does" steps 3–5 to reflect Deepgram-without-diarize. Move "Speaker → Person resolution" out of Backlog into the active pipeline. Reference migrations 047–050.
 - **`docs/agents/crew/analyst.md`** — add Identification surface alongside Transform.
 - **`docs/agents/system/ingestion.md`** — Scout now acquires video alongside audio; document the new path and S3 lifecycle rule.
 - **`docs/sources/extraction-method.md`** — extraction method labels evolve: `deepgram_words+pyannote_v1` → `…+visual_v1` after Phase 4.
@@ -516,7 +516,7 @@ The asymmetry that makes this work: face ID + ASD is *easier to bootstrap* (few 
 
 ## Related
 
-- [Transcription (Analyst's first Transform)](../agents/system/transcription.md) — predecessor surface this plan extends.
+- [Transcription (Analyst's first Transform)](../agents/system/transcription-pipeline.md) — predecessor surface this plan extends.
 - [Analyst (crew)](../agents/crew/analyst.md)
 - [Ingestion (Scout)](../agents/system/ingestion.md) — gains the video acquisition step.
 - [Migration 044](../../packages/db/migrations/044_audio_first_extract.sql), [045](../../packages/db/migrations/045_split_ingestion_transcription.sql), [046](../../packages/db/migrations/046_chunk_paragraph_break.sql) — current schema.

@@ -48,7 +48,7 @@ The system improves itself over time: every operator confirmation and every high
 |---|---|---|
 | Turn segmentation | `pyannote/speaker-diarization-3.1` | Splits audio into per-turn spans. The atomic unit everything else attributes to. |
 | Voice embedding | `pyannote/wespeaker-voxceleb-resnet34-LM` (256-dim) | One vector per 2-second sliding window inside a turn — the voice fingerprint. |
-| ASR (transcription) | Deepgram `nova-3` | Words + timestamps + paragraph breaks. Separate surface — see [transcription.md](transcription.md). |
+| ASR (transcription) | Deepgram `nova-3` | Words + timestamps + paragraph breaks. Separate surface — see [transcription-pipeline.md](transcription-pipeline.md). |
 | Face detection + embedding | InsightFace `buffalo_l` — RetinaFace detector + ArcFace 512-dim embedder + `landmark_3d_68` | Detects faces in 1 fps video frames, extracts an embedding per face, and provides 3D facial landmarks for active-speaker detection. |
 | Active-speaker detection | Mouth-opening heuristic over 3D landmarks (no model) | Picks the *speaking* face when multiple are visible. Phase 4-asd. Real audio-sync ASD models (Light-ASD, TalkNet) are on the backlog. |
 | Storage — registries | Postgres + pgvector — `person_voiceprints` (256d), `person_face_embeddings` (512d) | Per-Person voice and face vectors that grow over time. |
@@ -79,7 +79,7 @@ video (Scout)  ────> InsightFace @ 1 fps > face detections + 512-dim emb
 
 - **Direct inputs:** pyannote's per-turn voice embeddings (`source_speakers.embedding`) **and** 1 fps video frames. Both are required for full coverage; either alone produces partial attribution.
 - **Not an input:** Deepgram's text. Speaker Identification would still populate `speaker_person_id` correctly with Deepgram disabled — you'd just have no readable transcript text to attribute *to*. Deepgram and Speaker ID are parallel: they fill different columns on the same source.
-- **Predecessor:** [Transcription](transcription.md) — owns both audio branches (pyannote + Deepgram) and the merge that creates the `source_speakers` and `source_chunks` rows. Speaker ID reads from `source_speakers` and writes back to it.
+- **Predecessor:** [Transcription](transcription-pipeline.md) — owns both audio branches (pyannote + Deepgram) and the merge that creates the `source_speakers` and `source_chunks` rows. Speaker ID reads from `source_speakers` and writes back to it.
 - **Priors source:** [Presenter Scout](presenter-scout.md) — curates *which* hosts are confirmed for a channel, giving Identification a starting roster before manual enrollment is needed (presenter-scout Phase 3, planned).
 - **Consumers:**
   - The in-app stream viewer's face overlay (`YouTubeFaceOverlay.tsx`) — reads the face-track JSON live.
@@ -256,7 +256,7 @@ S-norm score normalisation is mentioned in the plan as a future enhancement — 
 
 Embedded into both enrollment and matching, in order of importance:
 
-1. **Sub-300 ms turns are skipped at diarization time** ([transcription.md](transcription.md)). They have NULL embeddings and never participate.
+1. **Sub-300 ms turns are skipped at diarization time** ([transcription-pipeline.md](transcription-pipeline.md)). They have NULL embeddings and never participate.
 2. **NaN/inf embeddings are dropped at every layer**: extraction (`diarize.py`), pre-write (`transcribe.py` `_safe_embedding`), pre-match (`identify_voice.identify_pyannote_turns`), and the threshold check itself uses `math.isfinite` to defend against `NaN < 0.75` returning False.
 3. **Sub-`MIN_TURN_DURATION` enrollment spans are hard-rejected.** Spans below `SOFT_MIN_ENROLLMENT_DURATION` (10 s) log-warn but proceed.
 
@@ -312,6 +312,6 @@ The review UI overlays the face-track JSON directly on the YouTube iframe via `s
 
 ## Related
 
-- [Transcription (Phase 2)](transcription.md) — predecessor surface that produces the per-turn embeddings this surface matches against.
+- [Transcription Pipeline](transcription-pipeline.md) — predecessor surface that produces the per-turn embeddings this surface matches against.
 - [Speaker Identification plan](../../todo/speaker-identification-plan.md) — Phase 1–5 roadmap.
 - [Migration 047](../../../packages/db/migrations/047_pyannote_diarization.sql) (voice embeddings on `source_speakers`), [048](../../../packages/db/migrations/048_person_voiceprints.sql) (voiceprint table), [049](../../../packages/db/migrations/049_person_face_embeddings.sql) (face registry), [050](../../../packages/db/migrations/050_speaker_match_provenance.sql) (per-modality provenance + video columns).

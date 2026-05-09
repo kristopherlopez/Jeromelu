@@ -14,7 +14,7 @@ tags: [area/agents, subarea/system, status/live]
 
 Replaces the legacy Temporal-based `IntelSweepWorkflow` (under `services/worker-ingestion/`, dev-only). Sits at the boundary between Scout's discovery + enumeration surface and Analyst's transcription surface.
 
-> **For transcription / diarisation** — see [transcription.md](transcription.md). That's a separate Analyst-owned pass that runs on Scout's audio after it's in S3.
+> **For transcription / diarisation** — see [transcription-pipeline.md](transcription-pipeline.md). That's a separate Analyst-owned pass that runs on Scout's audio after it's in S3.
 
 ---
 
@@ -39,7 +39,7 @@ On failure (yt-dlp DownloadError, video deleted, members-only): `sources.ingesti
 |---|---|---|
 | `sources` | `audio_s3_key`, `ingestion_status='collected'` | `transcription_status`, `extraction_method`, `ingested_at` (Analyst sets these once the transcript materialises) |
 
-Scout writes **nothing** to `source_documents`, `source_speakers`, `source_chunks`. Those are Analyst's writes — see [transcription.md](transcription.md).
+Scout writes **nothing** to `source_documents`, `source_speakers`, `source_chunks`. Those are Analyst's writes — see [transcription-pipeline.md](transcription-pipeline.md).
 
 ---
 
@@ -80,7 +80,7 @@ OK
 ## Related
 
 - [Scout — § 3.5 audio acquisition](../crew/scout.md#35-audio-acquisition-deterministic-shipped)
-- [Transcription (Analyst)](transcription.md) — what runs on Scout's audio next
+- [Transcription (Analyst)](transcription-pipeline.md) — what runs on Scout's audio next
 - [Source discovery](source-discovery.md) — Scout's discovery + enumeration; produces the `sources` rows that this module drains
 - [Sources § extraction method](../../sources/extraction-method.md) — full pipeline cost model
 - [Migration 044](../../../packages/db/migrations/044_audio_first_extract.sql), [Migration 045](../../../packages/db/migrations/045_split_ingestion_transcription.sql), [Migration 046](../../../packages/db/migrations/046_chunk_paragraph_break.sql)

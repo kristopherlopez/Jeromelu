@@ -220,7 +220,7 @@ flowchart LR
 **Trace:**
 1. **Sync enumeration** (§3.3) — recon-approval handler commits `channels`, then synchronously calls `refresh_channel_videos(full_backfill=True)`. The channel's uploads playlist is walked (capped 200), each video inserted as a `sources` row, and a discovery-time `video_metrics` snapshot is written per video.
 2. **Daily cron keeps things current** (§3.4) — `POST /admin/scout/refresh-videos` walks each channel for new uploads using the last known `video_id` as cursor (typically 1 quota unit / channel / day) and re-snapshots stats for every YouTube source. ~750 quota units / pass.
-3. **Audio gets collected** (§3.5) — `acquire_audio()` pulls m4a via yt-dlp and lands it in `s3://jeromelu-raw-audio/...`, setting `audio_s3_key` and `ingestion_status='collected'`. Transcription is the next step (Analyst, [transcription](../system/transcription.md)). Recurring drain job over `ingestion_status='pending'` sources is on the backlog.
+3. **Audio gets collected** (§3.5) — `acquire_audio()` pulls m4a via yt-dlp and lands it in `s3://jeromelu-raw-audio/...`, setting `audio_s3_key` and `ingestion_status='collected'`. Transcription is the next step (Analyst, [transcription](../system/transcription-pipeline.md)). Recurring drain job over `ingestion_status='pending'` sources is on the backlog.
 
 ---
 
@@ -323,7 +323,7 @@ Keeps every tracked YouTube channel's video list and per-video popularity number
 
 ### 3.5 Audio acquisition `[deterministic, shipped]`
 
-Scout's last Extract step. Pulls audio from approved-but-pending YouTube sources and lands it in S3. **Extract only** — does not interpret the audio. Transcription / diarisation belongs to [Analyst](analyst.md) (see [analyst/transcription](../system/transcription.md)).
+Scout's last Extract step. Pulls audio from approved-but-pending YouTube sources and lands it in S3. **Extract only** — does not interpret the audio. Transcription / diarisation belongs to [Analyst](analyst.md) (see [analyst/transcription](../system/transcription-pipeline.md)).
 
 **Trigger** — Manual CLI: `python -m app.scout.audio_cli <source_id>` or `make collect-audio SOURCE_ID=<uuid>`. The recurring drain job (APScheduler / cron over `ingestion_status='pending'`) is on the backlog.
 
@@ -340,7 +340,7 @@ Scout's last Extract step. Pulls audio from approved-but-pending YouTube sources
 **Failure mode** — no fallback chain. On `yt-dlp` failure: `sources.ingestion_status='failed'`, `AudioError` raised. Operator inspects and re-runs.
 
 **Hand-off boundary** — Scout is done when the source row has `ingestion_status='collected'` and `audio_s3_key` set. Analyst picks it up from there:
-- Transcription + diarisation + chunking ([analyst/transcription](../system/transcription.md))
+- Transcription + diarisation + chunking ([analyst/transcription](../system/transcription-pipeline.md))
 - Cleaning pass (`source_documents.cleaned_text`, `source_chunks.clean_text`)
 - Embedding pass (`source_chunks.embedding`)
 - Speaker → Person resolution (`source_speakers.speaker_person_id`)

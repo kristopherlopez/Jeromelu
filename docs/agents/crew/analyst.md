@@ -6,7 +6,7 @@ tags: [area/agents, subarea/crew]
 
 **Internal function** — owns every Transform on top of Scout's raw bytes:
 
-1. **Transcript materialisation** — turn audio in S3 (Scout's output) into a structured transcript (`source_documents`, `source_chunks`). [System spec → transcription](../system/transcription.md).
+1. **Transcript materialisation** — turn audio in S3 (Scout's output) into a structured transcript (`source_documents`, `source_chunks`). [System spec → transcription](../system/transcription-pipeline.md).
 2. **Lineup — speaker identification.** Within transcript materialisation, attribute each turn to a known `Person` using voice fingerprints, face embeddings, and active-speaker mouth-motion fused per turn. Writes `source_speakers` + provenance columns + the registries (`person_voiceprints`, `person_face_embeddings`). [System spec → identification](../system/speaker-identification.md).
 3. **Cleaning, claim / quote / consensus extraction** — the historical Analyst surface; cross-references claims across sources, finds contradictions, detects consensus shifts, builds structured evidence on top of those chunks.
 
@@ -119,7 +119,7 @@ Flagged but not currently scoped:
 
 Analyst mode spans:
 
-- **[Transcription](../system/transcription.md)** — current shipped surface (Deepgram words + pyannote diarization)
+- **[Transcription](../system/transcription-pipeline.md)** — current shipped surface (Deepgram words + pyannote diarization)
 - **[Identification (Lineup)](../system/speaker-identification.md)** — voice + face fusion, enrolment CLIs, threshold tuning
 - **[Extraction](../system/extraction.md)** — claim / entity resolution, cleaning, augmenting (skill-driven today)
 - **[Publishing](../system/publishing.md)** — `update_consensus_snapshots` for consensus shifts and contradictions (planned)

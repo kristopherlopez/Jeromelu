@@ -136,7 +136,7 @@ Backfill of the 215 prod sources currently in `source_chunks_v1` is deferred —
 - [Scout § 3.5 — Audio acquisition](../agents/crew/scout.md#35-audio-acquisition-deterministic-shipped)
 - [Analyst (crew)](../agents/crew/analyst.md) — owns transcription + later passes
 - [Audio ingestion system spec](../agents/system/ingestion.md) — Scout's audio-pull surface
-- [Transcription system spec](../agents/system/transcription.md) — Analyst's Deepgram surface
+- [Transcription system spec](../agents/system/transcription-pipeline.md) — Analyst's Deepgram surface
 - [Migration 044](../../packages/db/migrations/044_audio_first_extract.sql) — chunks rebuilt with speaker FK
 - [Migration 045](../../packages/db/migrations/045_split_ingestion_transcription.sql) — split Scout ingest from Analyst transcription
 - [Migration 046](../../packages/db/migrations/046_chunk_paragraph_break.sql) — `source_chunks.paragraph_break`
