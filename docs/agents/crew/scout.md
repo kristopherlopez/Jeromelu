@@ -15,7 +15,7 @@ Scope is everything from *we don't know about this source* to *raw transcripts p
 | **Type**              | Crew mode (internal reasoning)                                                                                                                               |
 | **ETL role**          | **Extract only.** No Transform. (Cleaning, diarisation, parsing, embedding, normalisation are all downstream.)                                               |
 | **Scope**             | Discovery · post-approval enumeration · metadata refresh · raw transcript pull                                                                               |
-| **Status**            | **Shipped:** agentic discovery, recon API, post-approval enumeration, weekly video-stats refresh. **In design:** deterministic discovery surface.            |
+| **Status**            | **Shipped:** agentic discovery, recon API, post-approval enumeration, daily video-stats refresh. **In design:** deterministic discovery surface.            |
 | **Platform coverage** | YouTube only today. Schema (`scout_candidates.platform`, `sources.platform`) is platform-agnostic; podcasts (RSS), Twitter/X, blogs, and Reddit are backlog. |
 | **Code**              | `services/api/app/scout/` — discovery agent (`loop.py`, `prompt.py`, `tools.py`), enumeration / refresh (`refresh.py`), audio acquisition (`audio.py`). Transcription / diarisation is Analyst's surface — `services/api/app/analyst/transcribe.py`. Legacy: `services/worker-ingestion/` (Temporal, superseded).                                                                  |
 | **Trigger**           | Manual CLI: `python -m app.scout.cli`. Scheduled runs and live SSE stream are planned.                                                                       |
@@ -45,8 +45,8 @@ Scout       →  Analyst    →  Bookkeeper + Critic  →  Jaromelu
 ### What Scout DOES cover
 
 1. **Discovering new channels** across platforms — deterministic YouTube-native search (§3.1, in design) for the bulk case; agentic web hunt today (§3.2, shipped) for off-platform / long-tail. YouTube only today; podcasts / Twitter / blogs / Reddit on backlog.
-2. **Enumerating new sources from approved channels** — synchronous uploads-playlist walk on approval (§3.3, shipped) plus incremental weekly enumeration of fresh uploads on tracked channels (§3.4, shipped).
-3. **Refreshing per-video metadata** — weekly snapshot of views / likes / comments into `video_metrics` (§3.4, shipped). Enables view-velocity ranking and breakout detection.
+2. **Enumerating new sources from approved channels** — synchronous uploads-playlist walk on approval (§3.3, shipped) plus incremental daily enumeration of fresh uploads on tracked channels (§3.4, shipped).
+3. **Refreshing per-video metadata** — daily snapshot of views / likes / comments into `video_metrics` (§3.4, shipped). Enables view-velocity ranking and breakout detection.
 4. **Extracting raw audio** — `acquire_audio()` pulls the m4a for an approved source and lands it in S3 (§3.5, shipped). Diarised transcription of that audio is downstream — owned by Analyst, not Scout.
 5. **Refreshing channel-level metadata** — sub count, total views, video count, name changes, active/inactive detection. *Planned* — currently `channel_metrics` is only written at approval time, not periodically refreshed.
 6. **Source health / liveness monitoring** — detecting stalled channels, 404 sources, transcript fetch failures, caption regenerations. *Backlog* — not built.
@@ -185,7 +185,7 @@ flowchart LR
       Enum["§3.3<br/>refresh_channel_videos<br/>uploads-playlist walk"]
     end
 
-    subgraph Weekly["Weekly — Mon 09:00 AET"]
+    subgraph Daily["Daily — 09:15 AEST"]
       Refresh["§3.4<br/>refresh-videos endpoint<br/>incremental enumerate + stats"]
     end
 
@@ -215,11 +215,11 @@ flowchart LR
     Tx      --> Chunks
 ```
 
-**Legend:** rounded ovals = external systems · cylinders = DB tables · hexagon = upstream gate · subgraphs = cadence (sync / weekly / dev-only).
+**Legend:** rounded ovals = external systems · cylinders = DB tables · hexagon = upstream gate · subgraphs = cadence (sync / daily / dev-only).
 
 **Trace:**
 1. **Sync enumeration** (§3.3) — recon-approval handler commits `channels`, then synchronously calls `refresh_channel_videos(full_backfill=True)`. The channel's uploads playlist is walked (capped 200), each video inserted as a `sources` row, and a discovery-time `video_metrics` snapshot is written per video.
-2. **Weekly cron keeps things current** (§3.4) — `POST /admin/scout/refresh-videos` walks each channel for new uploads using the last known `video_id` as cursor (typically 1 quota unit / channel / week) and re-snapshots stats for every YouTube source. ~750 quota units / pass.
+2. **Daily cron keeps things current** (§3.4) — `POST /admin/scout/refresh-videos` walks each channel for new uploads using the last known `video_id` as cursor (typically 1 quota unit / channel / day) and re-snapshots stats for every YouTube source. ~750 quota units / pass.
 3. **Audio gets collected** (§3.5) — `acquire_audio()` pulls m4a via yt-dlp and lands it in `s3://jeromelu-raw-audio/...`, setting `audio_s3_key` and `ingestion_status='collected'`. Transcription is the next step (Analyst, [transcription](../system/transcription.md)). Recurring drain job over `ingestion_status='pending'` sources is on the backlog.
 
 ---
@@ -247,7 +247,7 @@ Cheap, fast, reproducible YouTube-native discovery. Owns the bulk case (new uplo
 
 **Outputs** — rows in `scout_candidates` (same table as §3.2, distinguished by `discovered_via`). No score / content_categories on first pass — those are added post-hoc by a lightweight scoring pass (could be deterministic heuristics or a small LLM batch).
 
-**Quota budget** — `search.list` = 100 units/call. ~10 seed queries × daily = 7,000 units/week. ~150 channels × `channels.list?relatedToChannelId` = depends on endpoint cost (verify during implementation). Target: stay within 10,000-unit/day free tier including the weekly refresh job (§3.4, ~750 units/week).
+**Quota budget** — `search.list` = 100 units/call. ~10 seed queries × daily = 7,000 units/week. ~150 channels × `channels.list?relatedToChannelId` = depends on endpoint cost (verify during implementation). Target: stay within 10,000-unit/day free tier including the daily refresh job (§3.4, ~750 units/day).
 
 **Audit** — needs to land on `agent_runs` even though there's no LLM (treat the cron run as an "agent" of `agent_id='scout-det'` for unified cost/health dashboards). Open question — see roadmap row.
 
@@ -295,11 +295,11 @@ Runs synchronously inside the recon-approval HTTP handler. Pulls a freshly-appro
 
 **Outputs** — `sources` rows (videos), `video_metrics` snapshot rows.
 
-**Failure mode** — approval still commits if YouTube API fails; channel is in `channels`, admin can re-trigger via the per-channel endpoint (§3.4 — `POST /admin/scout/channels/{ref}/refresh-videos?full_backfill=true`) without waiting for the weekly cron.
+**Failure mode** — approval still commits if YouTube API fails; channel is in `channels`, admin can re-trigger via the per-channel endpoint (§3.4 — `POST /admin/scout/channels/{ref}/refresh-videos?full_backfill=true`) without waiting for the daily cron.
 
 **Audit** — currently logged through the recon endpoint's standard request log (no `agent_runs` row — this is a deterministic post-processing step, not an agent run).
 
-### 3.4 Weekly refresh job `[deterministic]`
+### 3.4 Daily refresh job `[deterministic]`
 
 Keeps every tracked YouTube channel's video list and per-video popularity numbers current. Idempotent.
 
@@ -313,7 +313,7 @@ Keeps every tracked YouTube channel's video list and per-video popularity number
 
 **Outputs** — new `sources` rows for fresh uploads + new `video_metrics` rows. Total ~750 YouTube quota units per pass against a 10,000-unit free tier.
 
-**Per-channel ad-hoc variant** — `POST /api/admin/scout/channels/{ref}/refresh-videos[?full_backfill=true][&max_results=N]` runs `refresh_channel_videos()` for a single channel on demand. Path param accepts UUID or slug. Use to recover a channel whose approval-time enumerate (§3.3) failed (`full_backfill=true`), or to force-pull one channel's new uploads between weekly runs (incremental). `max_results` defaults to 200 and is hard-capped at 15000 by the YouTube helper — sized for broadcaster archives (NRL / WWOS / NRL on Nine each have ~11-12k uploads). Make wrapper: `make prod-refresh-channel-videos CHANNEL=<uuid-or-slug> [FULL_BACKFILL=1] [MAX_RESULTS=15000] ADMIN_KEY=xxx`.
+**Per-channel ad-hoc variant** — `POST /api/admin/scout/channels/{ref}/refresh-videos[?full_backfill=true][&max_results=N]` runs `refresh_channel_videos()` for a single channel on demand. Path param accepts UUID or slug. Use to recover a channel whose approval-time enumerate (§3.3) failed (`full_backfill=true`), or to force-pull one channel's new uploads between daily runs (incremental). `max_results` defaults to 200 and is hard-capped at 15000 by the YouTube helper — sized for broadcaster archives (NRL / WWOS / NRL on Nine each have ~11-12k uploads). Make wrapper: `make prod-refresh-channel-videos CHANNEL=<uuid-or-slug> [FULL_BACKFILL=1] [MAX_RESULTS=15000] ADMIN_KEY=xxx`.
 
 **Downstream** — once `video_metrics` has 2+ samples per video, view-velocity ranking becomes available (SQL in [the spec](../system/source-discovery.md#influence-ranking)).
 

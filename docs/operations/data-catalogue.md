@@ -570,7 +570,7 @@ Individual content items (a specific video, episode, article).
 
 ### video_metrics
 
-Time-series popularity per video (a `sources` row). Same shape as `channel_metrics` — see migration 023 for the design rationale. YouTube payload: `{views, likes, comments, duration_seconds}`. Sampled at video discovery time and weekly thereafter via the admin refresh endpoint.
+Time-series popularity per video (a `sources` row). Same shape as `channel_metrics` — see migration 023 for the design rationale. YouTube payload: `{views, likes, comments, duration_seconds}`. Sampled at video discovery time and daily thereafter via the admin refresh endpoint.
 
 | Column | Type | Nullable | Default | Notes |
 |--------|------|----------|---------|-------|

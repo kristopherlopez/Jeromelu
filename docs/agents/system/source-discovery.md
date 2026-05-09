@@ -14,7 +14,7 @@ tags: [area/agents, subarea/system, status/live]
 
 Scout's "find new sources" job. An autonomous Anthropic agent that hunts the web for NRL YouTube channels and videos, scores them, and files them to `scout_candidates` for human review. **Not Temporal-based** — runs in-process, see [project-temporal-not-in-prod note](../../operations/aws-resource-inventory.md).
 
-Approval of a channel candidate triggers deterministic post-processing: the channel's full uploads playlist is enumerated and each video is inserted as a `sources` row, with an initial popularity snapshot in `video_metrics`. A weekly refresh job re-walks each channel for new uploads and re-snapshots view/like/comment counts so we can rank videos by influence and detect breakouts. See [§ Post-approval video enumeration](#post-approval-video-enumeration) below.
+Approval of a channel candidate triggers deterministic post-processing: the channel's full uploads playlist is enumerated and each video is inserted as a `sources` row, with an initial popularity snapshot in `video_metrics`. A daily refresh job re-walks each channel for new uploads and re-snapshots view/like/comment counts so we can rank videos by influence and detect breakouts. See [§ Post-approval video enumeration](#post-approval-video-enumeration) below.
 
 ### Extract-only boundary
 
@@ -62,8 +62,8 @@ ANTHROPIC_API_KEY
 | `app/scout/loop.py` | Multi-turn streaming loop with bounds (turns, tool calls, wall-clock, USD budget) |
 | `app/scout/cli.py` | `python -m app.scout.cli` entry point |
 | `app/scout/youtube_api.py` | YouTube Data API v3 client (search, channel stats, playlist enumeration, video stats) |
-| `app/scout/refresh.py` | Post-approval video enumeration + weekly stats refresh (deterministic, not agent-driven) |
-| `app/routers/recon.py` | Admin recon endpoints (list/approve/reject candidates) + the weekly refresh entry point |
+| `app/scout/refresh.py` | Post-approval video enumeration + daily stats refresh (deterministic, not agent-driven) |
+| `app/routers/recon.py` | Admin recon endpoints (list/approve/reject candidates) + the daily refresh entry point |
 | `packages/db/migrations/017_discovered_sources.sql` | Candidate inbox table (renamed to `scout_candidates` in mig 035) |
 | `packages/db/migrations/023_channel_metrics.sql` | Time-series channel popularity (subs/views/videos) |
 | `packages/db/migrations/024_video_metrics.sql` | Time-series video popularity (views/likes/comments) |
@@ -317,7 +317,7 @@ This:
 
 If the YouTube API call fails the approval still commits — the channel is in
 the canonical tables, and the admin can re-trigger enumeration on just that
-channel via the per-channel endpoint (below) without waiting for the weekly
+channel via the per-channel endpoint (below) without waiting for the daily
 refresh.
 
 ## Per-channel ad-hoc refresh
@@ -333,7 +333,7 @@ POST /api/admin/scout/channels/{channel_ref}/refresh-videos
 
 `{channel_ref}` accepts the channel UUID or its slug
 (e.g. `bloke-in-a-bar`). Returns the same shape as one entry in the
-weekly refresh's `enumerate.per_channel` list — `videos_listed`,
+daily refresh's `enumerate.per_channel` list — `videos_listed`,
 `videos_inserted`, `metrics_recorded`. Re-runs are idempotent at the DB
 layer: `sources` INSERTs use `ON CONFLICT DO NOTHING` on `canonical_url`,
 and `video_metrics` snapshots only fire for newly-inserted sources.
@@ -351,13 +351,13 @@ Two situations call for this:
    channel even if YouTube's API hiccupped, leaving the channel
    approved with zero `sources` rows. Run with `FULL_BACKFILL=1` to
    pull the full uploads playlist (capped 200) instead of waiting for
-   Monday's incremental cron.
-2. **Force-pull a single channel between weekly runs** (e.g. a tracked
+   tonight's incremental cron.
+2. **Force-pull a single channel between daily runs** (e.g. a tracked
    channel just published a video and you want it ingested now). Run
    without `FULL_BACKFILL` so the incremental cursor stops at the
    newest known video — typically 1 quota unit.
 
-## Weekly video refresh
+## Daily video refresh
 
 A single admin endpoint runs both the incremental enumerate and the stats
 refresh:
@@ -375,20 +375,20 @@ The job is idempotent and does two things:
    `channel` where `platform='youtube'` and `active=true`, find the most
    recent already-known `sources.canonical_url`, extract its `video_id`, and
    pass that as the `after_video_id` cursor to `playlistItems.list`. The
-   walker stops as soon as it sees the cursor, so most weeks this is one API
+   walker stops as soon as it sees the cursor, so most days this is one API
    page (1 quota unit) and zero new videos per channel.
 2. **Stats refresh** (`refresh_all_video_stats`) — pulls every YouTube source,
    batches `videos.list` 50 ids at a time, and appends one `video_metrics`
-   row per video. ~1 quota unit per 50 videos. ~150 channels × ~200 videos =
-   ~600 quota units per pass.
+   row per video. ~1 quota unit per 50 videos. ~180 channels × ~200 videos =
+   ~720 quota units per pass.
 
-Total weekly quota cost: ~750 units against a 10,000-unit daily free tier.
+Total daily quota cost: ~750 units against a 10,000-unit daily free tier.
 
 Wired to cron — see [Production schedule](#production-schedule) below.
 
 ## Daily channel stats refresh
 
-Lightweight cousin of the weekly video refresh. Snapshots subscriber /
+Lightweight cousin of the daily video refresh. Snapshots subscriber /
 video / view counts for every active YouTube channel into
 `channel_metrics`:
 
@@ -409,8 +409,8 @@ Identity fields (`handle`, `avatar_url`) are also synced onto the
 
 **Quota:** 1 unit per 50 channels — 3 units per pass at the projected ~150
 channel scale. Cheap enough to run daily (10,000 units/day on the free
-tier). Decoupled from the weekly video refresh because per-video stats are
-~200× more expensive and don't need daily cadence.
+tier). Kept on its own endpoint from the heavier video refresh so the
+channel-stats snapshot still lands if the video job fails.
 
 Wired to cron — see [Production schedule](#production-schedule) below.
 
@@ -419,8 +419,8 @@ Wired to cron — see [Production schedule](#production-schedule) below.
 Both refreshes run on the Lightsail box via a checked-in cron file:
 
 - **Schedule:** [`scripts/cron.d/jeromelu`](../../../scripts/cron.d/jeromelu)
-  — daily channel-stats at 09:00 AEST (23:00 UTC), weekly videos Monday
-  09:15 AEST (Sun 23:15 UTC). DST drifts the local hour to 10:00 / 10:15
+  — daily channel-stats at 09:00 AEST (23:00 UTC), daily videos at
+  09:15 AEST (23:15 UTC). DST drifts the local hour to 10:00 / 10:15
   AEDT during summer; accepted.
 - **Wrapper:** [`scripts/scout-refresh.sh`](../../../scripts/scout-refresh.sh)
   — sources `/opt/jeromelu/.env` for `ADMIN_KEY`, hits the API, appends

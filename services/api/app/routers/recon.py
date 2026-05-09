@@ -448,7 +448,7 @@ def stats(db: Session = Depends(get_db)):
 
 
 # ---------------------------------------------------------------------------
-# POST — weekly Scout refresh job
+# POST — daily Scout refresh job
 # ---------------------------------------------------------------------------
 
 @router.post(
@@ -460,7 +460,7 @@ def refresh_videos(
     skip_enumerate: bool = Query(default=False),
     db: Session = Depends(get_db),
 ):
-    """Weekly cron entry point.
+    """Daily cron entry point.
 
     Runs two jobs in sequence:
       1. Incremental video enumerate across every active YouTube channel —
@@ -544,9 +544,8 @@ def refresh_channel_stats(db: Session = Depends(get_db)):
     """Daily cron entry point — snapshot channel popularity into channel_metrics.
 
     Cheap (~1 quota unit per 50 channels — 3 units for the projected ~150
-    channel scale). Decoupled from the weekly /admin/scout/refresh-videos
-    job because the per-video stats refresh is ~200x more expensive and
-    doesn't need daily cadence.
+    channel scale). Kept on its own endpoint so the channel-stats snapshot
+    runs even if the heavier /admin/scout/refresh-videos job fails.
     """
     result = refresh_all_channel_stats(db)
     return {"ok": True, **result}

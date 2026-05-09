@@ -1656,7 +1656,7 @@ class VideoMetric(Base):
 
     Sibling of ChannelMetric. YouTube payload shape:
     {views, likes, comments, duration_seconds}. Sampled at video discovery
-    time (channel approval) and weekly thereafter via the admin refresh
+    time (channel approval) and daily thereafter via the admin refresh
     endpoint.
 
     For "current state" queries prefer the `video_latest_metrics` view.

@@ -8,7 +8,7 @@ filtering — all of which require the official Data API.
 Requires `YOUTUBE_API_KEY` (free tier: 10,000 units/day; search.list = 100
 units, channels.list / channelSections.list / playlistItems.list / videos.list
 = 1 unit). A typical Scout run with 6 channel searches + 20 channel-stats
-lookups consumes ~620 units. A weekly video-stats refresh across ~150 channels
+lookups consumes ~620 units. A daily video-stats refresh across ~180 channels
 consumes ~750 units.
 
 Module surface — all functions are sync (Scout's loop is sync) and use httpx
@@ -401,7 +401,7 @@ def list_channel_videos(
 
     For incremental refresh, pass `after_video_id` = the most-recent video_id
     you already have for this channel. Pagination stops as soon as that id
-    appears in the response, so weekly refreshes are typically a single page.
+    appears in the response, so daily refreshes are typically a single page.
     """
     playlist_id = _uploads_playlist_id(channel_external_id)
     # Defensive safety net — bounds the worst case if a caller passes a

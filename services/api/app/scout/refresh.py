@@ -4,18 +4,18 @@ Two deterministic jobs that bolt on to Scout's discovery flow:
 
 1. `refresh_channel_videos(session, channel)` — enumerate a channel's uploads
    playlist and insert any new videos as `sources` rows. Called automatically
-   on channel approval (full backfill), and weekly via the admin refresh
+   on channel approval (full backfill), and daily via the admin refresh
    endpoint (incremental: stops at the most-recent known video_id).
 
 2. `refresh_all_video_stats(session)` — batch-fetch view/like/comment counts
    for every YouTube source and append a row to `video_metrics`. Called
-   weekly so we can see which videos are gaining traction.
+   daily so we can see view velocity / detect breakouts at 1-day resolution.
 
 Both jobs are idempotent and safe to re-run. Quota cost:
   - Per-channel enumerate: ~4 quota units for full backfill (200 videos),
-    ~1 for incremental (most weeks no new videos).
-  - All-video stats refresh: ~1 unit per 50 videos. ~150 channels × ~200
-    videos = ~600 units for a full pass.
+    ~1 for incremental (most days no new videos).
+  - All-video stats refresh: ~1 unit per 50 videos. ~180 channels × ~200
+    videos = ~720 units for a full pass.
 
 Not Temporal-driven — sync, in-process. Matches the rest of Scout.
 """
@@ -103,7 +103,7 @@ def refresh_channel_videos(
     """Enumerate `channel`'s uploads playlist and insert any new videos.
 
     By default uses the most-recent already-known video_id as a cursor, so
-    weekly runs only fetch what's new. Pass `full_backfill=True` to ignore
+    daily runs only fetch what's new. Pass `full_backfill=True` to ignore
     the cursor and pull up to `max_results` videos regardless.
 
     For each new video inserted into `sources`, also writes a snapshot row
@@ -209,7 +209,7 @@ def refresh_channel_videos(
 
 
 # ---------------------------------------------------------------------------
-# All-video weekly stats refresh
+# All-video daily stats refresh
 # ---------------------------------------------------------------------------
 
 def refresh_all_video_stats(session: Session) -> dict[str, Any]:
@@ -226,7 +226,7 @@ def refresh_all_video_stats(session: Session) -> dict[str, Any]:
          chapter timestamps, thumbnails get refreshed) so always-overwrite
          keeps the DB in sync rather than letting it drift.
 
-    Quota: ~1 unit per 50 videos. ~150 channels × ~200 videos = ~600 units.
+    Quota: ~1 unit per 50 videos. ~180 channels × ~200 videos = ~720 units.
     """
     stmt = (
         select(Source.source_id, Source.canonical_url)
@@ -308,10 +308,6 @@ def refresh_all_video_stats(session: Session) -> dict[str, Any]:
         "batches": batches,
     }
 
-
-# ---------------------------------------------------------------------------
-# Combined weekly job — used by the admin endpoint
-# ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
 # Daily channel stats refresh

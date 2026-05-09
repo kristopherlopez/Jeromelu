@@ -1,8 +1,36 @@
 ---
 tags: [area/agents, subarea/system, status/live]
 ---
-
 # Speaker Identification (Voice + Visual Fusion)
+
+## Purpose
+
+Podcast transcripts come back from diarization as anonymous turn labels — `SPEAKER_00`, `SPEAKER_01`, etc. Speaker Identification attaches a real `Person` (e.g. *Denan Kemp*) to each spoken turn, so transcripts read like a conversation between named hosts rather than unattributed voices.
+
+That attribution is what lets the rest of the system answer questions like *"What did Denan say about Cleary?"* — opinions, predictions, and claims become traceable to the person who voiced them. Without it, every downstream surface (the wiki, claim extraction, consensus tracking, the ledger) would have to operate on anonymous speaker labels, which is the same as no attribution at all.
+
+## What it produces
+
+For each pyannote turn in `source_speakers`, this layer fills in:
+
+- `speaker_person_id` — the matched `Person`, when one was found
+- `match_method` — `voice`, `face`, `voice+face`, or NULL
+- `match_confidence` — score on the matched modality (averaged when both modalities agreed)
+- `audio_match_*` and `visual_match_*` — per-modality provenance (which Person each modality voted for, score) so disagreements stay inspectable
+
+Plus a **face-track JSON** in S3 — the artefact the review-UI overlay renders on top of the YouTube player.
+
+Concrete before / after on one podcast turn:
+
+```
+Before:  SPEAKER_00 (45.2s – 51.8s): "Cleary's a top-three buy this week."
+After:   Denan Kemp (45.2s – 51.8s): "Cleary's a top-three buy this week."
+                                      [match_method=voice+face, confidence=0.91]
+```
+
+The system improves itself over time: every operator confirmation and every high-confidence cross-modal agreement grows the registries (`person_voiceprints`, `person_face_embeddings`), so the next episode auto-resolves more turns without manual work.
+
+## At a glance
 
 | | |
 |---|---|
@@ -14,9 +42,51 @@ tags: [area/agents, subarea/system, status/live]
 
 > **Single-cam caveat:** mouth-opening ASD is the current precision-floor (76.7 % vs 55.4 % without it on the test source) but not a substitute for a real audio-sync ASD model. Reaction-shot false positives (smiling at someone else's joke, laughing during their monologue) survive — `voice+face` is still the most trustworthy subset.
 
+## Technology stack
+
+| Layer | Technology | Role |
+|---|---|---|
+| Turn segmentation | `pyannote/speaker-diarization-3.1` | Splits audio into per-turn spans. The atomic unit everything else attributes to. |
+| Voice embedding | `pyannote/wespeaker-voxceleb-resnet34-LM` (256-dim) | One vector per 2-second sliding window inside a turn — the voice fingerprint. |
+| ASR (transcription) | Deepgram `nova-3` | Words + timestamps + paragraph breaks. Separate surface — see [transcription.md](transcription.md). |
+| Face detection + embedding | InsightFace `buffalo_l` — RetinaFace detector + ArcFace 512-dim embedder + `landmark_3d_68` | Detects faces in 1 fps video frames, extracts an embedding per face, and provides 3D facial landmarks for active-speaker detection. |
+| Active-speaker detection | Mouth-opening heuristic over 3D landmarks (no model) | Picks the *speaking* face when multiple are visible. Phase 4-asd. Real audio-sync ASD models (Light-ASD, TalkNet) are on the backlog. |
+| Storage — registries | Postgres + pgvector — `person_voiceprints` (256d), `person_face_embeddings` (512d) | Per-Person voice and face vectors that grow over time. |
+| Storage — provenance | Postgres — `source_speakers.audio_match_*` / `visual_match_*` / `match_method` / `match_confidence` / `speaker_person_id` | Per-turn record of how each match was made. |
+| Object storage | S3 — `ap-southeast-2` (durable artefacts) + `us-east-1` (SageMaker async staging) | Raw audio, ephemeral video, pyannote JSON, face-track JSON. |
+| Remote GPU inference (Phase 5.5) | SageMaker Async, `ml.g5.xlarge` (A10G), `us-east-1` | Hosts pyannote + InsightFace; toggled by `LINEUP_REMOTE=1`. ~3 min wall time vs ~50 min CPU. |
+| Review UI overlay | Next.js + canvas-on-iframe (`services/web/src/app/components/YouTubeFaceOverlay.tsx`) | Draws colour-coded face boxes on the YouTube player using the face-track JSON. |
+
+## Where it sits in the pipeline
+
+```
+Scout                  Transcription              Speaker Identification         Knowledge Extraction
+(audio + video    →    (pyannote turns +     →    (voice + face + fusion)   →    (claims, quotes,
+ in S3)                 Deepgram words)            ← THIS SURFACE                 consensus)
+```
+
+- **Predecessor:** [Transcription](transcription.md) — produces the `source_speakers` rows (one per pyannote turn) with their per-window voice embeddings. This surface fills in `speaker_person_id` and provenance columns on those rows.
+- **Priors source:** [Presenter Scout](presenter-scout.md) — curates *which* hosts are confirmed for a channel, giving Identification a starting roster before manual enrollment is needed (presenter-scout Phase 3, planned).
+- **Consumers:**
+  - The in-app stream viewer's face overlay (`YouTubeFaceOverlay.tsx`) — reads the face-track JSON live.
+  - Claim extraction + the wiki — attribute opinions and predictions to the named `Person` rather than a `SPEAKER_NN` label.
+  - The ledger — tracks per-host prediction accuracy over time, only meaningful with attribution.
+
+## Concepts
+
+| Term | Meaning |
+|---|---|
+| **Turn** | A continuous span where one speaker is talking, as segmented by pyannote diarization. The atomic unit Identification attributes to. Stored as one `source_speakers` row. |
+| **Voiceprint** | A 256-dim voice embedding from a known host's enrolled audio. Each enrollment span yields many — a sliding-window stack. Stored in `person_voiceprints`. |
+| **Face embedding** | A 512-dim ArcFace vector from a known host's face. Stored in `person_face_embeddings`. |
+| **ASD (Active Speaker Detection)** | Deciding which of several visible faces is speaking *right now*. We use a mouth-opening heuristic; model-based ASD is on the backlog. |
+| **Match method** | How a turn was attributed: `voice` (audio only), `face` (visual only), `voice+face` (both modalities agreed — highest confidence), NULL (no match, or modalities disagreed). Stored on `source_speakers.match_method`. |
+| **Fusion** | The cross-modal vote that combines per-turn voice and face matches into a single `speaker_person_id`. See the [Fusion](#fusion--fuse_per_turnaudio_pid-audio_score-visual_pid-visual_score) table in [How it works](#how-it-works). |
+| **Lineup** | The internal / code name for this surface (voice + face + fusion). Surfaces in `LINEUP_REMOTE`, `services/gpu/`, the phase ledger. The operator-facing name is *Speaker Identification*. |
+
 ---
 
-## What it does
+## How it works
 
 The module is two parallel matchers + a fuser:
 

@@ -249,9 +249,9 @@ prod-update-clean:
 		-H "X-Admin-Key: $(ADMIN_KEY)" \
 		-d '{"video_id":"$(VIDEO)","channel_id":"$(CHANNEL)"}' | python -m json.tool
 
-# Weekly Scout refresh — incrementally enumerate new videos on every active
+# Daily Scout refresh — incrementally enumerate new videos on every active
 # YouTube channel, then refresh view/like/comment counts on every YouTube
-# source into video_metrics. Idempotent. Wire to cron on the Lightsail box.
+# source into video_metrics. Idempotent. Wired to cron on the Lightsail box.
 # Usage: make prod-refresh-videos ADMIN_KEY=xxx
 prod-refresh-videos:
 	curl -s -X POST $(PROD_API)/api/admin/scout/refresh-videos \
@@ -262,7 +262,7 @@ prod-refresh-videos:
 # to incremental; pass FULL_BACKFILL=1 to ignore the cursor and walk
 # newest-first up to MAX_RESULTS videos (default 200, hard cap 1000).
 # Used to recover from a failed approval-time enumerate or to force-pull
-# a single channel without waiting for the weekly cron.
+# a single channel without waiting for the daily cron.
 # Usage: make prod-refresh-channel-videos CHANNEL=<uuid-or-slug> [FULL_BACKFILL=1] [MAX_RESULTS=1000] ADMIN_KEY=xxx
 prod-refresh-channel-videos:
 	curl -s -X POST "$(PROD_API)/api/admin/scout/channels/$(CHANNEL)/refresh-videos?$(if $(FULL_BACKFILL),full_backfill=true&,)$(if $(MAX_RESULTS),max_results=$(MAX_RESULTS),)" \
