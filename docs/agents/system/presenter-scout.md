@@ -174,5 +174,5 @@ See [docs/todo/source-presenters.md](../../todo/source-presenters.md) for the fu
 ## Related
 
 - [Scout (source discovery)](source-discovery.md) — sibling agent; same loop shape, different scope
-- [Speaker Identification](identification.md) — the matchers that will consume confirmed presenters as priors (Phase 3)
+- [Speaker Identification](speaker-identification.md) — the matchers that will consume confirmed presenters as priors (Phase 3)
 - [Agent Audit](agent-audit.md) — the observability trail every agent writes

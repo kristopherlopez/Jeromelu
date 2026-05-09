@@ -504,7 +504,7 @@ The asymmetry that makes this work: face ID + ASD is *easier to bootstrap* (few 
 
 ## Documentation Updates
 
-- **NEW `docs/agents/system/identification.md`** — full surface doc: voice + visual + fusion, hand-off contract, running, backlog. Mirrors the shape of `transcription.md`.
+- **NEW `docs/agents/system/speaker-identification.md`** — full surface doc: voice + visual + fusion, hand-off contract, running, backlog. Mirrors the shape of `transcription.md`.
 - **NEW `docs/operations/identification-runbook.md`** — operator runbook: how to enroll a host (face + voice), how to clean up bad embeddings, threshold tuning, format heuristic interpretation.
 - **`docs/agents/system/transcription.md`** — rewrite "What it does" steps 3–5 to reflect Deepgram-without-diarize. Move "Speaker → Person resolution" out of Backlog into the active pipeline. Reference migrations 047–050.
 - **`docs/agents/crew/analyst.md`** — add Identification surface alongside Transform.

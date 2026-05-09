@@ -37,7 +37,7 @@ For one source where `audio_s3_key IS NOT NULL`:
    - `source_speakers` — **one row per pyannote turn**. Each row carries `speaker_label` (`SPEAKER_00`, `SPEAKER_01`, …), `start_ts`, `end_ts`, `embedding` (the medoid 256-dim vector, NULL on too-short turns), and `embedding_model`.
    - `source_chunks` — one row per Deepgram utterance, FK'd to the pyannote turn it overlaps most (max-overlap assignment). `paragraph_break=true` when the within-turn pause to the previous utterance ≥ 1.5 s.
    - `sources.transcription_status='transcribed'`, `extraction_method='deepgram_words+pyannote_v1'`, `diarization_method='pyannote-3.1'`.
-4. **Voice identification** — see [identification.md](identification.md). The voiceprint registry is loaded once; for each turn's `embedding_windows`, sliding-window cosine matches vote on a Person. When a Person clears the cosine + agreement thresholds, `source_speakers.speaker_person_id` and `confidence` are populated. With an empty registry every turn stays unidentified — no error.
+4. **Voice identification** — see [speaker-identification.md](speaker-identification.md). The voiceprint registry is loaded once; for each turn's `embedding_windows`, sliding-window cosine matches vote on a Person. When a Person clears the cosine + agreement thresholds, `source_speakers.speaker_person_id` and `confidence` are populated. With an empty registry every turn stays unidentified — no error.
 
 On failure (Deepgram, network, malformed response, pyannote, ffmpeg, missing HF token): roll back the transcription transaction, mark `sources.transcription_status='failed'` in a separate transaction, raise `TranscriptionError`. Pyannote is run before Deepgram so a pyannote failure costs zero Deepgram dollars. **No fallback chain** — operator inspects, fixes, re-runs with `--force`. Scout's `audio_s3_key` and `ingestion_status='collected'` are not touched, so the audio doesn't get re-downloaded.
 
@@ -104,7 +104,7 @@ OK
 
 ## Backlog
 
-- **Phase 4 — visual identification + fusion.** Add face recognition + active-speaker detection from low-res video; fuse with voice match to drive `source_speakers.speaker_person_id`. See [docs/todo/speaker-identification.md](../../todo/speaker-identification.md).
+- **Phase 4 — visual identification + fusion.** Add face recognition + active-speaker detection from low-res video; fuse with voice match to drive `source_speakers.speaker_person_id`. See [docs/todo/speaker-identification-plan.md](../../todo/speaker-identification-plan.md).
 - **Recurring drain job** — APScheduler / cron over `transcription_status IS NULL AND ingestion_status = 'collected'`. Single-source CLI today.
 - **Production GPU compute.** Pyannote on Lightsail micro is too slow / memory-tight for prod; Modal / RunPod / dedicated EC2 g4dn worker decision required before this pipeline runs in prod.
 - **Cleaning pass** — `source_documents.cleaned_text`, `source_chunks.clean_text`. Today via `/clean-transcript` skill.
@@ -120,6 +120,6 @@ OK
 - [Analyst (crew)](../crew/analyst.md)
 - [Audio ingestion (Scout)](ingestion.md) — predecessor stage
 - [Sources § extraction method](../../sources/extraction-method.md) — full pipeline cost model, keyterm strategy, error handling
-- [Voice Identification (Phase 3)](identification.md) — successor surface that populates `speaker_person_id` from the embeddings this pipeline produces
-- [Speaker Identification plan](../../todo/speaker-identification.md) — Phase 1 ✅, Phase 2 ✅, Phase 3 ✅, Phase 4 (visual + fusion) next
+- [Voice Identification (Phase 3)](speaker-identification.md) — successor surface that populates `speaker_person_id` from the embeddings this pipeline produces
+- [Speaker Identification plan](../../todo/speaker-identification-plan.md) — Phase 1 ✅, Phase 2 ✅, Phase 3 ✅, Phase 4 (visual + fusion) next
 - [Migration 044](../../../packages/db/migrations/044_audio_first_extract.sql) (chunks rebuilt with speaker FK), [Migration 045](../../../packages/db/migrations/045_split_ingestion_transcription.sql) (status fields split), [Migration 046](../../../packages/db/migrations/046_chunk_paragraph_break.sql) (paragraph_break), [Migration 047](../../../packages/db/migrations/047_pyannote_diarization.sql) (voice embeddings on source_speakers), [Migration 048](../../../packages/db/migrations/048_person_voiceprints.sql) (voiceprint registry)

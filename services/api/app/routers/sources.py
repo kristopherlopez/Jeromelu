@@ -519,7 +519,7 @@ def reassign_speaker(
     repeated clicks add more rows. That's intentional: every correction
     grows the registry.
 
-    See [identification.md § Manual reassign](../system/identification.md).
+    See [speaker-identification.md § Manual reassign](../system/speaker-identification.md).
     """
     # 1. Validate inputs
     source = db.query(Source).filter(Source.source_id == source_id).first()

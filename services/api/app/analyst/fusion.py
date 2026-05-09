@@ -7,7 +7,7 @@ each ``source_speakers`` row. The provenance columns
 ``match_confidence``) record both modalities so the review-UI override
 (Phase 4b) can show why a turn was assigned.
 
-Fusion table (per the plan in ``docs/todo/speaker-identification.md``):
+Fusion table (per the plan in ``docs/todo/speaker-identification-plan.md``):
 
     voice match | face match | result
     -----------+------------+--------

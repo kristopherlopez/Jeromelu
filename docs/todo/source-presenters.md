@@ -205,7 +205,7 @@ No streaming UI in v1. The agent run is fast (~30s); a spinner is fine.
 - **`docs/agents/system/README.md`** — add Presenter Scout to the agent registry.
 - **`docs/operations/data-catalogue.md`** — document `scout_presenter_candidates` and `source_presenters`.
 - **`README.md`** — add `make scout-presenters` to the dev cheatsheet.
-- **`docs/todo/speaker-identification.md`** — cross-link Phase 5 (cross-modal compounding) with this plan: confirmed presenters are the natural starting roster for face/voice priors.
+- **`docs/todo/speaker-identification-plan.md`** — cross-link Phase 5 (cross-modal compounding) with this plan: confirmed presenters are the natural starting roster for face/voice priors.
 
 ## Success criteria
 
@@ -215,5 +215,5 @@ No streaming UI in v1. The agent run is fast (~30s); a spinner is fine.
 
 ## Related
 
-- [Speaker Identification](./speaker-identification.md) — the matchers that consume confirmed presenters as priors (Phase 5).
+- [Speaker Identification](./speaker-identification-plan.md) — the matchers that consume confirmed presenters as priors (Phase 5).
 - [Scout (the original source-discovery agent)](../agents/system/ingestion.md) — same loop shape and audit pattern this extends.

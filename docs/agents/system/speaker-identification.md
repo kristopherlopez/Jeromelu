@@ -229,5 +229,5 @@ The review UI overlays the face-track JSON directly on the YouTube iframe via `s
 ## Related
 
 - [Transcription (Phase 2)](transcription.md) — predecessor surface that produces the per-turn embeddings this surface matches against.
-- [Speaker Identification plan](../../todo/speaker-identification.md) — Phase 1–5 roadmap.
+- [Speaker Identification plan](../../todo/speaker-identification-plan.md) — Phase 1–5 roadmap.
 - [Migration 047](../../../packages/db/migrations/047_pyannote_diarization.sql) (voice embeddings on `source_speakers`), [048](../../../packages/db/migrations/048_person_voiceprints.sql) (voiceprint table), [049](../../../packages/db/migrations/049_person_face_embeddings.sql) (face registry), [050](../../../packages/db/migrations/050_speaker_match_provenance.sql) (per-modality provenance + video columns).

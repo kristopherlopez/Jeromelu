@@ -7,7 +7,7 @@ tags: [area/agents, subarea/crew]
 **Internal function** — owns every Transform on top of Scout's raw bytes:
 
 1. **Transcript materialisation** — turn audio in S3 (Scout's output) into a structured transcript (`source_documents`, `source_chunks`). [System spec → transcription](../system/transcription.md).
-2. **Lineup — speaker identification.** Within transcript materialisation, attribute each turn to a known `Person` using voice fingerprints, face embeddings, and active-speaker mouth-motion fused per turn. Writes `source_speakers` + provenance columns + the registries (`person_voiceprints`, `person_face_embeddings`). [System spec → identification](../system/identification.md).
+2. **Lineup — speaker identification.** Within transcript materialisation, attribute each turn to a known `Person` using voice fingerprints, face embeddings, and active-speaker mouth-motion fused per turn. Writes `source_speakers` + provenance columns + the registries (`person_voiceprints`, `person_face_embeddings`). [System spec → identification](../system/speaker-identification.md).
 3. **Cleaning, claim / quote / consensus extraction** — the historical Analyst surface; cross-references claims across sources, finds contradictions, detects consensus shifts, builds structured evidence on top of those chunks.
 
 **Not a separate visible character.** When this mode is active, Jaromelu's voice (and the UI activity status) reflects it.
@@ -92,7 +92,7 @@ It does **not** write `source_chapters` (analyse-transcript / chapter detection)
 
 ## Lineup status
 
-Lineup is the speaker-identification surface within Analyst's transcript materialisation pipeline. The detailed phase-by-phase plan, evaluation results, and tuning notes live in [docs/todo/speaker-identification.md](../../todo/speaker-identification.md). Operator-facing details (enrollment, thresholds, how matching runs) live in [docs/agents/system/identification.md](../system/identification.md). The summary:
+Lineup is the speaker-identification surface within Analyst's transcript materialisation pipeline. The detailed phase-by-phase plan, evaluation results, and tuning notes live in [docs/todo/speaker-identification-plan.md](../../todo/speaker-identification-plan.md). Operator-facing details (enrollment, thresholds, how matching runs) live in [docs/agents/system/speaker-identification.md](../system/speaker-identification.md). The summary:
 
 | Phase | Scope | Status |
 |---|---|---|
@@ -120,7 +120,7 @@ Flagged but not currently scoped:
 Analyst mode spans:
 
 - **[Transcription](../system/transcription.md)** — current shipped surface (Deepgram words + pyannote diarization)
-- **[Identification (Lineup)](../system/identification.md)** — voice + face fusion, enrolment CLIs, threshold tuning
+- **[Identification (Lineup)](../system/speaker-identification.md)** — voice + face fusion, enrolment CLIs, threshold tuning
 - **[Extraction](../system/extraction.md)** — claim / entity resolution, cleaning, augmenting (skill-driven today)
 - **[Publishing](../system/publishing.md)** — `update_consensus_snapshots` for consensus shifts and contradictions (planned)
 
@@ -128,5 +128,5 @@ Analyst mode spans:
 
 - [Crew Dynamics](dynamics.md) — Analyst mode's place in Jaromelu's internal reasoning flow
 - [The Wiki](../../pages/wiki/overview.md) — where cross-referenced knowledge surfaces, authored by Jaromelu
-- [Speaker Identification plan (Lineup)](../../todo/speaker-identification.md) — full phase ledger, evaluation results, threshold tuning notes
+- [Speaker Identification plan (Lineup)](../../todo/speaker-identification-plan.md) — full phase ledger, evaluation results, threshold tuning notes
 - [Extraction method](../../sources/extraction-method.md) — Deepgram parameters, keyterm vocabulary, cost model for the transcription pass
