@@ -92,22 +92,35 @@ This module does **not** write `source_chapters`, `quotes`, `claims`, or `claim_
 
 ## Running
 
+Full operator workflow for one source:
+
 ```bash
-# Prerequisite: Scout has collected the audio
+# 1. Prerequisite: Scout has collected the audio (and video, if speaker
+#    identification will be applied — Scout writes both to S3 today).
 make collect-audio SOURCE_ID=<uuid>
 
-# Then transcribe (pyannote then Deepgram)
+# 2. (Optional, but recommended) Enroll any known hosts before transcribing.
+#    Skipping leaves speaker_person_id NULL on un-enrolled voices; the
+#    transcript itself still gets produced. See speaker-identification.md
+#    for span recommendations and the underlying matching algorithm.
+make enroll-voice PERSON_ID=<person-uuid> SOURCE_ID=<uuid> START_TS=91.97 END_TS=166.98
+make enroll-face  PERSON_ID=<person-uuid> SOURCE_ID=<uuid> FRAME_TS=120
+
+# 3. Run the pipeline: pyannote → Deepgram → merge → voice ID → visual ID → fusion.
 make transcribe SOURCE_ID=<uuid>
 
 # Replace any existing SourceDocument (re-runs Deepgram + DB writes; pyannote
-# JSON is reused if at current JSON_VERSION).
+# JSON is reused if at current JSON_VERSION). Speaker ID re-runs against the
+# current voice + face registries — new enrollments improve next-run accuracy
+# without a backfill step.
 make transcribe SOURCE_ID=<uuid> FORCE=1
 
-# Force a pyannote re-run (slow on CPU). Then re-transcribe.
+# Force a pyannote re-run (slow on CPU; ~3 min wall time on the SageMaker
+# Async endpoint with LINEUP_REMOTE=1). Then re-transcribe.
 make diarize SOURCE_ID=<uuid> FORCE=1
 make transcribe SOURCE_ID=<uuid> FORCE=1
 
-# Convenience: do both stages in sequence
+# Convenience: collect-audio + transcribe in sequence (does NOT run enrollment).
 make extract-transcript SOURCE_ID=<uuid>
 ```
 
@@ -150,7 +163,7 @@ OK
 
 - [Analyst (crew)](../crew/analyst.md)
 - [Audio ingestion (Scout)](ingestion.md) — predecessor stage
-- [Sources § extraction method](../../sources/extraction-method.md) — full pipeline cost model, keyterm strategy, error handling
-- [Voice Identification (Phase 3)](speaker-identification.md) — successor surface that populates `speaker_person_id` from the embeddings this pipeline produces
-- [Speaker Identification plan](../../todo/speaker-identification-plan.md) — Phase 1 ✅, Phase 2 ✅, Phase 3 ✅, Phase 4 (visual + fusion) next
-- [Migration 044](../../../packages/db/migrations/044_audio_first_extract.sql) (chunks rebuilt with speaker FK), [Migration 045](../../../packages/db/migrations/045_split_ingestion_transcription.sql) (status fields split), [Migration 046](../../../packages/db/migrations/046_chunk_paragraph_break.sql) (paragraph_break), [Migration 047](../../../packages/db/migrations/047_pyannote_diarization.sql) (voice embeddings on source_speakers), [Migration 048](../../../packages/db/migrations/048_person_voiceprints.sql) (voiceprint registry)
+- [Speaker Identification](speaker-identification.md) — successor stage; voice + face + fusion. Populates `speaker_person_id` from the per-turn embeddings this pipeline produces.
+- [Sources § extraction method](../../sources/extraction-method.md) — keyterm strategy, error handling, per-stage cost model
+- [Speaker Identification plan](../../todo/speaker-identification-plan.md) — phase ledger and tuning notes
+- [Migration 044](../../../packages/db/migrations/044_audio_first_extract.sql) (chunks rebuilt with speaker FK), [045](../../../packages/db/migrations/045_split_ingestion_transcription.sql) (status fields split), [046](../../../packages/db/migrations/046_chunk_paragraph_break.sql) (paragraph_break), [047](../../../packages/db/migrations/047_pyannote_diarization.sql) (voice embeddings on `source_speakers`)
