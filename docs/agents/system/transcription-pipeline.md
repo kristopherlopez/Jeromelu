@@ -159,6 +159,22 @@ OK
 
 ---
 
+## Appendix: How pyannote 3.1 does diarization
+
+This is a black-box dependency — `pyannote/speaker-diarization-3.1` is a third-party library; nothing in this repo implements diarization itself. Captured here for audit context. Authoritative source: the `pyannote-audio` project on GitHub and its published paper.
+
+The model is an end-to-end neural pipeline with three internal stages:
+
+1. **Segmentation.** A neural model (PyanNet) processes the audio in short sliding windows and predicts, per frame, who's speaking. The "powerset" output supports overlapping speech (multiple speakers at once), not just single-speaker frames.
+2. **Embedding.** For each segment, generate a 256-dim speaker fingerprint using `pyannote/wespeaker-voxceleb-resnet34-LM` — the same embedder the downstream [Speaker Identification](speaker-identification.md) surface uses for voiceprint matching, which is why our per-turn voice embeddings come "for free" from this stage rather than being re-extracted.
+3. **Clustering.** Agglomerative clustering groups embeddings so all of *speaker A*'s segments end up labelled `SPEAKER_00`, all of *speaker B*'s as `SPEAKER_01`, etc. This step decides how many distinct speakers the source contains.
+
+Output is RTTM-style turn segmentation — a list of `(start, end, speaker_label)` tuples — which we persist as `{video_id}.pyannote.json` alongside the per-turn embeddings.
+
+**Caveat — labels are local to one source.** `SPEAKER_00` in podcast A has nothing to do with `SPEAKER_00` in podcast B. Pyannote has no notion of identity across runs; it only clusters within the audio it's given. That's the gap [Speaker Identification](speaker-identification.md) fills — it attaches a stable `Person` to each anonymous label by matching voice and face fingerprints against persistent registries (`person_voiceprints`, `person_face_embeddings`).
+
+---
+
 ## Related
 
 - [Analyst (crew)](../crew/analyst.md)
