@@ -2,16 +2,48 @@
 tags: [area/agents, subarea/system, status/live]
 ---
 
-# Transcription (Analyst's first Transform)
+# Transcription Pipeline
+
+The orchestration surface for the audio → identified-transcript flow. Takes an audio (and optionally video) source from Scout and walks it through diarization, ASR, merge, and speaker identification — producing the structured transcript every downstream pass (cleaning, claim extraction, the wiki, the ledger) reads from.
+
+This doc is the **end-to-end view**. For matching algorithm detail (voice + face + fusion), see [speaker-identification.md](speaker-identification.md). For audio acquisition, see [ingestion.md](ingestion.md). The rest of this doc owns the pyannote / Deepgram / merge stages and the orchestration that ties everything together.
+
+## Pipeline overview
+
+```
+audio (Scout)  ─┬─> pyannote ───────────> turns + 256-dim voice embeddings  ──┐
+                │                                                              │
+                └─> Deepgram nova-3 ────> words → source_chunks (text)        │
+                                                                               │
+video (Scout)  ────> InsightFace @ 1 fps > face detections + 512-dim embeds  ─┤
+                                                                               │
+                                                                               ▼
+                                                              Speaker Identification
+                                                              (voice + face + fusion)
+                                                                               │
+                                                                               ▼
+                                                              Knowledge Extraction
+                                                              (claims, quotes, consensus)
+```
+
+| Stage | What it does | Surface spec |
+|---|---|---|
+| **Audio + video acquisition** | Scout downloads audio (and optionally video) to S3 — `audio_s3_key` populated; video staged ephemerally per request. | [ingestion.md](ingestion.md) |
+| **Diarization (pyannote)** | `pyannote/speaker-diarization-3.1` segments audio into per-speaker turns; per-window 256-dim voice embeddings via `pyannote/wespeaker-voxceleb-resnet34-LM`. | This doc, step 1 |
+| **ASR (Deepgram)** | `nova-3`, keyterm-biased to the canonical NRL roster; produces words + timestamps + paragraph breaks. | This doc, step 2 |
+| **Merge** | Joins Deepgram utterances to pyannote turns by max-overlap; writes `source_documents` + `source_speakers` (one row per turn) + `source_chunks` (one row per utterance). | This doc, step 3 |
+| **Speaker identification + fusion** | Per-turn voice match (sliding-window cosine vs `person_voiceprints`) + visual match (InsightFace + mouth-opening ASD vs `person_face_embeddings`) + cross-modal fusion → `source_speakers.speaker_person_id`. Plus face-track JSON for the review-UI overlay. | [speaker-identification.md](speaker-identification.md) |
+
+## At a glance
 
 | | |
 |---|---|
-| **Module** | `services/api/app/analyst/transcribe.py` (orchestrator) + `services/api/app/analyst/diarize.py` (pyannote stage) |
+| **Modules** | `services/api/app/analyst/transcribe.py` (orchestrator), `services/api/app/analyst/diarize.py` (pyannote stage). Speaker-identification modules — `identify_voice.py`, `visual_id.py`, `fusion.py` — are run inline by the orchestrator; see [speaker-identification.md](speaker-identification.md). |
 | **Driver** | `python -m app.analyst.transcribe_cli <source_id>` · `make transcribe SOURCE_ID=<uuid>` |
 | **Crew counterpart** | [Analyst](../crew/analyst.md) — Analyst's first surface, sitting in front of cleaning / claim extraction. |
-| **ETL role** | **Transform.** Reads Scout's audio, produces the structured transcript artefacts every later stage depends on. |
-| **Cost** | Deepgram ~$0.30 per 90-min video (nova-3 batch, words only). Pyannote 3.1 runs locally — ~40 min CPU per 45-min audio (~0.9× real-time), single-digit minutes on GPU. |
-| **Status** | Phase 2 (Deepgram words + pyannote diarization) live. Single-source CLI shipped. Recurring drain job not yet built. |
+| **ETL role** | **Transform.** Reads Scout's audio (and video, when speaker ID is in scope); produces the structured transcript artefacts every later stage depends on. |
+| **Cost** | Deepgram ~$0.30 per 90-min video (nova-3 batch, words only). Pyannote 3.1 + InsightFace combined: ~50 min CPU per 45-min source locally; ~3 min wall time on the SageMaker Async GPU endpoint when `LINEUP_REMOTE=1`. End-to-end **~$0.43/source** with remote GPU enabled. |
+| **Status** | Diarization + ASR + merge + voice ID + visual ID + fusion all live. Single-source CLI shipped. Recurring drain job not yet built. |
 
 > **For audio acquisition** — see [ingestion.md](ingestion.md). That's Scout's job; this module refuses to run if Scout hasn't already populated `audio_s3_key`.
 
@@ -37,7 +69,7 @@ For one source where `audio_s3_key IS NOT NULL`:
    - `source_speakers` — **one row per pyannote turn**. Each row carries `speaker_label` (`SPEAKER_00`, `SPEAKER_01`, …), `start_ts`, `end_ts`, `embedding` (the medoid 256-dim vector, NULL on too-short turns), and `embedding_model`.
    - `source_chunks` — one row per Deepgram utterance, FK'd to the pyannote turn it overlaps most (max-overlap assignment). `paragraph_break=true` when the within-turn pause to the previous utterance ≥ 1.5 s.
    - `sources.transcription_status='transcribed'`, `extraction_method='deepgram_words+pyannote_v1'`, `diarization_method='pyannote-3.1'`.
-4. **Voice identification** — see [speaker-identification.md](speaker-identification.md). The voiceprint registry is loaded once; for each turn's `embedding_windows`, sliding-window cosine matches vote on a Person. When a Person clears the cosine + agreement thresholds, `source_speakers.speaker_person_id` and `confidence` are populated. With an empty registry every turn stays unidentified — no error.
+4. **Speaker identification (voice + face + fusion)** — see [speaker-identification.md](speaker-identification.md). The voiceprint and face registries are matched against each pyannote turn's per-window voice embeddings and (when a video stream is available) per-frame face embeddings; results are fused per turn into `speaker_person_id` + `match_method` + `match_confidence`. With empty registries every turn stays unidentified — no error.
 
 On failure (Deepgram, network, malformed response, pyannote, ffmpeg, missing HF token): roll back the transcription transaction, mark `sources.transcription_status='failed'` in a separate transaction, raise `TranscriptionError`. Pyannote is run before Deepgram so a pyannote failure costs zero Deepgram dollars. **No fallback chain** — operator inspects, fixes, re-runs with `--force`. Scout's `audio_s3_key` and `ingestion_status='collected'` are not touched, so the audio doesn't get re-downloaded.
 
@@ -104,7 +136,6 @@ OK
 
 ## Backlog
 
-- **Phase 4 — visual identification + fusion.** Add face recognition + active-speaker detection from low-res video; fuse with voice match to drive `source_speakers.speaker_person_id`. See [docs/todo/speaker-identification-plan.md](../../todo/speaker-identification-plan.md).
 - **Recurring drain job** — APScheduler / cron over `transcription_status IS NULL AND ingestion_status = 'collected'`. Single-source CLI today.
 - **Production GPU compute.** Pyannote on Lightsail micro is too slow / memory-tight for prod; Modal / RunPod / dedicated EC2 g4dn worker decision required before this pipeline runs in prod.
 - **Cleaning pass** — `source_documents.cleaned_text`, `source_chunks.clean_text`. Today via `/clean-transcript` skill.
