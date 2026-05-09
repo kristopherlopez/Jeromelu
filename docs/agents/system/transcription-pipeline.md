@@ -4,7 +4,7 @@ tags: [area/agents, subarea/system, status/live]
 
 # Transcription Pipeline
 
-The orchestration surface for the audio → identified-transcript flow. Takes an audio (and optionally video) source from Scout and walks it through diarization, ASR, merge, and speaker identification — producing the structured transcript every downstream pass (cleaning, claim extraction, the wiki, the ledger) reads from.
+The orchestration surface for the audio → identified-transcript flow. Takes an audio (and optionally video) source from Scout and walks it through diarization, Automatic Speech Recognition (ASR), merge, and speaker identification — producing the structured transcript every downstream pass (cleaning, claim extraction, the wiki, the ledger) reads from.
 
 This doc is the **end-to-end view**. For matching algorithm detail (voice + face + fusion), see [speaker-identification.md](speaker-identification.md). For audio acquisition, see [ingestion.md](ingestion.md). The rest of this doc owns the pyannote / Deepgram / merge stages and the orchestration that ties everything together.
 
