@@ -193,3 +193,38 @@ import {
   to = aws_lightsail_instance.jeromelu
   id = "jeromelu"
 }
+
+# ---- Lineup (Phase 5.5) ------------------------------------------------------
+#
+# Created via aws CLI during the first deploy (services/gpu/SETUP.md).
+# Imported here for source-of-truth consistency. The lifecycle rule on
+# the staging bucket is NOT imported — it was created from HCL on first
+# apply (no live state to adopt).
+
+import {
+  to       = aws_ecr_repository.lineup_gpu
+  id       = "jeromelu/lineup-gpu"
+  provider = aws.us_east_1
+}
+
+import {
+  to       = aws_s3_bucket.sagemaker_async
+  id       = "jeromelu-sagemaker-async"
+  provider = aws.us_east_1
+}
+
+import {
+  to       = aws_s3_bucket_public_access_block.sagemaker_async
+  id       = "jeromelu-sagemaker-async"
+  provider = aws.us_east_1
+}
+
+import {
+  to = aws_iam_role.sagemaker_lineup
+  id = "JeromeluSagemakerLineup"
+}
+
+import {
+  to = aws_iam_role_policy.sagemaker_lineup
+  id = "JeromeluSagemakerLineup:JeromeluSagemakerLineupInline"
+}

@@ -18,6 +18,7 @@ coverage.
 | Lightsail instance + static IP + firewall | yes (PR2) | `jeromelu` instance + `jeromelu-ip`. SSH key pair stays manual. |
 | V0 orphan teardown | yes (PR3) | Out-of-band script — see [`cleanup-v0.sh`](cleanup-v0.sh) |
 | CI workflow (`.github/workflows/terraform.yml`) | yes (PR4) — live 2026-04-30 | Plan-on-PR, comment plan; apply stays manual until apply IAM is sorted |
+| Lineup GPU (Phase 5.5) | yes — `lineup.tf` | ECR `jeromelu/lineup-gpu` + S3 `jeromelu-sagemaker-async` (both `us-east-1`) + IAM role `JeromeluSagemakerLineup`. SageMaker model/config/endpoint stay imperative — see [`services/gpu/deploy.py`](../../services/gpu/deploy.py). |
 
 ## What is **not** managed by Terraform
 
@@ -72,22 +73,20 @@ You need:
 
 ### Pre-flight: verify policies and parameters match HCL
 
-Two HCL blocks are reconstructed from documentation and may not match live
-state byte-for-byte. Verify before plan:
+The IAM policy documents in `iam.tf` are reconstructed from documentation and
+may not match live state byte-for-byte. Verify before plan:
 
 ```bash
-# 1. SSM parameter list — make sure ssm.tf matches what's actually in
-#    Parameter Store. Notably, /jeromelu/anthropic-api-key may exist but
-#    isn't in ssm.tf yet.
-aws ssm describe-parameters \
-  --query 'Parameters[?starts_with(Name, `/jeromelu/`)].Name' \
-  --output text
-
-# 2. IAM policy documents — diff what's in iam.tf against live.
+# Diff what's in iam.tf against live.
 aws iam get-user-policy --user-name jeromelu-cicd \
   --policy-name jeromelu-cicd-permissions --query PolicyDocument
 aws iam get-user-policy --user-name jeromelu-instance \
   --policy-name jeromelu-instance-permissions --query PolicyDocument
+
+# Sanity check on SSM — list of /jeromelu/* params should match `ssm.tf`.
+aws ssm describe-parameters \
+  --query 'Parameters[?starts_with(Name, `/jeromelu/`)].Name' \
+  --output text
 ```
 
 If anything differs, edit the HCL **before** the first plan so apply does

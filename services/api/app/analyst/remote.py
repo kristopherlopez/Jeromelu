@@ -82,12 +82,18 @@ def _invoke_async(payload: dict[str, Any], *, timeout: int) -> dict[str, Any]:
     endpoint = _ensure_endpoint_configured()
     client = _runtime_client()
 
-    # Stage the input JSON in S3. Use the raw-transcripts bucket (same
-    # bucket the artefacts land in — keeps IAM simple).
+    # Stage the input JSON in the SageMaker staging bucket (us-east-1 if
+    # the endpoint is there, regardless of where the artefact buckets
+    # live — see lineup_staging_bucket settings doc).
     request_id = str(uuid4())
     input_key = f"{settings.lineup_input_prefix}/{request_id}.json"
-    upload_raw(input_key, json.dumps(payload, ensure_ascii=False))
-    input_location = f"s3://{settings.s3_raw_bucket}/{input_key}"
+    s3 = get_s3_client()
+    s3.put_object(
+        Bucket=settings.lineup_staging_bucket,
+        Key=input_key,
+        Body=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+    )
+    input_location = f"s3://{settings.lineup_staging_bucket}/{input_key}"
     logger.info("[Lineup remote] %s submitted → %s", payload.get("task"), input_location)
 
     response = client.invoke_endpoint_async(
@@ -98,28 +104,27 @@ def _invoke_async(payload: dict[str, Any], *, timeout: int) -> dict[str, Any]:
     )
     output_location: str = response["OutputLocation"]
 
-    # Poll for the output object. The output URL points at the configured
-    # output prefix — SageMaker writes the response body there on success
-    # and a separate FailureLocation on error.
+    # Poll for the output object. The output URL points at the staging
+    # bucket — SageMaker writes the response body there on success and a
+    # separate FailureLocation on error.
     deadline = time.time() + timeout
-    output_key = output_location.replace(f"s3://{settings.s3_raw_bucket}/", "")
+    output_key = output_location.replace(f"s3://{settings.lineup_staging_bucket}/", "")
     failure_location = response.get("FailureLocation", "")
     failure_key = (
-        failure_location.replace(f"s3://{settings.s3_raw_bucket}/", "")
+        failure_location.replace(f"s3://{settings.lineup_staging_bucket}/", "")
         if failure_location else None
     )
-    s3 = get_s3_client()
 
     while time.time() < deadline:
         try:
-            obj = s3.get_object(Bucket=settings.s3_raw_bucket, Key=output_key)
+            obj = s3.get_object(Bucket=settings.lineup_staging_bucket, Key=output_key)
             body = obj["Body"].read().decode("utf-8")
             return json.loads(body)
         except Exception:
             pass
         if failure_key:
             try:
-                obj = s3.get_object(Bucket=settings.s3_raw_bucket, Key=failure_key)
+                obj = s3.get_object(Bucket=settings.lineup_staging_bucket, Key=failure_key)
                 msg = obj["Body"].read().decode("utf-8", errors="replace")
                 raise RemoteInferenceError(f"Endpoint reported failure: {msg[:500]}")
             except RemoteInferenceError:
@@ -217,12 +222,26 @@ def visual_identify_remote(
         for i, pid in enumerate(person_ids)
     ]
 
+    # Visual ID only uses start/end/speaker from each turn — strip the
+    # embedding_medoid + embedding_windows fields before sending. Drops
+    # the request body from ~28 MB to ~50 KB on a 45-min source. Earlier
+    # versions sent the full turn list and required the TorchServe
+    # max-request-size to be raised; this trim makes that bump optional.
+    slim_turns = [
+        {
+            "start": t["start"],
+            "end": t["end"],
+            "speaker": t.get("speaker"),
+        }
+        for t in pyannote_turns
+    ]
+
     response = _invoke_async(
         {
             "task": "visual_identify",
             "audio_s3_key": audio_s3_key,
             "video_s3_key": video_s3_key,
-            "pyannote_turns": pyannote_turns,
+            "pyannote_turns": slim_turns,
             "cosine_threshold": cosine_threshold,
             "agreement_threshold": agreement_threshold,
             "sample_rate": sample_rate,

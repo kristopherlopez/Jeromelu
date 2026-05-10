@@ -3,7 +3,13 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://jeromelu_admin:localdev123@localhost:5440/jeromelu"
-    s3_endpoint: str = "http://localhost:9000"
+    # Empty default = use real AWS S3 (the standard boto3 endpoint).
+    # Local dev that wants MinIO sets S3_ENDPOINT explicitly via .env or
+    # shell; docker-compose.yml does so for the dev stack. Phase 5.5 fix:
+    # SageMaker silently drops empty-string env values, so we can't rely
+    # on `S3_ENDPOINT=""` overriding a localhost default in the GPU
+    # container — the default itself has to be empty.
+    s3_endpoint: str = ""
     s3_access_key: str = "minioadmin"
     s3_secret_key: str = "minioadmin"
     s3_raw_bucket: str = "jeromelu-raw-transcripts"
@@ -35,11 +41,22 @@ class Settings(BaseSettings):
     # GPU/AWS still works.
     lineup_remote: bool = False
     lineup_endpoint_name: str = "jeromelu-lineup-async"
-    lineup_aws_region: str = "ap-southeast-2"
+    # us-east-1 not ap-southeast-2: Sydney g4dn / g5 capacity was
+    # exhausted at deploy time. us-east-1 has effectively unlimited GPU
+    # capacity. Cross-region S3 reads to the Sydney buckets cost
+    # ~$0.001/source — rounding error against per-source GPU compute.
+    lineup_aws_region: str = "us-east-1"
     lineup_ecr_repo: str = "jeromelu/lineup-gpu"
     lineup_sagemaker_role_arn: str = ""  # arn:aws:iam::ACCOUNT:role/JeromeluSagemakerLineup
-    lineup_input_prefix: str = "sagemaker/lineup/input"
-    lineup_output_prefix: str = "sagemaker/lineup/output"
+    # SageMaker Async requires its input + output S3 paths to be in the
+    # same region as the endpoint. Audio/transcripts live in Sydney; the
+    # endpoint runs in us-east-1 (capacity). Staging bucket bridges that
+    # — it only carries invoke request/response JSONs (small, ephemeral).
+    # Container code still reads/writes the actual artefacts cross-region
+    # to the Sydney buckets, which works fine via virtual-host boto3.
+    lineup_staging_bucket: str = "jeromelu-sagemaker-async"
+    lineup_input_prefix: str = "input"
+    lineup_output_prefix: str = "output"
 
     model_config = {"env_prefix": "", "env_file": ".env", "extra": "ignore"}
 

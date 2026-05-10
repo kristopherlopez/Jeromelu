@@ -29,7 +29,12 @@ from botocore.exceptions import ClientError
 from jeromelu_shared.config import settings
 
 
-INSTANCE_TYPE = "ml.g4dn.xlarge"
+#: T4 (g4dn) is cheapest but capacity is tight in ap-southeast-2 — saw
+#: `InsufficientInstanceCapacity` errors. A10G (g5) is newer, faster,
+#: more readily available; ~2× the price (~$1.40/hr) but still <$1/source
+#: at ~5 min GPU per source. Easy revert: change back to ml.g4dn.xlarge
+#: when you see capacity is back.
+INSTANCE_TYPE = "ml.g5.xlarge"
 
 
 def _account_id(region: str) -> str:
@@ -81,6 +86,25 @@ def _create_or_update_model(sm, *, model_name: str, image: str, role: str, hf_to
                 # Pin S3 region so boto3 inside the container talks to the
                 # right endpoint without a hop through us-east-1.
                 "AWS_DEFAULT_REGION": settings.lineup_aws_region,
+                # TorchServe defaults to a 6 MB request body limit. Visual
+                # ID requests carry the pyannote turn list + face registry
+                # which can reach 30+ MB on a 45-min source. Raise the cap
+                # so requests aren't rejected with HTTP 413 before reaching
+                # our handler. Phase 5.5 follow-up: trim the request body
+                # by having the container fetch artefacts from S3 itself,
+                # at which point this can drop back to default.
+                #
+                # Both `TS_*` (TorchServe direct) and `SAGEMAKER_TS_*` (DLC
+                # passthrough) are set — the DLC base image plumbs different
+                # variants depending on version. Belt + braces.
+                "TS_MAX_REQUEST_SIZE": "209715200",
+                "TS_MAX_RESPONSE_SIZE": "209715200",
+                "SAGEMAKER_TS_MAX_REQUEST_SIZE": "209715200",
+                "SAGEMAKER_TS_MAX_RESPONSE_SIZE": "209715200",
+                # Match the response time budget — 45-min visual ID can
+                # exceed default TorchServe response timeout of 120s.
+                "TS_DEFAULT_RESPONSE_TIMEOUT": "1200",
+                "SAGEMAKER_TS_RESPONSE_TIMEOUT": "1200",
             },
         },
     )
@@ -111,7 +135,7 @@ def _create_or_update_endpoint_config(
         AsyncInferenceConfig={
             "OutputConfig": {
                 "S3OutputPath": (
-                    f"s3://{settings.s3_raw_bucket}/{settings.lineup_output_prefix}/"
+                    f"s3://{settings.lineup_staging_bucket}/{settings.lineup_output_prefix}/"
                 ),
             },
             "ClientConfig": {
