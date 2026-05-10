@@ -57,6 +57,7 @@ data "aws_iam_policy_document" "cicd" {
     resources = [
       "arn:aws:ecr:${var.aws_region}:${var.aws_account_id}:repository/jeromelu/web",
       "arn:aws:ecr:${var.aws_region}:${var.aws_account_id}:repository/jeromelu/api",
+      "arn:aws:ecr:${var.aws_region}:${var.aws_account_id}:repository/jeromelu/video-worker",
     ]
   }
 
@@ -105,6 +106,7 @@ data "aws_iam_policy_document" "instance" {
     resources = [
       "arn:aws:ecr:${var.aws_region}:${var.aws_account_id}:repository/jeromelu/web",
       "arn:aws:ecr:${var.aws_region}:${var.aws_account_id}:repository/jeromelu/api",
+      "arn:aws:ecr:${var.aws_region}:${var.aws_account_id}:repository/jeromelu/video-worker",
     ]
   }
 

@@ -13,6 +13,7 @@ locals {
   ecr_repos = toset([
     "jeromelu/web",
     "jeromelu/api",
+    "jeromelu/video-worker",
   ])
 
   ecr_lifecycle_policy = jsonencode({
