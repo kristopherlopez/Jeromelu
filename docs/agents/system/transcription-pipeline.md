@@ -93,6 +93,7 @@ For one source where `audio_s3_key IS NOT NULL`:
    - Build keyterm vocabulary from the canonical roster (`people` + `teams`). See [extraction-method § keyterm](../../sources/extraction-method.md#keyterm-vocabulary).
    - Presign the audio S3 URL (regional virtual-host endpoint, 15-min validity).
    - POST to Deepgram's prerecorded API with `model=nova-3`, `language=en-AU`, `diarize=false`, `punctuate=true`, `smart_format=true`, `utterances=true`, `paragraphs=true`, `keyterm=<vocabulary>`.
+   - **Why `diarize=false`?** Deepgram can do diarization, but pyannote owns that stage. Pyannote 3.1 also exposes the per-window voice embeddings ([wespeaker](#appendix-how-pyannote-31-does-diarization)) that Speaker Identification later matches against; Deepgram's diarizer doesn't expose embeddings, so using it would force a separate embedder run. The two were A/B'd at Phase 1 — see [analyst.md § Lineup status](../crew/analyst.md#lineup-status) for the 83.6 % agreement result that drove the choice.
    - Persist Deepgram JSON → `s3://jeromelu-raw-transcripts/.../{video_id}.deepgram.json`. Replayable.
 3. **Merge + DB write** (single transaction):
    - `source_documents` — joined utterance text, checksum, language, chunk_count, S3 pointer.
