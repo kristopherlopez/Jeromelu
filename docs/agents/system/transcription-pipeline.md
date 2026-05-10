@@ -26,6 +26,8 @@ video (Scout)  ────> InsightFace @ 1 fps > face detections + 512-dim emb
                                                               (claims, quotes, consensus)
 ```
 
+> **Order of execution:** acquisition → pyannote → Deepgram → merge → speaker identification. The diagram shows the *data flow* (pyannote and Deepgram both branch off the same audio); the *runtime order* is sequential — pyannote runs first, then Deepgram, so a pyannote failure costs zero Deepgram dollars. Visual ID runs inline during speaker identification.
+
 | Stage | What it does | Surface spec |
 |---|---|---|
 | **Audio + video acquisition** | Scout downloads audio (and optionally video) to S3 — `audio_s3_key` populated; video staged ephemerally per request. | [ingestion.md](ingestion.md) |
