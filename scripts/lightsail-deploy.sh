@@ -26,10 +26,10 @@ aws ecr get-login-password --region ap-southeast-2 \
 	| docker login --username AWS --password-stdin "$ECR_REGISTRY"
 
 # Pull only the app images (postgres + caddy use public registry)
-docker compose -f docker-compose.prod.yml --env-file /opt/jeromelu/.env pull web api
+docker compose -f docker-compose.prod.yml --env-file /opt/jeromelu/.env pull web api video-worker
 
-# Recreate web + api with new image; postgres + caddy stay running
-docker compose -f docker-compose.prod.yml --env-file /opt/jeromelu/.env up -d web api
+# Recreate web + api + video-worker with new image; postgres + caddy stay running
+docker compose -f docker-compose.prod.yml --env-file /opt/jeromelu/.env up -d web api video-worker
 
 # Prune old images to free disk (keeps the current ones — they're tagged in compose)
 docker image prune -f

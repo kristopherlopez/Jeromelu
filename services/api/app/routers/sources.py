@@ -1,7 +1,6 @@
 import logging
 import tempfile
 import uuid
-from contextlib import contextmanager
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -10,12 +9,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.analyst.identify_voice import EnrollmentError, enroll
-from app.analyst.video_staging import (
-    VideoStagingError,
-    download_persistent_video,
-    extract_frame,
-    staged_video_local,
-)
+from app.analyst.video_worker_client import VideoWorkerError, fetch_frame_to
 from app.analyst.visual_id import VisualIdError, enroll_face_from_image
 from jeromelu_shared.db import (
     Claim,
@@ -40,28 +34,28 @@ def _face_track_key_from_audio(audio_s3_key: str) -> str:
     return audio_s3_key + ".face_track.json"
 
 
-@contextmanager
-def _acquire_video_for_reassign(source: Source):
-    """Yield a local video Path the reassign endpoint can ffmpeg against.
+def _fetch_reassign_frame(source: Source, ts: float, dest: Path) -> None:
+    """Pull one JPEG at ``ts`` for the reassign endpoint. Routes via the
+    video-worker sidecar — the API container has no yt-dlp / ffmpeg.
 
-    Picks persistent-S3 fast-path when ``source.video_s3_key`` is set,
-    falls back to on-demand yt-dlp via ``staged_video_local``. Cleans up
-    its temp dir on exit.
+    Picks the persistent-S3 fast-path when ``source.video_s3_key`` is
+    set, otherwise lets the worker yt-dlp from ``canonical_url``.
     """
-    if source.video_s3_key:
-        with tempfile.TemporaryDirectory(prefix="jeromelu-reassign-") as tmp:
-            video_path = Path(tmp) / "video.mp4"
-            download_persistent_video(source.video_s3_key, video_path)
-            yield video_path
-    else:
-        try:
-            with staged_video_local(source.canonical_url) as video_path:
-                yield video_path
-        except VideoStagingError as exc:
-            raise HTTPException(
-                status_code=502,
-                detail=f"yt-dlp acquisition failed: {exc}",
+    try:
+        if source.video_s3_key:
+            fetch_frame_to(
+                dest,
+                persistent_video_s3_key=source.video_s3_key,
+                ts=ts,
             )
+        else:
+            fetch_frame_to(
+                dest,
+                canonical_url=source.canonical_url,
+                ts=ts,
+            )
+    except VideoWorkerError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
 
 
 router = APIRouter()
@@ -555,28 +549,24 @@ def reassign_speaker(
     if frame_ts is None:
         frame_ts = (speaker.start_ts + speaker.end_ts) / 2.0
 
-    # 3. Extract face crop from video and enroll. Two acquisition paths
-    #    in `_acquire_video_for_reassign`: persisted S3 mp4 (legacy) or
-    #    on-demand yt-dlp via staged_video_local.
+    # 3. Extract face crop and enroll. The video-worker sidecar owns
+    #    yt-dlp + ffmpeg; the API just receives the JPG bytes via HTTP
+    #    (see _fetch_reassign_frame).
     face_id_written: uuid.UUID | None = None
-    with _acquire_video_for_reassign(source) as video_path:
-        with tempfile.TemporaryDirectory(prefix="jeromelu-reassign-frame-") as ftmp:
-            frame_path = Path(ftmp) / "frame.jpg"
-            try:
-                extract_frame(video_path, frame_ts, frame_path)
-            except VideoStagingError as exc:
-                raise HTTPException(status_code=500, detail=str(exc))
-            try:
-                face_id_written, det_score, _area = enroll_face_from_image(
-                    db,
-                    person_id=body.person_id,
-                    source_id=source_id,
-                    image_path=frame_path,
-                    frame_ts=frame_ts,
-                    created_by="manual",
-                )
-            except VisualIdError as exc:
-                logger.warning("Face enrollment skipped during reassign: %s", exc)
+    with tempfile.TemporaryDirectory(prefix="jeromelu-reassign-frame-") as ftmp:
+        frame_path = Path(ftmp) / "frame.jpg"
+        _fetch_reassign_frame(source, frame_ts, frame_path)
+        try:
+            face_id_written, det_score, _area = enroll_face_from_image(
+                db,
+                person_id=body.person_id,
+                source_id=source_id,
+                image_path=frame_path,
+                frame_ts=frame_ts,
+                created_by="manual",
+            )
+        except VisualIdError as exc:
+            logger.warning("Face enrollment skipped during reassign: %s", exc)
 
     # 4. Voiceprint write-back from the speaker turn's audio span. Same
     #    pattern as `enroll_voice_cli.py`. Skip silently when the turn is

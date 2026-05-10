@@ -74,6 +74,20 @@ services:
       postgres:
         condition: service_healthy
 
+  # Internal sidecar — yt-dlp + ffmpeg surface the API container can't ship
+  # itself (see feedback_api_container_lean.md). No host port bind, not in
+  # Caddy's routing, only reachable from other compose services on the
+  # default docker network.
+  video-worker:
+    image: ${ECR_REGISTRY:-111424988703.dkr.ecr.ap-southeast-2.amazonaws.com}/jeromelu/video-worker:${IMAGE_TAG:-latest}
+    container_name: jeromelu-video-worker
+    restart: unless-stopped
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ap-southeast-2
+      S3_AUDIO_BUCKET: jeromelu-raw-transcripts
+
   web:
     image: ${ECR_REGISTRY:-111424988703.dkr.ecr.ap-southeast-2.amazonaws.com}/jeromelu/web:${IMAGE_TAG:-latest}
     container_name: jeromelu-web

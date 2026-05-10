@@ -26,6 +26,7 @@ jobs:
     outputs:
       api: ${{ steps.changes.outputs.api }}
       web: ${{ steps.changes.outputs.web }}
+      video_worker: ${{ steps.changes.outputs.video_worker }}
       db: ${{ steps.changes.outputs.db }}
     steps:
       - uses: actions/checkout@v4
@@ -38,6 +39,8 @@ jobs:
               - 'packages/shared/**'
             web:
               - 'services/web/**'
+            video_worker:
+              - 'services/video-worker/**'
             db:
               - 'packages/db/**'
 
@@ -56,6 +59,10 @@ jobs:
             path: services/web
             ecr_repo: jeromelu/web
             changed: ${{ needs.detect-changes.outputs.web }}
+          - service: video-worker
+            path: services/video-worker
+            ecr_repo: jeromelu/video-worker
+            changed: ${{ needs.detect-changes.outputs.video_worker }}
     steps:
       - name: Skip if unchanged
         if: matrix.changed != 'true'
@@ -86,7 +93,7 @@ jobs:
 
   deploy-lightsail:
     needs: [detect-changes, build-and-push]
-    if: needs.detect-changes.outputs.api == 'true' || needs.detect-changes.outputs.web == 'true'
+    if: needs.detect-changes.outputs.api == 'true' || needs.detect-changes.outputs.web == 'true' || needs.detect-changes.outputs.video_worker == 'true'
     # Runs on the self-hosted runner installed on the Lightsail box itself —
     # no inbound SSH from GitHub required, so the firewall can keep port 22
     # locked to the operator's IP. See docs/ops/ci-cd.md.

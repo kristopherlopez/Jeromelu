@@ -58,6 +58,14 @@ class Settings(BaseSettings):
     lineup_input_prefix: str = "input"
     lineup_output_prefix: str = "output"
 
+    # Video worker (services/video-worker) — sidecar container in the
+    # compose stack that runs yt-dlp + ffmpeg out of the API image. Per
+    # feedback_api_container_lean.md, the API container does not ship
+    # those deps; the worker is reachable via docker DNS. In dev / unit
+    # tests the worker isn't running and callers should branch on the
+    # ConnectError or stub the client.
+    video_worker_url: str = "http://video-worker:8000"
+
     model_config = {"env_prefix": "", "env_file": ".env", "extra": "ignore"}
 
 
