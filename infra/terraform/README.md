@@ -135,6 +135,13 @@ of downtime + DNS cutover. Reconcile via HCL edits first.
    additions).
 5. `terraform apply`.
 
+For `for_each` resources, the import block's `for_each` must be a strict
+subset of the resource's — only the keys whose live state actually exists.
+Mixed click-ops history is the common case: see
+`local.ecr_repos_with_existing_lifecycle_policy` in `ecr.tf`, which is the
+import set for `aws_ecr_lifecycle_policy.this` (api/web only — video-worker
+never had one, so TF creates it on first apply).
+
 ## Rotating a secret
 
 The Parameter Store SecureStrings ignore drift on `value`, so you rotate via
