@@ -128,7 +128,7 @@ The V1 architecture is one Lightsail VM running Docker Compose, fronted by Cloud
 ## Phase L5 — DNS cutover
 
 1. **Lower TTLs** on `jeromelu.ai`, `www.jeromelu.ai`, `api.jeromelu.ai` to 60s. Wait 1 hour.
-2. **Update CloudFront origin** for `E2G6FL11A3JP8F`: change origin domain from `jeromelu-alb-943756887...` to `<static-ip>`. Origin protocol HTTPS, origin SSL protocols TLSv1.2. Wait for distribution to deploy (~5 min).
+2. **Update CloudFront origin** for `E2G6FL11A3JP8F`: change origin domain from `jeromelu-alb-943756887...` to `origin.jeromelu.ai` (an A record pointing at the Lightsail static IP). Origin protocol **HTTP-only** — the CF→Caddy HTTPS handshake fails on Caddy's TLSv1.2 + ECDSA-only ciphers; user-facing TLS is unchanged because CloudFront still terminates HTTPS at the edge via the us-east-1 ACM cert. Wait for distribution to deploy (~5 min). See inventory 11.6 for the full diagnosis and the backlog item to switch back to HTTPS once Caddy is forced to issue RSA certs.
 3. **Update Route 53** `api.jeromelu.ai` A record from ALB alias to a plain A pointing at the Lightsail static IP. TTL 60s.
 4. **Watch CloudWatch ALB metrics** — request count should drop to ~0 within 5–10 minutes. Hold on Phase L6 until you see this.
 
@@ -149,15 +149,19 @@ Each step is **destructive and requires explicit operator confirmation**.
 
 ## Phase L7 — Cron + backups
 
-On the Lightsail box:
+Cron is **repo-managed**, not hand-installed. The schedule lives at [`scripts/cron.d/jeromelu`](../../scripts/cron.d/jeromelu) and is synced into `/etc/cron.d/jeromelu` by [`scripts/lightsail-deploy.sh`](../../scripts/lightsail-deploy.sh) on every deploy. To change the schedule, edit the file in the repo and redeploy — do not edit `/etc/cron.d/jeromelu` directly.
 
-```bash
-chmod +x /opt/jeromelu/scripts/pg-backup.sh
-echo '30 16 * * * /opt/jeromelu/scripts/pg-backup.sh >> /var/log/jeromelu-backup.log 2>&1' \
-  | sudo tee /etc/cron.d/jeromelu-pg-backup
-```
+Current jobs (all run as `ubuntu`, times in UTC):
 
-Add a S3 lifecycle rule on `jeromelu-public-assets` prefix `backups/postgres/` → expire after 30 days.
+| Cron | Job | Purpose |
+|---|---|---|
+| `0 23 * * *` | `scout-refresh.sh channel-stats` | Daily channel metrics snapshot (23:00 UTC = 09:00 AEST) |
+| `15 23 * * *` | `scout-refresh.sh videos` | Daily video enumeration + metrics (23:15 UTC = 09:15 AEST) |
+| `30 16 * * *` | `pg-backup.sh` | Nightly Postgres dump → S3 (16:30 UTC = 02:30 AEST) |
+
+S3 lifecycle on `jeromelu-public-assets` prefix `backups/postgres/` expires dumps after 30 days (managed in Terraform via `s3.tf`).
+
+The deploy script `chmod +x`'s both wrapper scripts and uses a `sudo install` to copy the cron file into `/etc/cron.d/`. `ubuntu` already has `NOPASSWD:ALL` from cloud-init, so no extra sudoers entry is required.
 
 ## Phase L8 — CI/CD
 

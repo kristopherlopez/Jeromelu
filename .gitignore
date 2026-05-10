@@ -38,6 +38,9 @@ Thumbs.db
 docker/data/
 data/
 
+# Local runtime logs (uvicorn etc.)
+.run/
+
 # Sensitive files
 docs/aws-resource-inventory.md
 *.egg-info

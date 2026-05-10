@@ -32,36 +32,61 @@ This matters because bad inputs will poison the brand.
 
 ### C. Ingestion Layer
 Purpose:
-Fetch and store raw content.
+Fetch and store raw bytes. Extract-only — no interpretation.
 
 Functions:
-- transcript retrieval
-- article extraction
-- normalisation
+- audio acquisition (yt-dlp m4a → S3) for podcast / video sources
+- low-res video acquisition (when visual identification is in scope)
+- article extraction (when non-video sources are added)
 - metadata capture
-- chunking
-- raw text storage
+- raw byte storage
 
 V1 rule:
-Store the full raw transcript permanently.
+Store the full raw audio (and video, where collected) permanently. The full
+Deepgram + pyannote JSON artefacts are also retained so transcripts can be
+re-merged from raw bytes without re-paying ASR cost.
 
-### D. Extraction Layer
+Owned by **Scout** today (see
+[../agents/crew/scout.md](../agents/crew/scout.md) §3.5 and
+[../agents/system/ingestion.md](../agents/system/ingestion.md)). Article /
+RSS / Twitter ingest is on the backlog; audio is the only live extractor.
+
+### D. Transcription + Identification Layer
 Purpose:
-Turn raw text into structured knowledge.
+Turn raw audio into a structured, speaker-attributed transcript.
+
+Functions:
+- diarisation (`pyannote/speaker-diarization-3.1`) — turn-level segmentation with per-window voice embeddings
+- ASR (Deepgram nova-3) — words, timestamps, paragraph breaks; keyterm-biased to the canonical NRL roster
+- merge — joined utterances → `source_documents` + `source_speakers` (one row per pyannote turn) + `source_chunks` (one row per utterance)
+- speaker identification — voice match (sliding-window cosine vs `person_voiceprints`) + visual match (InsightFace + mouth-opening ASD vs `person_face_embeddings`) + per-turn cross-modal fusion → `source_speakers.speaker_person_id`
+
+Output:
+fully diarised, optionally per-Person-attributed transcript chunks.
+
+Owned by **Analyst** ([../agents/system/transcription-pipeline.md](../agents/system/transcription-pipeline.md),
+[../agents/system/speaker-identification.md](../agents/system/speaker-identification.md)).
+Heavy inference can offload to a SageMaker Async endpoint
+([../../services/gpu/SETUP.md](../../services/gpu/SETUP.md)) when
+`LINEUP_REMOTE=1`.
+
+### E. Knowledge Extraction Layer
+Purpose:
+Turn structured transcripts into structured claims.
 
 Functions:
 - entity recognition
 - quote extraction
-- opinion extraction
-- prediction extraction
-- matchup extraction
-- speaker attribution
+- opinion / prediction / matchup extraction
 - claim normalisation
 
 Output:
 quotes, claims, predictions, linked entities.
 
-### E. Knowledge Layer
+Skill-driven today (`/clean-transcript`, `/process-transcript`); the
+workerised version is pending. Owned by Analyst once shipped.
+
+### F. Knowledge Layer
 Purpose:
 Provide queryable state for the rest of the product.
 
@@ -71,7 +96,7 @@ Contains:
 - consensus snapshot builder
 - expert performance history
 
-### F. Decision Engine
+### G. Decision Engine
 V1 choice:
 Rules + heuristics.
 
@@ -92,7 +117,7 @@ Important:
 Contrarian behaviour should be policy-bounded, not random.
 It should only occur inside safe thresholds.
 
-### G. Orchestration Layer
+### H. Orchestration Layer
 Purpose:
 Run the system as a chain of workflows.
 
@@ -109,7 +134,7 @@ Typical flows:
 2. injury news -> inject event -> re-evaluate plans -> publish update
 3. weekly deadline window -> generate options -> choose move -> publish decision
 
-### H. Publishing Layer
+### I. Publishing Layer
 Purpose:
 Convert machine state into public experience.
 
@@ -121,7 +146,7 @@ Produces:
 - war room state
 - article drafts later
 
-### I. Admin / Operator Layer
+### J. Admin / Operator Layer
 Needs on day one:
 - source approvals
 - manual event injection
@@ -132,7 +157,7 @@ Needs on day one:
 - entity correction / merge tools
 - emergency kill switch
 
-### J. Frontend Experience Layer
+### K. Frontend Experience Layer
 Recommended shape:
 Mostly static website shell with dynamic modules.
 
