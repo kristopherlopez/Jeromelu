@@ -20,7 +20,7 @@ import type { WikiPageSummary, WikiPageType } from "./wiki-data";
 import type { SourceListItem } from "@/lib/types";
 import VoicesView from "./VoicesView";
 import PlayersIndexView from "./PlayersIndexView";
-import SourceListClient from "./source/SourceListClient";
+import SourcesView from "./SourcesView";
 import "./wiki.css";
 
 /* ── Constants ── */
@@ -211,69 +211,6 @@ function EntityView({
           <FileText size={32} style={{ marginBottom: "0.75rem", opacity: 0.5 }} />
           <p style={{ fontSize: "14px" }}>No pages found.</p>
         </div>
-      )}
-    </>
-  );
-}
-
-/* ══════════════════════════════════════════════════════
-   Sources view — /wiki?type=sources
-   ══════════════════════════════════════════════════════ */
-
-function SourcesView({ sources }: { sources: SourceListItem[] }) {
-  return (
-    <>
-      <Link
-        href="/wiki"
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "0.4rem",
-          fontSize: "12px",
-          fontWeight: 600,
-          letterSpacing: "0.08em",
-          textTransform: "uppercase",
-          color: v.inkFaint,
-          textDecoration: "none",
-          marginBottom: "1.5rem",
-        }}
-      >
-        <ArrowLeft size={14} /> Back to the Wiki
-      </Link>
-      <h1
-        style={{
-          fontFamily: v.serif,
-          fontSize: "clamp(1.8rem, 4vw, 2.4rem)",
-          fontWeight: 700,
-          color: v.ink,
-          lineHeight: 1.1,
-          marginBottom: "0.4rem",
-        }}
-      >
-        Sources
-      </h1>
-      <p
-        style={{
-          fontSize: "14px",
-          color: v.inkFaint,
-          marginBottom: "2rem",
-        }}
-      >
-        {sources.length} {sources.length === 1 ? "source" : "sources"}
-      </p>
-      {sources.length === 0 ? (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "4rem 0",
-            color: v.inkFaint,
-          }}
-        >
-          <FileText size={32} style={{ marginBottom: "0.75rem", opacity: 0.5 }} />
-          <p style={{ fontSize: "14px" }}>No sources yet.</p>
-        </div>
-      ) : (
-        <SourceListClient sources={sources} />
       )}
     </>
   );
