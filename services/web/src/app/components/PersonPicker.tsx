@@ -7,13 +7,21 @@ import type { PersonSummary } from "@/lib/types";
 
 interface Props {
   onSelect: (person: PersonSummary) => void;
+  /**
+   * If provided, the picker shows a "Create new: '<query>'" affordance
+   * at the bottom of the list whenever the search returns no exact
+   * match for the typed query. Click invokes this callback with the
+   * trimmed name. The caller is responsible for handing the name to
+   * whatever endpoint creates / lookups-or-creates the Person.
+   */
+  onCreateNew?: (name: string) => void;
   placeholder?: string;
   autoFocus?: boolean;
 }
 
 const DEBOUNCE_MS = 150;
 
-export default function PersonPicker({ onSelect, placeholder = "Search hosts and players…", autoFocus }: Props) {
+export default function PersonPicker({ onSelect, onCreateNew, placeholder = "Search hosts and players…", autoFocus }: Props) {
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<PersonSummary[]>([]);
   const [loading, setLoading] = useState(false);
@@ -54,6 +62,19 @@ export default function PersonPicker({ onSelect, placeholder = "Search hosts and
     };
   }, [query]);
 
+  // Derived: only offer "Create new" when (a) the caller opted in by
+  // passing onCreateNew, (b) the operator has typed something non-empty,
+  // and (c) no exact case-insensitive match already exists in `items`.
+  // Picking the existing match by typing the exact name is the natural
+  // path; only surface the create affordance when the search definitively
+  // didn't find them.
+  const trimmedQuery = query.trim();
+  const showCreate =
+    !!onCreateNew &&
+    trimmedQuery.length > 0 &&
+    !loading &&
+    !items.some((p) => p.canonical_name.toLowerCase() === trimmedQuery.toLowerCase());
+
   return (
     <div className="flex flex-col gap-2">
       <input
@@ -81,7 +102,7 @@ export default function PersonPicker({ onSelect, placeholder = "Search hosts and
         className="flex max-h-72 flex-col gap-px overflow-y-auto rounded border"
         style={{ borderColor: "var(--border)" }}
       >
-        {items.length === 0 && !loading && (
+        {items.length === 0 && !loading && !showCreate && (
           <li className="px-3 py-2 text-xs" style={{ color: "var(--foreground-ghost)" }}>
             no matches
           </li>
@@ -106,6 +127,26 @@ export default function PersonPicker({ onSelect, placeholder = "Search hosts and
             </button>
           </li>
         ))}
+        {showCreate && (
+          <li
+            // Visual gap from the existing-person matches above; reads
+            // as "this is a different kind of choice" without needing a
+            // section heading.
+            style={{
+              borderTop: items.length > 0 ? "1px dashed var(--border)" : undefined,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => onCreateNew?.(trimmedQuery)}
+              className="flex w-full items-baseline gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-white/5"
+              style={{ color: "var(--accent)" }}
+            >
+              <span style={{ color: "var(--foreground-ghost)" }}>+ Create:</span>
+              <span style={{ color: "var(--foreground)" }}>{trimmedQuery}</span>
+            </button>
+          </li>
+        )}
       </ul>
     </div>
   );

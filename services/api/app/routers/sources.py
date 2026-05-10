@@ -472,7 +472,24 @@ def people_search(q: str = "", limit: int = 30, db: Session = Depends(get_db)):
 # ---------------------------------------------------------------------------
 
 class ReassignRequest(BaseModel):
-    person_id: uuid.UUID
+    person_id: uuid.UUID | None = Field(
+        default=None,
+        description=(
+            "UUID of an existing Person to attribute this turn to. "
+            "Mutually exclusive with `new_person_name` — exactly one must "
+            "be provided."
+        ),
+    )
+    new_person_name: str | None = Field(
+        default=None,
+        description=(
+            "Canonical name for a new Person. If a Person with this "
+            "canonical_name already exists (case-insensitive match), that "
+            "Person is reused; otherwise a new `people` row is created "
+            "with `canonical_name` set and all other fields at their "
+            "defaults. Mutually exclusive with `person_id`."
+        ),
+    )
     frame_ts: float | None = Field(
         default=None,
         description=(
@@ -501,17 +518,22 @@ def reassign_speaker(
     """Operator override: a face on the video overlay was misidentified.
 
     On save:
-      1. Set ``source_speakers.speaker_person_id = body.person_id`` for the
-         clicked turn (and ``match_method='manual'``, ``match_confidence=1.0``).
-      2. Extract the face from the video frame at ``frame_ts`` and write a
+      1. Resolve target Person — either ``body.person_id`` (existing) or
+         ``body.new_person_name`` (lookup-or-create by canonical_name,
+         case-insensitive). Exactly one must be provided.
+      2. Set ``source_speakers.speaker_person_id`` for the clicked turn
+         (with ``match_method='manual'``, ``match_confidence=1.0``).
+      3. Extract the face from the video frame at ``frame_ts`` and write a
          new ``person_face_embeddings`` row (``created_by='manual'``).
-      3. Extract a voiceprint from the speaker turn's audio span and write
+      4. Extract a voiceprint from the speaker turn's audio span and write
          ``person_voiceprints`` rows (``created_by='manual'``). Skipped if
          the turn is shorter than the embedder's minimum.
 
     Idempotent on the SourceSpeaker update; embeddings are append-only —
     repeated clicks add more rows. That's intentional: every correction
-    grows the registry.
+    grows the registry. Person creation is also idempotent: a second
+    click with the same ``new_person_name`` reuses the first run's
+    Person row rather than creating a duplicate.
 
     See [speaker-identification.md § Manual reassign](../system/speaker-identification.md).
     """
@@ -538,9 +560,44 @@ def reassign_speaker(
     if not speaker:
         raise HTTPException(status_code=404, detail="Speaker segment not found")
 
-    person = db.query(Person).filter(Person.person_id == body.person_id).first()
-    if not person:
-        raise HTTPException(status_code=404, detail="Person not found")
+    # Resolve target Person — exactly one of person_id / new_person_name.
+    # The lookup-or-create path lets the operator attribute a turn to a
+    # Person who isn't enrolled yet (canonicalising on the fly), which is
+    # the most common new-host workflow. Reuses an existing Person if the
+    # name already exists (case-insensitive) so duplicate clicks don't
+    # create duplicate rows.
+    if (body.person_id is None) == (body.new_person_name is None):
+        raise HTTPException(
+            status_code=400,
+            detail="Provide exactly one of `person_id` or `new_person_name`",
+        )
+
+    person_created = False
+    if body.person_id is not None:
+        person = db.query(Person).filter(Person.person_id == body.person_id).first()
+        if not person:
+            raise HTTPException(status_code=404, detail="Person not found")
+    else:
+        new_name = (body.new_person_name or "").strip()
+        if not new_name:
+            raise HTTPException(status_code=400, detail="`new_person_name` is empty")
+        if len(new_name) > 200:
+            raise HTTPException(
+                status_code=400,
+                detail="`new_person_name` is too long (max 200 chars)",
+            )
+        person = (
+            db.query(Person)
+            .filter(func.lower(Person.canonical_name) == new_name.lower())
+            .first()
+        )
+        if not person:
+            person = Person(canonical_name=new_name)
+            db.add(person)
+            db.flush()  # populate person.person_id without committing
+            person_created = True
+
+    target_person_id = person.person_id
 
     # 2. Compute the frame timestamp to extract a face from. Default to the
     #    middle of the speaker turn — that's where the host is most likely
@@ -559,7 +616,7 @@ def reassign_speaker(
         try:
             face_id_written, det_score, _area = enroll_face_from_image(
                 db,
-                person_id=body.person_id,
+                person_id=target_person_id,
                 source_id=source_id,
                 image_path=frame_path,
                 frame_ts=frame_ts,
@@ -575,7 +632,7 @@ def reassign_speaker(
     try:
         result = enroll(
             db,
-            person_id=body.person_id,
+            person_id=target_person_id,
             source_id=source_id,
             start_ts=float(speaker.start_ts),
             end_ts=float(speaker.end_ts),
@@ -586,15 +643,16 @@ def reassign_speaker(
         logger.warning("Voiceprint enrollment skipped during reassign: %s", exc)
 
     # 5. Mark the speaker turn as manually corrected.
-    speaker.speaker_person_id = body.person_id
+    speaker.speaker_person_id = target_person_id
     speaker.match_method = "manual"
     speaker.match_confidence = 1.0
     db.commit()
 
     return {
         "segment_id": str(segment_id),
-        "person_id": str(body.person_id),
+        "person_id": str(target_person_id),
         "person_name": person.canonical_name,
+        "person_created": person_created,
         "face_embedding_id": str(face_id_written) if face_id_written else None,
         "voiceprints_written": voice_rows_written,
         "match_method": "manual",

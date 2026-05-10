@@ -16,6 +16,13 @@ interface Props {
   onSaved: () => void;
 }
 
+// The picker can return either an existing Person row or a free-text
+// name the operator wants to create. Discriminated union so the save
+// handler can shape the request body correctly.
+type Selection =
+  | { kind: "existing"; person: PersonSummary }
+  | { kind: "new"; name: string };
+
 export default function ReassignFaceModal({
   sourceId,
   speaker,
@@ -24,7 +31,7 @@ export default function ReassignFaceModal({
   onClose,
   onSaved,
 }: Props) {
-  const [selected, setSelected] = useState<PersonSummary | null>(null);
+  const [selected, setSelected] = useState<Selection | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,13 +50,19 @@ export default function ReassignFaceModal({
     setSubmitting(true);
     setError(null);
     try {
+      // Backend resolves target Person from exactly one of these:
+      // existing person_id, or new_person_name (lookup-or-create).
+      const personFields =
+        selected.kind === "existing"
+          ? { person_id: selected.person.person_id }
+          : { new_person_name: selected.name };
       const resp = await fetch(
         `${API_BASE}/api/sources/${sourceId}/speakers/${speaker.segment_id}/reassign`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            person_id: selected.person_id,
+            ...personFields,
             frame_ts: frameTs,
             bbox,
           }),
@@ -114,7 +127,11 @@ export default function ReassignFaceModal({
           </div>
         </div>
 
-        <PersonPicker onSelect={setSelected} autoFocus />
+        <PersonPicker
+          onSelect={(p) => setSelected({ kind: "existing", person: p })}
+          onCreateNew={(name) => setSelected({ kind: "new", name })}
+          autoFocus
+        />
 
         {selected && (
           <div
@@ -124,10 +141,21 @@ export default function ReassignFaceModal({
               color: "var(--foreground)",
             }}
           >
-            Saving will assign this turn to{" "}
-            <strong>{selected.canonical_name}</strong>, write a face
-            embedding from the current frame, and a voiceprint from the
-            turn audio.
+            {selected.kind === "existing" ? (
+              <>
+                Saving will assign this turn to{" "}
+                <strong>{selected.person.canonical_name}</strong>, write a face
+                embedding from the current frame, and a voiceprint from the
+                turn audio.
+              </>
+            ) : (
+              <>
+                Saving will create a new Person <strong>{selected.name}</strong>{" "}
+                (or reuse an existing one with the same canonical name), assign
+                this turn to them, and write a face embedding + voiceprint from
+                this turn.
+              </>
+            )}
           </div>
         )}
 

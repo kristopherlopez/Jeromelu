@@ -348,24 +348,31 @@ When the operator overrides a misidentified turn (the click-to-reassign UI in `Y
 
 1. User clicks a face box in the YouTube-iframe overlay.
 2. `ReassignFaceModal` opens, prefilled with `segment_id`, `frame_ts`, and the clicked `bbox` (from the face-track JSON).
-3. User picks a Person via `PersonPicker` (fuzzy search over `people`).
-4. POST to the reassign endpoint with `{ person_id, frame_ts, bbox }`.
+3. User picks a Person via `PersonPicker` (fuzzy search over `people`), **or** types a name not in the registry and clicks the "Create new: '<name>'" affordance to attribute the turn to a brand-new Person on the fly.
+4. POST to the reassign endpoint with `{ frame_ts, bbox, ...personFields }` — where `personFields` is exactly one of `{ person_id }` (existing) or `{ new_person_name }` (lookup-or-create by canonical name, case-insensitive).
 
 ### Backend sequence
 
 ```
 1. Validate              source exists + has pixels access (video_s3_key OR YouTube canonical_url)
                          speaker turn exists (by segment_id)
-                         target Person exists
+                         exactly one of body.person_id / body.new_person_name is provided
 
-2. Resolve frame_ts      body.frame_ts if provided, else turn midpoint
+2. Resolve target Person if body.person_id:
+                            look up Person; 404 if missing
+                         else (body.new_person_name):
+                            strip + length-validate (1..200)
+                            case-insensitive lookup by canonical_name
+                            if missing → INSERT new people row (canonical_name only),
+                                          mark person_created=true
+                            else → reuse existing row (idempotent on repeat clicks)
+                         target_person_id := person.person_id
 
-3. Acquire video         _acquire_video_for_reassign:
-                           - persisted s3://.../{vid}.video.mp4 (legacy), OR
-                           - on-demand yt-dlp via staged_video_local → tempdir
-                         Auto-cleaned when context exits.
+3. Resolve frame_ts      body.frame_ts if provided, else turn midpoint
 
-4. Extract frame         ffmpeg @ frame_ts → frame.jpg in tempdir
+4. Acquire frame         _fetch_reassign_frame:
+                           - delegated to the video-worker sidecar (yt-dlp + ffmpeg)
+                           - JPG bytes returned over HTTP and written to tempdir
 
 5. Enroll face           enroll_face_from_image:
                            - cv2 decode + InsightFace buffalo_l (RetinaFace + ArcFace)
@@ -379,13 +386,15 @@ When the operator overrides a misidentified turn (the click-to-reassign UI in `Y
                            - INSERT N rows into person_voiceprints (created_by='manual')
                            - Skipped silently if turn shorter than embedder minimum
 
-7. Update SourceSpeaker  speaker_person_id  = body.person_id
+7. Update SourceSpeaker  speaker_person_id  = target_person_id
                          match_method       = 'manual'
                          match_confidence   = 1.0
 
-8. Commit                Single transaction.
+8. Commit                Single transaction. Person creation, embeddings, and
+                         the SourceSpeaker update all land or roll back together.
 
-9. Return                Response with face_id_written, voice_rows_written.
+9. Return                Response with target person_id + canonical_name,
+                         person_created flag, face_embedding_id, voiceprints_written.
 ```
 
 ### Behaviour notes
@@ -394,7 +403,7 @@ When the operator overrides a misidentified turn (the click-to-reassign UI in `Y
 
 **Failure tolerance.** Face or voice enrollment failures during reassign are caught and logged as warnings — they do *not* fail the reassign. The `SourceSpeaker` update always happens (assuming validation passed). Useful when, e.g., the face crop has no detectable face but the operator still wants to mark the turn correctly attributed.
 
-**Idempotency and append-only.** The `SourceSpeaker` update is idempotent — re-clicks rewrite the same fields. Embeddings are append-only — repeated clicks add more rows, never overwrite. Misclick recovery is "click again with the right Person" — the bad embeddings stay but get vote-drowned by the correct ones at match time.
+**Idempotency and append-only.** The `SourceSpeaker` update is idempotent — re-clicks rewrite the same fields. Embeddings are append-only — repeated clicks add more rows, never overwrite. Misclick recovery is "click again with the right Person" — the bad embeddings stay but get vote-drowned by the correct ones at match time. Person creation is also idempotent: a second `new_person_name` click with the same string reuses the first run's row rather than duplicating.
 
 ---
 
