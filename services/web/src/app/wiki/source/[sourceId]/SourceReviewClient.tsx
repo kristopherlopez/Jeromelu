@@ -2,8 +2,9 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, User, Calendar, Video, PenLine, Hourglass } from "lucide-react";
+import { ArrowLeft, User, Calendar, Video, PenLine, Hourglass, Smartphone } from "lucide-react";
 import type { SourceDetailResponse, SourceListItem } from "@/lib/types";
+import { useIsYouTubeShort } from "@/lib/useIsYouTubeShort";
 import YouTubePlayer, { type YouTubePlayerHandle } from "@/app/components/YouTubePlayer";
 import VideoOverlay, { type VideoOverlayHandle } from "@/app/components/VideoOverlay";
 import YouTubeFaceOverlay, {
@@ -32,6 +33,7 @@ export default function SourceReviewClient({ data, allSources }: Props) {
   //   3. YouTubePlayer — plain YouTube embed, no overlay (no face-track
   //      yet, or non-YouTube source with no local video).
   const isYouTube = source.source_type === "youtube" && Boolean(source.canonical_url);
+  const isShort = useIsYouTubeShort(isYouTube ? source.canonical_url : null);
   const useYouTubeOverlay = isYouTube && Boolean(source.face_track_url);
   const useLegacyOverlay =
     !useYouTubeOverlay && Boolean(source.video_url && source.face_track_url);
@@ -91,7 +93,11 @@ export default function SourceReviewClient({ data, allSources }: Props) {
   }, [allSources, source.source_id, source.creator_name]);
 
   const sourceTypeLabel =
-    source.source_type === "youtube" ? "YouTube" : source.source_type;
+    source.source_type === "youtube"
+      ? isShort
+        ? "YouTube · Short"
+        : "YouTube"
+      : source.source_type;
 
   // Sources without chunks haven't been transcribed yet — the video still
   // plays, but transcript and claims tabs need a placeholder so the panel
@@ -121,6 +127,29 @@ export default function SourceReviewClient({ data, allSources }: Props) {
         <h1 className="flex-1 truncate text-sm font-semibold" style={{ color: "var(--foreground)" }}>
           {source.title}
         </h1>
+        {isShort && (
+          <span
+            className="hidden sm:inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+            style={{
+              borderColor: "var(--accent)",
+              color: "var(--accent)",
+              backgroundColor: "color-mix(in srgb, var(--accent) 12%, transparent)",
+            }}
+            title="This video was uploaded as a YouTube Short (vertical 9:16)"
+          >
+            <Smartphone size={11} />
+            Short
+          </span>
+        )}
+        {source.face_track_url && (
+          <Link
+            href={`/wiki/source/${source.source_id}/faces`}
+            className="hidden text-xs sm:block"
+            style={{ color: "var(--foreground-secondary)" }}
+          >
+            Faces →
+          </Link>
+        )}
         {source.published_at && (
           <span className="hidden text-xs sm:block" style={{ color: "var(--foreground-ghost)" }}>
             {new Date(source.published_at).toLocaleDateString("en-AU", {

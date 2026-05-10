@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { extractVideoId } from "@/lib/youtube";
 
 export interface YouTubePlayerHandle {
   seekTo: (seconds: number) => void;
@@ -22,16 +23,6 @@ declare global {
   interface Window {
     YT: typeof YT;
     onYouTubeIframeAPIReady: () => void;
-  }
-}
-
-function extractVideoId(url: string): string | null {
-  try {
-    const u = new URL(url);
-    if (u.hostname.includes("youtu.be")) return u.pathname.slice(1);
-    return u.searchParams.get("v");
-  } catch {
-    return null;
   }
 }
 

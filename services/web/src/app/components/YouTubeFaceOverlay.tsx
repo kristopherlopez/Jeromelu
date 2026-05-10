@@ -12,6 +12,7 @@ import {
 
 import { API_BASE } from "@/lib/api";
 import type { FaceTrack, FaceTrackFace, FaceTrackFrame, Speaker } from "@/lib/types";
+import { extractVideoId } from "@/lib/youtube";
 import ReassignFaceModal from "./ReassignFaceModal";
 
 export interface YouTubeFaceOverlayHandle {
@@ -94,16 +95,6 @@ function frameAt(
   const best =
     prev && Math.abs(prev.ts - ts) < Math.abs(candidate.ts - ts) ? prev : candidate;
   return Math.abs(best.ts - ts) <= tolerance ? best : null;
-}
-
-function extractVideoId(url: string): string | null {
-  try {
-    const u = new URL(url);
-    if (u.hostname.includes("youtu.be")) return u.pathname.slice(1);
-    return u.searchParams.get("v");
-  } catch {
-    return null;
-  }
 }
 
 const YouTubeFaceOverlay = forwardRef<YouTubeFaceOverlayHandle, Props>(
