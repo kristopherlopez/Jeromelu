@@ -10,23 +10,51 @@ This doc is the **end-to-end view**. For matching algorithm detail (voice + face
 
 ## Pipeline overview
 
+Stages run **sequentially** in the order shown. Each block lists the technologies used and the artefacts written.
+
 ```
-audio (Scout)  ─┬─> pyannote ───────────> turns + 256-dim voice embeddings  ──┐
-                │                                                              │
-                └─> Deepgram nova-3 ────> words → source_chunks (text)        │
-                                                                               │
-video (Scout)  ────> InsightFace @ 1 fps > face detections + 512-dim embeds  ─┤
-                                                                               │
-                                                                               ▼
-                                                              Speaker Identification
-                                                              (voice + face + fusion)
-                                                                               │
-                                                                               ▼
-                                                              Knowledge Extraction
-                                                              (claims, quotes, consensus)
+[1] Audio acquisition (Scout)
+       Tools:  yt-dlp (audio-only m4a) · boto3 → S3
+       Output: m4a → s3://jeromelu-raw-audio/...
+       │
+       ▼
+[2] Pyannote 3.1 diarization
+       Tools:  ffmpeg (m4a → 16 kHz mono WAV)
+               · pyannote/speaker-diarization-3.1 (HuggingFace Hub model)
+               · pyannote/wespeaker-voxceleb-resnet34-LM (256-dim embedder, bundled)
+       Output: turns + per-window voice embeddings → {video_id}.pyannote.json
+       │
+       ▼
+[3] Deepgram ASR
+       Tools:  Deepgram nova-3 HTTP API (audio fetched via S3 presigned URL,
+               keyterm-biased to canonical NRL roster)
+       Output: words + timestamps + paragraphs → {video_id}.deepgram.json
+       │
+       ▼
+[4] Merge (single DB transaction)
+       Tools:  SQLAlchemy → Postgres
+       Output: source_documents + source_speakers (one per pyannote turn) + source_chunks
+       │
+       ▼
+[5] Speaker identification + fusion
+       Voice match:   numpy cosine vs person_voiceprints
+                      (reuses pyannote embeddings from stage 2 — no new inference)
+       Visual match:  yt-dlp (ephemeral video staging) · cv2 (1 fps frame sampling)
+                      · InsightFace buffalo_l: RetinaFace detector + ArcFace
+                        512-dim embedder + landmark_3d_68 (mouth-opening ASD)
+                      → cosine vs person_face_embeddings
+       Fusion:        per-turn cross-modal vote (Python)
+       Output:        source_speakers.speaker_person_id
+                      + match_method + match_confidence
+                      + face-track JSON (for the review-UI overlay)
+       │
+       ▼
+   (Knowledge Extraction — claims, quotes, consensus — downstream, not this doc)
 ```
 
-> **Order of execution:** acquisition → pyannote → Deepgram → merge → speaker identification. The diagram shows the *data flow* (pyannote and Deepgram both branch off the same audio); the *runtime order* is sequential — pyannote runs first, then Deepgram, so a pyannote failure costs zero Deepgram dollars. Visual ID runs inline during speaker identification.
+> **Why pyannote-before-Deepgram?** Pyannote runs locally (free); Deepgram is paid (~$0.30/source). Running pyannote first means a pyannote failure (HF token, malformed audio, OOM) costs zero Deepgram dollars.
+>
+> **Remote-GPU mode (`LINEUP_REMOTE=1`):** stages [2] and [5]'s GPU-bound steps run on a SageMaker Async endpoint (`ml.g5.xlarge`, A10G) in `us-east-1`. Same artefact contracts — see `## Remote vs local inference` in [speaker-identification.md](speaker-identification.md).
 
 | Stage | What it does | Surface spec |
 |---|---|---|
