@@ -262,6 +262,82 @@ Embedded into both enrollment and matching, in order of importance:
 
 ---
 
+## Lifecycle and maturation
+
+The accuracy of this surface is not a property of the matching algorithm — it's a property of `person_voiceprints` and `person_face_embeddings`. Both registries grow append-only over time, by three distinct mechanisms (human enrollment, human correction, automatic compounding). This section captures how that happens, what's deliberately left out, and how to observe maturation in flight.
+
+### Human-in-the-loop — three roles
+
+Speaker Identification has no learned classifier; it has a reference library, and the library only exists because humans seed and correct it.
+
+**1. Bootstrap.** Without manual enrollment, both registries are empty and every turn writes NULL to `speaker_person_id`. `make enroll-voice` and `make enroll-face` are the only entry points to populate the registries — ~10 s of audio per host, one frame per host. Until at least one host is enrolled, there is nothing to match against.
+
+**2. Correction (Phase 4b-action — planned).** The review-UI overlay (Phase 4b-display, shipped) shows colour-coded face boxes per turn. The next phase makes them clickable: click a mis-attributed face → Person picker → the system extracts new voice and face embeddings from that turn and inserts them into the registries with `created_by='manual'`, plus corrects `speaker_person_id`. A single correction therefore (a) fixes the current turn, (b) adds new exemplars *in the conditions where matching just failed*, (c) improves all future episodes recorded under similar conditions.
+
+**3. Compounding (Phase 5 — planned).** Once humans have seeded enough high-confidence exemplars, a periodic job auto-promotes turns with `match_method = 'voice+face'` and high per-modality scores. The voice and face embeddings from those turns are inserted with `created_by='auto-confirmed'`. This grows both registries simultaneously — a host originally only voice-enrolled gets a face embedding the first time they appear on camera and voice agrees. Phase 5 is what turns the loop from "human-corrects-each-mistake" into "humans-correct-edge-cases".
+
+The `created_by` enum (`manual` · `headshot` · `auto-confirmed`) records provenance per row. All three vote equally at match time today; future tooling could weight by trust.
+
+### How the registries mature
+
+**Voice (`person_voiceprints`).** Each enrolled span yields ~17 rows per 10 seconds of audio (sliding 2 s window, 0.5 s hop). New spans — manual, corrected, or auto-confirmed — append more rows. What this buys at match time:
+
+- *More votes per turn.* The matcher requires `votes / total_windows ≥ 0.6`. With dozens of voiceprints per Person, one noisy second only dilutes one vote out of many. Robustness scales with registry size.
+- *Coverage across conditions.* Different rooms, different mics, different days, different vocal states (sick, tired, energetic). The match is "nearest exemplar wins per window" — adding a sick-voice exemplar is exactly what makes future sick-voice turns auto-resolve.
+- *Cross-source generalisation.* As a host appears on multiple podcasts, voiceprints from each recording chain enter the registry. The Person becomes recognisable everywhere they actually appear.
+
+**Face (`person_face_embeddings`).** One 512-dim ArcFace per enrolled image or corrected frame. New entries add new angles, lighting conditions, expressions, beard length, glasses-on/off. The k-NN match is permissive (cosine threshold 0.40) — any single matching exemplar in the registry is enough to recognise that host in that condition.
+
+### What does not happen — architectural non-decisions
+
+Worth being explicit about, since several of these were considered and rejected:
+
+- **No model fine-tuning.** wespeaker (voice) and ArcFace (face) are frozen pretrained models. We don't retrain on Jaromelu data — no GPU training cycles, no model versioning, no MLOps pipeline. All "improvement" is registry-side, observable as `person_voiceprints` row counts growing over time.
+- **No centroid / mean voiceprint.** A single representative vector per Person was considered in early design and rejected: a centroid drowns out variation, and one bad span poisons all future matches. Per-window voting tolerates ~30–40 % noisy exemplars without misidentifying.
+- **No decay or time-weighting.** Old embeddings carry equal weight to new ones. A 2024 voiceprint still votes in 2026. The volume of normal-condition recordings drowns out outliers, and the cosine threshold filters bad windows. The trade-off: dramatic voice changes (puberty, surgery) are handled by accumulating enough new exemplars rather than by forgetting old ones.
+- **No pruning.** Bad embeddings (a cough during enrollment, a blurry frame) stay in the registry forever unless manually deleted from SQL. The matching algorithm votes them down.
+- **No S-norm score normalisation.** Mentioned in [Backlog](#backlog). Without it, cosine scores from different recording conditions aren't strictly comparable across sources, but threshold-based matching is robust enough at single-digit-host scale.
+
+### Scaling characteristics
+
+The voice matcher loads the entire `person_voiceprints` table into memory once per source — a single matrix multiply per turn. Sizing:
+
+- *Today:* 1–10 hosts × 1–10 enrollment spans × 17 voiceprints × 256-dim × 4 bytes ≈ <100 KB.
+- *Plausible mid-scale:* 100 hosts × 100 episodes × 17 voiceprints × 256-dim × 4 bytes ≈ 174 MB. Still feasible.
+- *Large-scale:* 1000 hosts × 1000 episodes ≈ 17 GB. Not feasible in-memory.
+
+Backlog calls out **pgvector HNSW server-side k-NN** as the migration path — same matching semantics, the index lives in Postgres rather than being loaded per source. Until that ships, the in-memory load is the implicit ceiling on registry growth. Face matching has the same shape: in-memory cosine k-NN today, pgvector-able later.
+
+### Auditing the registries
+
+Useful queries when checking system health:
+
+```sql
+-- Voiceprints per host, by provenance
+SELECT p.full_name, pv.created_by, COUNT(*)
+FROM person_voiceprints pv
+JOIN people p ON p.person_id = pv.person_id
+GROUP BY 1, 2 ORDER BY 1, 2;
+
+-- Face embeddings per host, by provenance
+SELECT p.full_name, pfe.created_by, COUNT(*)
+FROM person_face_embeddings pfe
+JOIN people p ON p.person_id = pfe.person_id
+GROUP BY 1, 2 ORDER BY 1, 2;
+
+-- Match-method distribution per source. Over time, as registries mature,
+-- this should shift toward voice+face on sources that have video.
+SELECT s.source_id, ss.match_method, COUNT(*)
+FROM source_speakers ss
+JOIN sources s ON s.source_id = ss.source_id
+WHERE s.transcription_status = 'transcribed'
+GROUP BY 1, 2 ORDER BY 1;
+```
+
+The data is there; an admin-panel surfacing of these metrics ("Lineup health") is on the wider backlog.
+
+---
+
 ## Remote vs local inference (Phase 5.5)
 
 Lineup runs locally by default. To use the SageMaker Async endpoint instead:
