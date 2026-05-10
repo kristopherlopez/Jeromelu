@@ -91,6 +91,10 @@ services:
       # upload path in services/api/app/scout/video.py). Pointing this at
       # raw-transcripts causes HeadObject 404 on click-to-reassign.
       S3_AUDIO_BUCKET: jeromelu-raw-audio
+    volumes:
+      # LRU cache for the persistent .video.mp4 fast-path. Repeat
+      # reassign clicks on the same source skip the S3 round-trip.
+      - video_cache:/var/cache/video-worker
 
   web:
     image: ${ECR_REGISTRY:-111424988703.dkr.ecr.ap-southeast-2.amazonaws.com}/jeromelu/web:${IMAGE_TAG:-latest}
@@ -124,3 +128,5 @@ volumes:
     name: jeromelu_caddy_data
   caddy_config:
     name: jeromelu_caddy_config
+  video_cache:
+    name: jeromelu_video_cache

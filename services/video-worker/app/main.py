@@ -23,11 +23,15 @@ the docker network — the API is the only client.
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import re
 import shutil
 import subprocess
 import tempfile
+import threading
+import time
 from pathlib import Path
 from typing import Iterator
 from uuid import uuid4
@@ -58,6 +62,12 @@ class Settings(BaseSettings):
     aws_default_region: str = "ap-southeast-2"
     staging_prefix: str = "staging/video"
     default_quality: str = "360"
+
+    # LRU cache for persistent_video_s3_key downloads. Sized to fit a
+    # handful of typical 360p episode mp4s (each ~135MB). Set to 0 to
+    # disable the cache entirely.
+    cache_dir: str = "/var/cache/video-worker"
+    cache_max_bytes: int = 4 * 1024 * 1024 * 1024  # 4 GB
 
 
 settings = Settings()
@@ -117,6 +127,134 @@ def _yt_dlp_low_res(video_id: str, output_dir: Path, quality: str) -> Path:
         )
     mp4s = [c for c in candidates if c.suffix == ".mp4"]
     return mp4s[0] if mp4s else candidates[0]
+
+
+def _yt_dlp_section(
+    video_id: str,
+    output_dir: Path,
+    ts: float,
+    quality: str,
+    pad_seconds: float = 3.0,
+) -> Path:
+    """Pull only a small range around ``ts`` instead of the full video.
+
+    yt-dlp's ``download_sections`` flag asks the server for just the
+    matching segment, which collapses single-frame extraction time from
+    "wait for the whole episode to download" to "wait for ~6 seconds of
+    video". The output is keyframe-aligned, so the actual mp4 starts at
+    or before ``ts - pad_seconds`` — the caller still seeks with ffmpeg.
+    """
+    start = max(0.0, ts - pad_seconds)
+    end = ts + pad_seconds
+    fmt = (
+        f"best[ext=mp4][vcodec!*=none][acodec!*=none][height<={quality}]"
+        f"/best[vcodec!*=none][acodec!*=none][height<={quality}]"
+        f"/worst[vcodec!*=none][acodec!*=none]"
+    )
+    opts = {
+        "format": fmt,
+        "outtmpl": str(output_dir / f"{video_id}.%(ext)s"),
+        "logger": logger,
+        "quiet": True,
+        "noprogress": True,
+        "download_ranges": yt_dlp.utils.download_range_func(
+            None, [(start, end)]
+        ),
+        "force_keyframes_at_cuts": True,
+    }
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            ydl.download([f"https://www.youtube.com/watch?v={video_id}"])
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"yt-dlp section failed for {video_id}: {exc}",
+        ) from exc
+
+    candidates = list(output_dir.glob(f"{video_id}.*"))
+    if not candidates:
+        raise HTTPException(
+            status_code=502,
+            detail=f"yt-dlp section produced no output for {video_id}",
+        )
+    mp4s = [c for c in candidates if c.suffix == ".mp4"]
+    return mp4s[0] if mp4s else candidates[0]
+
+
+# ---------------------------------------------------------------------------
+# Persistent-mp4 LRU disk cache
+# ---------------------------------------------------------------------------
+
+# In-process lock — the worker is uvicorn-single-process, but
+# /extract-frame is sync-in-threadpool, so two reassigns racing on the
+# same key shouldn't both trigger the S3 download.
+_cache_lock = threading.Lock()
+
+
+def _cache_path(s3_key: str) -> Path:
+    """Map an S3 key to a flat cache filename. Slashes become ``__`` so the
+    cache directory stays one level deep — easier to inspect, and avoids
+    creating per-channel subdirs that complicate eviction."""
+    safe = s3_key.replace("/", "__")
+    return Path(settings.cache_dir) / safe
+
+
+def _cache_evict_to_fit(needed_bytes: int) -> None:
+    """LRU by access time. Walks the cache dir, evicts oldest first until
+    ``cache_max_bytes - needed_bytes`` worth of headroom exists. Cheap —
+    runs only on miss, only over a flat directory of a few large files."""
+    cache = Path(settings.cache_dir)
+    if not cache.exists():
+        return
+    files = [(p, p.stat()) for p in cache.iterdir() if p.is_file()]
+    total = sum(st.st_size for _, st in files)
+    target = max(0, settings.cache_max_bytes - needed_bytes)
+    if total <= target:
+        return
+    files.sort(key=lambda x: x[1].st_atime)  # oldest access first
+    for path, st in files:
+        if total <= target:
+            break
+        try:
+            path.unlink()
+            total -= st.st_size
+            logger.info("Evicted %s (%.1f MB)", path.name, st.st_size / (1024 * 1024))
+        except OSError as exc:
+            logger.warning("eviction failed for %s: %s", path, exc)
+
+
+def _cached_s3_download(s3_key: str) -> Path:
+    """Return a local path holding the mp4 for ``s3_key`` — using the
+    cache if present, populating it on miss. Touches mtime/atime on hit
+    so LRU sees it as recent."""
+    if settings.cache_max_bytes <= 0:
+        # Cache disabled — fall through to a tempfile each call.
+        tmp = Path(tempfile.mkdtemp(prefix="video-worker-nocache-"))
+        path = tmp / "video.mp4"
+        _s3().download_file(settings.s3_audio_bucket, s3_key, str(path))
+        return path
+
+    Path(settings.cache_dir).mkdir(parents=True, exist_ok=True)
+    target = _cache_path(s3_key)
+
+    with _cache_lock:
+        if target.exists():
+            os.utime(target, None)  # bump atime for LRU
+            logger.info("cache hit %s", s3_key)
+            return target
+
+        # Miss. Probe size first so eviction can be sized correctly.
+        head = _s3().head_object(Bucket=settings.s3_audio_bucket, Key=s3_key)
+        size = int(head["ContentLength"])
+        logger.info("cache miss %s (%.1f MB) — downloading", s3_key, size / (1024 * 1024))
+        _cache_evict_to_fit(size)
+
+        # Download to a sibling tmp file then atomic-rename so a crash
+        # mid-download doesn't poison the cache with a half-file.
+        tmp = target.with_suffix(target.suffix + ".tmp")
+        _s3().download_file(settings.s3_audio_bucket, s3_key, str(tmp))
+        tmp.rename(target)
+        return target
 
 
 def _ffmpeg_frame(video_path: Path, ts: float, dest: Path) -> None:
@@ -210,17 +348,29 @@ class ExtractFrameRequest(BaseModel):
     )
     ts: float = Field(..., ge=0, description="Frame timestamp in seconds")
     quality: str | None = Field(default=None)
+    prefer_section: bool = Field(
+        default=False,
+        description=(
+            "When true and canonical_url is set, yt-dlp only a few seconds "
+            "around ts instead of the full file. Drops single-frame "
+            "extraction from ~30s to ~3s — used by reassign."
+        ),
+    )
 
 
 @app.post("/extract-frame")
 def extract_frame(body: ExtractFrameRequest) -> Response:
     """Pull (or download) a video, dump one JPEG at ``ts``, return the bytes.
 
-    Two acquisition modes:
-      - ``persistent_video_s3_key`` set: fetch the mp4 from S3 (no yt-dlp).
-      - ``canonical_url`` set: yt-dlp on the fly. Cleaned up on exit.
+    Acquisition modes (chosen in order):
+      - ``prefer_section`` + ``canonical_url``: yt-dlp a ~6s slice around
+        ``ts``. Fast cold-start, no S3 hit at all.
+      - ``persistent_video_s3_key``: fetch the mp4 from S3, populating
+        the LRU disk cache so subsequent clicks on the same source are
+        ~instant. No yt-dlp.
+      - ``canonical_url``: yt-dlp the full file (legacy fallback).
 
-    Returns image/jpeg bytes inline. Caller writes them to disk if needed.
+    Returns image/jpeg bytes inline.
     """
     if not body.canonical_url and not body.persistent_video_s3_key:
         raise HTTPException(
@@ -232,13 +382,11 @@ def extract_frame(body: ExtractFrameRequest) -> Response:
 
     with tempfile.TemporaryDirectory(prefix="video-worker-frame-") as tmp:
         tmp_path = Path(tmp)
-        if body.persistent_video_s3_key:
-            video_path = tmp_path / "video.mp4"
-            _s3().download_file(
-                settings.s3_audio_bucket,
-                body.persistent_video_s3_key,
-                str(video_path),
-            )
+        if body.prefer_section and body.canonical_url:
+            video_id = _video_id_from_url(body.canonical_url)
+            video_path = _yt_dlp_section(video_id, tmp_path, body.ts, quality)
+        elif body.persistent_video_s3_key:
+            video_path = _cached_s3_download(body.persistent_video_s3_key)
         else:
             video_id = _video_id_from_url(body.canonical_url)
             video_path = _yt_dlp_low_res(video_id, tmp_path, quality)

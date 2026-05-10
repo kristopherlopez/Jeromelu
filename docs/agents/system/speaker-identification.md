@@ -353,49 +353,65 @@ When the operator overrides a misidentified turn (the click-to-reassign UI in `Y
 
 ### Backend sequence
 
+The endpoint returns **NDJSON** (`application/x-ndjson`) — one JSON event per line emitted as each substep completes. The frontend reads it with a `ReadableStream` reader and renders a 5-row checklist. Validation errors raised before the stream starts still surface as ordinary HTTP 4xx JSON responses.
+
 ```
-1. Validate              source exists + has pixels access (video_s3_key OR YouTube canonical_url)
-                         speaker turn exists (by segment_id)
-                         exactly one of body.person_id / body.new_person_name is provided
+SYNC PRELUDE (HTTP 4xx on failure)
+  1. Validate              source exists + has pixels access (video_s3_key OR YouTube canonical_url)
+                           speaker turn exists (by segment_id)
+                           exactly one of body.person_id / body.new_person_name is provided
 
-2. Resolve target Person if body.person_id:
-                            look up Person; 404 if missing
-                         else (body.new_person_name):
-                            strip + length-validate (1..200)
-                            case-insensitive lookup by canonical_name
-                            if missing → INSERT new people row (canonical_name only),
-                                          mark person_created=true
-                            else → reuse existing row (idempotent on repeat clicks)
-                         target_person_id := person.person_id
+  2. Resolve target Person if body.person_id:
+                              look up Person; 404 if missing
+                           else (body.new_person_name):
+                              strip + length-validate (1..200)
+                              case-insensitive lookup by canonical_name
+                              if missing → INSERT new people row (canonical_name only),
+                                            mark person_created=true
+                              else → reuse existing row (idempotent on repeat clicks)
+                           target_person_id := person.person_id
+                           db.flush() makes the new row visible without committing
 
-3. Resolve frame_ts      body.frame_ts if provided, else turn midpoint
+  3. Resolve frame_ts      body.frame_ts if provided, else turn midpoint
 
-4. Acquire frame         _fetch_reassign_frame:
-                           - delegated to the video-worker sidecar (yt-dlp + ffmpeg)
-                           - JPG bytes returned over HTTP and written to tempdir
+STREAMED STEPS (NDJSON)         emits {"step", "status", "detail"?} per event
+  4. person  done              detail = {person_id, person_name, person_created}
 
-5. Enroll face           enroll_face_from_image:
-                           - cv2 decode + InsightFace buffalo_l (RetinaFace + ArcFace)
-                           - Largest face (bbox hint disambiguates if multiple)
-                           - INSERT person_face_embeddings (created_by='manual')
+  5. frame   start → done      _fetch_reassign_frame:
+                                 - YouTube source → worker yt-dlp's a ~6s slice
+                                   around frame_ts (`prefer_section=true`).
+                                   Cold path ≈ 3 s, no S3 round-trip.
+                                 - Otherwise → worker pulls video_s3_key via its
+                                   LRU disk cache (/var/cache/video-worker).
+                                   Repeat clicks on the same source ≈ instant.
+                                 - JPG bytes returned over HTTP, written to tempdir.
 
-6. Enroll voice          enroll() — same path as enroll_voice_cli:
-                           - Pull audio from S3, ffmpeg → 16 kHz mono WAV
-                           - 2 s sliding window / 0.5 s hop over [turn.start_ts, turn.end_ts]
-                           - wespeaker embeddings (256-dim) per window
-                           - INSERT N rows into person_voiceprints (created_by='manual')
-                           - Skipped silently if turn shorter than embedder minimum
+  6. face    start → done      enroll_face_from_image:
+             or skip             - cv2 decode + InsightFace buffalo_l (RetinaFace + ArcFace)
+                                 - Largest face (bbox hint disambiguates if multiple)
+                                 - INSERT person_face_embeddings (created_by='manual')
+                                 - skip event if no face detected — turn still attributed
 
-7. Update SourceSpeaker  speaker_person_id  = target_person_id
-                         match_method       = 'manual'
-                         match_confidence   = 1.0
+  7. voice   start → done      enroll() — same path as enroll_voice_cli:
+             or skip             - Pull audio from S3, ffmpeg → 16 kHz mono WAV
+                                 - 2 s sliding window / 0.5 s hop over [turn.start_ts, turn.end_ts]
+                                 - wespeaker embeddings (256-dim) per window
+                                 - INSERT N rows into person_voiceprints (created_by='manual')
+                                 - skip event if turn shorter than embedder minimum
 
-8. Commit                Single transaction. Person creation, embeddings, and
-                         the SourceSpeaker update all land or roll back together.
+  8. commit  start → done      speaker_person_id  = target_person_id
+                               match_method       = 'manual'
+                               match_confidence   = 1.0
+                               Single transaction — Person creation, embeddings,
+                               and the SourceSpeaker update all land together.
 
-9. Return                Response with target person_id + canonical_name,
-                         person_created flag, face_embedding_id, voiceprints_written.
+  9. result  done              Terminal event — detail mirrors the legacy single-shot
+                               response: {segment_id, person_id, person_name,
+                               person_created, face_embedding_id, voiceprints_written,
+                               match_method}.
 ```
+
+Any unhandled exception in the streamed section emits `{"step": "<current>", "status": "error", "detail": "<msg>"}` and rolls back the session — partial writes never persist.
 
 ### Behaviour notes
 

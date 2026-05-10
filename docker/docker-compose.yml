@@ -105,7 +105,12 @@ services:
       - AWS_PROFILE=${AWS_PROFILE:-default}
     volumes:
       - ${USERPROFILE:-${HOME}}/.aws:/root/.aws:ro
+      # LRU disk cache for staged .video.mp4 downloads. Repeat clicks on
+      # the same source skip the S3 round-trip. Survives container
+      # restarts; manual purge via `docker volume rm docker_video_cache`.
+      - video_cache:/var/cache/video-worker
 
 volumes:
   postgres_data:
   minio_data:
+  video_cache:

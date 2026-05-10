@@ -1,9 +1,12 @@
+import json
 import logging
 import tempfile
 import uuid
 from pathlib import Path
+from typing import Iterator
 
 from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
@@ -39,11 +42,24 @@ def _fetch_reassign_frame(source: Source, ts: float, dest: Path) -> None:
     """Pull one JPEG at ``ts`` for the reassign endpoint. Routes via the
     video-worker sidecar — the API container has no yt-dlp / ffmpeg.
 
-    Picks the persistent-S3 fast-path when ``source.video_s3_key`` is
-    set, otherwise lets the worker yt-dlp from ``canonical_url``.
+    Strategy:
+      - YouTube source with canonical_url → ask the worker to yt-dlp
+        only a ~6s slice around ts (``prefer_section``). Fastest cold
+        path; bypasses S3 entirely.
+      - Otherwise → use ``video_s3_key`` against the worker's LRU disk
+        cache. First click is the full mp4 download; repeats are
+        ~instant.
     """
     try:
-        if source.video_s3_key:
+        if source.source_type == "youtube" and source.canonical_url:
+            fetch_frame_to(
+                dest,
+                canonical_url=source.canonical_url,
+                persistent_video_s3_key=source.video_s3_key,
+                ts=ts,
+                prefer_section=True,
+            )
+        elif source.video_s3_key:
             fetch_frame_to(
                 dest,
                 persistent_video_s3_key=source.video_s3_key,
@@ -527,6 +543,12 @@ class ReassignRequest(BaseModel):
     )
 
 
+def _ndjson(event: dict) -> bytes:
+    """Encode one stream event. NDJSON = one JSON object per line. The
+    frontend consumes this with a ReadableStream + line splitter."""
+    return (json.dumps(event) + "\n").encode("utf-8")
+
+
 @router.post("/sources/{source_id}/speakers/{segment_id}/reassign")
 def reassign_speaker(
     source_id: uuid.UUID,
@@ -536,27 +558,43 @@ def reassign_speaker(
 ):
     """Operator override: a face on the video overlay was misidentified.
 
-    On save:
-      1. Resolve target Person — either ``body.person_id`` (existing) or
-         ``body.new_person_name`` (lookup-or-create by canonical_name,
-         case-insensitive). Exactly one must be provided.
-      2. Set ``source_speakers.speaker_person_id`` for the clicked turn
-         (with ``match_method='manual'``, ``match_confidence=1.0``).
-      3. Extract the face from the video frame at ``frame_ts`` and write a
-         new ``person_face_embeddings`` row (``created_by='manual'``).
-      4. Extract a voiceprint from the speaker turn's audio span and write
-         ``person_voiceprints`` rows (``created_by='manual'``). Skipped if
-         the turn is shorter than the embedder's minimum.
+    Returns an **NDJSON stream** (``application/x-ndjson``) — one JSON
+    object per line, emitted as each substep completes. Lets the modal
+    render a checklist that ticks through 'person → frame → face →
+    voice → commit' in real time, instead of staring at a single
+    spinner while a 30s S3 download blocks the response.
+
+    Sync prelude (still raises HTTPException 4xx if invalid):
+      - Source / speaker / person-field validation.
+      - Person resolve — ``body.person_id`` (existing) or
+        ``body.new_person_name`` (lookup-or-create by canonical_name,
+        case-insensitive). Exactly one must be provided.
+
+    Streamed steps (one ``{"step", "status", "detail"?}`` event each
+    on start / done / skip / error):
+      1. ``frame``  — pull a JPEG from the video at ``frame_ts``. Goes
+         via the video-worker sidecar (yt-dlp section path for YouTube
+         sources, LRU-cached S3 mp4 otherwise).
+      2. ``face``   — InsightFace enrollment from the frame. ``skip`` if
+         no face detected; the turn is still attributed.
+      3. ``voice``  — pyannote voiceprint from the turn's audio span.
+         ``skip`` if the turn is shorter than the embedder's minimum.
+      4. ``commit`` — write ``source_speakers.speaker_person_id`` +
+         ``match_method='manual'`` + ``match_confidence=1.0`` and commit.
+
+    A terminal ``{"step": "result", "status": "done", "detail": {...}}``
+    carries the final response payload (same shape as the pre-streaming
+    return). Any unhandled exception emits ``{"status": "error"}`` and
+    closes the stream.
 
     Idempotent on the SourceSpeaker update; embeddings are append-only —
     repeated clicks add more rows. That's intentional: every correction
-    grows the registry. Person creation is also idempotent: a second
-    click with the same ``new_person_name`` reuses the first run's
-    Person row rather than creating a duplicate.
+    grows the registry. Person creation is idempotent: a second click
+    with the same ``new_person_name`` reuses the first run's Person row.
 
     See [speaker-identification.md § Manual reassign](../system/speaker-identification.md).
     """
-    # 1. Validate inputs
+    # ---- Sync prelude: validate + resolve Person (fast, DB-only) -----
     source = db.query(Source).filter(Source.source_id == source_id).first()
     if not source:
         raise HTTPException(status_code=404, detail="Source not found")
@@ -579,12 +617,6 @@ def reassign_speaker(
     if not speaker:
         raise HTTPException(status_code=404, detail="Speaker segment not found")
 
-    # Resolve target Person — exactly one of person_id / new_person_name.
-    # The lookup-or-create path lets the operator attribute a turn to a
-    # Person who isn't enrolled yet (canonicalising on the fly), which is
-    # the most common new-host workflow. Reuses an existing Person if the
-    # name already exists (case-insensitive) so duplicate clicks don't
-    # create duplicate rows.
     if (body.person_id is None) == (body.new_person_name is None):
         raise HTTPException(
             status_code=400,
@@ -617,62 +649,136 @@ def reassign_speaker(
             person_created = True
 
     target_person_id = person.person_id
+    person_name = person.canonical_name
 
-    # 2. Compute the frame timestamp to extract a face from. Default to the
-    #    middle of the speaker turn — that's where the host is most likely
-    #    to be on screen if the format is multi-cam.
+    # Frame timestamp defaults to the middle of the speaker turn — that's
+    # where the host is most likely to be on screen if the format is
+    # multi-cam.
     frame_ts = body.frame_ts
     if frame_ts is None:
         frame_ts = (speaker.start_ts + speaker.end_ts) / 2.0
 
-    # 3. Extract face crop and enroll. The video-worker sidecar owns
-    #    yt-dlp + ffmpeg; the API just receives the JPG bytes via HTTP
-    #    (see _fetch_reassign_frame).
-    face_id_written: uuid.UUID | None = None
-    with tempfile.TemporaryDirectory(prefix="jeromelu-reassign-frame-") as ftmp:
-        frame_path = Path(ftmp) / "frame.jpg"
-        _fetch_reassign_frame(source, frame_ts, frame_path)
+    # ---- Streamed work: frame fetch, enroll, commit ------------------
+
+    def stream() -> Iterator[bytes]:
+        face_id_written: uuid.UUID | None = None
+        voice_rows_written = 0
         try:
-            face_id_written, det_score, _area = enroll_face_from_image(
-                db,
-                person_id=target_person_id,
-                source_id=source_id,
-                image_path=frame_path,
-                frame_ts=frame_ts,
-                created_by="manual",
-            )
-        except VisualIdError as exc:
-            logger.warning("Face enrollment skipped during reassign: %s", exc)
+            # The Person resolution is already done; tell the client up
+            # front so the checklist starts populated.
+            yield _ndjson({
+                "step": "person",
+                "status": "done",
+                "detail": {
+                    "person_id": str(target_person_id),
+                    "person_name": person_name,
+                    "person_created": person_created,
+                },
+            })
 
-    # 4. Voiceprint write-back from the speaker turn's audio span. Same
-    #    pattern as `enroll_voice_cli.py`. Skip silently when the turn is
-    #    too short for the embedder.
-    voice_rows_written = 0
-    try:
-        result = enroll(
-            db,
-            person_id=target_person_id,
-            source_id=source_id,
-            start_ts=float(speaker.start_ts),
-            end_ts=float(speaker.end_ts),
-            created_by="manual",
-        )
-        voice_rows_written = result.voiceprints_written
-    except EnrollmentError as exc:
-        logger.warning("Voiceprint enrollment skipped during reassign: %s", exc)
+            # Step: video-worker frame fetch. Slowest substep on cold
+            # cache; ~3s on yt-dlp section path, ~instant on cache hit.
+            yield _ndjson({"step": "frame", "status": "start"})
+            with tempfile.TemporaryDirectory(prefix="jeromelu-reassign-frame-") as ftmp:
+                frame_path = Path(ftmp) / "frame.jpg"
+                try:
+                    _fetch_reassign_frame(source, frame_ts, frame_path)
+                except HTTPException as exc:
+                    yield _ndjson({
+                        "step": "frame",
+                        "status": "error",
+                        "detail": str(exc.detail),
+                    })
+                    return
+                yield _ndjson({"step": "frame", "status": "done"})
 
-    # 5. Mark the speaker turn as manually corrected.
-    speaker.speaker_person_id = target_person_id
-    speaker.match_method = "manual"
-    speaker.match_confidence = 1.0
-    db.commit()
+                # Step: InsightFace enrollment. Skipped (not failed) when
+                # no face is detected — the turn is still attributed.
+                yield _ndjson({"step": "face", "status": "start"})
+                try:
+                    face_id_written, _det, _area = enroll_face_from_image(
+                        db,
+                        person_id=target_person_id,
+                        source_id=source_id,
+                        image_path=frame_path,
+                        frame_ts=frame_ts,
+                        created_by="manual",
+                    )
+                    yield _ndjson({
+                        "step": "face",
+                        "status": "done",
+                        "detail": {"face_embedding_id": str(face_id_written)},
+                    })
+                except VisualIdError as exc:
+                    logger.warning("Face enrollment skipped during reassign: %s", exc)
+                    yield _ndjson({
+                        "step": "face",
+                        "status": "skip",
+                        "detail": str(exc),
+                    })
 
-    return {
-        "segment_id": str(segment_id),
-        "person_id": str(target_person_id),
-        "person_name": person.canonical_name,
-        "person_created": person_created,
-        "face_embedding_id": str(face_id_written) if face_id_written else None,
-        "voiceprints_written": voice_rows_written,
-        "match_method": "manual",
-    }
+            # Step: voiceprint enrollment from the turn's audio span.
+            # Skipped when the turn is shorter than the embedder's min.
+            yield _ndjson({"step": "voice", "status": "start"})
+            try:
+                result = enroll(
+                    db,
+                    person_id=target_person_id,
+                    source_id=source_id,
+                    start_ts=float(speaker.start_ts),
+                    end_ts=float(speaker.end_ts),
+                    created_by="manual",
+                )
+                voice_rows_written = result.voiceprints_written
+                yield _ndjson({
+                    "step": "voice",
+                    "status": "done",
+                    "detail": {"voiceprints_written": voice_rows_written},
+                })
+            except EnrollmentError as exc:
+                logger.warning("Voiceprint enrollment skipped during reassign: %s", exc)
+                yield _ndjson({
+                    "step": "voice",
+                    "status": "skip",
+                    "detail": str(exc),
+                })
+
+            # Step: mark the turn manually corrected and commit. This
+            # also flushes the new Person row (if any) durably.
+            yield _ndjson({"step": "commit", "status": "start"})
+            speaker.speaker_person_id = target_person_id
+            speaker.match_method = "manual"
+            speaker.match_confidence = 1.0
+            db.commit()
+            yield _ndjson({"step": "commit", "status": "done"})
+
+            # Terminal event with the same shape as the legacy response.
+            yield _ndjson({
+                "step": "result",
+                "status": "done",
+                "detail": {
+                    "segment_id": str(segment_id),
+                    "person_id": str(target_person_id),
+                    "person_name": person_name,
+                    "person_created": person_created,
+                    "face_embedding_id": str(face_id_written) if face_id_written else None,
+                    "voiceprints_written": voice_rows_written,
+                    "match_method": "manual",
+                },
+            })
+        except Exception as exc:
+            # Anything that escapes a step's own handler ends up here.
+            # Roll back the session so a partial write doesn't persist,
+            # then let the client know which step blew up.
+            logger.exception("reassign stream failed")
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            yield _ndjson({
+                "step": "unknown",
+                "status": "error",
+                "detail": f"{type(exc).__name__}: {exc}",
+            })
+
+    return StreamingResponse(stream(), media_type="application/x-ndjson")

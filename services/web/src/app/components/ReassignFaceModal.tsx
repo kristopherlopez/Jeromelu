@@ -23,6 +23,58 @@ type Selection =
   | { kind: "existing"; person: PersonSummary }
   | { kind: "new"; name: string };
 
+// One row in the live checklist. The backend emits
+// {step, status, detail?} events as work progresses; this maps each to
+// the UI state machine.
+type StepStatus = "pending" | "running" | "done" | "skip" | "error";
+type StepKey = "person" | "frame" | "face" | "voice" | "commit";
+
+interface StepEvent {
+  step: StepKey | "result" | "unknown";
+  status: "start" | "done" | "skip" | "error";
+  // The detail payload varies per step; we only consume a few fields,
+  // so unknown is fine here.
+  detail?: unknown;
+}
+
+const STEPS: { key: StepKey; label: string }[] = [
+  { key: "person", label: "Resolved person" },
+  { key: "frame", label: "Pulled video frame" },
+  { key: "face", label: "Enrolled face" },
+  { key: "voice", label: "Enrolled voice" },
+  { key: "commit", label: "Saved to database" },
+];
+
+function stepIcon(s: StepStatus): string {
+  switch (s) {
+    case "pending":
+      return "○";
+    case "running":
+      return "⟳";
+    case "done":
+      return "✓";
+    case "skip":
+      return "⊘";
+    case "error":
+      return "✗";
+  }
+}
+
+function stepColor(s: StepStatus): string {
+  switch (s) {
+    case "pending":
+      return "var(--foreground-ghost)";
+    case "running":
+      return "var(--accent)";
+    case "done":
+      return "var(--accent)";
+    case "skip":
+      return "var(--foreground-secondary)";
+    case "error":
+      return "#f87171"; // red-400
+  }
+}
+
 export default function ReassignFaceModal({
   sourceId,
   speaker,
@@ -34,6 +86,13 @@ export default function ReassignFaceModal({
   const [selected, setSelected] = useState<Selection | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [steps, setSteps] = useState<Record<StepKey, StepStatus>>({
+    person: "pending",
+    frame: "pending",
+    face: "pending",
+    voice: "pending",
+    commit: "pending",
+  });
 
   // Escape closes the modal — standard expectation; not having it reads
   // as "buggy" even if everything else works.
@@ -45,10 +104,49 @@ export default function ReassignFaceModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose, submitting]);
 
+  const applyEvent = (evt: StepEvent) => {
+    if (evt.step === "result" && evt.status === "done") {
+      // Stream's terminal success — let the caller close + refresh.
+      onSaved();
+      return;
+    }
+    if (evt.step === "unknown" || (evt.status === "error" && evt.step !== "result")) {
+      const detail = typeof evt.detail === "string" ? evt.detail : "stream error";
+      setError(detail);
+      setSteps((prev) => {
+        // Mark whatever was running as errored so the UI doesn't sit
+        // on a frozen ⟳ icon.
+        const next = { ...prev };
+        if (evt.step !== "unknown" && evt.step in next) {
+          next[evt.step as StepKey] = "error";
+        }
+        return next;
+      });
+      return;
+    }
+    if (evt.step === "result") return;
+    const key = evt.step as StepKey;
+    setSteps((prev) => {
+      const next = { ...prev };
+      if (evt.status === "start") next[key] = "running";
+      else if (evt.status === "done") next[key] = "done";
+      else if (evt.status === "skip") next[key] = "skip";
+      else if (evt.status === "error") next[key] = "error";
+      return next;
+    });
+  };
+
   const handleSave = async () => {
     if (!selected) return;
     setSubmitting(true);
     setError(null);
+    setSteps({
+      person: "pending",
+      frame: "pending",
+      face: "pending",
+      voice: "pending",
+      commit: "pending",
+    });
     try {
       // Backend resolves target Person from exactly one of these:
       // existing person_id, or new_person_name (lookup-or-create).
@@ -69,10 +167,38 @@ export default function ReassignFaceModal({
         },
       );
       if (!resp.ok) {
+        // 4xx validation errors come back as a normal JSON body, not
+        // the stream — surface those before trying to read events.
         const text = await resp.text();
         throw new Error(`API ${resp.status}: ${text}`);
       }
-      onSaved();
+      if (!resp.body) {
+        throw new Error("Streaming not supported by this browser");
+      }
+
+      // NDJSON reader. The backend emits one JSON object per line; we
+      // buffer across chunks because a chunk boundary can land mid-line.
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        let nl: number;
+        while ((nl = buf.indexOf("\n")) >= 0) {
+          const line = buf.slice(0, nl).trim();
+          buf = buf.slice(nl + 1);
+          if (!line) continue;
+          try {
+            applyEvent(JSON.parse(line) as StepEvent);
+          } catch {
+            // Garbled line — log and keep going. Better to soldier on
+            // and let later events update the UI than to bail entirely.
+            console.error("reassign: failed to parse stream line", line);
+          }
+        }
+      }
     } catch (e: unknown) {
       setError(String(e));
     } finally {
@@ -133,7 +259,10 @@ export default function ReassignFaceModal({
           autoFocus
         />
 
-        {selected && (
+        {/* Pre-submit explainer — replaced by the live checklist while
+            submitting so the user sees actual progress instead of a
+            spinner sitting on a 30s+ S3 download. */}
+        {!submitting && selected && (
           <div
             className="rounded border px-3 py-2 text-xs"
             style={{
@@ -157,6 +286,45 @@ export default function ReassignFaceModal({
               </>
             )}
           </div>
+        )}
+
+        {submitting && (
+          <ul
+            className="flex flex-col gap-1 rounded border px-3 py-2 text-xs"
+            style={{
+              borderColor: "var(--border)",
+              backgroundColor: "var(--background-deep)",
+            }}
+          >
+            {STEPS.map(({ key, label }) => {
+              const status = steps[key];
+              return (
+                <li
+                  key={key}
+                  className="flex items-center gap-2"
+                  style={{ color: stepColor(status) }}
+                >
+                  <span
+                    className="inline-block w-4 text-center"
+                    style={{
+                      // Spin the running glyph so it reads as active.
+                      animation:
+                        status === "running" ? "spin 1s linear infinite" : undefined,
+                    }}
+                  >
+                    {stepIcon(status)}
+                  </span>
+                  <span>{label}</span>
+                  {status === "skip" && (
+                    <span style={{ color: "var(--foreground-ghost)" }}>
+                      (skipped)
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+            <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+          </ul>
         )}
 
         {error && (

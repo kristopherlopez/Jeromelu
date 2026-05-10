@@ -41,17 +41,20 @@ def fetch_frame_to(
     persistent_video_s3_key: str | None = None,
     ts: float,
     quality: str | None = None,
+    prefer_section: bool = False,
     timeout: float = 600.0,
 ) -> None:
     """Ask the worker for one JPEG at ``ts`` and write its bytes to ``dest``.
 
-    Supply exactly one of ``canonical_url`` (yt-dlp on the worker) or
+    Supply at least one of ``canonical_url`` (yt-dlp on the worker) or
     ``persistent_video_s3_key`` (worker downloads the staged mp4 from S3
-    and skips yt-dlp).
+    and skips yt-dlp). When both are given, ``prefer_section=True`` asks
+    the worker to yt-dlp only a few seconds around ``ts`` instead of
+    pulling the full file — single-frame fast path used by reassign.
     """
-    if bool(canonical_url) == bool(persistent_video_s3_key):
+    if not canonical_url and not persistent_video_s3_key:
         raise VideoWorkerError(
-            "Supply exactly one of canonical_url or persistent_video_s3_key"
+            "Supply at least one of canonical_url or persistent_video_s3_key"
         )
 
     payload: dict[str, object] = {"ts": ts}
@@ -61,6 +64,8 @@ def fetch_frame_to(
         payload["persistent_video_s3_key"] = persistent_video_s3_key
     if quality:
         payload["quality"] = quality
+    if prefer_section:
+        payload["prefer_section"] = True
 
     try:
         with _client(timeout) as c:
