@@ -41,9 +41,6 @@ from pathlib import Path
 from typing import Iterator
 from uuid import uuid4
 
-import yt_dlp
-from youtube_utils.exceptions import DownloadError
-
 from jeromelu_shared.config import settings
 from jeromelu_shared.s3 import get_s3_client
 
@@ -83,6 +80,15 @@ def _yt_dlp_low_res_video(video_id: str, output_dir: Path, quality: str) -> Path
     """Single-stream low-res download. Same selector as the persistent
     Scout path, so the file format / codec the GPU container sees is
     identical."""
+    # Lazy-imported: yt-dlp is not in the API container per
+    # feedback_api_container_lean.md. This module is on the API import path
+    # via routers/sources.py, but its downloader functions are only invoked
+    # by the lineup pipeline (which runs out-of-process). Keeping the import
+    # inside the function lets the API boot without yt-dlp installed; if a
+    # caller ever invokes this from the API, the ModuleNotFoundError will
+    # surface here and signal the architectural boundary was crossed.
+    import yt_dlp  # noqa: PLC0415
+
     fmt = (
         f"best[ext=mp4][vcodec!*=none][acodec!*=none][height<={quality}]"
         f"/best[vcodec!*=none][acodec!*=none][height<={quality}]"
@@ -100,11 +106,11 @@ def _yt_dlp_low_res_video(video_id: str, output_dir: Path, quality: str) -> Path
         with yt_dlp.YoutubeDL(opts) as ydl:
             ydl.download([f"https://www.youtube.com/watch?v={video_id}"])
     except Exception as exc:
-        raise DownloadError(f"yt-dlp failed for {video_id}: {exc}") from exc
+        raise VideoStagingError(f"yt-dlp failed for {video_id}: {exc}") from exc
 
     candidates = list(output_dir.glob(f"{video_id}.*"))
     if not candidates:
-        raise DownloadError(
+        raise VideoStagingError(
             f"yt-dlp produced no output in {output_dir} for {video_id}"
         )
     mp4s = [c for c in candidates if c.suffix == ".mp4"]
@@ -195,12 +201,7 @@ def acquire_video_temp(canonical_url: str, *, quality: str = DEFAULT_QUALITY) ->
     key = _staging_key(request_id)
 
     with tempfile.TemporaryDirectory(prefix="jeromelu-video-staging-") as tmp:
-        try:
-            local_path = _yt_dlp_low_res_video(video_id, Path(tmp), quality)
-        except DownloadError as exc:
-            raise VideoStagingError(
-                f"yt-dlp failed for {video_id}: {exc}"
-            ) from exc
+        local_path = _yt_dlp_low_res_video(video_id, Path(tmp), quality)
         size = _upload(local_path, key)
         logger.info(
             "Staged video: s3://%s/%s (%.1f MB)",
@@ -224,12 +225,7 @@ def staged_video_local(canonical_url: str, *, quality: str = DEFAULT_QUALITY) ->
         )
 
     with tempfile.TemporaryDirectory(prefix="jeromelu-video-local-") as tmp:
-        try:
-            local_path = _yt_dlp_low_res_video(video_id, Path(tmp), quality)
-        except DownloadError as exc:
-            raise VideoStagingError(
-                f"yt-dlp failed for {video_id}: {exc}"
-            ) from exc
+        local_path = _yt_dlp_low_res_video(video_id, Path(tmp), quality)
         size = local_path.stat().st_size
         logger.info(
             "Local-staged video: %s (%.1f MB)",
