@@ -238,7 +238,7 @@ V0 architecture replaced by a single Lightsail VM running Docker Compose. See `d
 | SSH key pair | `jeromelu-prod` (ED25519, fingerprint `SHA256:SC5vIKcmU0jNXOwEU9ywmXTejOTOIhkKea5lV5sSTb4`) |
 | Private key location | `~/.ssh/jeromelu-prod` on operator workstation |
 | Firewall | TCP 22 from operator-only allowlist (see below), TCP 80 + 443 from `0.0.0.0/0` |
-| SSH allowlist | `112.213.155.188/32` (Kris home internet), `49.186.102.61/32` + `49.186.51.170/32` (Kris phone hotspot — carrier reassigns frequently, add new entries as they rotate). Update via `aws lightsail put-instance-public-ports --instance-name jeromelu --region ap-southeast-2 --port-infos '[{"fromPort":22,"toPort":22,"protocol":"tcp","cidrs":[...]}]'` (the call replaces all rules for port 22 — list every CIDR you want kept). |
+| SSH allowlist | `112.213.155.188/32` (Kris home internet), `49.186.102.61/32` + `49.186.51.170/32` (Kris phone hotspot — carrier reassigns frequently, add new entries as they rotate). Update via `aws lightsail put-instance-public-ports --instance-name jeromelu --region ap-southeast-2 --port-infos file://port-infos.json`. **WARNING: the call replaces ALL firewall rules on the instance, not just the ones in the payload.** You must pass the full desired state every time, including ports 80 and 443 — otherwise they get wiped and the site goes down (incident 2026-05-10). Minimum payload: `[{"fromPort":22,"toPort":22,"protocol":"tcp","cidrs":[...]},{"fromPort":80,"toPort":80,"protocol":"tcp","cidrs":["0.0.0.0/0"]},{"fromPort":443,"toPort":443,"protocol":"tcp","cidrs":["0.0.0.0/0"]}]`. Verify with `aws lightsail get-instance-port-states --instance-name jeromelu --region ap-southeast-2` before and after. |
 | Bootstrap | Docker 29.4.1, Compose v5.1.3, AWS CLI v2, Git installed via cloud-init |
 | Swap | 1 GB at `/swapfile` (persisted in `/etc/fstab`) |
 | SSH alias | `jeromelu-prod` (configured in operator's `~/.ssh/config`) |
@@ -391,7 +391,7 @@ Cron is repo-managed: schedule lives at `scripts/cron.d/jeromelu`, synced into `
 | Cron | Wrapper | Purpose | Local time |
 |---|---|---|---|
 | `0 23 * * *` | `scout-refresh.sh channel-stats` | Snapshot subscriber/video/view counts into `channel_metrics` (~3 quota units) | 09:00 AEST / 10:00 AEDT |
-| `15 23 * * 0` | `scout-refresh.sh videos` | Enumerate new videos per channel + snapshot `video_metrics` (~750 quota units, offset 15 min from channel-stats to avoid DB connection contention) | Mon 09:15 AEST / 10:15 AEDT |
+| `15 23 * * *` | `scout-refresh.sh videos` | Enumerate new videos per channel + snapshot `video_metrics` (~750 quota units, offset 15 min from channel-stats to avoid DB connection contention) | 09:15 AEST / 10:15 AEDT |
 | `30 16 * * *` | `pg-backup.sh` | Stream `pg_dump` from postgres container → `s3://jeromelu-public-assets/backups/postgres/` (S3 lifecycle expires after 30d) | 02:30 AEST / 03:30 AEDT |
 
 Logs:
