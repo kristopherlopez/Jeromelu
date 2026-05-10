@@ -5,15 +5,27 @@
 #
 # Usage: scout-refresh.sh {channel-stats|videos}
 #
-# Sources /opt/jeromelu/.env to pick up ADMIN_KEY. Logs response status +
-# body to /var/log/jeromelu/scout-refresh.log so non-2xx (which curl does
-# not surface as a non-zero exit on its own) is recoverable after the
-# fact. Returns non-zero on non-2xx so cron / external monitoring can
-# pick up failures.
+# Sources /opt/jeromelu/.env to pick up ADMIN_KEY. ALWAYS appends a
+# status line to /var/log/jeromelu/scout-refresh.log — including on
+# curl-level failures (timeout, DNS, connection refused) that cause
+# curl to exit non-zero. Without that, the prior `set -e` made cron
+# failures invisible: curl would error, the script would die before
+# the log line, and nothing surfaced.
+#
+# Returns non-zero on either curl failure or non-2xx HTTP so cron /
+# external monitoring can detect failure.
+#
+# Routes via --resolve to 127.0.0.1 because Lightsail does not hairpin-
+# NAT — sending a packet to api.jeromelu.ai (52.65.91.199) from the
+# box's own egress IP just times out. Caddy in the same compose stack
+# answers fine on loopback with the right Host header.
 #
 # Tail /var/log/jeromelu/scout-refresh.log to see recent runs.
 
-set -euo pipefail
+# Note: deliberately NOT using `set -e` — we want to log the failure
+# status even when curl exits non-zero. `pipefail` is fine since we
+# don't have any pipelines that should swallow upstream failures.
+set -uo pipefail
 
 JOB="${1:-}"
 case "$JOB" in
@@ -25,7 +37,8 @@ esac
 # shellcheck disable=SC1091
 . /opt/jeromelu/.env
 
-API_URL="https://api.jeromelu.ai/api/admin/scout/${ENDPOINT}"
+API_HOST="api.jeromelu.ai"
+API_URL="https://${API_HOST}/api/admin/scout/${ENDPOINT}"
 LOG_DIR="/var/log/jeromelu"
 LOG_FILE="${LOG_DIR}/scout-refresh.log"
 
@@ -33,9 +46,21 @@ mkdir -p "$LOG_DIR"
 
 TS="$(date -u +%FT%TZ)"
 RESPONSE="$(curl -sS -w '\n__http_status__=%{http_code}' \
-    --max-time 600 \
+    --max-time 900 \
+    --resolve "${API_HOST}:443:127.0.0.1" \
     -X POST "$API_URL" \
-    -H "X-Admin-Key: ${ADMIN_KEY}")"
+    -H "X-Admin-Key: ${ADMIN_KEY}" 2>&1)"
+CURL_RC=$?
+
+if [[ $CURL_RC -ne 0 ]]; then
+  # curl failed at the transport layer — no HTTP response. Log the
+  # exit code + whatever curl wrote (its error message lands on stderr,
+  # captured via 2>&1 above) so the cause is recoverable.
+  ERR_ONELINE="$(printf '%s' "$RESPONSE" | tr -d '\n' | tr -s ' ')"
+  echo "[${TS}] ${JOB} curl_rc=${CURL_RC} err=${ERR_ONELINE}" >> "$LOG_FILE"
+  exit 1
+fi
+
 STATUS="${RESPONSE##*__http_status__=}"
 BODY="${RESPONSE%__http_status__=*}"
 
