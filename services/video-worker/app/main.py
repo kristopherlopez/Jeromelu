@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     single ``/opt/jeromelu/.env`` covers both."""
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    s3_audio_bucket: str = "jeromelu-raw-transcripts"
+    s3_audio_bucket: str = "jeromelu-raw-audio"
     aws_default_region: str = "ap-southeast-2"
     staging_prefix: str = "staging/video"
     default_quality: str = "360"

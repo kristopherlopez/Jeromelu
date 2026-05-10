@@ -86,7 +86,11 @@ services:
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_DEFAULT_REGION: ap-southeast-2
-      S3_AUDIO_BUCKET: jeromelu-raw-transcripts
+      # Persistent .video.mp4 files live in jeromelu-raw-audio (matches
+      # packages/shared/jeromelu_shared/config.py:s3_audio_bucket and the
+      # upload path in services/api/app/scout/video.py). Pointing this at
+      # raw-transcripts causes HeadObject 404 on click-to-reassign.
+      S3_AUDIO_BUCKET: jeromelu-raw-audio
 
   web:
     image: ${ECR_REGISTRY:-111424988703.dkr.ecr.ap-southeast-2.amazonaws.com}/jeromelu/web:${IMAGE_TAG:-latest}

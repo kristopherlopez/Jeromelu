@@ -80,6 +80,32 @@ services:
       minio:
         condition: service_started
 
+  # yt-dlp + ffmpeg sidecar (see feedback_api_container_lean.md). In prod
+  # the API container talks to it via docker DNS at video-worker:8000. In
+  # local dev the API runs on the host (uvicorn), so we publish 8001 on the
+  # host and the API must override VIDEO_WORKER_URL=http://localhost:8001.
+  # AWS creds come from the host's ~/.aws (mounted read-only) so the worker
+  # talks to the real jeromelu-raw-transcripts bucket and can yt-dlp the
+  # persistent S3 fast-path.
+  video-worker:
+    build:
+      context: ..
+      dockerfile: services/video-worker/Dockerfile
+    container_name: jeromelu-video-worker
+    ports:
+      - "8001:8000"
+    environment:
+      - AWS_DEFAULT_REGION=ap-southeast-2
+      # Persistent .video.mp4 files live in jeromelu-raw-audio (see
+      # packages/shared/jeromelu_shared/config.py:s3_audio_bucket and
+      # services/api/app/scout/video.py). The worker's own default
+      # ("jeromelu-raw-transcripts") and the prod compose are wrong —
+      # leaving that default in causes HeadObject 404 on reassign.
+      - S3_AUDIO_BUCKET=jeromelu-raw-audio
+      - AWS_PROFILE=${AWS_PROFILE:-default}
+    volumes:
+      - ${USERPROFILE:-${HOME}}/.aws:/root/.aws:ro
+
 volumes:
   postgres_data:
   minio_data:
