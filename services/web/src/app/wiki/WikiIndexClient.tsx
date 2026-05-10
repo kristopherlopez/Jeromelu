@@ -127,7 +127,7 @@ export default function WikiIndexClient({
         {filterKey ? (
           <EntityView entityKey={filterKey} pages={filtered} sources={sources} />
         ) : (
-          <DashboardView pages={pages} sourceCount={sources.length} />
+          <DashboardView pages={pages} sources={sources} sourceCount={sources.length} />
         )}
       </div>
     </div>
@@ -222,9 +222,11 @@ function EntityView({
 
 function DashboardView({
   pages,
+  sources,
   sourceCount,
 }: {
   pages: WikiPageSummary[];
+  sources: SourceListItem[];
   sourceCount: number;
 }) {
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -232,7 +234,7 @@ function DashboardView({
   return (
     <>
       <Hero onAboutClick={() => setAboutOpen(true)} />
-      <ExploreByEntity pages={pages} sourceCount={sourceCount} />
+      <ExploreByEntity pages={pages} sources={sources} sourceCount={sourceCount} />
       <AskJaromelu />
       <HowItConnects />
       <DashboardFooter />
@@ -581,11 +583,40 @@ const ENTITY_ORDER: EntityKey[] = ["player", "team", "voices", "sources"];
 
 function ExploreByEntity({
   pages,
+  sources,
   sourceCount,
 }: {
   pages: WikiPageSummary[];
+  sources: SourceListItem[];
   sourceCount: number;
 }) {
+  // Sources don't live in wiki_pages, so the tile's avatar row would be
+  // empty. Synthesise channel-page-shaped samples from the most-recent
+  // sources' voice blocks so the tile matches the other entities visually
+  // and clicks through to /wiki/channel/<slug>.
+  const sourceSamples = useMemo<WikiPageSummary[]>(() => {
+    const seen = new Set<string>();
+    const out: WikiPageSummary[] = [];
+    for (const s of sources) {
+      const voice = s.voice;
+      if (!voice || seen.has(voice.slug)) continue;
+      seen.add(voice.slug);
+      out.push({
+        page_id: `voice:${voice.slug}`,
+        slug: voice.slug,
+        title: voice.name,
+        page_type: "channel",
+        summary: null,
+        status: "published",
+        metadata_json: {},
+        updated_at: new Date().toISOString(),
+        logo_url: voice.logo_url,
+      });
+      if (out.length >= 4) break;
+    }
+    return out;
+  }, [sources]);
+
   return (
     <section style={{ marginBottom: "2.5rem" }}>
       <SectionLabel>Explore by Entity</SectionLabel>
@@ -599,7 +630,7 @@ function ExploreByEntity({
         {ENTITY_ORDER.map((key) => {
           // Sources don't live in the wiki pages table — count comes from /api/sources.
           const matched = pagesByEntity(pages, key);
-          const samples = matched.slice(0, 4);
+          const samples = key === "sources" ? sourceSamples : matched.slice(0, 4);
           const total = key === "sources" ? sourceCount : matched.length;
           return (
             <EntityCard

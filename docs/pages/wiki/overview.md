@@ -229,7 +229,7 @@ Implemented via new `display_mode='wiki_update'` on the Event table.
 | `services/web/src/app/wiki/PlayersIndexView.tsx` | Bespoke `/wiki?type=player` index — stats, highlights, filterable card grid |
 | `services/web/src/app/wiki/VoicesView.tsx` | `/wiki?type=voices` index — advisors + channels |
 | `services/web/src/app/wiki/channel/[slug]/ChannelView.tsx` | Bespoke channel detail page — hero card + sidebar (About / Coverage / Related voices) |
-| `services/web/src/app/wiki/WikiIndexClient.tsx` | Wiki dashboard + per-entity entry-point routing |
+| `services/web/src/app/wiki/WikiIndexClient.tsx` | Wiki dashboard + per-entity entry-point routing. The dashboard's `Sources` entity tile synthesises sample avatar chips from the most-recent sources' `voice` blocks (sources don't live in `wiki_pages`, so it can't pull samples from there), each linking to `/wiki/channel/<slug>`. |
 | `scripts/data/seed_wiki.py` | One-time seed from existing KB entries |
 | `scripts/data/backfill_wiki_team_pages.py` | One-shot backfill of `wiki_pages` rows for every `Team` (gap left by `seed_teams.py`, which only writes to `teams`) |
 | `scripts/data/backfill_team_logos_from_parents.py` | Copies `logo_url` from each NRL parent to its NRLW / reserve-grade children. Independent QLD Cup clubs and PNG Chiefs NRL still need hand-curated URLs. |
