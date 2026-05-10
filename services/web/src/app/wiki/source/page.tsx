@@ -25,7 +25,7 @@ export default async function SourcesPage() {
   if (data.items.length === 0) {
     return (
       <main className="flex min-h-screen items-center justify-center p-8">
-        <p className="text-zinc-500">No processed sources yet.</p>
+        <p className="text-zinc-500">No sources yet.</p>
       </main>
     );
   }

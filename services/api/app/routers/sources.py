@@ -87,7 +87,12 @@ def get_stats(db: Session = Depends(get_db)):
 
 @router.get("/sources")
 def list_sources(db: Session = Depends(get_db)):
-    """List sources that have chunks, with claim counts."""
+    """List every row in the sources table, with claim counts.
+
+    Includes sources with no transcript yet (queued, failed, or freshly
+    discovered) so the wiki can surface ingestion state. Unprocessed
+    sources have claim_count=0.
+    """
     claim_count_sq = (
         db.query(
             SourceDocument.source_id,
@@ -99,11 +104,8 @@ def list_sources(db: Session = Depends(get_db)):
     )
 
     rows = (
-        db.query(Source, SourceDocument.chunk_count, claim_count_sq.c.claim_count)
-        .join(SourceDocument, SourceDocument.source_id == Source.source_id)
+        db.query(Source, claim_count_sq.c.claim_count)
         .outerjoin(claim_count_sq, claim_count_sq.c.source_id == Source.source_id)
-        .filter(SourceDocument.chunk_count > 0)
-        .filter(SourceDocument.cleaned_text.isnot(None))
         .order_by(Source.published_at.desc().nullslast())
         .all()
     )
@@ -118,7 +120,7 @@ def list_sources(db: Session = Depends(get_db)):
                 "creator_name": src.creator_name,
                 "claim_count": claim_count or 0,
             }
-            for src, _chunk_count, claim_count in rows
+            for src, claim_count in rows
         ]
     }
 
