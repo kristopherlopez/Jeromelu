@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import type { SourceListItem } from "@/lib/types";
 
+type Voice = NonNullable<SourceListItem["voice"]>;
+
 /* ── Style tokens (mirrors VoicesView) ── */
 
 const v = {
@@ -94,6 +96,80 @@ function initials(title: string, max = 2): string {
     .slice(0, max)
     .map((w) => w[0]?.toUpperCase() ?? "")
     .join("");
+}
+
+function VoiceChip({ voice }: { voice: Voice }) {
+  return (
+    <Link
+      href={`/wiki/channel/${voice.slug}`}
+      // Defends against the card-level onClick which would otherwise router.push the source page.
+      onClick={(e) => e.stopPropagation()}
+      title={voice.name}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "0.4rem",
+        padding: "0.2rem 0.55rem 0.2rem 0.25rem",
+        marginBottom: "0.4rem",
+        borderRadius: 999,
+        border: `1px solid ${v.border}`,
+        background: v.bg,
+        color: v.inkMuted,
+        fontSize: "12px",
+        fontWeight: 600,
+        textDecoration: "none",
+        maxWidth: "100%",
+        minWidth: 0,
+        alignSelf: "flex-start",
+      }}
+    >
+      {voice.logo_url ? (
+        <img
+          src={voice.logo_url}
+          alt=""
+          width={20}
+          height={20}
+          style={{
+            width: 20,
+            height: 20,
+            borderRadius: "50%",
+            objectFit: "cover",
+            background: v.surface,
+            flexShrink: 0,
+          }}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+        />
+      ) : (
+        <span
+          style={{
+            width: 20,
+            height: 20,
+            borderRadius: "50%",
+            background: v.surface,
+            color: v.inkFaint,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "9px",
+            fontWeight: 700,
+            flexShrink: 0,
+          }}
+        >
+          {initials(voice.name, 2)}
+        </span>
+      )}
+      <span
+        style={{
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {voice.name}
+      </span>
+    </Link>
+  );
 }
 
 type SortKey = "newest" | "oldest" | "most_claims" | "alpha";
@@ -525,7 +601,9 @@ function SourceCard({ source }: { source: SourceListItem }) {
         >
           {source.title}
         </h3>
-        {source.creator_name && (
+        {source.voice ? (
+          <VoiceChip voice={source.voice} />
+        ) : source.creator_name ? (
           <p
             style={{
               fontSize: "12px",
@@ -537,7 +615,7 @@ function SourceCard({ source }: { source: SourceListItem }) {
           >
             {source.creator_name}
           </p>
-        )}
+        ) : null}
 
         <div
           style={{

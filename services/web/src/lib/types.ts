@@ -5,6 +5,13 @@ export interface SourceListItem {
   published_at: string | null;
   creator_name: string | null;
   claim_count: number;
+  /** Channel that produced this source. Null for legacy rows without
+   * a `channel_id`. Drives the voice chip on the wiki Sources card. */
+  voice: {
+    slug: string;
+    name: string;
+    logo_url: string | null;
+  } | null;
 }
 
 export interface SourceListResponse {

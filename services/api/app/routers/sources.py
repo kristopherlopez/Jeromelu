@@ -12,6 +12,7 @@ from app.analyst.identify_voice import EnrollmentError, enroll
 from app.analyst.video_worker_client import VideoWorkerError, fetch_frame_to
 from app.analyst.visual_id import VisualIdError, enroll_face_from_image
 from jeromelu_shared.db import (
+    Channel,
     Claim,
     ClaimAssociation,
     ClaimChunk,
@@ -92,6 +93,10 @@ def list_sources(db: Session = Depends(get_db)):
     Includes sources with no transcript yet (queued, failed, or freshly
     discovered) so the wiki can surface ingestion state. Unprocessed
     sources have claim_count=0.
+
+    Each row carries an optional ``voice`` block (channel slug / name /
+    logo_url) so the wiki Sources index can render a voice chip that
+    links through to the channel's wiki page.
     """
     claim_count_sq = (
         db.query(
@@ -105,10 +110,21 @@ def list_sources(db: Session = Depends(get_db)):
 
     rows = (
         db.query(Source, claim_count_sq.c.claim_count)
+        .options(joinedload(Source.channel))
         .outerjoin(claim_count_sq, claim_count_sq.c.source_id == Source.source_id)
         .order_by(Source.published_at.desc().nullslast())
         .all()
     )
+
+    def _voice(src: Source) -> dict | None:
+        ch = src.channel
+        if ch is None:
+            return None
+        return {
+            "slug": ch.slug,
+            "name": ch.name,
+            "logo_url": ch.logo_url,
+        }
 
     return {
         "items": [
@@ -119,6 +135,7 @@ def list_sources(db: Session = Depends(get_db)):
                 "published_at": src.published_at.isoformat() if src.published_at else None,
                 "creator_name": src.creator_name,
                 "claim_count": claim_count or 0,
+                "voice": _voice(src),
             }
             for src, claim_count in rows
         ]

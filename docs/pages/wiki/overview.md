@@ -64,6 +64,7 @@ shells; the rest fall back to a paginated grid:
 |--------|-----------|-------|
 | Player | `PlayersIndexView.tsx` | Hero (title + tagline, mirrors Voices), 5-stat knowledge row, three themed knowledge highlights (featured player, weekly activity, open ground), `All players (N)` heading with filter chips and sort pill inline, `By team` / `By position` / `By price` chips each toggle a horizontal `FilterDrawer` (multi-select — click chips to add/remove, click again to clear; team chips carry team logos plus a search input; position labels are humanised — SuperCoach `CTW` renders as `Centre / Wing` so wingers aren't hidden; price chips are fixed buckets — `<$300K`, `$300K–$500K`, `$500K–$700K`, `$700K–$900K`, `$900K+`) that filters the grid live with one footer pill per active selection, gapped card grid with 84×84 thumbnails matching `VoiceCard`, low-evidence callout, ask box |
 | Voices | `VoicesView.tsx` | Combines `advisor` + `channel` pages |
+| Sources | `SourcesView.tsx` | Hero + searchable / sortable `SourceCard` grid (84×84 YouTube thumbnail, YouTube click-out chip, title, voice chip — small logo+name pill linking to `/wiki/channel/<slug>` — claim count + relative time). Voice payload comes from `/api/sources` (joins `Source.channel` and returns `slug`, `name`, `logo_url`); legacy rows without `channel_id` fall back to plain `creator_name` text. |
 | Team / Round | `WikiIndexClient.PaginatedGrid` | Generic paginated card grid |
 
 **Per-page detail views.** Most page types render through the generic
@@ -180,6 +181,7 @@ Migrations:
 | `GET /api/wiki/pages/{slug}/revisions` | Full revision history |
 | `GET /api/wiki/recent-changes` | Recent revisions across all pages |
 | `GET /api/wiki/channels/{slug}/episodes` | Latest sources (episodes) for a channel-backed page, ordered by `published_at` desc. Returns title, thumbnail, duration, canonical URL, ingestion status. Powers the "Latest episodes" panel in `ChannelView`. |
+| `GET /api/sources` | Every row in `sources`, with `claim_count` and an optional `voice` block (`slug`, `name`, `logo_url`) joined from `channels`. Powers the wiki Sources index and its voice chips. Unprocessed sources have `claim_count=0`; legacy rows without `channel_id` have `voice: null`. |
 
 The `linked_pages` response field maps each `[[slug]]` found in the content to `{title, page_type}`, enabling the frontend to render wiki-links with correct display names and routes without extra API calls.
 
