@@ -161,3 +161,52 @@ export interface FaceGroupsResponse {
   total_faces: number;
   groups: FaceGroup[];
 }
+
+// Faces tab — per-position runs over the face-track JSON. Each run is
+// one row in the UI: a stretch of frames at the same on-screen position
+// where the matched person_id stays constant (with a small gap and
+// flicker tolerance — see services/api/app/analyst/face_runs.py).
+export interface FaceRunSample {
+  ts: number;
+  bbox: [number, number, number, number];
+}
+
+export interface FaceRunOverlapTurn {
+  segment_id: string;
+  start_ts: number;
+  end_ts: number;
+  speaker_label: string | null;
+  speaker_person_id: string | null;
+  speaker_person_name: string | null;
+  match_method: MatchMethod;
+}
+
+export interface FaceRun {
+  /** null = unassigned. */
+  person_id: string | null;
+  person_name: string | null;
+  start_ts: number;
+  end_ts: number;
+  frame_count: number;
+  avg_similarity: number | null;
+  start_sample: FaceRunSample;
+  end_sample: FaceRunSample;
+  overlapping_turns: FaceRunOverlapTurn[];
+}
+
+export interface FacePosition {
+  position_id: number;
+  /** "Left" / "Centre" / "Right" / "Position N" — relative on-screen position. */
+  label: string;
+  centroid: [number, number];
+  detection_count: number;
+  runs: FaceRun[];
+}
+
+export interface FaceRunsResponse {
+  source_id: string;
+  duration_seconds: number | null;
+  frame_width: number | null;
+  frame_height: number | null;
+  positions: FacePosition[];
+}

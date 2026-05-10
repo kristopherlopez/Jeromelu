@@ -423,21 +423,39 @@ Any unhandled exception in the streamed section emits `{"step": "<current>", "st
 
 ---
 
-## Faces gallery (Slice A)
+## Faces tab (Slice A.5 — runs view)
 
-Read-only triage view at `/wiki/source/{source_id}/faces`. Linked from the source page header when a face-track JSON exists. Aggregates the cached face-track JSON into per-Person groups so the operator can scan an entire video's face attribution at once instead of scrubbing the overlay frame by frame.
+A `Faces` tab on `/wiki/source/{source_id}` (alongside `Transcript` and `Claims`) shows a per-position run-length view of the face-track JSON. Each row is a stretch of contiguous detections at the same on-screen position with the same matched `person_id`. Where the matched person changes, a new row begins — the "material changes" the operator actually cares about. Far higher signal than evenly-spaced thumbnails.
+
+Slice A's standalone gallery and `/face-groups` endpoint were retired in this change; the gallery is now the runs view. The cropping endpoint (`/face-crop`) survives — it backs the start/end thumbnails on each row.
 
 ### Endpoints
 
-- `GET /api/sources/{source_id}/face-groups` — walks every detection in the face-track JSON, buckets by matched `person_id` (with NULL going to a single "unassigned" group), and returns counts + representative samples per group. Sampling divides the source duration into 12 equal-time bins and picks the highest-`det_score` face per bin per group, so groups render with up to 12 thumbnails spread across the video. Per-group payload: `{person_id, person_name, detection_count, avg_det_score, avg_similarity, samples: [{ts, bbox, det_score, similarity}]}`.
+- `GET /api/sources/{source_id}/face-runs` — downloads the face-track JSON, runs spatial clustering + run detection (`services/api/app/analyst/face_runs.py`), joins each run to overlapping `source_speakers` turns, and returns `{positions: [{position_id, label, centroid, detection_count, runs: [...]}]}`. Each run carries `{person_id, person_name, start_ts, end_ts, frame_count, avg_similarity, start_sample, end_sample, overlapping_turns}`.
 
-- `GET /api/sources/{source_id}/face-crop?ts=<seconds>&bbox=<x1,y1,x2,y2>` — returns a JPEG cropped to the bbox at the given ts. Reuses the reassign frame-fetch plumbing (yt-dlp section path on YouTube sources, LRU-cached S3 mp4 fallback) and asks ffmpeg to apply `-vf crop=W:H:X:Y` so the crop happens before the JPEG encode — keeps the API container free of cv2 / PIL. Long browser cache (`max-age=86400`) means scrolling back through the gallery doesn't re-hit the worker.
+- `POST /api/sources/{source_id}/face-runs/assign` — body `{segment_ids: uuid[], person_id?: uuid, new_person_name?: string}`. Bulk-reassigns every supplied turn to the same target Person in one transaction. Streams `application/x-ndjson` events: `person done` → `turn start/done/error` × N → `commit start/done` → `result done`. A failure on any turn rolls back the whole batch; idempotent retries are safe.
+
+- `GET /api/sources/{source_id}/face-crop?ts=<seconds>&bbox=<x1,y1,x2,y2>` — unchanged. ffmpeg crops the bbox before the JPEG encode (`-vf crop=W:H:X:Y -pix_fmt yuvj420p`) so the API container stays free of cv2 / PIL. `max-age=86400` cache so scrolling doesn't re-hit the worker.
+
+### How the runs are computed
+
+1. **Spatial clustering.** Greedy online: each detection joins the nearest existing position whose centroid is within `CENTROID_EPS=120px`, or seeds a new position. Centroids drift to the running mean of their members so a slowly panning camera still tracks.
+
+2. **Position consolidation.** Repeatedly merges the closest pair of positions whose centroids fall within `CONSOLIDATE_EPS=100px` (bigger absorbs smaller); then drops positions with fewer than `MIN_POSITION_DETECTIONS=5` members. Removes the bumper-shot / cutaway / partial-face noise that the greedy first pass would otherwise label as its own row.
+
+3. **Position labels.** Sorted by x-centroid: `Centre` (1), `Left/Right` (2), `Left/Centre/Right` (3), `Position N` (4+). Lets the operator map "Left" / "Right" to camera angles by clicking, without committing to a fixed labelling scheme.
+
+4. **Run detection.** Per position, sort detections by ts and walk in order. A run breaks when (a) `person_id` changes, or (b) the gap to the next detection exceeds `RUN_GAP_SECONDS=5.0`. Single-frame flickers (`< SMOOTH_FLICKER_FRAMES=5`) between two same-person runs are absorbed — those are visual matcher hiccups (NULL between two Denan frames during a brief look-down), not real transitions.
+
+5. **Overlap join.** Each run is joined to every `source_speakers` row whose `[start_ts, end_ts]` overlaps the run's range. Bulk assign reassigns *those turns* — the run itself isn't a first-class DB entity.
 
 ### Limitations (and what Slice B unlocks)
 
-The face-track JSON keeps `bbox + matched_person_id + similarity + mouth_opening` per detection but **drops the underlying embeddings** (intentional — see [Video lifecycle](#video-lifecycle)). So the unassigned bucket renders thumbnails, but you can't tell *which* unassigned faces look alike. Bulk-attribute ("label this whole cluster as Matthew Buxton") needs vectors, which means a future `source_face_detections` table that persists every detection's 512-dim ArcFace alongside its bbox. Once that lands, the same gallery page gains cluster groupings inside the unassigned bucket plus a one-click bulk-reassign affordance.
+- **Spatial clustering misses** when the same Person appears at different bbox positions in the same frame. Fine for podcast formats; breaks for sports/news.
+- **Bulk assign only writes for overlapping turns.** A run with no transcript-aligned turn (e.g. a brief cutaway with no one speaking) has the assign button disabled — there's nothing to reassign. Once Slice B persists per-detection embeddings, the assign action also writes face exemplars for every frame in the run.
+- **The face-track JSON drops embeddings**, so we still can't ask "which other unassigned runs across this video — or other videos — look like the run I just labelled?" That's the cluster-similarity story Slice B/C delivers, on top of a future `source_face_detections` table.
 
-Today the gallery's role is triage: surface how many unassigned faces exist, where they are in time, and whether they all *look* like one Person. The operator then opens the source page at the chosen ts and uses the existing per-turn reassign modal to label one. Subsequent re-transcribe (after deleting the cached face-track JSON — see [face-track invalidation gotcha](#visual-identification--visual_identifyaudio_s3_key-video_s3_key-pyannote_turns)) propagates that label across the rest of the video via the standard visual matcher.
+Today's runs view is the right primitive for review: scan one source top-to-bottom, label the obvious unassigned runs, move on. Re-transcribe (after deleting the cached face-track JSON — see [face-track invalidation gotcha](#visual-identification--visual_identifyaudio_s3_key-video_s3_key-pyannote_turns)) propagates the new exemplars across other sources via the standard visual matcher.
 
 ---
 

@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
+from app.analyst.face_runs import compute_face_runs
 from app.analyst.identify_voice import EnrollmentError, enroll
 from app.analyst.video_worker_client import VideoWorkerError, fetch_frame_to
 from app.analyst.visual_id import VisualIdError, enroll_face_from_image
@@ -579,6 +580,106 @@ def get_face_crop(
         )
 
 
+@router.get("/sources/{source_id}/face-runs")
+def get_face_runs(source_id: uuid.UUID, db: Session = Depends(get_db)):
+    """Return per-position runs of contiguous attribution for the
+    Faces tab. Each run is one row in the UI: a stretch of frames at
+    the same on-screen position with the same matched ``person_id``.
+
+    Joins each run to the source_speakers turns whose [start_ts, end_ts]
+    overlaps the run, so the bulk-assign endpoint knows which turns to
+    rewrite. ``speaker_label`` per turn (e.g. 'Speaker 0') is included
+    so the UI can show pyannote's diarisation labels alongside the
+    face-track person.
+
+    Slice A.5 of the cluster-manager work — see
+    [speaker-identification.md § Faces tab](../system/speaker-identification.md).
+    """
+    source = db.query(Source).filter(Source.source_id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    if not source.audio_s3_key:
+        raise HTTPException(status_code=404, detail="No audio key for source")
+
+    key = _face_track_key_from_audio(source.audio_s3_key)
+    try:
+        body = download_raw(key)
+    except Exception as exc:
+        logger.warning("Face-track fetch failed for %s: %s", source_id, exc)
+        raise HTTPException(status_code=404, detail="Face-track not found")
+    try:
+        face_track = json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=502, detail=f"Face-track JSON malformed: {exc}")
+
+    runs_payload = compute_face_runs(face_track)
+
+    # Look up the source's document so we can find overlapping turns.
+    doc = (
+        db.query(SourceDocument)
+        .filter(SourceDocument.source_id == source_id)
+        .first()
+    )
+    turns = []
+    if doc:
+        turns = (
+            db.query(SourceSpeaker)
+            .filter(SourceSpeaker.document_id == doc.document_id)
+            .order_by(SourceSpeaker.start_ts)
+            .all()
+        )
+
+    # Names for every Person referenced — both face-run person_ids and
+    # turn speaker_person_ids — gathered in one query.
+    person_ids: set[uuid.UUID] = set()
+    for pos in runs_payload["positions"]:
+        for run in pos["runs"]:
+            if run["person_id"]:
+                person_ids.add(uuid.UUID(run["person_id"]))
+    for t in turns:
+        if t.speaker_person_id:
+            person_ids.add(t.speaker_person_id)
+    name_by_id: dict[str, str] = {}
+    if person_ids:
+        for p in db.query(Person).filter(Person.person_id.in_(person_ids)).all():
+            name_by_id[str(p.person_id)] = p.canonical_name
+
+    def turns_overlapping(start: float, end: float) -> list[dict]:
+        out: list[dict] = []
+        for t in turns:
+            if t.start_ts >= end or t.end_ts <= start:
+                continue
+            out.append({
+                "segment_id": str(t.segment_id),
+                "start_ts": float(t.start_ts),
+                "end_ts": float(t.end_ts),
+                "speaker_label": t.speaker_label,
+                "speaker_person_id": str(t.speaker_person_id) if t.speaker_person_id else None,
+                "speaker_person_name": (
+                    name_by_id.get(str(t.speaker_person_id))
+                    if t.speaker_person_id else None
+                ),
+                "match_method": t.match_method,
+            })
+        return out
+
+    # Decorate runs with person names + overlapping turns.
+    for pos in runs_payload["positions"]:
+        for run in pos["runs"]:
+            run["person_name"] = (
+                name_by_id.get(run["person_id"]) if run["person_id"] else None
+            )
+            run["overlapping_turns"] = turns_overlapping(run["start_ts"], run["end_ts"])
+
+    return {
+        "source_id": str(source_id),
+        "duration_seconds": face_track.get("duration_seconds"),
+        "frame_width": face_track.get("frame_width"),
+        "frame_height": face_track.get("frame_height"),
+        "positions": runs_payload["positions"],
+    }
+
+
 @router.get("/sources/{source_id}/face-track")
 def get_face_track(source_id: uuid.UUID, db: Session = Depends(get_db)):
     """Proxy the face-track JSON from S3 to the browser.
@@ -968,6 +1069,250 @@ def reassign_speaker(
             # Roll back the session so a partial write doesn't persist,
             # then let the client know which step blew up.
             logger.exception("reassign stream failed")
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            yield _ndjson({
+                "step": "unknown",
+                "status": "error",
+                "detail": f"{type(exc).__name__}: {exc}",
+            })
+
+    return StreamingResponse(stream(), media_type="application/x-ndjson")
+
+
+# ---------------------------------------------------------------------------
+# Bulk reassign — Slice A.5. The Faces tab's runs view collapses dozens of
+# face-track frames into one row per material attribution change. When the
+# operator picks a Person for a run, every source_speakers turn that
+# overlaps the run gets reassigned in a single transaction. Same per-turn
+# face + voice enrollment as single reassign — just N times in a loop.
+# ---------------------------------------------------------------------------
+
+
+class BulkAssignRequest(BaseModel):
+    segment_ids: list[uuid.UUID] = Field(
+        ...,
+        min_length=1,
+        max_length=200,
+        description="source_speakers.segment_id values to reassign in this batch",
+    )
+    person_id: uuid.UUID | None = Field(
+        default=None,
+        description="Existing Person to attribute every turn to.",
+    )
+    new_person_name: str | None = Field(
+        default=None,
+        max_length=200,
+        description="Lookup-or-create a Person by canonical_name. Mutually exclusive with person_id.",
+    )
+
+
+@router.post("/sources/{source_id}/face-runs/assign")
+def bulk_assign_face_run(
+    source_id: uuid.UUID,
+    body: BulkAssignRequest,
+    db: Session = Depends(get_db),
+):
+    """Bulk reassign every source_speakers turn in ``body.segment_ids``
+    to the same target Person. Used by the Faces tab when the operator
+    confirms a face-position run belongs to a known speaker.
+
+    Streams ``application/x-ndjson`` like the single reassign endpoint.
+    Events:
+
+      ``person`` done           — Person resolved (created if needed).
+      ``turn`` start/done/error — one pair per segment_id, in order.
+      ``commit`` start/done     — single end-of-batch commit so partial
+                                  failures roll back ALL writes.
+      ``result`` done           — totals across the batch.
+
+    The whole batch is one transaction. If turn N fails mid-stream, the
+    handler emits a ``turn`` error event, then rolls back — turns 1..N-1
+    are not persisted. Idempotent retries are safe: the new-Person path
+    reuses an existing row by canonical name, and SourceSpeaker updates
+    are pure overwrites.
+    """
+    source = db.query(Source).filter(Source.source_id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    if not source.video_s3_key and not (
+        source.source_type == "youtube" and source.canonical_url
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Source has no video_s3_key and no YouTube URL — face reassign needs pixels",
+        )
+    if (body.person_id is None) == (body.new_person_name is None):
+        raise HTTPException(
+            status_code=400,
+            detail="Provide exactly one of `person_id` or `new_person_name`",
+        )
+
+    # Resolve Person (sync, same lookup-or-create as single reassign).
+    person_created = False
+    if body.person_id is not None:
+        person = db.query(Person).filter(Person.person_id == body.person_id).first()
+        if not person:
+            raise HTTPException(status_code=404, detail="Person not found")
+    else:
+        new_name = (body.new_person_name or "").strip()
+        if not new_name:
+            raise HTTPException(status_code=400, detail="`new_person_name` is empty")
+        person = (
+            db.query(Person)
+            .filter(func.lower(Person.canonical_name) == new_name.lower())
+            .first()
+        )
+        if not person:
+            person = Person(canonical_name=new_name)
+            db.add(person)
+            db.flush()
+            person_created = True
+    target_person_id = person.person_id
+    person_name = person.canonical_name
+
+    # Validate every requested segment exists + belongs to this source.
+    # Doing this up-front (before any worker calls) means malformed input
+    # surfaces as 4xx instead of mid-stream.
+    doc = db.query(SourceDocument).filter(SourceDocument.source_id == source_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Source has no document")
+    speakers = (
+        db.query(SourceSpeaker)
+        .filter(
+            SourceSpeaker.document_id == doc.document_id,
+            SourceSpeaker.segment_id.in_(body.segment_ids),
+        )
+        .all()
+    )
+    seen = {sp.segment_id for sp in speakers}
+    missing = [sid for sid in body.segment_ids if sid not in seen]
+    if missing:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Speaker turn(s) not in this source: {missing[:5]}",
+        )
+    # Process in the request order so the client's progress UI lines up
+    # with what it sent.
+    speakers_by_id = {sp.segment_id: sp for sp in speakers}
+    ordered = [speakers_by_id[sid] for sid in body.segment_ids]
+
+    def stream() -> Iterator[bytes]:
+        face_writes = 0
+        voice_writes = 0
+        try:
+            yield _ndjson({
+                "step": "person",
+                "status": "done",
+                "detail": {
+                    "person_id": str(target_person_id),
+                    "person_name": person_name,
+                    "person_created": person_created,
+                },
+            })
+
+            for idx, sp in enumerate(ordered):
+                seg_id = str(sp.segment_id)
+                yield _ndjson({
+                    "step": "turn",
+                    "status": "start",
+                    "detail": {
+                        "index": idx,
+                        "segment_id": seg_id,
+                        "start_ts": float(sp.start_ts),
+                        "end_ts": float(sp.end_ts),
+                    },
+                })
+
+                # Frame midpoint = where face is most likely to appear.
+                frame_ts = (float(sp.start_ts) + float(sp.end_ts)) / 2.0
+                with tempfile.TemporaryDirectory(prefix="jeromelu-bulk-frame-") as ftmp:
+                    frame_path = Path(ftmp) / "frame.jpg"
+                    try:
+                        _fetch_reassign_frame(source, frame_ts, frame_path)
+                    except HTTPException as exc:
+                        yield _ndjson({
+                            "step": "turn",
+                            "status": "error",
+                            "detail": {
+                                "index": idx,
+                                "segment_id": seg_id,
+                                "stage": "frame",
+                                "error": str(exc.detail),
+                            },
+                        })
+                        db.rollback()
+                        return
+
+                    try:
+                        face_id, _det, _area = enroll_face_from_image(
+                            db,
+                            person_id=target_person_id,
+                            source_id=source_id,
+                            image_path=frame_path,
+                            frame_ts=frame_ts,
+                            created_by="manual",
+                        )
+                        if face_id:
+                            face_writes += 1
+                    except VisualIdError as exc:
+                        # Same skip-not-fail policy as single reassign.
+                        logger.warning(
+                            "Bulk face enrollment skipped for %s: %s", seg_id, exc
+                        )
+
+                # Voiceprint enrollment from the turn's audio span.
+                try:
+                    result = enroll(
+                        db,
+                        person_id=target_person_id,
+                        source_id=source_id,
+                        start_ts=float(sp.start_ts),
+                        end_ts=float(sp.end_ts),
+                        created_by="manual",
+                    )
+                    voice_writes += result.voiceprints_written
+                except EnrollmentError as exc:
+                    logger.warning(
+                        "Bulk voiceprint enrollment skipped for %s: %s", seg_id, exc
+                    )
+
+                # Mark the turn manually corrected. Not committed yet —
+                # one DB transaction across the whole batch.
+                sp.speaker_person_id = target_person_id
+                sp.match_method = "manual"
+                sp.match_confidence = 1.0
+
+                yield _ndjson({
+                    "step": "turn",
+                    "status": "done",
+                    "detail": {
+                        "index": idx,
+                        "segment_id": seg_id,
+                    },
+                })
+
+            yield _ndjson({"step": "commit", "status": "start"})
+            db.commit()
+            yield _ndjson({"step": "commit", "status": "done"})
+
+            yield _ndjson({
+                "step": "result",
+                "status": "done",
+                "detail": {
+                    "person_id": str(target_person_id),
+                    "person_name": person_name,
+                    "person_created": person_created,
+                    "turns_updated": len(ordered),
+                    "face_embeddings_written": face_writes,
+                    "voiceprints_written": voice_writes,
+                    "match_method": "manual",
+                },
+            })
+        except Exception as exc:
+            logger.exception("bulk reassign failed mid-stream")
             try:
                 db.rollback()
             except Exception:

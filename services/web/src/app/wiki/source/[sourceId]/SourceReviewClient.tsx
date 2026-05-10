@@ -13,6 +13,7 @@ import YouTubeFaceOverlay, {
 import ClaimsList from "@/app/components/ClaimsList";
 import TranscriptPanel from "@/app/components/TranscriptPanel";
 import EpisodeTimeline from "@/app/components/EpisodeTimeline";
+import FacesPanel from "@/app/components/FacesPanel";
 
 interface Props {
   data: SourceDetailResponse;
@@ -22,7 +23,7 @@ interface Props {
 export default function SourceReviewClient({ data, allSources }: Props) {
   const { source, claims, chunks, speakers } = data;
   const [currentTime, setCurrentTime] = useState(0);
-  const [activeTab, setActiveTab] = useState<"transcript" | "claims">("transcript");
+  const [activeTab, setActiveTab] = useState<"transcript" | "claims" | "faces">("transcript");
   // Three video surfaces, picked in priority order:
   //   1. YouTubeFaceOverlay — canvas drawn over the YouTube iframe.
   //      Default for any YouTube source with a face-track JSON. The
@@ -140,15 +141,6 @@ export default function SourceReviewClient({ data, allSources }: Props) {
             <Smartphone size={11} />
             Short
           </span>
-        )}
-        {source.face_track_url && (
-          <Link
-            href={`/wiki/source/${source.source_id}/faces`}
-            className="hidden text-xs sm:block"
-            style={{ color: "var(--foreground-secondary)" }}
-          >
-            Faces →
-          </Link>
         )}
         {source.published_at && (
           <span className="hidden text-xs sm:block" style={{ color: "var(--foreground-ghost)" }}>
@@ -310,6 +302,18 @@ export default function SourceReviewClient({ data, allSources }: Props) {
             >
               Claims ({claims.length})
             </button>
+            {source.face_track_url && (
+              <button
+                onClick={() => setActiveTab("faces")}
+                className="pb-2 text-[11px] font-semibold uppercase tracking-wider transition-colors"
+                style={{
+                  color: activeTab === "faces" ? "var(--accent)" : "var(--foreground-muted)",
+                  borderBottom: activeTab === "faces" ? "2px solid var(--accent)" : "2px solid transparent",
+                }}
+              >
+                Faces
+              </button>
+            )}
           </div>
 
           {/* Tab content */}
@@ -334,6 +338,8 @@ export default function SourceReviewClient({ data, allSources }: Props) {
                 currentTime={currentTime}
                 onSeek={handleSeek}
               />
+            ) : activeTab === "faces" ? (
+              <FacesPanel sourceId={source.source_id} onSeek={handleSeek} />
             ) : (
               <ClaimsList
                 claims={claims}
