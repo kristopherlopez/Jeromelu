@@ -309,13 +309,15 @@ Driver: at 100K+ catalogue scale, persisting a 360p mp4 per source is wasted hot
 - ⏳ S3 lifecycle rule on `staging/video/` prefix (24h expiration) — set in Terraform.
 - ⏳ Manual cleanup of the one persisted video remaining (`e276d3fc…`).
 
-### Phase 4b-action — Click-to-reassign (3–4 days, **next**)
+### Phase 4b-action — Click-to-reassign — **SHIPPED 2026-05-05**
 
-- HTML5 `<video>` streaming the locally-stored 360p mp4 + absolutely-positioned `<canvas>` overlay.
-- On `timeupdate`, look up nearest face_track entry, draw bbox + Person label.
-- Click a face → modal Person picker; persist via `POST /api/admin/face-embeddings/enroll` and reassign the corresponding `source_speakers.speaker_person_id`.
-- Same surface doubles as the manual override mechanism — clicking a misidentified face writes both a face embedding (`created_by='manual'`) and a voice embedding (using the audio span of the corresponding turn) to compound the registry.
-- Surfaces `match_method` colour-coding: green for `voice+face`, amber for single modality, red for disagreements.
+Shipped alongside Phase 4b-display-v2 (canvas-on-iframe overlay) in commit `87b14f0`.
+
+- Click a face on `YouTubeFaceOverlay` → `ReassignFaceModal` opens with prefilled `segment_id`, `frame_ts`, `bbox`.
+- Person picker (`PersonPicker`, fuzzy search over `people`) → POST `/api/sources/{source_id}/speakers/{segment_id}/reassign`.
+- Backend (`services/api/app/routers/sources.py::reassign_speaker`): acquires video (persisted S3 mp4 OR ephemeral yt-dlp), extracts frame via ffmpeg, enrols face via InsightFace + voice via wespeaker over the turn's audio span, both with `created_by='manual'`. Updates `source_speakers.speaker_person_id`, `match_method='manual'`, `match_confidence=1.0`. Single transaction; idempotent on the speaker update; embeddings are append-only.
+- Match-method colour-coding: shipped via the overlay component.
+- Full sequence: see [`speaker-identification.md` § Manual reassign](../agents/system/speaker-identification.md#manual-reassign).
 
 ### Phase 4 — Visual ID + ASD + Fusion + Video-overlay Review UI — original plan (kept for reference)
 
@@ -486,6 +488,71 @@ The asymmetry that makes this work: face ID + ASD is *easier to bootstrap* (few 
 - **Lexical / stylistic fingerprint as a third modality.** Audio-derived but text-grounded: TF-IDF over each host's known utterances (catchphrases, slang, references), speech-rate distribution, pause patterns, exact-match short-phrase detection. Fails on short or generic turns, but nearly free since the transcripts already exist. Useful tiebreaker when voice and face disagree.
 - **Speaker-overlap-aware embedding.** For turns flagged as overlapping by pyannote, use overlap-aware embedding extractors (e.g. pyannote's overlap-aware speaker embedding head) rather than skipping them entirely.
 - **Per-source mic/room calibration.** Extract a "channel signature" from a known-clean span at the start of each episode; subtract it from per-turn embeddings before matching. Reduces false negatives when the same host moves studios.
+
+## Autonomous bootstrap and annotation
+
+Phase 5 (cross-modal compounding) is the autonomous loop, but it depends on at least one bootstrap signal in either registry to start. This section enumerates the bootstrap and annotation paths that don't require a human at annotation time. They're complementary — building any combination further reduces the human-in-the-loop role from "label every misattribution" to "audit the system and correct residual edge cases".
+
+### Layer 1 — Phase 5 compounding (planned, captured above)
+
+Once *anything* is in either registry, voice + face cross-modal agreement promotes itself. See [Phase 5](#phase-5--cross-modal-compounding-3-days) above. This is the autonomous loop; layers 2–5 below are non-human ways to seed it.
+
+### Layer 2 — Headshot scraping (cheap, high leverage)
+
+`person_face_embeddings.created_by` already supports `'headshot'`; the scraper is unbuilt. Concept: take a Person's name, find a public photo (channel banner, news article, public profile), run it through `enroll_face_from_image`, persist with `created_by='headshot'`. One-time per host, no human at annotation time.
+
+Combined with Phase 5: the scraped headshot identifies the host on first appearance, and voice embeddings auto-promote from the high-confidence visual matches. This converts "first episode is unattributed" into "first episode is attributed in the visual-only / voice-bootstrapped state".
+
+Open: which sources are licensable for scraping; how to handle stale photos (host changed appearance — covered partially by append-only growth, but a strict-newest-N policy may be wanted).
+
+### Layer 3 — Channel presenters as priors (presenter-scout Phase 3, planned)
+
+[presenter-scout.md](../agents/system/presenter-scout.md) curates `(channel_id, person_id)` confirmations agentically. Presenter-scout's own Phase 3 (planned) feeds those into Lineup as the channel's expected roster — lowering match thresholds for in-roster Persons and short-circuiting first-appearance enrollment when a headshot exists.
+
+This is the obvious cross-link between two surfaces; both half-done. Wiring is the only blocker.
+
+### Layer 4 — LLM-driven transcript annotation (unbuilt)
+
+The Deepgram transcript already names hosts during intros and outros — *"What's up everyone, this is Denan from Bloke In A Bar."* / *"Joined today by Tyson Jackson and Blake Austin."* / *"That was Denan's take, what do you reckon Tyson?"*
+
+A small-LLM pass over the first/last 60 seconds of each transcript could:
+
+1. Detect self-identification or peer-naming patterns.
+2. Match each name to the channel's known presenter list (from presenter-scout) or the `people` registry — high precision because the candidate set is tiny.
+3. Identify which `SPEAKER_NN` was speaking or being addressed by joining Deepgram word timestamps to pyannote turn boundaries.
+4. Insert voice embeddings (and optionally face embeddings from corresponding video frames) with `created_by='auto-llm'` (a new provenance value to add).
+
+Cost: one LLM call per episode, scoped to ~120 s of audio. Probably <$0.01 per source.
+
+Strong candidate for the next built phase after Phase 5 — the LLM is reading data already produced, the candidate set is naturally constrained, and the failure mode (a wrong name → bad embedding) is voted down by the registry-side robustness machinery rather than poisoning future matches.
+
+Schema impact: extend the `created_by` enum to include `'auto-llm'` so post-hoc auditing can distinguish human-confirmed from LLM-confirmed.
+
+### Layer 5 — Cross-source clustering (unbuilt)
+
+When N episodes of a channel are processed without enrollments, pyannote produces N independent SPEAKER_NN labels per source. Across episodes, the same actual host appears repeatedly. Cosine-clustering the per-turn embeddings across all episodes of one channel agglomerates them — the largest clusters are regular hosts, smaller clusters are guests, singletons are noise.
+
+Match the largest clusters against the channel's known presenters (from presenter-scout, or LLM annotations from Layer 4) and auto-enroll each cluster as a Person.
+
+Cost: bigger lift than Layer 4 (a clustering pipeline + cluster-to-Person matching logic), but it bootstraps an entire channel from a folder of audio + a list of host names with zero human annotation.
+
+### What humans still own
+
+Even with all five layers:
+
+- **Curation of `people`.** Name canonicalisation, identity disambiguation across podcasts. Ontology problem, not annotation.
+- **Edge-case correction.** Guests, side conversations, audio cameos. Phase 4b-action handles these. Active-learning surfacing (lowest-confidence turns first) would compound the savings.
+- **Auditing auto-enrolled embeddings.** `created_by` provenance enables retroactive cleanup if a layer turns out noisy. Append-only registries mean pruning bad rows is a separate operator workflow — useful for layers with imperfect precision.
+
+### Recommended sequencing
+
+If the goal is fastest path to "human-in-the-loop is just an audit, not a labelling job":
+
+1. **Headshot scraper (Layer 2)** — cheapest, most leveraged. One-time per host.
+2. **Wire presenter-scout Phase 3 priors into Lineup (Layer 3)** — already designed, needs hooking up.
+3. **LLM transcript annotator (Layer 4)** — one new model integration; high signal-to-noise.
+4. **Phase 5 compounding** (already in plan) — closes the loop with all the above feeding it.
+5. **Cross-source clustering (Layer 5)** — bigger lift, lower marginal value once 1–4 are in.
 
 ## Risks
 
