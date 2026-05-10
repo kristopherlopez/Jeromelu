@@ -382,6 +382,203 @@ def get_source(source_id: uuid.UUID, db: Session = Depends(get_db)):
     }
 
 
+# ---------------------------------------------------------------------------
+# Faces gallery — Slice A of the cluster-manager work. Read-only triage view
+# over the existing face-track JSON; no new schema. The endpoints here let
+# the /wiki/source/{id}/faces page render face thumbnails grouped by who
+# they were attributed to during visual ID, including a NULL bucket for the
+# unassigned faces. Embeddings aren't persisted yet, so genuine clustering
+# of unassigned faces (Slice B) lives behind a future schema change.
+# ---------------------------------------------------------------------------
+
+# Fewer samples per group than the JSON has, since each thumbnail is one
+# worker round-trip + ffmpeg crop. 12 reads as "enough variety to spot a
+# pattern" without making the page take 30 s to fully populate.
+_FACE_GROUP_SAMPLE_LIMIT = 12
+
+
+def _aggregate_face_groups(face_track: dict) -> list[dict]:
+    """Walk every face detection, bucket by (matched) ``person_id`` with
+    NULL going to a single 'unassigned' group, and pick representative
+    samples evenly distributed across the source duration.
+
+    Sampling strategy: divide the video into ``_FACE_GROUP_SAMPLE_LIMIT``
+    equal-time bins; per bin pick the highest-``det_score`` face from
+    that group. Skips empty bins, so short groups produce fewer
+    thumbnails — that's fine, the gallery just shows what exists.
+    """
+    duration = max(0.001, float(face_track.get("duration_seconds") or 1.0))
+
+    # First pass: collect every detection per group.
+    by_group: dict[str | None, list[dict]] = {}
+    for frame in face_track.get("frames", []):
+        ts = float(frame.get("ts") or 0.0)
+        for face in frame.get("faces", []):
+            pid = face.get("person_id")
+            entry = {
+                "ts": ts,
+                "bbox": face["bbox"],
+                "det_score": float(face.get("det_score") or 0.0),
+                "similarity": face.get("similarity"),
+            }
+            by_group.setdefault(pid, []).append(entry)
+
+    # Second pass: sample + summarise. Sorted so the largest groups
+    # render first in the UI.
+    out: list[dict] = []
+    for pid, entries in sorted(by_group.items(), key=lambda kv: -len(kv[1])):
+        bin_count = _FACE_GROUP_SAMPLE_LIMIT
+        bins: list[dict | None] = [None] * bin_count
+        for e in entries:
+            idx = min(bin_count - 1, int(bin_count * e["ts"] / duration))
+            current = bins[idx]
+            if current is None or e["det_score"] > current["det_score"]:
+                bins[idx] = e
+        samples = [b for b in bins if b is not None]
+
+        sims = [e["similarity"] for e in entries if e["similarity"] is not None]
+        scores = [e["det_score"] for e in entries]
+        out.append({
+            "person_id": pid,
+            "detection_count": len(entries),
+            "avg_det_score": round(sum(scores) / len(scores), 3) if scores else 0.0,
+            "avg_similarity": round(sum(sims) / len(sims), 3) if sims else None,
+            "samples": samples,
+        })
+    return out
+
+
+@router.get("/sources/{source_id}/face-groups")
+def get_face_groups(source_id: uuid.UUID, db: Session = Depends(get_db)):
+    """Aggregate the source's face-track JSON into per-Person groups for
+    the gallery view. One group per matched ``person_id`` plus a
+    ``person_id=null`` 'unassigned' bucket. Samples are JSON
+    ``{ts, bbox, det_score}`` pointers — the actual thumbnail bytes are
+    served on demand by ``/face-crop``.
+    """
+    source = db.query(Source).filter(Source.source_id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    if not source.audio_s3_key:
+        raise HTTPException(status_code=404, detail="No audio key for source")
+
+    key = _face_track_key_from_audio(source.audio_s3_key)
+    try:
+        body = download_raw(key)
+    except Exception as exc:
+        logger.warning("Face-track fetch failed for %s: %s", source_id, exc)
+        raise HTTPException(status_code=404, detail="Face-track not found")
+
+    try:
+        face_track = json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=502, detail=f"Face-track JSON malformed: {exc}")
+
+    groups = _aggregate_face_groups(face_track)
+
+    # Look up Person canonical names for the matched groups in one query
+    # rather than N. The unassigned bucket has person_id=None.
+    matched_ids = [uuid.UUID(g["person_id"]) for g in groups if g["person_id"]]
+    name_by_id: dict[str, str] = {}
+    if matched_ids:
+        for p in db.query(Person).filter(Person.person_id.in_(matched_ids)).all():
+            name_by_id[str(p.person_id)] = p.canonical_name
+
+    enriched = []
+    total = 0
+    for g in groups:
+        total += g["detection_count"]
+        enriched.append({
+            "person_id": g["person_id"],
+            "person_name": name_by_id.get(g["person_id"]) if g["person_id"] else None,
+            "detection_count": g["detection_count"],
+            "avg_det_score": g["avg_det_score"],
+            "avg_similarity": g["avg_similarity"],
+            "samples": g["samples"],
+        })
+
+    return {
+        "source_id": str(source_id),
+        "duration_seconds": face_track.get("duration_seconds"),
+        "frame_width": face_track.get("frame_width"),
+        "frame_height": face_track.get("frame_height"),
+        "total_faces": total,
+        "groups": enriched,
+    }
+
+
+@router.get("/sources/{source_id}/face-crop")
+def get_face_crop(
+    source_id: uuid.UUID,
+    ts: float,
+    bbox: str,
+    db: Session = Depends(get_db),
+):
+    """Return a JPEG cropped to ``bbox`` at ``ts``. ``bbox`` is the
+    comma-separated ``x1,y1,x2,y2`` in source-frame pixels.
+
+    Backed by the same worker plumbing as reassign — yt-dlp section
+    path for YouTube sources, LRU-cached S3 mp4 otherwise. The crop
+    happens in ffmpeg on the worker so the API container stays free of
+    cv2 / PIL.
+    """
+    source = db.query(Source).filter(Source.source_id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    if not source.video_s3_key and not (
+        source.source_type == "youtube" and source.canonical_url
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Source has no pixels available (no video_s3_key, not a YouTube source)",
+        )
+
+    parts = bbox.split(",")
+    if len(parts) != 4:
+        raise HTTPException(
+            status_code=400,
+            detail="bbox must be 'x1,y1,x2,y2'",
+        )
+    try:
+        bbox_t = (float(parts[0]), float(parts[1]), float(parts[2]), float(parts[3]))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="bbox values must be numeric")
+    if bbox_t[2] <= bbox_t[0] or bbox_t[3] <= bbox_t[1]:
+        raise HTTPException(status_code=400, detail="bbox must satisfy x2>x1, y2>y1")
+
+    with tempfile.TemporaryDirectory(prefix="jeromelu-face-crop-") as tmp:
+        crop_path = Path(tmp) / "crop.jpg"
+        try:
+            if source.source_type == "youtube" and source.canonical_url:
+                fetch_frame_to(
+                    crop_path,
+                    canonical_url=source.canonical_url,
+                    persistent_video_s3_key=source.video_s3_key,
+                    ts=ts,
+                    prefer_section=True,
+                    bbox=bbox_t,
+                )
+            else:
+                fetch_frame_to(
+                    crop_path,
+                    persistent_video_s3_key=source.video_s3_key,
+                    ts=ts,
+                    bbox=bbox_t,
+                )
+        except VideoWorkerError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+
+        return Response(
+            content=crop_path.read_bytes(),
+            media_type="image/jpeg",
+            # Crops are immutable for a given (source, ts, bbox) — the
+            # face-track is versioned, so the bbox doesn't change. A long
+            # browser cache means scrolling back to a group doesn't
+            # re-hit the worker.
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+
+
 @router.get("/sources/{source_id}/face-track")
 def get_face_track(source_id: uuid.UUID, db: Session = Depends(get_db)):
     """Proxy the face-track JSON from S3 to the browser.

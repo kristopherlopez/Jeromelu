@@ -132,3 +132,32 @@ export interface FaceTrack {
   frame_height?: number;
   frames: FaceTrackFrame[];
 }
+
+// Faces gallery (Slice A of the cluster-manager work). Aggregates the
+// face-track JSON into per-Person groups for the gallery view at
+// /wiki/source/[id]/faces. Fetched from /api/sources/{id}/face-groups.
+export interface FaceGroupSample {
+  ts: number;
+  bbox: [number, number, number, number];
+  det_score: number;
+  similarity: number | null;
+}
+
+export interface FaceGroup {
+  /** null = unassigned bucket. */
+  person_id: string | null;
+  person_name: string | null;
+  detection_count: number;
+  avg_det_score: number;
+  avg_similarity: number | null;
+  samples: FaceGroupSample[];
+}
+
+export interface FaceGroupsResponse {
+  source_id: string;
+  duration_seconds: number | null;
+  frame_width: number | null;
+  frame_height: number | null;
+  total_faces: number;
+  groups: FaceGroup[];
+}

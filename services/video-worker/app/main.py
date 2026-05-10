@@ -257,21 +257,38 @@ def _cached_s3_download(s3_key: str) -> Path:
         return target
 
 
-def _ffmpeg_frame(video_path: Path, ts: float, dest: Path) -> None:
-    """Single JPEG at ``ts``. Raises 502 on ffmpeg failure."""
+def _ffmpeg_frame(
+    video_path: Path,
+    ts: float,
+    dest: Path,
+    bbox: tuple[float, float, float, float] | None = None,
+) -> None:
+    """Single JPEG at ``ts``. Raises 502 on ffmpeg failure.
+
+    ``bbox`` is the optional crop in source pixels: ``(x1, y1, x2, y2)``.
+    When supplied, ffmpeg crops the frame before encoding the JPEG —
+    used by the face-gallery thumbnails to avoid sending full frames
+    over the wire just to discard everything outside a face. Out-of-
+    bounds bboxes are clamped by the ffmpeg crop filter.
+    """
     if shutil.which("ffmpeg") is None:
         raise HTTPException(status_code=500, detail="ffmpeg not on PATH")
-    proc = subprocess.run(
-        [
-            "ffmpeg", "-y",
-            "-ss", f"{ts:.3f}",
-            "-i", str(video_path),
-            "-frames:v", "1",
-            "-q:v", "2",
-            str(dest),
-        ],
-        capture_output=True,
-    )
+    cmd = [
+        "ffmpeg", "-y",
+        "-ss", f"{ts:.3f}",
+        "-i", str(video_path),
+        "-frames:v", "1",
+        "-q:v", "2",
+    ]
+    if bbox is not None:
+        x1, y1, x2, y2 = bbox
+        w = max(1, int(round(x2 - x1)))
+        h = max(1, int(round(y2 - y1)))
+        x = max(0, int(round(x1)))
+        y = max(0, int(round(y1)))
+        cmd += ["-vf", f"crop={w}:{h}:{x}:{y}"]
+    cmd.append(str(dest))
+    proc = subprocess.run(cmd, capture_output=True)
     if proc.returncode != 0:
         err = proc.stderr.decode("utf-8", errors="replace")[:500]
         raise HTTPException(
@@ -356,6 +373,14 @@ class ExtractFrameRequest(BaseModel):
             "extraction from ~30s to ~3s — used by reassign."
         ),
     )
+    bbox: tuple[float, float, float, float] | None = Field(
+        default=None,
+        description=(
+            "Optional crop in source pixels (x1, y1, x2, y2). When set, "
+            "ffmpeg crops the frame before encoding — keeps face-gallery "
+            "thumbnail bytes small."
+        ),
+    )
 
 
 @app.post("/extract-frame")
@@ -392,7 +417,7 @@ def extract_frame(body: ExtractFrameRequest) -> Response:
             video_path = _yt_dlp_low_res(video_id, tmp_path, quality)
 
         frame_path = tmp_path / "frame.jpg"
-        _ffmpeg_frame(video_path, body.ts, frame_path)
+        _ffmpeg_frame(video_path, body.ts, frame_path, bbox=body.bbox)
         return Response(
             content=frame_path.read_bytes(),
             media_type="image/jpeg",

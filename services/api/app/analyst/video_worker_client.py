@@ -42,6 +42,7 @@ def fetch_frame_to(
     ts: float,
     quality: str | None = None,
     prefer_section: bool = False,
+    bbox: tuple[float, float, float, float] | None = None,
     timeout: float = 600.0,
 ) -> None:
     """Ask the worker for one JPEG at ``ts`` and write its bytes to ``dest``.
@@ -66,6 +67,8 @@ def fetch_frame_to(
         payload["quality"] = quality
     if prefer_section:
         payload["prefer_section"] = True
+    if bbox is not None:
+        payload["bbox"] = list(bbox)
 
     try:
         with _client(timeout) as c:

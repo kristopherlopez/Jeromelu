@@ -423,6 +423,24 @@ Any unhandled exception in the streamed section emits `{"step": "<current>", "st
 
 ---
 
+## Faces gallery (Slice A)
+
+Read-only triage view at `/wiki/source/{source_id}/faces`. Linked from the source page header when a face-track JSON exists. Aggregates the cached face-track JSON into per-Person groups so the operator can scan an entire video's face attribution at once instead of scrubbing the overlay frame by frame.
+
+### Endpoints
+
+- `GET /api/sources/{source_id}/face-groups` — walks every detection in the face-track JSON, buckets by matched `person_id` (with NULL going to a single "unassigned" group), and returns counts + representative samples per group. Sampling divides the source duration into 12 equal-time bins and picks the highest-`det_score` face per bin per group, so groups render with up to 12 thumbnails spread across the video. Per-group payload: `{person_id, person_name, detection_count, avg_det_score, avg_similarity, samples: [{ts, bbox, det_score, similarity}]}`.
+
+- `GET /api/sources/{source_id}/face-crop?ts=<seconds>&bbox=<x1,y1,x2,y2>` — returns a JPEG cropped to the bbox at the given ts. Reuses the reassign frame-fetch plumbing (yt-dlp section path on YouTube sources, LRU-cached S3 mp4 fallback) and asks ffmpeg to apply `-vf crop=W:H:X:Y` so the crop happens before the JPEG encode — keeps the API container free of cv2 / PIL. Long browser cache (`max-age=86400`) means scrolling back through the gallery doesn't re-hit the worker.
+
+### Limitations (and what Slice B unlocks)
+
+The face-track JSON keeps `bbox + matched_person_id + similarity + mouth_opening` per detection but **drops the underlying embeddings** (intentional — see [Video lifecycle](#video-lifecycle)). So the unassigned bucket renders thumbnails, but you can't tell *which* unassigned faces look alike. Bulk-attribute ("label this whole cluster as Matthew Buxton") needs vectors, which means a future `source_face_detections` table that persists every detection's 512-dim ArcFace alongside its bbox. Once that lands, the same gallery page gains cluster groupings inside the unassigned bucket plus a one-click bulk-reassign affordance.
+
+Today the gallery's role is triage: surface how many unassigned faces exist, where they are in time, and whether they all *look* like one Person. The operator then opens the source page at the chosen ts and uses the existing per-turn reassign modal to label one. Subsequent re-transcribe (after deleting the cached face-track JSON — see [face-track invalidation gotcha](#visual-identification--visual_identifyaudio_s3_key-video_s3_key-pyannote_turns)) propagates that label across the rest of the video via the standard visual matcher.
+
+---
+
 ## Remote vs local inference (Phase 5.5)
 
 Lineup runs locally by default. To use the SageMaker Async endpoint instead:
