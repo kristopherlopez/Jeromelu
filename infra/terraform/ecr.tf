@@ -16,6 +16,14 @@ locals {
     "jeromelu/video-worker",
   ])
 
+  # Subset of ecr_repos that already have a lifecycle policy in AWS — used
+  # by imports.tf. video-worker is excluded because it was never given one
+  # via click-ops; TF creates it on first apply.
+  ecr_repos_with_existing_lifecycle_policy = toset([
+    "jeromelu/web",
+    "jeromelu/api",
+  ])
+
   ecr_lifecycle_policy = jsonencode({
     rules = [
       {

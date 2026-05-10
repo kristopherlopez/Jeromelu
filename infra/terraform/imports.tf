@@ -103,8 +103,10 @@ import {
   id       = each.key
 }
 
+# Lifecycle policies were only ever click-ops'd onto api/web. video-worker
+# never had one — TF will create it on first apply (same 14d/last-10 rule).
 import {
-  for_each = local.ecr_repos
+  for_each = local.ecr_repos_with_existing_lifecycle_policy
   to       = aws_ecr_lifecycle_policy.this[each.key]
   id       = each.key
 }
