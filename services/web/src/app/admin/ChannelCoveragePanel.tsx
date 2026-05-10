@@ -11,10 +11,13 @@ interface ChannelRow {
   external_id: string | null;
   reported_videos: number | null;
   tracked_videos: number;
-  // Optional — older deployed APIs may not return these (legacy
-  // `collected_videos` was renamed to `transcribed_videos`).
+  // Optional — older deployed APIs may not return these.
   transcribed_videos?: number;
+  chunked_videos?: number;
   cleaned_videos?: number;
+  extracted_videos?: number;
+  chunks_total?: number;
+  claims_total?: number;
   gap: number | null;
   metrics_sampled_at: string | null;
 }
@@ -28,10 +31,14 @@ interface CoverageResponse {
 
 type SortField =
   | "name"
-  | "reported"
+  | "discovered"
   | "tracked"
   | "transcribed"
+  | "chunked"
   | "cleaned"
+  | "extracted"
+  | "chunks"
+  | "claims"
   | "sampled";
 type SortDir = "asc" | "desc";
 
@@ -57,7 +64,7 @@ function funnelClass(value: number | undefined, parent: number | null | undefine
 }
 
 export default function ChannelCoveragePanel() {
-  const { base } = useAdminApiBase();
+  const { base, webBase } = useAdminApiBase();
   // Per-target cache: toggling LOCAL ↔ PROD shows previously-fetched data
   // instantly. First visit per target auto-fetches.
   const [cache, setCache] = useState<Map<string, CoverageResponse>>(() => new Map());
@@ -67,7 +74,7 @@ export default function ChannelCoveragePanel() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [onlyGaps, setOnlyGaps] = useState(false);
-  const [sortField, setSortField] = useState<SortField>("reported");
+  const [sortField, setSortField] = useState<SortField>("discovered");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const fetchCoverage = useCallback(async () => {
@@ -119,14 +126,22 @@ export default function ChannelCoveragePanel() {
       switch (sortField) {
         case "name":
           return dir * a.name.localeCompare(b.name);
-        case "reported":
+        case "discovered":
           return dir * ((a.reported_videos ?? -1) - (b.reported_videos ?? -1));
         case "tracked":
           return dir * (a.tracked_videos - b.tracked_videos);
         case "transcribed":
           return dir * ((a.transcribed_videos ?? -1) - (b.transcribed_videos ?? -1));
+        case "chunked":
+          return dir * ((a.chunked_videos ?? -1) - (b.chunked_videos ?? -1));
         case "cleaned":
           return dir * ((a.cleaned_videos ?? -1) - (b.cleaned_videos ?? -1));
+        case "extracted":
+          return dir * ((a.extracted_videos ?? -1) - (b.extracted_videos ?? -1));
+        case "chunks":
+          return dir * ((a.chunks_total ?? -1) - (b.chunks_total ?? -1));
+        case "claims":
+          return dir * ((a.claims_total ?? -1) - (b.claims_total ?? -1));
         case "sampled": {
           const ta = a.metrics_sampled_at
             ? new Date(a.metrics_sampled_at).getTime()
@@ -207,9 +222,9 @@ export default function ChannelCoveragePanel() {
                 <th
                   className="cursor-pointer select-none px-3 py-2 text-right hover:text-zinc-300"
                   title="YouTube's reported video count (latest channel_metrics snapshot)"
-                  onClick={() => toggleSort("reported")}
+                  onClick={() => toggleSort("discovered")}
                 >
-                  Reported{sortIndicator("reported")}
+                  Discovered{sortIndicator("discovered")}
                 </th>
                 <th
                   className="cursor-pointer select-none px-3 py-2 text-right hover:text-zinc-300"
@@ -223,14 +238,42 @@ export default function ChannelCoveragePanel() {
                   title="Sources whose transcript has been saved (s3_key set on document)"
                   onClick={() => toggleSort("transcribed")}
                 >
-                  Transcribed{sortIndicator("transcribed")}
+                  Tran{sortIndicator("transcribed")}
+                </th>
+                <th
+                  className="cursor-pointer select-none px-3 py-2 text-right hover:text-zinc-300"
+                  title="Sources with chunks loaded into the DB (chunk_count > 0)"
+                  onClick={() => toggleSort("chunked")}
+                >
+                  Chun{sortIndicator("chunked")}
                 </th>
                 <th
                   className="cursor-pointer select-none px-3 py-2 text-right hover:text-zinc-300"
                   title="Sources with at least one chunk where clean_text is populated"
                   onClick={() => toggleSort("cleaned")}
                 >
-                  Cleaned{sortIndicator("cleaned")}
+                  Clea{sortIndicator("cleaned")}
+                </th>
+                <th
+                  className="cursor-pointer select-none px-3 py-2 text-right hover:text-zinc-300"
+                  title="Sources with at least one Claim row extracted"
+                  onClick={() => toggleSort("extracted")}
+                >
+                  Extr{sortIndicator("extracted")}
+                </th>
+                <th
+                  className="cursor-pointer select-none px-3 py-2 text-right hover:text-zinc-300"
+                  title="Total chunks across all sources for this channel"
+                  onClick={() => toggleSort("chunks")}
+                >
+                  Chunks{sortIndicator("chunks")}
+                </th>
+                <th
+                  className="cursor-pointer select-none px-3 py-2 text-right hover:text-zinc-300"
+                  title="Total claims across all sources for this channel"
+                  onClick={() => toggleSort("claims")}
+                >
+                  Claims{sortIndicator("claims")}
                 </th>
                 <th
                   className="cursor-pointer select-none px-3 py-2 text-right hover:text-zinc-300"
@@ -248,7 +291,9 @@ export default function ChannelCoveragePanel() {
                 >
                   <td className="px-3 py-2">
                     <a
-                      href={`/wiki/channel/${row.slug}`}
+                      href={`${webBase}/wiki/channel/${row.slug}`}
+                      target={webBase ? "_blank" : undefined}
+                      rel={webBase ? "noopener noreferrer" : undefined}
                       className="text-orange-400 hover:text-orange-300 hover:underline"
                     >
                       {row.name}
@@ -284,12 +329,42 @@ export default function ChannelCoveragePanel() {
                   </td>
                   <td
                     className={`px-3 py-2 text-right ${funnelClass(
-                      row.cleaned_videos,
+                      row.chunked_videos,
                       row.transcribed_videos,
+                    )}`}
+                  >
+                    {row.chunked_videos !== undefined
+                      ? row.chunked_videos.toLocaleString()
+                      : "—"}
+                  </td>
+                  <td
+                    className={`px-3 py-2 text-right ${funnelClass(
+                      row.cleaned_videos,
+                      row.chunked_videos ?? row.transcribed_videos,
                     )}`}
                   >
                     {row.cleaned_videos !== undefined
                       ? row.cleaned_videos.toLocaleString()
+                      : "—"}
+                  </td>
+                  <td
+                    className={`px-3 py-2 text-right ${funnelClass(
+                      row.extracted_videos,
+                      row.cleaned_videos,
+                    )}`}
+                  >
+                    {row.extracted_videos !== undefined
+                      ? row.extracted_videos.toLocaleString()
+                      : "—"}
+                  </td>
+                  <td className="px-3 py-2 text-right text-zinc-400">
+                    {row.chunks_total !== undefined
+                      ? row.chunks_total.toLocaleString()
+                      : "—"}
+                  </td>
+                  <td className="px-3 py-2 text-right text-zinc-400">
+                    {row.claims_total !== undefined
+                      ? row.claims_total.toLocaleString()
                       : "—"}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-right text-zinc-500">
@@ -300,7 +375,7 @@ export default function ChannelCoveragePanel() {
               {visibleRows.length === 0 && (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={10}
                     className="px-3 py-6 text-center text-zinc-600"
                   >
                     {onlyGaps ? "No gaps — coverage is clean." : "No channels."}

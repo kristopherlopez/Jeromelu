@@ -35,6 +35,7 @@ from sqlalchemy.orm import Session
 from jeromelu_shared.db import (
     Channel,
     ChannelMetric,
+    Claim,
     Source,
     SourceChunk,
     SourceDocument,
@@ -436,8 +437,15 @@ def audit_channel_coverage(session: Session) -> dict[str, Any]:
       - tracked     rows in `sources` for this channel
       - transcribed sources whose transcript has been saved
                     (SourceDocument.s3_key IS NOT NULL)
+      - chunked     sources with SourceDocument.chunk_count > 0
       - cleaned     sources with at least one SourceChunk where clean_text
                     IS NOT NULL
+      - extracted   sources with at least one Claim row
+
+    Also surfaces totals to mirror the per-row Chunks/Claims columns on the
+    /admin/pipeline view:
+      - chunks_total  SUM(SourceDocument.chunk_count) across the channel
+      - claims_total  COUNT(Claim) across the channel
 
     `gap = reported - tracked` is preserved for the headline summary line.
 
@@ -466,6 +474,23 @@ def audit_channel_coverage(session: Session) -> dict[str, Any]:
         .group_by(Source.channel_id)
         .subquery()
     )
+    # "Chunked" — distinct sources whose SourceDocument has chunks loaded,
+    # plus the total chunk count across the channel for the right-hand
+    # Chunks column. Mirrors /admin/pipeline's `chunked` boolean.
+    chunked_subq = (
+        select(
+            Source.channel_id,
+            func.count(distinct(Source.source_id)).label("chunked_videos"),
+            func.coalesce(func.sum(SourceDocument.chunk_count), 0).label(
+                "chunks_total"
+            ),
+        )
+        .join(SourceDocument, SourceDocument.source_id == Source.source_id)
+        .where(Source.source_type == "youtube")
+        .where(SourceDocument.chunk_count > 0)
+        .group_by(Source.channel_id)
+        .subquery()
+    )
     # "Cleaned" — distinct sources with at least one SourceChunk whose
     # clean_text is populated. Mirrors /admin/pipeline's bool_or check.
     cleaned_subq = (
@@ -477,6 +502,21 @@ def audit_channel_coverage(session: Session) -> dict[str, Any]:
         .join(SourceChunk, SourceChunk.document_id == SourceDocument.document_id)
         .where(Source.source_type == "youtube")
         .where(SourceChunk.clean_text.is_not(None))
+        .group_by(Source.channel_id)
+        .subquery()
+    )
+    # "Extracted" — distinct sources with at least one Claim, plus the
+    # total claim count for the channel. Mirrors /admin/pipeline's
+    # `extracted` boolean and the per-row Claims column.
+    extracted_subq = (
+        select(
+            Source.channel_id,
+            func.count(distinct(Source.source_id)).label("extracted_videos"),
+            func.count(Claim.claim_id).label("claims_total"),
+        )
+        .join(SourceDocument, SourceDocument.source_id == Source.source_id)
+        .join(Claim, Claim.document_id == SourceDocument.document_id)
+        .where(Source.source_type == "youtube")
         .group_by(Source.channel_id)
         .subquery()
     )
@@ -498,14 +538,20 @@ def audit_channel_coverage(session: Session) -> dict[str, Any]:
             Channel.external_id,
             tracked_subq.c.tracked_videos,
             transcribed_subq.c.transcribed_videos,
+            chunked_subq.c.chunked_videos,
+            chunked_subq.c.chunks_total,
             cleaned_subq.c.cleaned_videos,
+            extracted_subq.c.extracted_videos,
+            extracted_subq.c.claims_total,
             latest_subq.c.reported_videos,
             latest_subq.c.sampled_at,
         )
         .select_from(Channel)
         .outerjoin(tracked_subq, tracked_subq.c.channel_id == Channel.channel_id)
         .outerjoin(transcribed_subq, transcribed_subq.c.channel_id == Channel.channel_id)
+        .outerjoin(chunked_subq, chunked_subq.c.channel_id == Channel.channel_id)
         .outerjoin(cleaned_subq, cleaned_subq.c.channel_id == Channel.channel_id)
+        .outerjoin(extracted_subq, extracted_subq.c.channel_id == Channel.channel_id)
         .outerjoin(latest_subq, latest_subq.c.channel_id == Channel.channel_id)
         .where(Channel.platform == "youtube")
         .where(Channel.active.is_(True))
@@ -518,7 +564,11 @@ def audit_channel_coverage(session: Session) -> dict[str, Any]:
     for r in session.execute(stmt).all():
         tracked = int(r.tracked_videos or 0)
         transcribed = int(r.transcribed_videos or 0)
+        chunked = int(r.chunked_videos or 0)
         cleaned = int(r.cleaned_videos or 0)
+        extracted = int(r.extracted_videos or 0)
+        chunks_total = int(r.chunks_total or 0)
+        claims_total = int(r.claims_total or 0)
         reported = int(r.reported_videos) if r.reported_videos is not None else None
         gap = (reported - tracked) if reported is not None else None
         if gap is not None and gap > 0:
@@ -532,7 +582,11 @@ def audit_channel_coverage(session: Session) -> dict[str, Any]:
             "reported_videos": reported,
             "tracked_videos": tracked,
             "transcribed_videos": transcribed,
+            "chunked_videos": chunked,
             "cleaned_videos": cleaned,
+            "extracted_videos": extracted,
+            "chunks_total": chunks_total,
+            "claims_total": claims_total,
             "gap": gap,
             "metrics_sampled_at": r.sampled_at.isoformat() if r.sampled_at else None,
         })

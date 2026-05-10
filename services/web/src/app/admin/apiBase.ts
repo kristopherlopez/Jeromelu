@@ -11,6 +11,16 @@ export const ADMIN_API_TARGETS = {
   prod: "https://api.jeromelu.ai",
 } as const;
 
+// Web origin paired with each API target. Used by admin panels to build
+// outbound links (e.g. /wiki/channel/<slug>) that should land on the same
+// environment whose data is being viewed — prod data → prod web.
+// Empty string for local means "same origin", so links remain relative
+// when developing against localhost.
+export const ADMIN_WEB_TARGETS = {
+  local: "",
+  prod: "https://jeromelu.ai",
+} as const;
+
 export type AdminApiTarget = keyof typeof ADMIN_API_TARGETS;
 
 const STORAGE_KEY = "admin.apiBase";
@@ -29,6 +39,7 @@ function readTarget(): AdminApiTarget {
 
 export function useAdminApiBase(): {
   base: string;
+  webBase: string;
   target: AdminApiTarget;
   setTarget: (t: AdminApiTarget) => void;
 } {
@@ -64,5 +75,10 @@ export function useAdminApiBase(): {
     setTargetState(t);
   }, []);
 
-  return { base: ADMIN_API_TARGETS[target], target, setTarget };
+  return {
+    base: ADMIN_API_TARGETS[target],
+    webBase: ADMIN_WEB_TARGETS[target],
+    target,
+    setTarget,
+  };
 }
