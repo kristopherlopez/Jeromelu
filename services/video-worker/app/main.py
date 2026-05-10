@@ -135,14 +135,17 @@ def _yt_dlp_section(
     ts: float,
     quality: str,
     pad_seconds: float = 3.0,
-) -> Path:
+) -> tuple[Path, float]:
     """Pull only a small range around ``ts`` instead of the full video.
 
     yt-dlp's ``download_sections`` flag asks the server for just the
     matching segment, which collapses single-frame extraction time from
     "wait for the whole episode to download" to "wait for ~6 seconds of
-    video". The output is keyframe-aligned, so the actual mp4 starts at
-    or before ``ts - pad_seconds`` — the caller still seeks with ffmpeg.
+    video". The output is keyframe-aligned and **rebased to start_time
+    = 0** by yt-dlp's ffmpeg post-processor — so the caller has to
+    subtract the requested section start before seeking. We return the
+    section's start timestamp alongside the path so the caller can do
+    that math.
     """
     start = max(0.0, ts - pad_seconds)
     end = ts + pad_seconds
@@ -178,7 +181,8 @@ def _yt_dlp_section(
             detail=f"yt-dlp section produced no output for {video_id}",
         )
     mp4s = [c for c in candidates if c.suffix == ".mp4"]
-    return mp4s[0] if mp4s else candidates[0]
+    chosen = mp4s[0] if mp4s else candidates[0]
+    return chosen, start
 
 
 # ---------------------------------------------------------------------------
@@ -279,6 +283,12 @@ def _ffmpeg_frame(
         "-i", str(video_path),
         "-frames:v", "1",
         "-q:v", "2",
+        # Force full-range JPEG colorspace. Without this, the mjpeg
+        # encoder rejects the input with "Could not open encoder /
+        # incorrect parameters" on YouTube clips whose YUV is non-full
+        # range — a long-standing ffmpeg behaviour, not specific to our
+        # pipeline.
+        "-pix_fmt", "yuvj420p",
     ]
     if bbox is not None:
         x1, y1, x2, y2 = bbox
@@ -290,10 +300,13 @@ def _ffmpeg_frame(
     cmd.append(str(dest))
     proc = subprocess.run(cmd, capture_output=True)
     if proc.returncode != 0:
-        err = proc.stderr.decode("utf-8", errors="replace")[:500]
+        # Tail the stderr instead of head — ffmpeg dumps its build banner
+        # first and the actual error sits at the bottom of the dump.
+        err = proc.stderr.decode("utf-8", errors="replace")
+        tail = err[-1500:] if len(err) > 1500 else err
         raise HTTPException(
             status_code=502,
-            detail=f"ffmpeg frame extraction failed at ts={ts}: {err}",
+            detail=f"ffmpeg frame extraction failed at ts={ts}: ...{tail}",
         )
 
 
@@ -407,9 +420,16 @@ def extract_frame(body: ExtractFrameRequest) -> Response:
 
     with tempfile.TemporaryDirectory(prefix="video-worker-frame-") as tmp:
         tmp_path = Path(tmp)
+        # ts inside the resolved video file. The section path strips
+        # the start of the original video off, so the requested ts has
+        # to be rebased; the other paths preserve the original timeline.
+        seek_ts = body.ts
         if body.prefer_section and body.canonical_url:
             video_id = _video_id_from_url(body.canonical_url)
-            video_path = _yt_dlp_section(video_id, tmp_path, body.ts, quality)
+            video_path, section_start = _yt_dlp_section(
+                video_id, tmp_path, body.ts, quality
+            )
+            seek_ts = max(0.0, body.ts - section_start)
         elif body.persistent_video_s3_key:
             video_path = _cached_s3_download(body.persistent_video_s3_key)
         else:
@@ -417,7 +437,7 @@ def extract_frame(body: ExtractFrameRequest) -> Response:
             video_path = _yt_dlp_low_res(video_id, tmp_path, quality)
 
         frame_path = tmp_path / "frame.jpg"
-        _ffmpeg_frame(video_path, body.ts, frame_path, bbox=body.bbox)
+        _ffmpeg_frame(video_path, seek_ts, frame_path, bbox=body.bbox)
         return Response(
             content=frame_path.read_bytes(),
             media_type="image/jpeg",
