@@ -6,6 +6,8 @@ import { AvatarEngineProvider } from "./AvatarEngine";
 import { JeromeluPresence } from "./JeromeluPresence";
 import { JeromeluTopBar, TOPBAR_HEIGHT } from "./JeromeluTopBar";
 import { ThemeProvider, useTheme } from "./ThemeContext";
+import { TeamProvider } from "./TeamContext";
+import { ThemeApplier } from "./ThemeApplier";
 import { TransitionProvider, CONTENT_DELAY_MS, CONTENT_FADE_MS } from "./TransitionContext";
 
 function PageContent({ children }: { children: ReactNode }) {
@@ -76,13 +78,16 @@ function PageContent({ children }: { children: ReactNode }) {
 export function AppShell({ children }: { children: ReactNode }) {
   return (
     <ThemeProvider>
-      <AvatarEngineProvider>
-        <TransitionProvider>
-          <JeromeluPresence />
-          <JeromeluTopBar />
-          <PageContent>{children}</PageContent>
-        </TransitionProvider>
-      </AvatarEngineProvider>
+      <TeamProvider>
+        <ThemeApplier />
+        <AvatarEngineProvider>
+          <TransitionProvider>
+            <JeromeluPresence />
+            <JeromeluTopBar />
+            <PageContent>{children}</PageContent>
+          </TransitionProvider>
+        </AvatarEngineProvider>
+      </TeamProvider>
     </ThemeProvider>
   );
 }

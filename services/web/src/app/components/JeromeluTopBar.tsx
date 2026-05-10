@@ -17,6 +17,8 @@ import type { LucideIcon } from "lucide-react";
 import { ConnectedAvatar } from "./ConnectedAvatar";
 import { useAvatarEngine } from "./AvatarEngine";
 import { useTheme } from "./ThemeContext";
+import { useTeam } from "./TeamContext";
+import { TEAMS } from "./teams";
 import { LETTERS } from "./JeromeluLogo";
 import type { FeedResponse } from "../feed/feed-data";
 import type { WikiChangeItem } from "../wiki/wiki-data";
@@ -97,6 +99,7 @@ export function JeromeluTopBar() {
   const pathname = usePathname();
   const router = useRouter();
   const { mode, setMode, isLight } = useTheme();
+  const { slug: teamSlug, team, setTeam } = useTeam();
   const { triggerClip } = useAvatarEngine();
 
   const isHome = pathname === "/landing";
@@ -106,11 +109,13 @@ export function JeromeluTopBar() {
   // Hooks must run unconditionally — early-return only after all hooks declared.
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [teamPickerOpen, setTeamPickerOpen] = useState(false);
   const [ringPulseColor, setRingPulseColor] = useState<string | null>(null);
   const [hoveredHref, setHoveredHref] = useState<string | null>(null);
   const [litLetters, setLitLetters] = useState<Set<number>>(new Set());
   const sweepTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const teamPickerRef = useRef<HTMLDivElement | null>(null);
 
   // Activity feed — same data source as the old sidebar
   useEffect(() => {
@@ -175,6 +180,18 @@ export function JeromeluTopBar() {
     return () => document.removeEventListener("mousedown", onClick);
   }, [activityOpen]);
 
+  // Click-outside to close the team picker
+  useEffect(() => {
+    if (!teamPickerOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (teamPickerRef.current && !teamPickerRef.current.contains(e.target as Node)) {
+        setTeamPickerOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [teamPickerOpen]);
+
   const runLogoSweep = useCallback(() => {
     sweepTimersRef.current.forEach(clearTimeout);
     sweepTimersRef.current = [];
@@ -215,13 +232,13 @@ export function JeromeluTopBar() {
   if (isHome || isAdmin || isStream) return null;
 
   // ── Theme tokens ──
+  // Accent tokens always read from CSS vars — ThemeApplier writes the
+  // current team's accent to `--accent` etc. for both light and dark modes.
   const bg = isLight ? "var(--wiki-surface, #ffffff)" : "var(--background-deep, #241e1a)";
   const border = isLight ? "var(--wiki-border, rgba(28,26,20,0.08))" : "var(--border, #3e3630)";
-  const accent = isLight ? "#b85c38" : "var(--accent, #d4874a)";
-  const accentBg = isLight ? "rgba(184,92,56,0.10)" : "var(--accent-bg, rgba(212,135,74,0.10))";
-  const accentBorder = isLight
-    ? "rgba(184,92,56,0.32)"
-    : "var(--accent-border, rgba(212,135,74,0.22))";
+  const accent = "var(--accent)";
+  const accentBg = "var(--accent-bg)";
+  const accentBorder = "var(--accent-border)";
   const labelMuted = isLight ? "rgba(92,64,48,0.55)" : "var(--foreground-muted, #948878)";
   const labelHover = isLight ? "#5c4030" : "var(--foreground-secondary, #c0b4a0)";
   const labelDim = isLight ? "rgba(92,64,48,0.35)" : "var(--foreground-muted, #948878)";
@@ -473,6 +490,118 @@ export function JeromeluTopBar() {
           )}
         </div>
 
+        {/* Team flag picker */}
+        <div
+          className="relative flex items-center shrink-0"
+          ref={teamPickerRef}
+          style={{
+            paddingLeft: 10,
+            borderLeft: `1px solid ${border}`,
+          }}
+        >
+          <button
+            className="flex items-center justify-center cursor-pointer focus:outline-none"
+            style={{
+              width: 32,
+              height: 18,
+              borderRadius: 4,
+              padding: 0,
+              border: `1.5px solid ${teamPickerOpen ? accentBorder : border}`,
+              backgroundColor: "transparent",
+              transition: "border-color 200ms",
+              overflow: "hidden",
+            }}
+            onClick={() => setTeamPickerOpen((v) => !v)}
+            aria-label={`Team: ${team.name}`}
+            title={team.name}
+          >
+            <span
+              aria-hidden
+              style={{
+                display: "block",
+                width: "100%",
+                height: "100%",
+                background: `linear-gradient(90deg, ${team.primary} 0%, ${team.primary} 50%, ${team.secondary} 50%, ${team.secondary} 100%)`,
+              }}
+            />
+          </button>
+
+          {teamPickerOpen && (
+            <div
+              className="absolute light-scrollbar"
+              style={{
+                top: "calc(100% + 8px)",
+                right: 0,
+                width: 220,
+                maxHeight: 360,
+                overflowY: "auto",
+                backgroundColor: bg,
+                border: `1px solid ${border}`,
+                borderRadius: 8,
+                boxShadow: isLight
+                  ? "0 8px 24px rgba(28,26,20,0.10)"
+                  : "0 8px 24px rgba(0,0,0,0.35)",
+                padding: "6px",
+                zIndex: 10,
+              }}
+            >
+              {TEAMS.map((t) => {
+                const isSelected = t.slug === teamSlug;
+                return (
+                  <button
+                    key={t.slug}
+                    className="flex items-center gap-2 w-full cursor-pointer focus:outline-none"
+                    style={{
+                      padding: "6px 8px",
+                      borderRadius: 6,
+                      border: "none",
+                      background: isSelected ? accentBg : "transparent",
+                      transition: "background-color 150ms",
+                    }}
+                    onClick={() => {
+                      setTeam(t.slug);
+                      setTeamPickerOpen(false);
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) e.currentTarget.style.backgroundColor = accentBg;
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) e.currentTarget.style.backgroundColor = "transparent";
+                    }}
+                    aria-label={t.name}
+                  >
+                    <span
+                      aria-hidden
+                      style={{
+                        flexShrink: 0,
+                        display: "block",
+                        width: 28,
+                        height: 16,
+                        borderRadius: 3,
+                        border: `1px solid ${border}`,
+                        background: `linear-gradient(90deg, ${t.primary} 0%, ${t.primary} 50%, ${t.secondary} 50%, ${t.secondary} 100%)`,
+                      }}
+                    />
+                    <span
+                      className="text-[12px]"
+                      style={{
+                        fontFamily: "Georgia, serif",
+                        color: isSelected ? accent : labelHover,
+                        fontWeight: isSelected ? 600 : 400,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {t.short}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         {/* Theme switcher */}
         <div
           className="flex items-center gap-1 shrink-0"
@@ -483,8 +612,8 @@ export function JeromeluTopBar() {
         >
           {(
             [
-              { key: "light" as const, icon: Sun, label: "Light" },
-              { key: "dark" as const, icon: Moon, label: "Dark" },
+              { key: "light" as const, icon: Sun, label: "Home" },
+              { key: "dark" as const, icon: Moon, label: "Away" },
             ]
           ).map(({ key, icon: Icon, label }) => {
             const isSelected = mode === key;
