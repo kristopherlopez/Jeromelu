@@ -11,7 +11,8 @@ import {
 } from "react";
 
 import { API_BASE } from "@/lib/api";
-import type { FaceTrack, FaceTrackFrame, Speaker } from "@/lib/types";
+import type { FaceTrack, FaceTrackFace, FaceTrackFrame, Speaker } from "@/lib/types";
+import ReassignFaceModal from "./ReassignFaceModal";
 
 export interface VideoOverlayHandle {
   seekTo: (seconds: number) => void;
@@ -20,8 +21,16 @@ export interface VideoOverlayHandle {
 interface Props {
   videoUrl: string;
   faceTrackUrl: string | null;
+  sourceId: string;
   speakers: Speaker[];
   onTimeUpdate?: (time: number) => void;
+}
+
+interface ClickableFace {
+  face: FaceTrackFace;
+  rect: { x: number; y: number; width: number; height: number };
+  speaker: Speaker | null;
+  frameTs: number;
 }
 
 // Match-method colors.
@@ -91,13 +100,19 @@ function frameAt(frames: FaceTrackFrame[], ts: number, sampleRate: number): Face
 }
 
 const VideoOverlay = forwardRef<VideoOverlayHandle, Props>(
-  ({ videoUrl, faceTrackUrl, speakers, onTimeUpdate }, ref) => {
+  ({ videoUrl, faceTrackUrl, sourceId, speakers, onTimeUpdate }, ref) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const animationRef = useRef<number | null>(null);
     const [faceTrack, setFaceTrack] = useState<FaceTrack | null>(null);
     const [trackError, setTrackError] = useState<string | null>(null);
     const [videoSize, setVideoSize] = useState<{ w: number; h: number } | null>(null);
+    // Faces visible in the current frame, with screen-space rects + the
+    // speaker turn each face overlaps. Updated at the same cadence as
+    // the canvas redraw so clickable buttons stay aligned with the
+    // boxes the operator sees.
+    const [clickableFaces, setClickableFaces] = useState<ClickableFace[]>([]);
+    const [reassignTarget, setReassignTarget] = useState<ClickableFace | null>(null);
 
     useImperativeHandle(ref, () => ({
       seekTo: (seconds: number) => {
@@ -176,6 +191,8 @@ const VideoOverlay = forwardRef<VideoOverlayHandle, Props>(
       ctx.lineWidth = 2;
       ctx.font = "12px system-ui, sans-serif";
 
+      const nextClickable: ClickableFace[] = [];
+
       for (const face of frame.faces) {
         const [x1, y1, x2, y2] = face.bbox;
         const x = x1 * sx;
@@ -206,7 +223,36 @@ const VideoOverlay = forwardRef<VideoOverlayHandle, Props>(
         ctx.fillRect(x, labelY, labelW, labelH);
         ctx.fillStyle = "#000";
         ctx.fillText(text, x + padX, labelY + labelH - padY - 3);
+
+        nextClickable.push({
+          face,
+          rect: { x, y, width: w, height: h },
+          speaker: active,
+          frameTs: frame.ts,
+        });
       }
+
+      // Update React state only when the visible faces actually change —
+      // re-rendering the overlay layer ~60×/sec is wasteful and confuses
+      // the click target.
+      setClickableFaces((prev) => {
+        if (prev.length !== nextClickable.length) return nextClickable;
+        for (let i = 0; i < prev.length; i++) {
+          const a = prev[i];
+          const b = nextClickable[i];
+          if (
+            a.rect.x !== b.rect.x ||
+            a.rect.y !== b.rect.y ||
+            a.rect.width !== b.rect.width ||
+            a.rect.height !== b.rect.height ||
+            a.face.person_id !== b.face.person_id ||
+            a.speaker?.segment_id !== b.speaker?.segment_id
+          ) {
+            return nextClickable;
+          }
+        }
+        return prev;
+      });
     }, [frames, sampleRate, sortedSpeakers, videoSize]);
 
     // Animation loop — runs whenever the video is playing.
@@ -275,10 +321,62 @@ const VideoOverlay = forwardRef<VideoOverlayHandle, Props>(
           ref={canvasRef}
           className="pointer-events-none absolute inset-0 h-full w-full"
         />
+        {/* Click-to-reassign layer. Buttons are positioned over each
+            visible face box. Clicks outside boxes pass through to the
+            video controls below. */}
+        <div className="pointer-events-none absolute inset-0">
+          {clickableFaces.map((cf, idx) => (
+            <button
+              key={`${cf.frameTs}-${idx}`}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!cf.speaker) return;
+                // Pause the video so face boxes don't keep updating
+                // behind the modal — distracting + makes the click
+                // target you saw a half-second ago feel "stale".
+                videoRef.current?.pause();
+                setReassignTarget(cf);
+              }}
+              title={
+                cf.speaker
+                  ? "Click to reassign this turn"
+                  : "No speaker turn at this frame"
+              }
+              className="pointer-events-auto absolute cursor-pointer"
+              style={{
+                left: cf.rect.x,
+                top: cf.rect.y,
+                width: cf.rect.width,
+                height: cf.rect.height,
+                background: "transparent",
+                border: "none",
+                padding: 0,
+              }}
+              aria-label="Reassign face"
+            />
+          ))}
+        </div>
         {trackError && (
           <div className="absolute right-2 top-2 rounded bg-red-900/70 px-2 py-1 text-xs text-red-100">
             face-track error: {trackError}
           </div>
+        )}
+        {reassignTarget && reassignTarget.speaker && (
+          <ReassignFaceModal
+            sourceId={sourceId}
+            speaker={reassignTarget.speaker}
+            frameTs={reassignTarget.frameTs}
+            bbox={reassignTarget.face.bbox}
+            onClose={() => setReassignTarget(null)}
+            onSaved={() => {
+              setReassignTarget(null);
+              // MVP: full reload picks up the corrected speaker_person_id
+              // and any new embeddings. Phase 4b-action follow-up: in-place
+              // state update without losing video position.
+              window.location.reload();
+            }}
+          />
         )}
       </div>
     );
