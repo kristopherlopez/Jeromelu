@@ -38,7 +38,7 @@ The system improves itself over time: every operator confirmation and every high
 | **Driver** | Enrollment via `make enroll-voice` / `make enroll-face`. Identification + fusion run inline inside `make transcribe`. |
 | **ETL role** | **Transform.** Populates `source_speakers.speaker_person_id`, `match_method`, `match_confidence` plus the per-modality provenance columns (`audio_match_*`, `visual_match_*`). |
 | **Cost** | Voice: ~10 s of CPU per enrollment span; matching is sub-second per source (in-memory). Visual: ~7 min CPU per 45-min video at 1 fps (face detection on every frame). With Phase 5.5 remote GPU enabled, both pyannote diarization and visual ID move to a SageMaker Async endpoint on `ml.g5.xlarge` (A10G) — ~$0.13 GPU + ~$0.001 cross-region S3 + $0.30 Deepgram = **~$0.43/source**, scale-to-zero idle, **~3 min total wall time**. |
-| **Status** | Phase 3 (voice) live; Phase 4a (visual + fusion) live; Phase 4-asd (mouth-opening ASD) live; Phase 4b-display (review UI overlay) live; Phase 5.5 (remote GPU on SageMaker Async, `us-east-1`) live. Click-to-reassign (Phase 4b-action) and cross-modal compounding (Phase 5) remain. |
+| **Status** | Phase 3 (voice) live; Phase 4a (visual + fusion) live; Phase 4-asd (mouth-opening ASD) live; Phase 4b-display (review UI overlay) live; Phase 4b-action (click-to-reassign) live; Phase 5.5 (remote GPU on SageMaker Async, `us-east-1`) live. Cross-modal compounding (Phase 5) remains. |
 
 > **Single-cam caveat:** mouth-opening ASD is the current precision-floor (76.7 % vs 55.4 % without it on the test source) but not a substitute for a real audio-sync ASD model. Reaction-shot false positives (smiling at someone else's joke, laughing during their monologue) survive — `voice+face` is still the most trustworthy subset.
 
@@ -272,7 +272,7 @@ Speaker Identification has no learned classifier; it has a reference library, an
 
 **1. Bootstrap.** Without manual enrollment, both registries are empty and every turn writes NULL to `speaker_person_id`. `make enroll-voice` and `make enroll-face` are the only entry points to populate the registries — ~10 s of audio per host, one frame per host. Until at least one host is enrolled, there is nothing to match against.
 
-**2. Correction (Phase 4b-action — planned).** The review-UI overlay (Phase 4b-display, shipped) shows colour-coded face boxes per turn. The next phase makes them clickable: click a mis-attributed face → Person picker → the system extracts new voice and face embeddings from that turn and inserts them into the registries with `created_by='manual'`, plus corrects `speaker_person_id`. A single correction therefore (a) fixes the current turn, (b) adds new exemplars *in the conditions where matching just failed*, (c) improves all future episodes recorded under similar conditions.
+**2. Correction (Phase 4b-action — shipped 2026-05-05).** The review-UI overlay shows colour-coded face boxes per turn; clicking a mis-attributed face opens a Person picker, and on save the system extracts new voice and face embeddings from that turn and inserts them into the registries with `created_by='manual'`, plus corrects `speaker_person_id`. A single correction therefore (a) fixes the current turn, (b) adds new exemplars *in the conditions where matching just failed*, (c) improves all future episodes recorded under similar conditions. Full sequence: see [Manual reassign](#manual-reassign) below.
 
 **3. Compounding (Phase 5 — planned).** Once humans have seeded enough high-confidence exemplars, a periodic job auto-promotes turns with `match_method = 'voice+face'` and high per-modality scores. The voice and face embeddings from those turns are inserted with `created_by='auto-confirmed'`. This grows both registries simultaneously — a host originally only voice-enrolled gets a face embedding the first time they appear on camera and voice agrees. Phase 5 is what turns the loop from "human-corrects-each-mistake" into "humans-correct-edge-cases".
 
@@ -338,6 +338,64 @@ The data is there; an admin-panel surfacing of these metrics ("Lineup health") i
 
 ---
 
+## Manual reassign
+
+When the operator overrides a misidentified turn (the click-to-reassign UI in `YouTubeFaceOverlay.tsx` → `ReassignFaceModal.tsx`), `POST /api/sources/{source_id}/speakers/{segment_id}/reassign` runs the following sequence (see `services/api/app/routers/sources.py::reassign_speaker`).
+
+### Frontend trigger
+
+1. User clicks a face box in the YouTube-iframe overlay.
+2. `ReassignFaceModal` opens, prefilled with `segment_id`, `frame_ts`, and the clicked `bbox` (from the face-track JSON).
+3. User picks a Person via `PersonPicker` (fuzzy search over `people`).
+4. POST to the reassign endpoint with `{ person_id, frame_ts, bbox }`.
+
+### Backend sequence
+
+```
+1. Validate              source exists + has pixels access (video_s3_key OR YouTube canonical_url)
+                         speaker turn exists (by segment_id)
+                         target Person exists
+
+2. Resolve frame_ts      body.frame_ts if provided, else turn midpoint
+
+3. Acquire video         _acquire_video_for_reassign:
+                           - persisted s3://.../{vid}.video.mp4 (legacy), OR
+                           - on-demand yt-dlp via staged_video_local → tempdir
+                         Auto-cleaned when context exits.
+
+4. Extract frame         ffmpeg @ frame_ts → frame.jpg in tempdir
+
+5. Enroll face           enroll_face_from_image:
+                           - cv2 decode + InsightFace buffalo_l (RetinaFace + ArcFace)
+                           - Largest face (bbox hint disambiguates if multiple)
+                           - INSERT person_face_embeddings (created_by='manual')
+
+6. Enroll voice          enroll() — same path as enroll_voice_cli:
+                           - Pull audio from S3, ffmpeg → 16 kHz mono WAV
+                           - 2 s sliding window / 0.5 s hop over [turn.start_ts, turn.end_ts]
+                           - wespeaker embeddings (256-dim) per window
+                           - INSERT N rows into person_voiceprints (created_by='manual')
+                           - Skipped silently if turn shorter than embedder minimum
+
+7. Update SourceSpeaker  speaker_person_id  = body.person_id
+                         match_method       = 'manual'
+                         match_confidence   = 1.0
+
+8. Commit                Single transaction.
+
+9. Return                Response with face_id_written, voice_rows_written.
+```
+
+### Behaviour notes
+
+**Effect.** The clicked turn now displays the corrected Person on the next overlay refresh (re-coloured to the `manual` match-method colour). Both registries gained new exemplars: one face embedding plus ~17 voiceprints per 10 s of turn audio. A single click grows *both* modalities — even if only the face was visually wrong, voice exemplars from the same turn join the voiceprint registry. Subsequent episodes featuring this Person in similar conditions auto-resolve without further operator effort.
+
+**Failure tolerance.** Face or voice enrollment failures during reassign are caught and logged as warnings — they do *not* fail the reassign. The `SourceSpeaker` update always happens (assuming validation passed). Useful when, e.g., the face crop has no detectable face but the operator still wants to mark the turn correctly attributed.
+
+**Idempotency and append-only.** The `SourceSpeaker` update is idempotent — re-clicks rewrite the same fields. Embeddings are append-only — repeated clicks add more rows, never overwrite. Misclick recovery is "click again with the right Person" — the bad embeddings stay but get vote-drowned by the correct ones at match time.
+
+---
+
 ## Remote vs local inference (Phase 5.5)
 
 Lineup runs locally by default. To use the SageMaker Async endpoint instead:
@@ -377,7 +435,6 @@ The review UI overlays the face-track JSON directly on the YouTube iframe via `s
 ## Backlog
 
 - **Real audio-sync ASD model.** The mouth-opening heuristic gets us from 55 % → 77 % visual precision but misses reaction-shot false positives (laughing during someone else's monologue still passes the density gate). A model that takes face crops + audio mel-spectrograms and predicts speaking probability (Light-ASD, TalkNet, LoCoNet) would close the remaining gap. None are pip-packaged — they'd need vendoring.
-- **Phase 4b — review-UI overlay.** Clickable face boxes over the locally-stored video, with per-turn `match_method` colour-coding. Doubles as the manual override surface (click → reassign → write face + voice embeddings).
 - **Phase 5 — cross-modal compounding.** Periodic job that promotes high-confidence `voice+face`-agreement turns into the registries with `created_by='auto-confirmed'`. The mechanism that turns "85 % on day 1" into "95 %+ over six months" without human work.
 - **S-norm calibration** — per-source impostor cohort to normalise similarity scores across episodes recorded in different rooms.
 - **Voice sliding-window weighting** — currently all windows in a turn vote with equal weight. Weighting by the dominant utterance's pyannote confidence would penalise low-quality windows.

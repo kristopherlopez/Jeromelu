@@ -19,7 +19,7 @@ tags: [area/agents, subarea/crew]
 | **Type**              | Crew mode (internal reasoning)                                                                                                                               |
 | **ETL role**          | **Transform.** Reads Scout's raw bytes, produces structured derivatives.                                                                                     |
 | **Scope today**       | Transcript materialisation (Deepgram words + pyannote turns) and Lineup speaker identification (voice + face + fusion). Both live in `services/api/app/analyst/`. |
-| **Scope planned**     | Cleaning pass (`source_documents.cleaned_text`, `source_chunks.clean_text`), embedding generation (`source_chunks.embedding`), quote / claim extraction. Lineup remaining work (Phases 4b-action and 5) is tracked separately — see [Lineup status](#lineup-status) below. |
+| **Scope planned**     | Cleaning pass (`source_documents.cleaned_text`, `source_chunks.clean_text`), embedding generation (`source_chunks.embedding`), quote / claim extraction. Lineup remaining work (Phase 5 — cross-modal compounding) is tracked separately — see [Lineup status](#lineup-status) below. |
 | **Code**              | `services/api/app/analyst/` — `transcribe.py`, `keyterms.py`, `transcribe_cli.py`, `diarize.py`, `identify_voice.py`, `visual_id.py`, `fusion.py`, `enroll_voice_cli.py`, `enroll_face_cli.py`. |
 | **Trigger**           | Manual CLI: `python -m app.analyst.transcribe_cli <source_id>` runs everything end-to-end. Recurring drain job for `transcription_status IS NULL` sources is on the backlog.            |
 
@@ -37,7 +37,7 @@ Scout                       Analyst                                           Bo
 | Stage | What | Status |
 |---|---|---|
 | Transcribe | Deepgram nova-3 (words+timestamps, no diarize) + pyannote diarization + keyterm. Writes `source_documents` + `source_speakers` (with voice embeddings) + `source_chunks`. | Shipped 2026-05-03 |
-| **Lineup — speaker ID** | Voice voiceprints + face embeddings + mouth-opening ASD + cross-modal fusion → `source_speakers.speaker_person_id` + `match_method` + `match_confidence`. Per-turn audio_match / visual_match provenance preserved. | Phases 1–4b-display shipped 2026-05-04. Compounding (Phase 5) and click-to-reassign UI (Phase 4b-action) pending. See [Lineup status](#lineup-status). |
+| **Lineup — speaker ID** | Voice voiceprints + face embeddings + mouth-opening ASD + cross-modal fusion → `source_speakers.speaker_person_id` + `match_method` + `match_confidence`. Per-turn audio_match / visual_match provenance preserved. | Phases 1–4b-display shipped 2026-05-04. Phase 4b-action (click-to-reassign) shipped 2026-05-05. Compounding (Phase 5) pending. See [Lineup status](#lineup-status). |
 | Clean | Fix garbles, merge restarts, normalise filler. Writes `source_documents.cleaned_text`, `source_chunks.clean_text`. | Skill-driven today (`/clean-transcript`); workerised version pending |
 | Embed | OpenAI / Voyage embeddings → `source_chunks.embedding`. (Distinct from the voice/face embeddings Lineup writes — those live on `source_speakers` / `person_voiceprints` / `person_face_embeddings`.) | Not built |
 | Extract claims / quotes | LLM extraction over chunks. Writes `quotes`, `claims`, `claim_chunks`. | Skill-driven today (`/process-transcript`); workerised version pending |
@@ -104,7 +104,7 @@ Lineup is the speaker-identification surface within Analyst's transcript materia
 | **4b-display** — Review-UI overlay | HTML5 `<video>` + canvas face-box overlay coloured by `match_method`. Read-only. | ✅ Shipped 2026-05-04. |
 | **4b-display-v2** — Ephemeral video + canvas-on-iframe overlay | Stop persisting per-source video. `video_staging.staged_video` yt-dlps into a 24 h-lifecycle staging key, deletes after `visual_identify` returns. `YouTubeFaceOverlay` draws bboxes on the YouTube iframe directly. | ✅ Shipped 2026-05-05. |
 | **5.5** — Remote GPU inference | `services/gpu/` SageMaker Async endpoint (us-east-1, `ml.g5.xlarge`) hosting pyannote + InsightFace. ~50 min CPU → **~3 min** wall time when `LINEUP_REMOTE=1`. | ✅ Shipped 2026-05-05. |
-| **4b-action** — Click-to-reassign | Click a face box → Person picker modal → writes face + voice embeddings + corrects `speaker_person_id`. | ⏳ Pending (3–4 days). |
+| **4b-action** — Click-to-reassign | Click a face box → Person picker modal → writes face + voice embeddings + corrects `speaker_person_id`. | ✅ Shipped 2026-05-05. See [Manual reassign](../system/speaker-identification.md#manual-reassign) for the endpoint sequence. |
 | **5** — Cross-modal compounding | Periodic job auto-promotes high-confidence `voice+face` turns into the registries with `created_by='auto-confirmed'`. The mechanism that grows accuracy without operator effort. | ⏳ Pending (3 days). |
 
 Flagged but not currently scoped:
