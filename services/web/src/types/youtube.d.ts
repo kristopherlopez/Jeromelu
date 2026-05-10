@@ -16,6 +16,8 @@ declare namespace YT {
     constructor(element: HTMLElement, options: PlayerOptions);
     seekTo(seconds: number, allowSeekAhead: boolean): void;
     getCurrentTime(): number;
+    getDuration(): number;
+    pauseVideo(): void;
     destroy(): void;
   }
 
