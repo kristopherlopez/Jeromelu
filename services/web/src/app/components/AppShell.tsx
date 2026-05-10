@@ -55,7 +55,7 @@ function PageContent({ children }: { children: ReactNode }) {
   const hasTopBar =
     pathname !== "/landing" &&
     !pathname.startsWith("/admin") &&
-    !pathname.startsWith("/stream");
+    !pathname.startsWith("/wiki/source");
 
   return (
     <div

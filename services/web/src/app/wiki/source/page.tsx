@@ -1,10 +1,15 @@
 import { apiFetch } from "@/lib/api";
 import type { SourceListResponse } from "@/lib/types";
-import StreamClient from "./StreamClient";
+import SourceListClient from "./SourceListClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function StreamPage() {
+export const metadata = {
+  title: "Sources | The Wiki | Jaromelu",
+  description: "Processed transcript sources Jaromelu has ingested.",
+};
+
+export default async function SourcesPage() {
   let data: SourceListResponse;
   try {
     data = await apiFetch<SourceListResponse>("/api/sources");
@@ -35,7 +40,7 @@ export default async function StreamPage() {
           Sources
         </h1>
       </div>
-      <StreamClient sources={data.items} />
+      <SourceListClient sources={data.items} />
     </main>
   );
 }

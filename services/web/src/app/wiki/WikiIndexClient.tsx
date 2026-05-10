@@ -7,7 +7,7 @@ import {
   Clock,
   FileText,
   Users,
-  Calendar,
+  Radio,
   Mic,
   ArrowRight,
   ArrowLeft,
@@ -28,7 +28,7 @@ const ITEMS_PER_PAGE = 30;
 // Voices is a virtual tab that combines advisor + channel pages.
 const VOICES_TYPES: WikiPageType[] = ["advisor", "channel"];
 
-type EntityKey = "player" | "team" | "round" | "voices";
+type EntityKey = "player" | "team" | "voices" | "source";
 
 /* ── Helpers ── */
 
@@ -58,6 +58,8 @@ function pageHref(page: { page_type: WikiPageType; slug: string }): string {
 
 function pagesByEntity(pages: WikiPageSummary[], key: EntityKey): WikiPageSummary[] {
   if (key === "voices") return pages.filter((p) => VOICES_TYPES.includes(p.page_type));
+  // "source" is not a wiki page_type — sources live at /wiki/source backed by /api/sources.
+  if (key === "source") return [];
   return pages.filter((p) => p.page_type === key);
 }
 
@@ -97,13 +99,16 @@ const v = {
 
 interface WikiIndexClientProps {
   pages: WikiPageSummary[];
+  sourceCount?: number;
   initialType?: string;
 }
 
-const VALID_TYPES: EntityKey[] = ["player", "team", "round", "voices"];
+// "source" is intentionally excluded — it has its own /wiki/source route, not a virtual ?type= filter.
+const VALID_TYPES: EntityKey[] = ["player", "team", "voices"];
 
 export default function WikiIndexClient({
   pages,
+  sourceCount = 0,
   initialType,
 }: WikiIndexClientProps) {
   const filterKey = (VALID_TYPES as string[]).includes(initialType ?? "")
@@ -121,7 +126,7 @@ export default function WikiIndexClient({
         {filterKey ? (
           <EntityView entityKey={filterKey} pages={filtered} />
         ) : (
-          <DashboardView pages={pages} />
+          <DashboardView pages={pages} sourceCount={sourceCount} />
         )}
       </div>
     </div>
@@ -209,13 +214,19 @@ function EntityView({
    Dashboard — the landing page
    ══════════════════════════════════════════════════════ */
 
-function DashboardView({ pages }: { pages: WikiPageSummary[] }) {
+function DashboardView({
+  pages,
+  sourceCount,
+}: {
+  pages: WikiPageSummary[];
+  sourceCount: number;
+}) {
   const [aboutOpen, setAboutOpen] = useState(false);
 
   return (
     <>
       <Hero onAboutClick={() => setAboutOpen(true)} />
-      <ExploreByEntity pages={pages} />
+      <ExploreByEntity pages={pages} sourceCount={sourceCount} />
       <AskJaromelu />
       <HowItConnects />
       <DashboardFooter />
@@ -297,7 +308,7 @@ function Hero({ onAboutClick }: { onAboutClick: () => void }) {
               maxWidth: 520,
             }}
           >
-            Players, teams, rounds and voices — connected by context.
+            Players, teams, voices and sources — connected by context.
           </p>
         </div>
         <AmbientGraph />
@@ -364,10 +375,10 @@ function AmbientGraph() {
         </circle>
 
         {/* Satellites */}
-        <SatelliteNode cx={200} cy={40} label="Rounds" />
-        <SatelliteNode cx={80} cy={140} label="Players" />
-        <SatelliteNode cx={320} cy={140} label="Teams" />
-        <SatelliteNode cx={200} cy={240} label="Voices" />
+        <SatelliteNode cx={200} cy={40} label="Players" />
+        <SatelliteNode cx={80} cy={140} label="Teams" />
+        <SatelliteNode cx={320} cy={140} label="Voices" />
+        <SatelliteNode cx={200} cy={240} label="Sources" />
       </svg>
     </div>
   );
@@ -494,8 +505,9 @@ function AboutModal({ onClose }: { onClose: () => void }) {
           }}
         >
           <p style={{ marginBottom: "0.85rem" }}>
-            Jaromelu maintains pages on every player, team, round and voice
-            — connected so you can move between them by context.
+            Jaromelu maintains pages on every player, team and voice — and
+            indexes the sources behind them, all connected so you can move
+            between them by context.
           </p>
           <p style={{ marginBottom: "0.85rem" }}>
             Browse by entity to drop into a category, or use{" "}
@@ -541,14 +553,6 @@ const ENTITY_CONFIG: Record<
     accent: v.accent,
     accentBg: v.accentBg,
   },
-  round: {
-    label: "Rounds",
-    singular: "round",
-    icon: Calendar,
-    copy: "Matchups, recaps and predictions.",
-    accent: v.amber,
-    accentBg: v.amberBg,
-  },
   voices: {
     label: "Voices",
     singular: "voice",
@@ -557,11 +561,25 @@ const ENTITY_CONFIG: Record<
     accent: v.purple,
     accentBg: v.purpleBg,
   },
+  source: {
+    label: "Sources",
+    singular: "source",
+    icon: Radio,
+    copy: "Episodes, transcripts and claims.",
+    accent: v.amber,
+    accentBg: v.amberBg,
+  },
 };
 
-const ENTITY_ORDER: EntityKey[] = ["player", "team", "round", "voices"];
+const ENTITY_ORDER: EntityKey[] = ["player", "team", "voices", "source"];
 
-function ExploreByEntity({ pages }: { pages: WikiPageSummary[] }) {
+function ExploreByEntity({
+  pages,
+  sourceCount,
+}: {
+  pages: WikiPageSummary[];
+  sourceCount: number;
+}) {
   return (
     <section style={{ marginBottom: "2.5rem" }}>
       <SectionLabel>Explore by Entity</SectionLabel>
@@ -573,8 +591,10 @@ function ExploreByEntity({ pages }: { pages: WikiPageSummary[] }) {
         }}
       >
         {ENTITY_ORDER.map((key) => {
-          const samples = pagesByEntity(pages, key).slice(0, 4);
-          const total = pagesByEntity(pages, key).length;
+          // Sources don't live in the wiki pages table — count comes from /api/sources.
+          const matched = pagesByEntity(pages, key);
+          const samples = matched.slice(0, 4);
+          const total = key === "source" ? sourceCount : matched.length;
           return (
             <EntityCard
               key={key}
@@ -600,7 +620,8 @@ function EntityCard({
 }) {
   const cfg = ENTITY_CONFIG[entityKey];
   const Icon = cfg.icon;
-  const browseHref = `/wiki?type=${entityKey}`;
+  // Sources have a real route; everything else uses the dashboard's virtual ?type= filter.
+  const browseHref = entityKey === "source" ? "/wiki/source" : `/wiki?type=${entityKey}`;
 
   return (
     <div
@@ -794,20 +815,19 @@ const ASK_CHIPS: Record<AskScope, string[]> = {
     "Defensive struggles",
     "Form lines into this round",
   ],
-  round: [
-    "This round's top picks",
-    "Captain options",
-    "Teams with double chance",
-    "Injury watchlist",
-    "Weather-affected games",
-    "Late mail and team-list shifts",
-  ],
   voices: [
     "Most trusted voices right now",
     "Recent calls vs. reality",
     "Best podcasts this week",
     "New voices added",
     "Trust-score movers",
+  ],
+  source: [
+    "Latest episodes ingested",
+    "Most-cited sources this week",
+    "New transcripts ready",
+    "Highest-claim episodes",
+    "Sources covering injuries",
   ],
 };
 
@@ -1054,8 +1074,8 @@ function HowItConnects() {
   const stages: { key: EntityKey; caption: string }[] = [
     { key: "player", caption: "Who they are." },
     { key: "team", caption: "How they play." },
-    { key: "round", caption: "What happened." },
     { key: "voices", caption: "What it means." },
+    { key: "source", caption: "Where it came from." },
   ];
 
   return (
@@ -1063,8 +1083,8 @@ function HowItConnects() {
       <SectionLabel>How it Connects</SectionLabel>
       <SectionTitle>Everything is connected.</SectionTitle>
       <SectionSubtitle>
-        Players sit inside teams, teams play out rounds, voices interpret the
-        signal. The same pages, four lenses.
+        Players sit inside teams, voices interpret the signal, and every claim
+        traces back to a source. The same pages, four lenses.
       </SectionSubtitle>
 
       <div

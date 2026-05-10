@@ -707,7 +707,7 @@ function EpisodeRow({ ep, index }: { ep: ChannelEpisode; index: number }) {
   // Always route to the in-app viewer; the YouTube affordance on the right
   // stays for users who explicitly want to watch on the platform.
   const onActivate = () => {
-    router.push(`/stream/${ep.source_id}`);
+    router.push(`/wiki/source/${ep.source_id}`);
   };
   const isClickable = true;
 

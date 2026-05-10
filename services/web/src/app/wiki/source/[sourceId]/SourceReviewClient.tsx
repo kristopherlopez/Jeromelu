@@ -4,14 +4,14 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, User, Calendar, Video, PenLine, Hourglass } from "lucide-react";
 import type { SourceDetailResponse, SourceListItem } from "@/lib/types";
-import YouTubePlayer, { type YouTubePlayerHandle } from "../../components/YouTubePlayer";
-import VideoOverlay, { type VideoOverlayHandle } from "../../components/VideoOverlay";
+import YouTubePlayer, { type YouTubePlayerHandle } from "@/app/components/YouTubePlayer";
+import VideoOverlay, { type VideoOverlayHandle } from "@/app/components/VideoOverlay";
 import YouTubeFaceOverlay, {
   type YouTubeFaceOverlayHandle,
-} from "../../components/YouTubeFaceOverlay";
-import ClaimsList from "../../components/ClaimsList";
-import TranscriptPanel from "../../components/TranscriptPanel";
-import EpisodeTimeline from "../../components/EpisodeTimeline";
+} from "@/app/components/YouTubeFaceOverlay";
+import ClaimsList from "@/app/components/ClaimsList";
+import TranscriptPanel from "@/app/components/TranscriptPanel";
+import EpisodeTimeline from "@/app/components/EpisodeTimeline";
 
 interface Props {
   data: SourceDetailResponse;
@@ -112,7 +112,7 @@ export default function SourceReviewClient({ data, allSources }: Props) {
       {/* Header */}
       <div className="flex items-center gap-3 border-b px-4 py-3 lg:px-6" style={{ borderColor: "var(--border)" }}>
         <Link
-          href="/stream"
+          href="/wiki/source"
           className="flex items-center gap-1 text-sm transition-colors" style={{ color: "var(--foreground-secondary)" }}
         >
           <ArrowLeft size={16} />
@@ -222,7 +222,7 @@ export default function SourceReviewClient({ data, allSources }: Props) {
               {relatedSources.map((s) => (
                 <Link
                   key={s.source_id}
-                  href={`/stream/${s.source_id}`}
+                  href={`/wiki/source/${s.source_id}`}
                   className="group flex items-center justify-between rounded-lg border px-3 py-2.5 transition-colors" style={{ borderColor: "var(--border)" }}
                 >
                   <div className="min-w-0 flex-1">

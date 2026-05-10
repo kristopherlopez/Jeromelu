@@ -104,7 +104,7 @@ export function JeromeluTopBar() {
 
   const isHome = pathname === "/landing";
   const isAdmin = pathname.startsWith("/admin");
-  const isStream = pathname.startsWith("/stream");
+  const isStream = pathname.startsWith("/wiki/source");
 
   // Hooks must run unconditionally — early-return only after all hooks declared.
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);

@@ -54,7 +54,7 @@ Build a pipeline to isolate individual speaker audio from YouTube podcast source
 
 1. **Audio retention** — every Scout audio pull (`app/scout/audio.py`) downloads the audio via yt-dlp and persists it to `s3://jeromelu-raw-audio/youtube/{channel_id}/{video_id}.m4a`. Long-term storage; never deleted.
 2. **Speaker diarisation** — Deepgram nova-3 with `diarize=true` is the canonical extract (`app/analyst/transcribe.py`). Each video produces `source_speakers` *turns* (one row per contiguous speaker span — multiple per speaker, all sharing the raw `speaker_label`) and `source_chunks` rows linked to their turn via FK.
-3. **Speaker rename UI** — operators can name a speaker via `PATCH /api/sources/speakers/{segment_id}` (rename cascades to every turn sharing the current label). Visible in the transcript panel on `/stream/{source_id}` — click any speaker label to rename inline.
+3. **Speaker rename UI** — operators can name a speaker via `PATCH /api/sources/speakers/{segment_id}` (rename cascades to every turn sharing the current label). Visible in the transcript panel on `/wiki/source/{source_id}` — click any speaker label to rename inline.
 
 **What's still to build:**
 

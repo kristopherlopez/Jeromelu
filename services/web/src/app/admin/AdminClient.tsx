@@ -596,7 +596,7 @@ export default function AdminClient() {
                   </td>
                   <td className="max-w-xs truncate px-3 py-2">
                     <a
-                      href={`/stream/${item.source_id}`}
+                      href={`/wiki/source/${item.source_id}`}
                       className="text-orange-400 hover:text-orange-300 hover:underline"
                     >
                       {item.title}

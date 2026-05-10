@@ -75,7 +75,7 @@ the page payload and a small batch of sibling channels in parallel for the
 related-voices sidebar.
 
 Episode rows in the Latest-episodes panel always deep-link internally to
-`/stream/[sourceId]` (the source review page — video player + episode timeline
+`/wiki/source/[sourceId]` (the source review page — video player + episode timeline
 + transcript + claims). When a source hasn't been transcribed yet,
 `/api/sources/{id}` returns the source metadata with empty `claims`/`chunks`/
 `speakers`, and the review page renders the video player plus an

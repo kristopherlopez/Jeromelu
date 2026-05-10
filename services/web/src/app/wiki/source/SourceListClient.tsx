@@ -106,7 +106,7 @@ function SourceRow({ source }: { source: SourceListItem }) {
 
   return (
     <Link
-      href={`/stream/${source.source_id}`}
+      href={`/wiki/source/${source.source_id}`}
       className="group flex items-center gap-3 px-3 py-2.5 transition-colors rounded-md"
     >
       {/* Claim count badge */}
@@ -322,7 +322,7 @@ function CheckIcon() {
   );
 }
 
-export default function StreamClient({ sources }: { sources: SourceListItem[] }) {
+export default function SourceListClient({ sources }: { sources: SourceListItem[] }) {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortKey>("newest");
   const [groupBy, setGroupBy] = useState<GroupMode>("none");

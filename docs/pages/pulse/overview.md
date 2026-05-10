@@ -29,7 +29,7 @@ The design originated in `design-artifacts/claude-design/Jaromelu Scheduled.html
 | `services/web/src/app/pulse/pulse-data.ts` | Shared types (`PulseResponse`, `CrewMember`, `TimelineEntry`, …). |
 | `services/web/src/app/api/pulse/route.ts` | Stub API. Returns `{ crew, timeline }` — to be replaced with real data from runs/discoveries tables. |
 
-Top bar: a "Live Pulse" entry lives in `NAV_ITEMS` in `services/web/src/app/components/JeromeluTopBar.tsx` — the global top bar that renders on every inner page (everything except `/landing`, `/admin/*`, `/stream/*`). The entry is intentionally *not* part of the JAROMELU logo letters (`LETTERS` in `JeromeluLogo.tsx`), so adding it does not change the logo.
+Top bar: a "Live Pulse" entry lives in `NAV_ITEMS` in `services/web/src/app/components/JeromeluTopBar.tsx` — the global top bar that renders on every inner page (everything except `/landing`, `/admin/*`, `/wiki/source/*`). The entry is intentionally *not* part of the JAROMELU logo letters (`LETTERS` in `JeromeluLogo.tsx`), so adding it does not change the logo.
 
 `JeromeluTopBar` is a fixed 56px bar at the top of the viewport. Content clearance is handled centrally in `AppShell.tsx` (`paddingTop: TOPBAR_HEIGHT` on the `PageContent` wrapper when `hasTopBar` is true), so individual pages don't have to add their own offset. The bar's background tracks the active theme — `--background-deep` on dark, `--wiki-surface` on light.
 
