@@ -1150,7 +1150,16 @@ def bulk_assign_face_run(
             detail="Provide exactly one of `person_id` or `new_person_name`",
         )
 
-    # Resolve Person (sync, same lookup-or-create as single reassign).
+    # Resolve Person (sync) — commit the new row up front rather than
+    # relying on db.flush() to keep it visible. enroll_face_from_image
+    # and enroll() each run their own session.commit() inside the
+    # stream; across a multi-turn bulk those internal commits can
+    # leave the session in a state where a flushed-only Person row
+    # isn't visible to subsequent FK checks, producing
+    # ForeignKeyViolation on person_face_embeddings. Committing here
+    # decouples Person creation from the per-turn writes — a partial
+    # bulk failure leaves an empty Person, which is harmless and
+    # idempotent on re-run (lookup-by-name reuses the row).
     person_created = False
     if body.person_id is not None:
         person = db.query(Person).filter(Person.person_id == body.person_id).first()
@@ -1168,7 +1177,7 @@ def bulk_assign_face_run(
         if not person:
             person = Person(canonical_name=new_name)
             db.add(person)
-            db.flush()
+            db.commit()
             person_created = True
     target_person_id = person.person_id
     person_name = person.canonical_name
