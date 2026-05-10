@@ -17,8 +17,10 @@ import {
   Send,
 } from "lucide-react";
 import type { WikiPageSummary, WikiPageType } from "./wiki-data";
+import type { SourceListItem } from "@/lib/types";
 import VoicesView from "./VoicesView";
 import PlayersIndexView from "./PlayersIndexView";
+import SourceListClient from "./source/SourceListClient";
 import "./wiki.css";
 
 /* ── Constants ── */
@@ -28,7 +30,7 @@ const ITEMS_PER_PAGE = 30;
 // Voices is a virtual tab that combines advisor + channel pages.
 const VOICES_TYPES: WikiPageType[] = ["advisor", "channel"];
 
-type EntityKey = "player" | "team" | "voices" | "source";
+type EntityKey = "player" | "team" | "voices" | "sources";
 
 /* ── Helpers ── */
 
@@ -58,8 +60,8 @@ function pageHref(page: { page_type: WikiPageType; slug: string }): string {
 
 function pagesByEntity(pages: WikiPageSummary[], key: EntityKey): WikiPageSummary[] {
   if (key === "voices") return pages.filter((p) => VOICES_TYPES.includes(p.page_type));
-  // "source" is not a wiki page_type — sources live at /wiki/source backed by /api/sources.
-  if (key === "source") return [];
+  // "sources" is not a wiki page_type — they're backed by /api/sources, rendered via SourceListClient.
+  if (key === "sources") return [];
   return pages.filter((p) => p.page_type === key);
 }
 
@@ -99,16 +101,15 @@ const v = {
 
 interface WikiIndexClientProps {
   pages: WikiPageSummary[];
-  sourceCount?: number;
+  sources?: SourceListItem[];
   initialType?: string;
 }
 
-// "source" is intentionally excluded — it has its own /wiki/source route, not a virtual ?type= filter.
-const VALID_TYPES: EntityKey[] = ["player", "team", "voices"];
+const VALID_TYPES: EntityKey[] = ["player", "team", "voices", "sources"];
 
 export default function WikiIndexClient({
   pages,
-  sourceCount = 0,
+  sources = [],
   initialType,
 }: WikiIndexClientProps) {
   const filterKey = (VALID_TYPES as string[]).includes(initialType ?? "")
@@ -124,9 +125,9 @@ export default function WikiIndexClient({
     <div className="min-h-screen">
       <div className="max-w-5xl mx-auto px-6 py-8">
         {filterKey ? (
-          <EntityView entityKey={filterKey} pages={filtered} />
+          <EntityView entityKey={filterKey} pages={filtered} sources={sources} />
         ) : (
-          <DashboardView pages={pages} sourceCount={sourceCount} />
+          <DashboardView pages={pages} sourceCount={sources.length} />
         )}
       </div>
     </div>
@@ -140,15 +141,20 @@ export default function WikiIndexClient({
 function EntityView({
   entityKey,
   pages,
+  sources,
 }: {
   entityKey: EntityKey;
   pages: WikiPageSummary[];
+  sources: SourceListItem[];
 }) {
   if (entityKey === "voices") {
     return <VoicesView pages={pages} />;
   }
   if (entityKey === "player") {
     return <PlayersIndexView pages={pages} />;
+  }
+  if (entityKey === "sources") {
+    return <SourcesView sources={sources} />;
   }
 
   const label = ENTITY_CONFIG[entityKey].label;
@@ -205,6 +211,69 @@ function EntityView({
           <FileText size={32} style={{ marginBottom: "0.75rem", opacity: 0.5 }} />
           <p style={{ fontSize: "14px" }}>No pages found.</p>
         </div>
+      )}
+    </>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   Sources view — /wiki?type=sources
+   ══════════════════════════════════════════════════════ */
+
+function SourcesView({ sources }: { sources: SourceListItem[] }) {
+  return (
+    <>
+      <Link
+        href="/wiki"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "0.4rem",
+          fontSize: "12px",
+          fontWeight: 600,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color: v.inkFaint,
+          textDecoration: "none",
+          marginBottom: "1.5rem",
+        }}
+      >
+        <ArrowLeft size={14} /> Back to the Wiki
+      </Link>
+      <h1
+        style={{
+          fontFamily: v.serif,
+          fontSize: "clamp(1.8rem, 4vw, 2.4rem)",
+          fontWeight: 700,
+          color: v.ink,
+          lineHeight: 1.1,
+          marginBottom: "0.4rem",
+        }}
+      >
+        Sources
+      </h1>
+      <p
+        style={{
+          fontSize: "14px",
+          color: v.inkFaint,
+          marginBottom: "2rem",
+        }}
+      >
+        {sources.length} {sources.length === 1 ? "source" : "sources"}
+      </p>
+      {sources.length === 0 ? (
+        <div
+          style={{
+            textAlign: "center",
+            padding: "4rem 0",
+            color: v.inkFaint,
+          }}
+        >
+          <FileText size={32} style={{ marginBottom: "0.75rem", opacity: 0.5 }} />
+          <p style={{ fontSize: "14px" }}>No sources yet.</p>
+        </div>
+      ) : (
+        <SourceListClient sources={sources} />
       )}
     </>
   );
@@ -561,7 +630,7 @@ const ENTITY_CONFIG: Record<
     accent: v.purple,
     accentBg: v.purpleBg,
   },
-  source: {
+  sources: {
     label: "Sources",
     singular: "source",
     icon: Radio,
@@ -571,7 +640,7 @@ const ENTITY_CONFIG: Record<
   },
 };
 
-const ENTITY_ORDER: EntityKey[] = ["player", "team", "voices", "source"];
+const ENTITY_ORDER: EntityKey[] = ["player", "team", "voices", "sources"];
 
 function ExploreByEntity({
   pages,
@@ -594,7 +663,7 @@ function ExploreByEntity({
           // Sources don't live in the wiki pages table — count comes from /api/sources.
           const matched = pagesByEntity(pages, key);
           const samples = matched.slice(0, 4);
-          const total = key === "source" ? sourceCount : matched.length;
+          const total = key === "sources" ? sourceCount : matched.length;
           return (
             <EntityCard
               key={key}
@@ -620,8 +689,7 @@ function EntityCard({
 }) {
   const cfg = ENTITY_CONFIG[entityKey];
   const Icon = cfg.icon;
-  // Sources have a real route; everything else uses the dashboard's virtual ?type= filter.
-  const browseHref = entityKey === "source" ? "/wiki/source" : `/wiki?type=${entityKey}`;
+  const browseHref = `/wiki?type=${entityKey}`;
 
   return (
     <div
@@ -822,7 +890,7 @@ const ASK_CHIPS: Record<AskScope, string[]> = {
     "New voices added",
     "Trust-score movers",
   ],
-  source: [
+  sources: [
     "Latest episodes ingested",
     "Most-cited sources this week",
     "New transcripts ready",
@@ -1075,7 +1143,7 @@ function HowItConnects() {
     { key: "player", caption: "Who they are." },
     { key: "team", caption: "How they play." },
     { key: "voices", caption: "What it means." },
-    { key: "source", caption: "Where it came from." },
+    { key: "sources", caption: "Where it came from." },
   ];
 
   return (

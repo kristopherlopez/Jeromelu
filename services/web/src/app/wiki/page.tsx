@@ -23,14 +23,10 @@ export default async function WikiPage({
 
   const pages =
     pagesResult.status === "fulfilled" ? pagesResult.value.items : [];
-  const sourceCount =
-    sourcesResult.status === "fulfilled" ? sourcesResult.value.items.length : 0;
+  const sources =
+    sourcesResult.status === "fulfilled" ? sourcesResult.value.items : [];
 
   return (
-    <WikiIndexClient
-      pages={pages}
-      sourceCount={sourceCount}
-      initialType={type}
-    />
+    <WikiIndexClient pages={pages} sources={sources} initialType={type} />
   );
 }
