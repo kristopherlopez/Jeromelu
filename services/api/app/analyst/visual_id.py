@@ -40,8 +40,9 @@ import numpy as np
 from sqlalchemy.orm import Session
 
 from jeromelu_shared.config import settings
-from jeromelu_shared.db import PersonFaceEmbedding
+from jeromelu_shared.db import PersonFaceEmbedding, SourceFaceDetection
 from jeromelu_shared.s3 import download_raw, get_s3_client, upload_raw
+from sqlalchemy import func as sa_func
 
 logger = logging.getLogger(__name__)
 
@@ -520,6 +521,9 @@ def visual_identify(
     cosine_threshold: float = DEFAULT_FACE_COSINE_THRESHOLD,
     agreement_threshold: float = DEFAULT_FACE_AGREEMENT_THRESHOLD,
     registry: tuple[np.ndarray, list[UUID]] | None = None,
+    source_id: UUID | None = None,
+    force_local: bool = False,
+    force_reextract: bool = False,
 ) -> VisualIdentifyResult:
     """Run face detection + matching over the source's video.
 
@@ -536,8 +540,15 @@ def visual_identify(
     dispatches to the SageMaker Async endpoint. The container does the
     ffmpeg/cv2/InsightFace heavy lifting on a GPU; the artefact contract
     is unchanged.
+
+    Slice B (per-detection embedding persistence): when ``session`` AND
+    ``source_id`` are supplied, the **local** branch also writes a row
+    per detected face into ``source_face_detections``. The remote branch
+    does not yet round-trip embeddings (a future GPU-container change),
+    so the backfill script forces the local path via ``force_local=True``
+    until that lands.
     """
-    if settings.lineup_remote and session is not None:
+    if settings.lineup_remote and session is not None and not force_local:
         from .remote import visual_identify_remote
         return visual_identify_remote(
             session,
@@ -569,8 +580,9 @@ def visual_identify(
     # tuning the per-turn vote logic cheap. Re-extraction is only needed
     # when the registry changes (different / additional faces enrolled)
     # since face-to-Person matching happens at extract time. To force a
-    # re-extract: delete the JSON or bump FACE_TRACK_JSON_VERSION.
-    if _face_track_object_exists(face_track_key):
+    # re-extract: pass ``force_reextract=True``, delete the JSON, or bump
+    # FACE_TRACK_JSON_VERSION.
+    if not force_reextract and _face_track_object_exists(face_track_key):
         try:
             existing = json.loads(download_raw(face_track_key))
         except Exception:
@@ -700,6 +712,13 @@ def visual_identify(
             settings.s3_raw_bucket, face_track_key,
         )
 
+        # Slice B — persist per-detection embeddings to source_face_detections.
+        # The JSON above drops them; this table keeps them for intra-source
+        # clustering + cross-source similarity propagation. Idempotent:
+        # skipped if the source already has detection rows.
+        if session is not None and source_id is not None:
+            _persist_face_detections(session, source_id, frames)
+
     distinct_persons = len({
         face.person_id
         for f in frames for face in f.faces
@@ -717,6 +736,70 @@ def visual_identify(
         turns_visually_matched=turns_matched,
         per_turn=per_turn,
     )
+
+
+def _persist_face_detections(
+    session: Session,
+    source_id: UUID,
+    frames: list["FrameDetections"],
+) -> int:
+    """Slice B — write one ``source_face_detections`` row per detected
+    face for the given source. Idempotent: if the source already has
+    detection rows, this is a no-op (and the count is returned for
+    logging). The clustering pass (Slice B PR 2) populates ``cluster_id``
+    later; rows land with NULL here.
+
+    Returns the number of rows inserted (0 if skipped).
+    """
+    existing = session.query(sa_func.count(SourceFaceDetection.detection_id)).filter(
+        SourceFaceDetection.source_id == source_id,
+    ).scalar() or 0
+    if existing > 0:
+        logger.info(
+            "source_face_detections already populated for %s (%d rows); skip",
+            source_id, existing,
+        )
+        return 0
+
+    rows: list[SourceFaceDetection] = []
+    for f in frames:
+        for face in f.faces:
+            # Defensive: shape was already validated upstream during
+            # detection, but guard so a malformed embedding here can't
+            # poison the whole batch.
+            emb = np.asarray(face.embedding, dtype=np.float32).reshape(-1)
+            if emb.shape[0] != EMBEDDING_DIM or not np.all(np.isfinite(emb)):
+                continue
+            bbox = face.bbox
+            rows.append(SourceFaceDetection(
+                source_id=source_id,
+                frame_ts=float(f.ts),
+                bbox_x1=float(bbox[0]),
+                bbox_y1=float(bbox[1]),
+                bbox_x2=float(bbox[2]),
+                bbox_y2=float(bbox[3]),
+                det_score=float(face.det_score),
+                embedding=emb.tolist(),
+                embedding_model=EMBEDDING_MODEL,
+                mouth_opening=(
+                    float(face.mouth_opening) if face.mouth_opening is not None else None
+                ),
+                matched_person_id=face.person_id,
+                match_score=(
+                    float(face.similarity) if face.similarity is not None else None
+                ),
+                cluster_id=None,
+            ))
+
+    if not rows:
+        return 0
+    session.add_all(rows)
+    session.commit()
+    logger.info(
+        "Persisted %d source_face_detections rows for %s",
+        len(rows), source_id,
+    )
+    return len(rows)
 
 
 def enroll_face_from_image(

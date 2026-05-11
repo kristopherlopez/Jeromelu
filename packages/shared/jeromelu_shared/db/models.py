@@ -298,6 +298,65 @@ class PersonFaceEmbedding(Base):
     )
 
 
+class SourceFaceDetection(Base):
+    """Raw face-detection log per source — one row per detection during
+    visual ID, embedding kept (instead of dropped into the face-track
+    JSON). The face-track JSON is still the per-frame overlay cache;
+    this table is the canonical embedding store for intra-source
+    clustering and cross-source label propagation (Slice B).
+
+    Separate from ``person_face_embeddings`` because that's the
+    *registry* (one row per enrolled exemplar) while this is the
+    *observation log* (one row per detection ≈ thousands per source).
+    Different growth rates and lifecycles — the registry persists, the
+    observation log is re-derivable from the source media.
+
+    See migration 053.
+    """
+
+    __tablename__ = "source_face_detections"
+
+    detection_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=_new_uuid,
+    )
+    source_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sources.source_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    frame_ts: Mapped[float] = mapped_column(Float, nullable=False)
+    # bbox in source-frame pixel coords: [x1, y1, x2, y2]. Stored as
+    # four columns so they're queryable; ck constraints enforce ordering.
+    bbox_x1: Mapped[float] = mapped_column(Float, nullable=False)
+    bbox_y1: Mapped[float] = mapped_column(Float, nullable=False)
+    bbox_x2: Mapped[float] = mapped_column(Float, nullable=False)
+    bbox_y2: Mapped[float] = mapped_column(Float, nullable=False)
+    det_score: Mapped[float] = mapped_column(Float, nullable=False)
+    embedding = mapped_column(Vector(512), nullable=False)
+    embedding_model: Mapped[str] = mapped_column(Text, nullable=False)
+    mouth_opening: Mapped[float | None] = mapped_column(Float)
+    matched_person_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("people.person_id", ondelete="SET NULL"),
+    )
+    match_score: Mapped[float | None] = mapped_column(Float)
+    # Populated by the per-source clustering pass (Slice B PR 2). NULL
+    # = not yet clustered; expected initial state for fresh detections.
+    cluster_id: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow,
+    )
+
+    __table_args__ = (
+        CheckConstraint("bbox_x2 > bbox_x1", name="ck_source_face_detections_bbox_x"),
+        CheckConstraint("bbox_y2 > bbox_y1", name="ck_source_face_detections_bbox_y"),
+        Index("idx_source_face_detections_source_ts", "source_id", "frame_ts"),
+        Index(
+            "idx_source_face_detections_source_cluster",
+            "source_id", "cluster_id",
+            postgresql_where="cluster_id IS NOT NULL",
+        ),
+    )
+
+
 class PersonVoiceprint(Base):
     """Voice fingerprint registry — Phase 3 of speaker identification.
 

@@ -322,6 +322,7 @@ def transcribe(
                             audio_s3_key=source.audio_s3_key,
                             video_s3_key=video_key,
                             pyannote_turns=pyannote_turns,
+                            source_id=source.source_id,
                         )
                         visual_per_turn = visual_result.per_turn
                         face_track_s3_key = visual_result.face_track_s3_key

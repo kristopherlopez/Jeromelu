@@ -195,6 +195,7 @@ Disagreement falls through to NULL on purpose: when the modalities conflict we d
 |---|---|---|
 | `person_voiceprints` | `person_id`, `source_id`, `start_ts`, `end_ts`, `embedding`, `embedding_model`, `created_by` | — |
 | `person_face_embeddings` | `person_id`, `source_id`, `frame_ts`, `embedding`, `embedding_model`, `created_by` | — |
+| `source_face_detections` (Slice B) | per-detection `bbox`, `det_score`, `embedding`, `embedding_model`, `mouth_opening`, `matched_person_id`, `match_score` | `cluster_id` populated by the per-source clustering pass (Slice B PR 2) |
 | `source_speakers` | `audio_match_person_id` + `audio_match_score`, `visual_match_person_id` + `visual_match_score`, `match_method`, `match_confidence`, `speaker_person_id`, `confidence` (legacy) | — |
 | `sources` | `video_format` (auto-detected: `multi_cam` / `single_cam` / `audio_only`) | — |
 
@@ -456,6 +457,62 @@ Slice A's standalone gallery and `/face-groups` endpoint were retired in this ch
 - **The face-track JSON drops embeddings**, so we still can't ask "which other unassigned runs across this video — or other videos — look like the run I just labelled?" That's the cluster-similarity story Slice B/C delivers, on top of a future `source_face_detections` table.
 
 Today's runs view is the right primitive for review: scan one source top-to-bottom, label the obvious unassigned runs, move on. Re-transcribe (after deleting the cached face-track JSON — see [face-track invalidation gotcha](#visual-identification--visual_identifyaudio_s3_key-video_s3_key-pyannote_turns)) propagates the new exemplars across other sources via the standard visual matcher.
+
+---
+
+## Per-detection embeddings — Slice B PR 1
+
+`source_face_detections` (migration 053) keeps the 512-dim ArcFace embedding from every detected face during visual ID, instead of dropping it into the face-track JSON and forgetting it. This is the canonical store for intra-source face clustering and cross-source label propagation.
+
+### Why a new table
+
+- `person_face_embeddings` is the **registry**: one row per *enrolled* exemplar; small (single-digit thousands at maturity); queried at match time.
+- `source_face_detections` is the **observation log**: one row per *detected* face; thousands per source; queried at review time for clustering and at ETL time for matching. Different growth rate, different access pattern, different lifecycle — the registry persists, observations are re-derivable from the source media.
+
+### Schema (per source ≈ 11 MB at 1 fps × 45 min × ~2 faces/frame)
+
+```
+detection_id      uuid pk
+source_id         uuid fk → sources (CASCADE on delete)
+frame_ts          real
+bbox_x1, y1, x2, y2  real (ck constraints enforce ordering)
+det_score         real
+embedding         vector(512)  -- pgvector, same model as person_face_embeddings
+embedding_model   text
+mouth_opening     real null
+matched_person_id uuid null    -- match result from this detection's ID pass
+match_score       real null
+cluster_id        int null     -- populated by Slice B PR 2; NULL on insert
+created_at        timestamptz
+```
+
+Indexes: `(source_id, frame_ts)` for the per-source listing query; `(source_id, cluster_id)` partial for the runs view; HNSW on `embedding` with cosine ops for kNN.
+
+### ETL write — visual_identify
+
+`visual_identify` (local branch) now takes a `source_id` parameter and writes one `source_face_detection` row per detected face after the face-track JSON is uploaded. Idempotent — if the source already has detection rows, the persistence step is a no-op. `transcribe.py` passes `source_id=source.source_id` on every call.
+
+The **remote** (SageMaker) branch does NOT yet round-trip embeddings — the container uploads the face-track JSON itself and returns aggregate stats only. Sources visual-ID'd via the remote path won't have detections persisted until the GPU container is updated to either write rows directly (requires DB credentials in the container, currently disallowed) or return embeddings to the API for the API to persist. Until then, the backfill script forces the local path via `force_local=True`.
+
+### Backfill — `app.analyst.backfill_source_face_detections_cli`
+
+For sources visual-ID'd before this table existed (every source pre-2026-05-11):
+
+```bash
+cd services/api
+source .venv/Scripts/activate
+python -m app.analyst.backfill_source_face_detections_cli              # all
+python -m app.analyst.backfill_source_face_detections_cli <source_id>  # one
+```
+
+Re-runs `visual_identify` with `force_local=True` + `force_reextract=True` so the local path runs end-to-end against the source's video. Cost ≈ 7-9 min CPU per source (video download + InsightFace at 1 fps). Idempotent — sources that already have detection rows are skipped.
+
+### What's coming in PR 2
+
+- Per-source clustering pass (HDBSCAN over embeddings; populates `cluster_id`).
+- `compute_face_runs` breaks runs on `cluster_id` instead of just position — fixes the "?" run that covers two visually distinct people in the same chair (which today bulk-assigns to one Person and silently pollutes the registry).
+- UI: cluster identifier per run row, assign button operates per cluster.
+- Cross-source preview via the HNSW index: "this label would also attribute N detections in M other sources at cosine ≥ X, confirm?".
 
 ---
 
