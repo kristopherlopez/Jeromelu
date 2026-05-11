@@ -10,10 +10,12 @@ import {
   Clock,
   PenLine,
   Search,
+  Smartphone,
   Video,
   Youtube,
 } from "lucide-react";
 import type { SourceListItem } from "@/lib/types";
+import { useIsYouTubeShort } from "@/lib/useIsYouTubeShort";
 
 type Voice = NonNullable<SourceListItem["voice"]>;
 
@@ -470,6 +472,7 @@ function SourceCard({ source }: { source: SourceListItem }) {
   const href = `/wiki/source/${source.source_id}`;
   const thumb = thumbnailFor(source.canonical_url);
   const isYouTube = Boolean(youTubeVideoId(source.canonical_url));
+  const isShort = useIsYouTubeShort(isYouTube ? source.canonical_url : null);
   const published = timeAgo(source.published_at);
   const hasClaims = source.claim_count > 0;
 
@@ -640,6 +643,27 @@ function SourceCard({ source }: { source: SourceListItem }) {
             <PenLine size={11} />
             {source.claim_count} {source.claim_count === 1 ? "claim" : "claims"}
           </span>
+          {isShort && (
+            <span
+              title="YouTube Short (vertical 9:16)"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.25rem",
+                padding: "0.1rem 0.45rem",
+                borderRadius: 999,
+                border: `1px solid ${v.accent}`,
+                color: v.accent,
+                background: v.accentBg,
+                fontWeight: 700,
+                fontSize: "10px",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+              }}
+            >
+              <Smartphone size={10} /> Short
+            </span>
+          )}
           {published && (
             <span
               style={{
