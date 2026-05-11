@@ -921,10 +921,13 @@ def get_face_runs(
             .all()
         )
 
-    # Names for every Person referenced — both face-run person_ids and
-    # turn speaker_person_ids — gathered in one query.
+    # Names for every Person referenced — face-run person_ids, cluster
+    # dominant person_ids, and turn speaker_person_ids — gathered in one
+    # query.
     person_ids: set[uuid.UUID] = set()
     for pos in runs_payload["positions"]:
+        if pos.get("dominant_person_id"):
+            person_ids.add(uuid.UUID(pos["dominant_person_id"]))
         for run in pos["runs"]:
             if run["person_id"]:
                 person_ids.add(uuid.UUID(run["person_id"]))
@@ -955,8 +958,13 @@ def get_face_runs(
             })
         return out
 
-    # Decorate runs with person names + overlapping turns.
+    # Decorate runs with person names + overlapping turns. Also resolve
+    # the cluster's dominant person_name from the same lookup.
     for pos in runs_payload["positions"]:
+        pos["dominant_person_name"] = (
+            name_by_id.get(pos["dominant_person_id"])
+            if pos.get("dominant_person_id") else None
+        )
         for run in pos["runs"]:
             run["person_name"] = (
                 name_by_id.get(run["person_id"]) if run["person_id"] else None

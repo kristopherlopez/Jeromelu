@@ -235,6 +235,16 @@ export interface FacePosition {
   label_override?: string | null;
   notes?: string | null;
   stats?: FaceClusterStats | null;
+  /** Majority matched_person_id across the cluster's detections — what
+   *  the UI shows in the section header instead of repeating the name
+   *  on every row. null when no detection in the cluster matched any
+   *  enrolled person. */
+  dominant_person_id?: string | null;
+  dominant_person_name?: string | null;
+  /** Fraction of detections that matched the dominant person (0..1).
+   *  Used to flag mixed-attribution clusters where the matcher
+   *  disagrees with itself within one visual identity. */
+  dominant_share?: number | null;
 }
 
 export interface FaceRunsResponse {

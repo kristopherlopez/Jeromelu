@@ -98,12 +98,11 @@ function pct(n: number | null): string {
   return `${Math.round(n * 100)}%`;
 }
 
-function runLabel(run: FaceRun): string {
-  return run.person_name ?? "?";
-}
-
-function runColor(run: FaceRun): string {
-  return run.person_id === null ? "var(--foreground-ghost)" : "var(--accent)";
+function runBorderColor(run: FaceRun): string {
+  // Accent border when the matcher fired on this run, ghost when not.
+  // The cluster header carries the identity; the row border is just a
+  // weak match/no-match signal.
+  return run.person_id ? "var(--accent)" : "var(--foreground-ghost)";
 }
 
 export default function FacesPanel({ sourceId, onSeek }: Props) {
@@ -353,6 +352,32 @@ function PositionSection({
       <header className="mb-2 flex items-baseline justify-between gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wider">
           {position.label}
+          {/* Cluster-level Person attribution. When most detections in
+              the cluster matched a single Person, we show that name in
+              the section header so each run row can drop it. share <
+              0.95 hints at mixed attribution — the operator may want
+              to investigate which rows differ. */}
+          {position.dominant_person_name && (
+            <span
+              className="ml-2 normal-case"
+              style={{ color: "var(--accent)" }}
+              title={
+                (position.dominant_share ?? 0) < 0.95
+                  ? `Dominant attribution — ${Math.round((position.dominant_share ?? 0) * 100)}% of detections`
+                  : "All / nearly all detections matched this Person"
+              }
+            >
+              — {position.dominant_person_name}
+              {(position.dominant_share ?? 0) < 0.95 && (
+                <span
+                  className="ml-1 font-normal"
+                  style={{ color: "var(--foreground-ghost)" }}
+                >
+                  ({Math.round((position.dominant_share ?? 0) * 100)}%)
+                </span>
+              )}
+            </span>
+          )}
           {(() => {
             const badge = kindBadge(position.kind, position.detected_kind);
             if (!badge) return null;
@@ -449,6 +474,7 @@ function PositionSection({
             otherClusters={allClusters.filter(
               (c) => c.clusterId !== position.cluster_id,
             )}
+            dominantPersonId={position.dominant_person_id ?? null}
             onMove={(target) =>
               onMoveRun(
                 position.cluster_id as number,
@@ -484,6 +510,7 @@ function RunRow({
   onSeek,
   currentClusterId,
   otherClusters,
+  dominantPersonId,
   onMove,
 }: {
   run: FaceRun;
@@ -493,6 +520,9 @@ function RunRow({
   currentClusterId: number | null;
   /** Available targets (all other clusters in this source). */
   otherClusters: { clusterId: number; label: string }[];
+  /** Cluster's dominant matched person — used to suppress the
+   *  redundant per-row name when this run matches the dominant. */
+  dominantPersonId: string | null;
   onMove: (targetClusterId: number) => void;
 }) {
   const dur = Math.round(run.end_ts - run.start_ts);
@@ -503,7 +533,7 @@ function RunRow({
     <li
       className="rounded px-2 py-1.5 text-xs"
       style={{
-        borderLeft: `3px solid ${runColor(run)}`,
+        borderLeft: `3px solid ${runBorderColor(run)}`,
         backgroundColor: "var(--background-deep)",
       }}
     >
@@ -524,28 +554,48 @@ function RunRow({
           onClick={() => onSeek(run.start_ts)}
           title="Seek video to start"
         >
-          <span style={{ color: runColor(run) }}>
-            <strong>{runLabel(run)}</strong>
-            {run.avg_similarity !== null && (
-              <span className="ml-1.5 font-normal" style={{ color: "var(--foreground-ghost)" }}>
-                sim {pct(run.avg_similarity)}
-              </span>
-            )}
+          <span style={{ color: "var(--foreground)" }}>
+            <strong>
+              {fmtTs(run.start_ts)} – {fmtTs(run.end_ts)}
+            </strong>
+            <span className="ml-1.5 font-normal" style={{ color: "var(--foreground-ghost)" }}>
+              {dur}s · {run.frame_count} frames
+              {run.overlapping_turns.length > 0 && (
+                <>
+                  {" · "}
+                  {run.overlapping_turns.length} turn
+                  {run.overlapping_turns.length > 1 ? "s" : ""}
+                </>
+              )}
+              {run.avg_similarity !== null && (
+                <>
+                  {" · "}
+                  sim {pct(run.avg_similarity)}
+                </>
+              )}
+            </span>
           </span>
-          <span style={{ color: "var(--foreground-ghost)" }}>
-            {fmtTs(run.start_ts)} – {fmtTs(run.end_ts)}
-            {" · "}
-            {dur}s
-            {" · "}
-            {run.frame_count} frames
-            {run.overlapping_turns.length > 0 && (
-              <>
-                {" · "}
-                {run.overlapping_turns.length} turn
-                {run.overlapping_turns.length > 1 ? "s" : ""}
-              </>
-            )}
-          </span>
+          {/* Deviation tag — only show a person name on the row when
+              this run's matched person differs from the cluster's
+              dominant attribution. The whole-cluster name lives in
+              the section header. */}
+          {run.person_id && run.person_id !== dominantPersonId && (
+            <span
+              className="text-[10px]"
+              style={{ color: "#f87171" }}
+              title="Matcher's call for this run differs from the cluster's dominant attribution"
+            >
+              ⚠ matched: {run.person_name ?? run.person_id.slice(0, 8)}
+            </span>
+          )}
+          {!run.person_id && (
+            <span
+              className="text-[10px]"
+              style={{ color: "var(--foreground-ghost)" }}
+            >
+              unmatched
+            </span>
+          )}
         </button>
         <button
           type="button"

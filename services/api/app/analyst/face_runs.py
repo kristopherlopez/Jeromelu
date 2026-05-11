@@ -496,6 +496,24 @@ def compute_face_runs_from_detections(
             else _cluster_label(cluster_id)
         )
 
+        # Dominant person across the cluster's detections. Most clusters
+        # are one identity, so the UI can drop per-row name labels and
+        # just show the dominant one in the cluster header. Runs whose
+        # person_id differs from the dominant get a small visual tag.
+        person_counts: dict[str, int] = {}
+        for det in bucket:
+            pid_str = det.get("person_id")
+            if pid_str:
+                person_counts[pid_str] = person_counts.get(pid_str, 0) + 1
+        dominant_person_id: str | None = None
+        dominant_share: float | None = None
+        if person_counts:
+            dom_pid, dom_count = max(
+                person_counts.items(), key=lambda kv: kv[1],
+            )
+            dominant_person_id = dom_pid
+            dominant_share = dom_count / len(bucket)
+
         positions.append({
             "position_id": pid,
             "label": label,
@@ -503,6 +521,12 @@ def compute_face_runs_from_detections(
             "centroid": list(centroid),
             "detection_count": len(bucket),
             "runs": runs,
+            # Cluster-level attribution — UI uses this so each row doesn't
+            # have to repeat the Person name when the whole cluster is
+            # one identity. dominant_person_name resolved in the caller
+            # alongside the run-level person names.
+            "dominant_person_id": dominant_person_id,
+            "dominant_share": dominant_share,
             # Slice B PR 2.5 — surface cluster metadata so the UI can
             # render the kind tag + override controls. ``kind`` is the
             # operator override (NULL if unreviewed); ``detected_kind``
