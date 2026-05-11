@@ -1,10 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { API_BASE, apiFetch } from "@/lib/api";
 import type { FacePosition, FaceRun, FaceRunsResponse } from "@/lib/types";
 import AssignRunModal from "./AssignRunModal";
+
+// Top-N runs (by frame_count) rendered per section on initial load.
+// Multi-cam shows can produce 80-100 runs per cluster; rendering all
+// at once fires hundreds of face-crop requests in parallel and
+// saturates the worker. The operator can click "Show all" to expand.
+const RUNS_INITIAL_LIMIT = 20;
 
 interface Props {
   sourceId: string;
@@ -115,6 +121,20 @@ function PositionSection({
   onSeek: (s: number) => void;
   onAssign: (run: FaceRun) => void;
 }) {
+  // Sort runs by frame_count desc so the top entries are the most
+  // screen-time-relevant — usually what the operator cares about for
+  // triage. Stable across renders via useMemo on identity.
+  const sortedRuns = useMemo(
+    () => [...position.runs].sort((a, b) => b.frame_count - a.frame_count),
+    [position.runs],
+  );
+  const [expanded, setExpanded] = useState(false);
+  const visibleRuns =
+    expanded || sortedRuns.length <= RUNS_INITIAL_LIMIT
+      ? sortedRuns
+      : sortedRuns.slice(0, RUNS_INITIAL_LIMIT);
+  const hiddenCount = sortedRuns.length - visibleRuns.length;
+
   return (
     <section
       className="rounded border p-3"
@@ -129,11 +149,16 @@ function PositionSection({
           >
             {position.detection_count.toLocaleString()} detections ·{" "}
             {position.runs.length} runs
+            {hiddenCount > 0 && (
+              <span className="ml-1">
+                (showing top {visibleRuns.length})
+              </span>
+            )}
           </span>
         </h3>
       </header>
       <ul className="flex flex-col gap-1">
-        {position.runs.map((run, idx) => (
+        {visibleRuns.map((run, idx) => (
           <RunRow
             key={`${position.position_id}-${idx}`}
             run={run}
@@ -143,6 +168,20 @@ function PositionSection({
           />
         ))}
       </ul>
+      {hiddenCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="mt-2 w-full rounded border px-3 py-1.5 text-xs"
+          style={{
+            borderColor: "var(--border)",
+            color: "var(--foreground-secondary)",
+            backgroundColor: "var(--background-deep)",
+          }}
+        >
+          Show {hiddenCount} more {hiddenCount === 1 ? "run" : "runs"}
+        </button>
+      )}
     </section>
   );
 }
