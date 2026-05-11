@@ -4,12 +4,23 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { API_BASE } from "@/lib/api";
-import type { FaceRun, PersonSummary } from "@/lib/types";
+import type { FaceRunOverlapTurn, PersonSummary } from "@/lib/types";
 import PersonPicker from "./PersonPicker";
 
 interface Props {
   sourceId: string;
-  run: FaceRun;
+  /** Cluster being assigned — null for the Outliers (HDBSCAN-noise) bucket,
+   *  which uses segment_ids only and skips the cluster-face-exemplar copy. */
+  clusterId: number | null;
+  clusterLabel: string;
+  /** Deduped union of overlapping_turns across all runs in the cluster. */
+  segments: FaceRunOverlapTurn[];
+  totalDetections: number;
+  currentPersonName?: string | null;
+  /** Earliest detection ts across the cluster, for header context. */
+  firstTs: number;
+  /** Latest detection ts across the cluster, for header context. */
+  lastTs: number;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -34,11 +45,17 @@ function fmtTs(s: number): string {
 
 export default function AssignRunModal({
   sourceId,
-  run,
+  clusterId,
+  clusterLabel,
+  segments,
+  totalDetections,
+  currentPersonName,
+  firstTs,
+  lastTs,
   onClose,
   onSaved,
 }: Props) {
-  const turns = run.overlapping_turns;
+  const turns = segments;
   const [selected, setSelected] = useState<Selection | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -116,13 +133,14 @@ export default function AssignRunModal({
         selected.kind === "existing"
           ? { person_id: selected.person.person_id }
           : { new_person_name: selected.name };
-      // When the run carries a cluster_id (Slice B path), send it so
-      // the backend reuses the cluster's persisted face embeddings as
+      // When the cluster has an id (Slice B path), send it so the
+      // backend reuses the cluster's persisted face embeddings as
       // exemplars instead of re-fetching frames per turn. Falls back
-      // to the slower per-turn flow when omitted.
+      // to the slower per-turn flow for the Outliers bucket where
+      // clusterId is null.
       const clusterField =
-        run.cluster_id !== null && run.cluster_id !== undefined
-          ? { cluster_id: run.cluster_id }
+        clusterId !== null && clusterId !== undefined
+          ? { cluster_id: clusterId }
           : {};
       const resp = await fetch(
         `${API_BASE}/api/sources/${sourceId}/face-runs/assign`,
@@ -204,13 +222,16 @@ export default function AssignRunModal({
           style={{ borderColor: "var(--border)", backgroundColor: "var(--background-deep)" }}
         >
           <div>
-            <span style={{ color: "var(--foreground-ghost)" }}>Currently: </span>
-            <strong>{run.person_name ?? "?"}</strong>
+            <strong>{clusterLabel}</strong>
             {" · "}
             <span style={{ color: "var(--foreground-ghost)" }}>
-              {fmtTs(run.start_ts)}–{fmtTs(run.end_ts)} · {run.frame_count} frames ·{" "}
-              {turns.length} overlapping turn{turns.length === 1 ? "" : "s"}
+              Currently: {currentPersonName ?? "?"}
             </span>
+          </div>
+          <div style={{ color: "var(--foreground-ghost)" }}>
+            {totalDetections.toLocaleString()} detections ·{" "}
+            {fmtTs(firstTs)}–{fmtTs(lastTs)} ·{" "}
+            {turns.length} overlapping turn{turns.length === 1 ? "" : "s"}
           </div>
         </div>
 

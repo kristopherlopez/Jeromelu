@@ -545,7 +545,19 @@ Once the operator sets `kind` explicitly, subsequent runs of the analyser preser
 Each cluster section in the Faces tab now shows:
 
 - Kind badge — `Person` / `Portrait` / `Noise`. Asterisk suffix indicates operator override (vs auto-tag).
+- `Assign` button — opens the AssignRunModal cluster-scoped; one click attributes every overlapping `source_speakers` turn across the cluster to a Person. Disabled for the Outliers bucket.
 - `Exclude` / `Include` button — flips `excluded` AND sets `kind='portrait'` when excluding so the analyser doesn't re-include on next run.
+
+Each run row shows:
+
+- Start + end thumbnails, time range, frame count, overlapping turn count.
+- `Move →` button — opens an inline popover listing all other clusters in this source. Clicking a target POSTs `/face-runs/move-run` which bulk-UPDATEs the `cluster_id` on every detection in the run's `[start_ts, end_ts]` range. Used when HDBSCAN mis-grouped a stretch — e.g. a profile shot of host A whose embedding happened to land closer to host B's centroid.
+
+### Assign-at-cluster, Move-at-run
+
+The semantic separation matters: **one cluster = one identity**, so the Assign action lives at the cluster level. Runs are evidence-chunks that might be mis-clustered; their action is `Move`, not `Assign`. This prevents the older Slice A.5 bug where assigning a run in Cluster B to a different Person than another run in the same Cluster B could silently pollute the registry.
+
+The `POST /face-runs/move-run` endpoint validates that both clusters already exist for the source — clusters are never invented mid-flow. After a move, `source_face_clusters.detection_count` updates on both source and target; full stat re-derivation waits for the next `recompute` call (cheap, mostly cached).
 
 ---
 

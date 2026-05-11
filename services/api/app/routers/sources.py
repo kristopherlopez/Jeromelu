@@ -628,6 +628,97 @@ def recompute_face_clusters(source_id: uuid.UUID, db: Session = Depends(get_db))
     }
 
 
+class MoveRunRequest(BaseModel):
+    source_cluster_id: int = Field(
+        ...,
+        description="The cluster the run currently belongs to.",
+    )
+    target_cluster_id: int = Field(
+        ...,
+        description="Where to move the run's detections. Must already exist for this source.",
+    )
+    start_ts: float = Field(..., ge=0.0)
+    end_ts: float = Field(..., gt=0.0)
+
+
+@router.post("/sources/{source_id}/face-runs/move-run")
+def move_run_between_clusters(
+    source_id: uuid.UUID,
+    body: MoveRunRequest,
+    db: Session = Depends(get_db),
+):
+    """Move every detection in [start_ts, end_ts] from
+    ``source_cluster_id`` into ``target_cluster_id``.
+
+    Use case: HDBSCAN occasionally puts a short stretch of frames into
+    the wrong cluster (a profile shot of host A grouped with host B
+    because the angle made them look similar). The operator spots it
+    in the runs view, picks the right target cluster, and one click
+    moves the run.
+
+    Both clusters must already exist for this source — we never
+    invent a new cluster_id here. The detection_count on both
+    source_face_clusters rows is updated so the runs view reflects
+    the new sizes without a full re-analyse.
+    """
+    if body.end_ts <= body.start_ts:
+        raise HTTPException(
+            status_code=400, detail="end_ts must be greater than start_ts",
+        )
+    if body.source_cluster_id == body.target_cluster_id:
+        raise HTTPException(
+            status_code=400,
+            detail="source and target cluster are the same — nothing to move",
+        )
+
+    src_meta = db.query(SourceFaceCluster).filter(
+        SourceFaceCluster.source_id == source_id,
+        SourceFaceCluster.cluster_id == body.source_cluster_id,
+    ).first()
+    tgt_meta = db.query(SourceFaceCluster).filter(
+        SourceFaceCluster.source_id == source_id,
+        SourceFaceCluster.cluster_id == body.target_cluster_id,
+    ).first()
+    if not src_meta:
+        raise HTTPException(
+            status_code=404,
+            detail=f"source cluster {body.source_cluster_id} not found for this source",
+        )
+    if not tgt_meta:
+        raise HTTPException(
+            status_code=404,
+            detail=f"target cluster {body.target_cluster_id} not found for this source",
+        )
+
+    moved = db.execute(
+        sa_update(SourceFaceDetection)
+        .where(
+            SourceFaceDetection.source_id == source_id,
+            SourceFaceDetection.cluster_id == body.source_cluster_id,
+            SourceFaceDetection.frame_ts >= body.start_ts,
+            SourceFaceDetection.frame_ts <= body.end_ts,
+        )
+        .values(cluster_id=body.target_cluster_id)
+    ).rowcount or 0
+
+    # Adjust the cached counts on both clusters so the next /face-runs
+    # call shows the right sizes. The full stats (mouth_open_std, etc)
+    # are stale until the next analyse — that's fine, they're advisory.
+    if moved:
+        src_meta.detection_count = max(0, (src_meta.detection_count or 0) - moved)
+        tgt_meta.detection_count = (tgt_meta.detection_count or 0) + moved
+        src_meta.updated_at = datetime.now(timezone.utc)
+        tgt_meta.updated_at = datetime.now(timezone.utc)
+    db.commit()
+
+    return {
+        "source_id": str(source_id),
+        "source_cluster_id": body.source_cluster_id,
+        "target_cluster_id": body.target_cluster_id,
+        "moved_detections": moved,
+    }
+
+
 class ClusterOverrideRequest(BaseModel):
     kind: str | None = Field(
         default=None,
