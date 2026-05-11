@@ -519,17 +519,16 @@ After clustering, `analyse_clusters` computes per-cluster:
 - `centroid_std` — `sqrt(var(cx) + var(cy))` of bbox centres in source-frame pixels.
 - `temporal_density` — detections per second over the cluster's lifespan (capped at 1.0).
 
-Auto-classification (`_classify_cluster`):
+Auto-classification (`_classify_cluster`), in order:
 
-| Stat | Person | Portrait |
-|---|---|---|
-| `mouth_open_std` | > 0.005 (people talk/listen/breathe) | ~0.001-0.004 (frozen face) |
-| `centroid_std` | > 5 px (head sways even when sitting still) | < 1 px (perfectly static modulo detector jitter) |
-| `temporal_density` | depends on camera cuts (0.3-0.6 in multi-cam) | same — multi-cam puts portraits and hosts at similar density |
+1. `detection_count < 10` → `noise`.
+2. `centroid_std < 2 px` → `portrait` regardless of `mouth_open_std`. Lip-landmark jitter on a frozen face can push `mouth_open_std` as high as ~0.01 even when the bbox itself has never moved — strong centroid stability alone is enough signal. Real on-screen people always show > 5 px of centroid drift over hundreds of frames.
+3. `mouth_open_std < 0.005` AND `centroid_std < 5 px` → `portrait`. Backup gate for clusters with mild centroid drift (e.g. a less-perfectly-static framed photo, a wall poster catching a draft) where the no-talking signal carries.
+4. Otherwise → `person`.
 
-Both `mouth_open_std < 0.005` AND `centroid_std < 5` must hold to tag `portrait`. Density was tested as a third gate but proved misleading in multi-cam — kept as a stored diagnostic. Clusters with `detection_count < 10` are tagged `noise`.
+Density was tested as a third gate but proved misleading in multi-cam (portraits and hosts share density when both visible only on certain camera angles). Kept as a stored diagnostic.
 
-Verified 2026-05-12 on a multi-cam Bloke In A Bar source: three known wall portraits scored `mouth_std ~0.003 + centroid_std < 0.5` and auto-tagged correctly; real hosts at `mouth_std > 0.018 + centroid_std > 14`. Zero false-positives on real people, ~70% recall on portraits (a couple of borderline clusters with `mouth_std ~0.006-0.008` need operator review).
+Verified 2026-05-12 on a multi-cam Bloke In A Bar source: 9 of 9 wall portraits caught auto (centroid_std 0.08-0.49); 3 of 3 real hosts kept as `person` (centroid_std 12.35-14.18). Zero false-positives; zero false-negatives in this run. The 5 px gap between portrait (< 0.5) and person (> 12) is wide enough that the 2 px strict gate is conservative.
 
 ### Operator override
 

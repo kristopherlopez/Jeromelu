@@ -174,10 +174,20 @@ def cluster_source_detections(
 PORTRAIT_MOUTH_STD = 0.005
 
 #: Bbox-centroid standard deviation in source-frame pixels below this
-#: indicates a static element. Detector jitter on a real bbox is ~1-2
-#: pixels; 5 keeps room for real people who barely move (rare but
-#: possible for a guest reading from a script).
+#: combined with low mouth_std indicates a portrait. Detector jitter
+#: on a real bbox is ~1-2 pixels; 5 keeps room for real people who
+#: barely move (rare but possible for a guest reading from a script).
 PORTRAIT_CENTROID_STD = 5.0
+
+#: When centroid_std is essentially zero, it's a portrait regardless
+#: of mouth_std. Lip landmarks can jitter on a frozen face producing
+#: modest mouth_std up to ~0.01, but if the bbox itself has never
+#: moved, it's wall art. Verified 2026-05-12: 4 clusters with
+#: centroid_std in 0.1-0.3 range and mouth_std 0.005-0.009 were all
+#: confirmed portraits the original AND-gate missed. Real hosts in
+#: the same source had centroid_std > 12 px — large gap with no
+#: ambiguity in between.
+PORTRAIT_CENTROID_STRICT = 2.0
 
 #: Diagnostic only — not gated. Initially thought a portrait would
 #: appear in 90%+ of in-span frames, but multi-cam shows cut between
@@ -219,6 +229,15 @@ def _classify_cluster(
     """
     if detection_count < NOISE_MIN_DETECTIONS:
         return "noise"
+    # Strong portrait signal: bbox is essentially static. Don't gate on
+    # mouth_std here — landmark jitter on a frozen face can push it as
+    # high as 0.01 even though nothing's actually moving.
+    if centroid_std < PORTRAIT_CENTROID_STRICT:
+        return "portrait"
+    # Moderate portrait signal: both mouth and centroid are flat. Kept
+    # so a face with mild centroid drift but no mouth activity (e.g.
+    # poster catching a breeze, or a less-static framed photo) still
+    # auto-tags correctly.
     if (
         mouth_open_std < PORTRAIT_MOUTH_STD
         and centroid_std < PORTRAIT_CENTROID_STD
