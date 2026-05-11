@@ -21,7 +21,7 @@ type Selection =
 type TurnStatus = "pending" | "running" | "done" | "error";
 
 interface StreamEvent {
-  step: "person" | "turn" | "commit" | "result" | "unknown";
+  step: "person" | "cluster_face" | "turn" | "commit" | "result" | "unknown";
   status: "start" | "done" | "skip" | "error";
   detail?: unknown;
 }
@@ -116,6 +116,14 @@ export default function AssignRunModal({
         selected.kind === "existing"
           ? { person_id: selected.person.person_id }
           : { new_person_name: selected.name };
+      // When the run carries a cluster_id (Slice B path), send it so
+      // the backend reuses the cluster's persisted face embeddings as
+      // exemplars instead of re-fetching frames per turn. Falls back
+      // to the slower per-turn flow when omitted.
+      const clusterField =
+        run.cluster_id !== null && run.cluster_id !== undefined
+          ? { cluster_id: run.cluster_id }
+          : {};
       const resp = await fetch(
         `${API_BASE}/api/sources/${sourceId}/face-runs/assign`,
         {
@@ -123,6 +131,7 @@ export default function AssignRunModal({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             ...personFields,
+            ...clusterField,
             segment_ids: turns.map((t) => t.segment_id),
           }),
         },

@@ -192,15 +192,31 @@ export interface FaceRun {
   start_sample: FaceRunSample;
   end_sample: FaceRunSample;
   overlapping_turns: FaceRunOverlapTurn[];
+  /**
+   * Slice B cluster identifier within the source. null when the
+   * runs came from the spatial-fallback path (source has no
+   * persisted detections yet) or this run is in the Outliers bucket.
+   */
+  cluster_id?: number | null;
 }
 
 export interface FacePosition {
   position_id: number;
-  /** "Left" / "Centre" / "Right" / "Position N" — relative on-screen position. */
+  /**
+   * "Cluster A" / "Cluster B" / "Outliers" (Slice B detection path),
+   * or "Left" / "Centre" / "Right" / "Position N" (legacy spatial
+   * path). The semantic is "what visually identifies this group" —
+   * face cluster when we have embeddings, screen position otherwise.
+   */
   label: string;
   centroid: [number, number];
   detection_count: number;
   runs: FaceRun[];
+  /**
+   * Set when this entry represents a face cluster (Slice B). null for
+   * the spatial fallback and for the Outliers bucket.
+   */
+  cluster_id?: number | null;
 }
 
 export interface FaceRunsResponse {

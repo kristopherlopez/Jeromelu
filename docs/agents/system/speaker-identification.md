@@ -507,12 +507,45 @@ python -m app.analyst.backfill_source_face_detections_cli <source_id>  # one
 
 Re-runs `visual_identify` with `force_local=True` + `force_reextract=True` so the local path runs end-to-end against the source's video. Cost ≈ 7-9 min CPU per source (video download + InsightFace at 1 fps). Idempotent — sources that already have detection rows are skipped.
 
-### What's coming in PR 2
+## Per-source clustering — Slice B PR 2
 
-- Per-source clustering pass (HDBSCAN over embeddings; populates `cluster_id`).
-- `compute_face_runs` breaks runs on `cluster_id` instead of just position — fixes the "?" run that covers two visually distinct people in the same chair (which today bulk-assigns to one Person and silently pollutes the registry).
-- UI: cluster identifier per run row, assign button operates per cluster.
-- Cross-source preview via the HNSW index: "this label would also attribute N detections in M other sources at cosine ≥ X, confirm?".
+Once detections are persisted, the runs view groups by **visual identity** (face cluster) instead of on-screen position. This is the fix for "the '?' run covers two different people in the same chair" — spatial clustering can't tell them apart, but ArcFace embeddings can.
+
+### Clustering pass — `face_clusters.cluster_source_detections`
+
+Per source: load every detection's embedding, run `sklearn.cluster.HDBSCAN(metric="cosine", algorithm="brute")`, write `cluster_id` back. HDBSCAN was picked over k-means / DBSCAN because:
+
+- **N clusters isn't known a priori** — different videos have different head counts. HDBSCAN figures it out from the data's density structure.
+- **Outliers go to a -1 noise bucket**, not forced into the nearest cluster. Motion-blurred frames, partial faces, side profiles that drift past similarity — labelled NULL `cluster_id`, surfaced separately in the UI as "Outliers" so the operator can still see them.
+- **Mutual-reachability metric merges same-person variation** across camera angles / lighting that look superficially different but share dense neighbourhoods.
+
+Hyperparameters (`face_clusters.py`): `min_cluster_size=20` (at 1 fps that's 20 s of cumulative screen time — minimum to "really be a cluster"), `min_samples=5` (lower = fewer noise points). Clamped down for short clips so HDBSCAN doesn't throw on `min_cluster_size > n_samples`.
+
+After clustering, cluster IDs are re-ranked **by size descending** so cluster 0 is always the busiest face, 1 the next, etc. Stable: same data → same labels. The UI maps these to letters: `Cluster A`, `Cluster B`, …, `Cluster Z`, then `Cluster 27` for the unlikely 27+ case.
+
+### Endpoints
+
+- `POST /api/sources/{source_id}/face-clusters/recompute` — re-runs clustering. Idempotent. Useful after backfill or a re-extract. Returns `{n_detections, n_clusters, n_noise, cluster_sizes}` so the caller can sanity-check that N clusters matches the expected number of people in the video.
+- `GET /api/sources/{source_id}/face-runs` — now branches on detection availability:
+  - **Cluster-backed** (detections exist): `compute_face_runs_from_detections` groups by `cluster_id`, breaks runs on `matched_person_id` change or >5 s gap. Each position entry carries `cluster_id`, label is `"Cluster A"`/`"Outliers"`/etc. If detections exist but none are clustered yet, the endpoint lazy-runs clustering before returning.
+  - **Spatial fallback** (no detections): legacy Slice A.5 path. Same wire shape, `cluster_id: null` everywhere. Sources backfilled later get auto-upgraded on next request.
+
+### Bulk-assign on clusters
+
+`POST /api/sources/{source_id}/face-runs/assign` now accepts an optional `cluster_id`. When supplied:
+
+1. Pulls the top `CLUSTER_EMBEDDING_SAMPLE_LIMIT=10` detections by `det_score` from `source_face_detections` for that cluster.
+2. Copies their embeddings straight into `person_face_embeddings` as exemplars (`created_by="manual"`). **Skips the per-turn frame fetch + InsightFace re-detect** — those exemplars are higher-quality (real cluster members) and cheaper (no worker round-trip, no model load) than per-turn midpoints.
+3. Voice enrollment + `source_speakers` updates proceed per turn as before.
+4. After the loop, a single bulk UPDATE on `source_face_detections.matched_person_id` re-attributes every detection in the cluster — so the runs view reflects the new attribution on the next refresh.
+
+A new `cluster_face` event is emitted in the NDJSON stream (`start` then `done` with `exemplars_written`). The modal's existing event loop tolerates the unknown step type — it's silently logged today, but if you want a visible row it's a small addition.
+
+### What's left for Slice B PR 3
+
+- **Cross-source label propagation preview.** With embeddings stored and the HNSW index in place, querying "find detections across all other sources within cosine ≥ X of this cluster's centroid" is a single SQL query. The bulk-assign flow can then offer "this would also attribute N detections across M other videos — confirm?", optionally enqueuing per-source re-attribution jobs.
+- **Remote-container support.** Today only the local `visual_identify` branch persists detections. The SageMaker container would need either DB credentials (currently disallowed) or an embedding-augmented S3 artefact the API can read.
+- **Cluster review / merge / split.** Once a few sources are clustered, operators may want to merge clusters that HDBSCAN over-split, or split clusters it over-merged. UX-only work on top of the existing data.
 
 ---
 

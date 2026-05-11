@@ -25,6 +25,12 @@ during operator review.
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
+
+from sqlalchemy import func as sa_func
+from sqlalchemy.orm import Session
+
+from jeromelu_shared.db import SourceFaceDetection
 
 # Distance in source-frame pixels — two detections within this much of
 # each other's centre are "the same position". 120px is appropriate for
@@ -330,4 +336,142 @@ def compute_face_runs(face_track: dict) -> dict:
             }
         )
     positions.sort(key=lambda p: -p["detection_count"])
+    return {"positions": positions}
+
+
+# ---------------------------------------------------------------------------
+# Slice B PR 2 — runs from persisted source_face_detections + clusters
+# ---------------------------------------------------------------------------
+
+#: Letters used to label clusters for the operator. After 26 we fall
+#: back to ``Cluster 27`` numerics, which won't happen at podcast scale
+#: but keeps the helper safe.
+_CLUSTER_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+
+def _cluster_label(cluster_id: int | None) -> str:
+    """Stable, human-friendly identifier per cluster within a source.
+
+    cluster_id 0 → "Cluster A", 1 → "Cluster B", ... 25 → "Cluster Z",
+    then "Cluster 27" onwards. ``None`` (HDBSCAN noise) → "Outliers".
+    The clustering pass already re-ranks labels by size descending, so
+    "Cluster A" is always the most-detected face in the video.
+    """
+    if cluster_id is None:
+        return "Outliers"
+    if 0 <= cluster_id < len(_CLUSTER_LETTERS):
+        return f"Cluster {_CLUSTER_LETTERS[cluster_id]}"
+    return f"Cluster {cluster_id + 1}"
+
+
+def _detect_runs_for_cluster(detections: list[dict]) -> list[dict]:
+    """Same break rules as the spatial path: ``matched_person_id``
+    change or >RUN_GAP_SECONDS gap. Detections must already be sorted
+    by ``ts``. Smoothing same as the spatial detector.
+    """
+    if not detections:
+        return []
+    raw: list[tuple[int, int]] = []
+    cur_pid = detections[0].get("person_id")
+    cur_start_idx = 0
+    last_ts = detections[0]["ts"]
+    for i in range(1, len(detections)):
+        det = detections[i]
+        same_pid = det.get("person_id") == cur_pid
+        gap = det["ts"] - last_ts
+        if same_pid and gap <= RUN_GAP_SECONDS:
+            last_ts = det["ts"]
+            continue
+        raw.append((cur_start_idx, i - 1))
+        cur_pid = det.get("person_id")
+        cur_start_idx = i
+        last_ts = det["ts"]
+    raw.append((cur_start_idx, len(detections) - 1))
+
+    smoothed = _smooth_flickers(detections, raw)
+    return [_run_from_slice(detections, s, e) for s, e in smoothed]
+
+
+def detections_exist(session: Session, source_id: UUID) -> bool:
+    """Cheap check the endpoint uses to decide whether to take the
+    detection-backed runs path or fall through to the legacy face-track
+    JSON path."""
+    count = session.query(sa_func.count(SourceFaceDetection.detection_id)).filter(
+        SourceFaceDetection.source_id == source_id,
+    ).scalar() or 0
+    return count > 0
+
+
+def compute_face_runs_from_detections(
+    session: Session,
+    source_id: UUID,
+) -> dict:
+    """Slice B PR 2 — build runs grouped by ``cluster_id`` instead of by
+    spatial bbox position.
+
+    Each top-level entry in the returned ``positions`` list represents
+    one face cluster (visual identity) rather than a screen position.
+    The wire shape matches :func:`compute_face_runs` so the existing
+    frontend keeps working; new ``cluster_id`` fields appear per
+    position and per run so the UI can show "Cluster A" alongside the
+    matched-person attribution.
+
+    Unclustered detections (HDBSCAN noise) are grouped into a single
+    "Outliers" entry so they're still visible — they're often partial
+    faces / scene transitions, but occasionally a one-shot guest who
+    just didn't pass the min-cluster-size gate.
+    """
+    rows = (
+        session.query(SourceFaceDetection)
+        .filter(SourceFaceDetection.source_id == source_id)
+        .order_by(SourceFaceDetection.frame_ts)
+        .all()
+    )
+
+    by_cluster: dict[int | None, list[dict]] = {}
+    for r in rows:
+        det = {
+            "ts": float(r.frame_ts),
+            "bbox": [r.bbox_x1, r.bbox_y1, r.bbox_x2, r.bbox_y2],
+            "person_id": str(r.matched_person_id) if r.matched_person_id else None,
+            "similarity": (
+                float(r.match_score) if r.match_score is not None else None
+            ),
+        }
+        by_cluster.setdefault(r.cluster_id, []).append(det)
+
+    # Sort: real clusters by size desc (matches the relabel order from
+    # the clustering pass; with cluster_id 0 being the biggest), then
+    # the Outliers bucket last so it doesn't crowd the top of the UI.
+    items = sorted(
+        [(cid, dets) for cid, dets in by_cluster.items() if cid is not None],
+        key=lambda kv: -len(kv[1]),
+    )
+    if None in by_cluster:
+        items.append((None, by_cluster[None]))
+
+    positions: list[dict] = []
+    # position_id starts from 0 for the response — independent of
+    # cluster_id since clusters may include None and we want stable
+    # per-source integer IDs for the UI.
+    for pid, (cluster_id, bucket) in enumerate(items):
+        bucket.sort(key=lambda d: d["ts"])
+        runs = _detect_runs_for_cluster(bucket)
+        # Attach cluster_id to each run so the bulk-assign action can
+        # send it back to the API (saves a round-trip).
+        for run in runs:
+            run["cluster_id"] = cluster_id
+        centroid = (
+            sum(_bbox_centre(d["bbox"])[0] for d in bucket) / max(1, len(bucket)),
+            sum(_bbox_centre(d["bbox"])[1] for d in bucket) / max(1, len(bucket)),
+        )
+        positions.append({
+            "position_id": pid,
+            "label": _cluster_label(cluster_id),
+            "cluster_id": cluster_id,
+            "centroid": list(centroid),
+            "detection_count": len(bucket),
+            "runs": runs,
+        })
+
     return {"positions": positions}

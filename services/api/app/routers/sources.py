@@ -11,7 +11,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
-from app.analyst.face_runs import compute_face_runs
+from app.analyst.face_clusters import cluster_source_detections
+from app.analyst.face_runs import (
+    compute_face_runs,
+    compute_face_runs_from_detections,
+    detections_exist,
+)
 from app.analyst.identify_voice import (
     EnrollmentError,
     enroll,
@@ -26,11 +31,14 @@ from jeromelu_shared.db import (
     ClaimAssociation,
     ClaimChunk,
     Person,
+    PersonFaceEmbedding,
     Source,
     SourceChunk,
     SourceDocument,
+    SourceFaceDetection,
     SourceSpeaker,
 )
+from sqlalchemy import update as sa_update
 from jeromelu_shared.s3 import download_raw, presign_raw, presign_video
 
 from ..deps import get_db
@@ -585,20 +593,60 @@ def get_face_crop(
         )
 
 
+@router.post("/sources/{source_id}/face-clusters/recompute")
+def recompute_face_clusters(source_id: uuid.UUID, db: Session = Depends(get_db)):
+    """Re-run per-source face clustering and write ``cluster_id`` back
+    onto every ``source_face_detections`` row.
+
+    Idempotent: re-running re-clusters from the current detection set.
+    Useful after a backfill, or after new detections land for a source
+    that's been re-extracted. Heavy clients (CLI / cron) should call
+    this directly; the face-runs endpoint will also opportunistically
+    trigger it when it sees unclustered detections.
+
+    Returns the cluster summary so the caller can sanity-check N
+    clusters vs expected number of people.
+    """
+    source = db.query(Source).filter(Source.source_id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+
+    stats = cluster_source_detections(db, source_id)
+    return {
+        "source_id": str(stats.source_id),
+        "n_detections": stats.n_detections,
+        "n_clusters": stats.n_clusters,
+        "n_noise": stats.n_noise,
+        "cluster_sizes": stats.cluster_sizes,
+    }
+
+
 @router.get("/sources/{source_id}/face-runs")
 def get_face_runs(source_id: uuid.UUID, db: Session = Depends(get_db)):
     """Return per-position runs of contiguous attribution for the
     Faces tab. Each run is one row in the UI: a stretch of frames at
-    the same on-screen position with the same matched ``person_id``.
+    the same on-screen position (or face cluster, post-Slice-B) with
+    the same matched ``person_id``.
 
-    Joins each run to the source_speakers turns whose [start_ts, end_ts]
-    overlaps the run, so the bulk-assign endpoint knows which turns to
-    rewrite. ``speaker_label`` per turn (e.g. 'Speaker 0') is included
-    so the UI can show pyannote's diarisation labels alongside the
-    face-track person.
+    Two code paths:
 
-    Slice A.5 of the cluster-manager work — see
-    [speaker-identification.md § Faces tab](../system/speaker-identification.md).
+    - **Cluster-backed** (Slice B): when ``source_face_detections``
+      has rows for this source, runs are grouped by ``cluster_id`` —
+      each "position" in the response is one face cluster (visual
+      identity). If detections exist but cluster_id is NULL on all of
+      them (clustering hasn't run yet), the endpoint lazily kicks off
+      clustering before returning.
+    - **Spatial fallback** (Slice A.5): no detections persisted →
+      legacy face-track JSON path that groups detections by bbox
+      centre and breaks runs on matched_person_id change. Same wire
+      shape, just less precise (two people in one chair = one row).
+
+    Both paths join each run to the source_speakers turns whose
+    [start_ts, end_ts] overlaps it, so bulk-assign knows which turns
+    to rewrite. ``speaker_label`` per turn (e.g. 'Speaker 0') is
+    included for diarisation context.
+
+    See [speaker-identification.md § Per-detection embeddings](../system/speaker-identification.md).
     """
     source = db.query(Source).filter(Source.source_id == source_id).first()
     if not source:
@@ -606,18 +654,67 @@ def get_face_runs(source_id: uuid.UUID, db: Session = Depends(get_db)):
     if not source.audio_s3_key:
         raise HTTPException(status_code=404, detail="No audio key for source")
 
-    key = _face_track_key_from_audio(source.audio_s3_key)
-    try:
-        body = download_raw(key)
-    except Exception as exc:
-        logger.warning("Face-track fetch failed for %s: %s", source_id, exc)
-        raise HTTPException(status_code=404, detail="Face-track not found")
-    try:
-        face_track = json.loads(body)
-    except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=502, detail=f"Face-track JSON malformed: {exc}")
+    # Cluster-backed path is the new default. Falls back to the
+    # face-track JSON for sources that haven't been backfilled.
+    duration_seconds: float | None = None
+    frame_width: int | None = None
+    frame_height: int | None = None
+    if detections_exist(db, source_id):
+        # Lazy cluster: if no detection has a cluster_id yet, run the
+        # clustering pass on-the-fly so the first /face-runs hit after
+        # a fresh backfill doesn't return a flat unclustered blob.
+        unclustered_count = (
+            db.query(func.count(SourceFaceDetection.detection_id))
+            .filter(
+                SourceFaceDetection.source_id == source_id,
+                SourceFaceDetection.cluster_id.is_(None),
+            )
+            .scalar() or 0
+        )
+        total_count = (
+            db.query(func.count(SourceFaceDetection.detection_id))
+            .filter(SourceFaceDetection.source_id == source_id)
+            .scalar() or 0
+        )
+        # All detections unclustered → first run; trigger clustering.
+        # Some unclustered but not all → noise from a prior pass; leave
+        # them as Outliers rather than re-clustering on every request.
+        if total_count > 0 and unclustered_count == total_count:
+            logger.info(
+                "Source %s has detections but no clusters — running on-demand clustering",
+                source_id,
+            )
+            cluster_source_detections(db, source_id)
 
-    runs_payload = compute_face_runs(face_track)
+        runs_payload = compute_face_runs_from_detections(db, source_id)
+        # Try to read frame dims from the cached face-track JSON for
+        # the response — the detections table doesn't store them.
+        # If the JSON isn't there it's fine; the UI tolerates null.
+        key = _face_track_key_from_audio(source.audio_s3_key)
+        try:
+            face_track = json.loads(download_raw(key))
+            duration_seconds = face_track.get("duration_seconds")
+            frame_width = face_track.get("frame_width")
+            frame_height = face_track.get("frame_height")
+        except Exception:
+            pass
+    else:
+        key = _face_track_key_from_audio(source.audio_s3_key)
+        try:
+            body = download_raw(key)
+        except Exception as exc:
+            logger.warning("Face-track fetch failed for %s: %s", source_id, exc)
+            raise HTTPException(status_code=404, detail="Face-track not found")
+        try:
+            face_track = json.loads(body)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(
+                status_code=502, detail=f"Face-track JSON malformed: {exc}",
+            )
+        runs_payload = compute_face_runs(face_track)
+        duration_seconds = face_track.get("duration_seconds")
+        frame_width = face_track.get("frame_width")
+        frame_height = face_track.get("frame_height")
 
     # Look up the source's document so we can find overlapping turns.
     doc = (
@@ -678,9 +775,9 @@ def get_face_runs(source_id: uuid.UUID, db: Session = Depends(get_db)):
 
     return {
         "source_id": str(source_id),
-        "duration_seconds": face_track.get("duration_seconds"),
-        "frame_width": face_track.get("frame_width"),
-        "frame_height": face_track.get("frame_height"),
+        "duration_seconds": duration_seconds,
+        "frame_width": frame_width,
+        "frame_height": frame_height,
         "positions": runs_payload["positions"],
     }
 
@@ -1096,12 +1193,30 @@ def reassign_speaker(
 # ---------------------------------------------------------------------------
 
 
+#: Top-N detections by det_score copied from a cluster into the
+#: person_face_embeddings registry on bulk-assign. More exemplars =
+#: better same-condition recall, but at >20 the registry starts
+#: ballooning per click. 10 buys variety without bloat.
+CLUSTER_EMBEDDING_SAMPLE_LIMIT = 10
+
+
 class BulkAssignRequest(BaseModel):
     segment_ids: list[uuid.UUID] = Field(
         ...,
         min_length=1,
         max_length=200,
         description="source_speakers.segment_id values to reassign in this batch",
+    )
+    cluster_id: int | None = Field(
+        default=None,
+        description=(
+            "Optional. When supplied, the bulk-assign uses the cluster's "
+            "persisted face embeddings as exemplars instead of fetching a "
+            "frame per turn and re-running InsightFace — cheaper + uses "
+            "richer evidence (multiple detections per cluster). The "
+            "cluster's source_face_detections rows are also updated to "
+            "attribute to the target Person."
+        ),
     )
     person_id: uuid.UUID | None = Field(
         default=None,
@@ -1213,6 +1328,27 @@ def bulk_assign_face_run(
     speakers_by_id = {sp.segment_id: sp for sp in speakers}
     ordered = [speakers_by_id[sid] for sid in body.segment_ids]
 
+    use_cluster = body.cluster_id is not None
+    cluster_detections: list[SourceFaceDetection] = []
+    if use_cluster:
+        cluster_detections = (
+            db.query(SourceFaceDetection)
+            .filter(
+                SourceFaceDetection.source_id == source_id,
+                SourceFaceDetection.cluster_id == body.cluster_id,
+            )
+            .order_by(SourceFaceDetection.det_score.desc())
+            .all()
+        )
+        if not cluster_detections:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"No source_face_detections for cluster_id={body.cluster_id} "
+                    f"in source {source_id}"
+                ),
+            )
+
     def stream() -> Iterator[bytes]:
         face_writes = 0
         voice_writes = 0
@@ -1226,6 +1362,46 @@ def bulk_assign_face_run(
                     "person_created": person_created,
                 },
             })
+
+            # Cluster mode (Slice B PR 2): the detections table already
+            # holds high-quality embeddings for every face in this
+            # cluster, so we copy the top-N as person_face_embeddings
+            # exemplars instead of fetching frames + re-running
+            # InsightFace per turn. Massive perf win (~3-5s saved per
+            # turn) AND better evidence (multiple angles/lighting from
+            # actual cluster members vs single midpoint frame).
+            if use_cluster:
+                yield _ndjson({
+                    "step": "cluster_face",
+                    "status": "start",
+                    "detail": {
+                        "cluster_id": body.cluster_id,
+                        "available_detections": len(cluster_detections),
+                    },
+                })
+                samples = cluster_detections[:CLUSTER_EMBEDDING_SAMPLE_LIMIT]
+                exemplar_rows = [
+                    PersonFaceEmbedding(
+                        person_id=target_person_id,
+                        source_id=source_id,
+                        frame_ts=float(d.frame_ts),
+                        embedding=list(d.embedding),
+                        embedding_model=d.embedding_model,
+                        created_by="manual",
+                    )
+                    for d in samples
+                ]
+                db.add_all(exemplar_rows)
+                db.commit()
+                face_writes += len(exemplar_rows)
+                yield _ndjson({
+                    "step": "cluster_face",
+                    "status": "done",
+                    "detail": {
+                        "cluster_id": body.cluster_id,
+                        "exemplars_written": len(exemplar_rows),
+                    },
+                })
 
             # Shared voice-enrollment setup. Without this every turn
             # would re-download the source's full m4a from S3 and
@@ -1248,42 +1424,48 @@ def bulk_assign_face_run(
                         },
                     })
 
-                    # Frame midpoint = where face is most likely to appear.
-                    frame_ts = (float(sp.start_ts) + float(sp.end_ts)) / 2.0
-                    with tempfile.TemporaryDirectory(prefix="jeromelu-bulk-frame-") as ftmp:
-                        frame_path = Path(ftmp) / "frame.jpg"
-                        try:
-                            _fetch_reassign_frame(source, frame_ts, frame_path)
-                        except HTTPException as exc:
-                            yield _ndjson({
-                                "step": "turn",
-                                "status": "error",
-                                "detail": {
-                                    "index": idx,
-                                    "segment_id": seg_id,
-                                    "stage": "frame",
-                                    "error": str(exc.detail),
-                                },
-                            })
-                            db.rollback()
-                            return
+                    # Per-turn face enrollment only when cluster mode is
+                    # off — otherwise the cluster-face step above
+                    # already wrote richer exemplars.
+                    if use_cluster:
+                        pass
+                    else:
+                        # Frame midpoint = where face is most likely to appear.
+                        frame_ts = (float(sp.start_ts) + float(sp.end_ts)) / 2.0
+                        with tempfile.TemporaryDirectory(prefix="jeromelu-bulk-frame-") as ftmp:
+                            frame_path = Path(ftmp) / "frame.jpg"
+                            try:
+                                _fetch_reassign_frame(source, frame_ts, frame_path)
+                            except HTTPException as exc:
+                                yield _ndjson({
+                                    "step": "turn",
+                                    "status": "error",
+                                    "detail": {
+                                        "index": idx,
+                                        "segment_id": seg_id,
+                                        "stage": "frame",
+                                        "error": str(exc.detail),
+                                    },
+                                })
+                                db.rollback()
+                                return
 
-                        try:
-                            face_id, _det, _area = enroll_face_from_image(
-                                db,
-                                person_id=target_person_id,
-                                source_id=source_id,
-                                image_path=frame_path,
-                                frame_ts=frame_ts,
-                                created_by="manual",
-                            )
-                            if face_id:
-                                face_writes += 1
-                        except VisualIdError as exc:
-                            # Same skip-not-fail policy as single reassign.
-                            logger.warning(
-                                "Bulk face enrollment skipped for %s: %s", seg_id, exc
-                            )
+                            try:
+                                face_id, _det, _area = enroll_face_from_image(
+                                    db,
+                                    person_id=target_person_id,
+                                    source_id=source_id,
+                                    image_path=frame_path,
+                                    frame_ts=frame_ts,
+                                    created_by="manual",
+                                )
+                                if face_id:
+                                    face_writes += 1
+                            except VisualIdError as exc:
+                                # Same skip-not-fail policy as single reassign.
+                                logger.warning(
+                                    "Bulk face enrollment skipped for %s: %s", seg_id, exc
+                                )
 
                     # Voiceprint enrollment from the turn's audio span,
                     # reusing the shared context (no audio re-download,
@@ -1329,6 +1511,21 @@ def bulk_assign_face_run(
                     },
                 })
 
+            # Cluster mode: re-attribute every detection in the cluster
+            # so the next /face-runs call shows them as the new person
+            # rather than the old (or NULL) one. Single bulk UPDATE.
+            cluster_detections_updated = 0
+            if use_cluster:
+                cluster_detections_updated = db.execute(
+                    sa_update(SourceFaceDetection)
+                    .where(
+                        SourceFaceDetection.source_id == source_id,
+                        SourceFaceDetection.cluster_id == body.cluster_id,
+                    )
+                    .values(matched_person_id=target_person_id)
+                ).rowcount or 0
+                db.commit()
+
             yield _ndjson({"step": "commit", "status": "start"})
             # No-op safety commit — every turn already flushed. Kept so
             # the event sequence the frontend listens for stays stable
@@ -1346,6 +1543,7 @@ def bulk_assign_face_run(
                     "turns_updated": len(ordered),
                     "face_embeddings_written": face_writes,
                     "voiceprints_written": voice_writes,
+                    "cluster_detections_updated": cluster_detections_updated,
                     "match_method": "manual",
                 },
             })
