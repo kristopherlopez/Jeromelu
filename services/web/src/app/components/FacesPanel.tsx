@@ -474,7 +474,6 @@ function PositionSection({
             otherClusters={allClusters.filter(
               (c) => c.clusterId !== position.cluster_id,
             )}
-            dominantPersonId={position.dominant_person_id ?? null}
             onMove={(target) =>
               onMoveRun(
                 position.cluster_id as number,
@@ -510,7 +509,6 @@ function RunRow({
   onSeek,
   currentClusterId,
   otherClusters,
-  dominantPersonId,
   onMove,
 }: {
   run: FaceRun;
@@ -520,9 +518,6 @@ function RunRow({
   currentClusterId: number | null;
   /** Available targets (all other clusters in this source). */
   otherClusters: { clusterId: number; label: string }[];
-  /** Cluster's dominant matched person — used to suppress the
-   *  redundant per-row name when this run matches the dominant. */
-  dominantPersonId: string | null;
   onMove: (targetClusterId: number) => void;
 }) {
   const dur = Math.round(run.end_ts - run.start_ts);
@@ -575,27 +570,6 @@ function RunRow({
               )}
             </span>
           </span>
-          {/* Deviation tag — only show a person name on the row when
-              this run's matched person differs from the cluster's
-              dominant attribution. The whole-cluster name lives in
-              the section header. */}
-          {run.person_id && run.person_id !== dominantPersonId && (
-            <span
-              className="text-[10px]"
-              style={{ color: "#f87171" }}
-              title="Matcher's call for this run differs from the cluster's dominant attribution"
-            >
-              ⚠ matched: {run.person_name ?? run.person_id.slice(0, 8)}
-            </span>
-          )}
-          {!run.person_id && (
-            <span
-              className="text-[10px]"
-              style={{ color: "var(--foreground-ghost)" }}
-            >
-              unmatched
-            </span>
-          )}
         </button>
         <button
           type="button"
