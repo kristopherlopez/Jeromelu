@@ -12,7 +12,12 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.analyst.face_runs import compute_face_runs
-from app.analyst.identify_voice import EnrollmentError, enroll
+from app.analyst.identify_voice import (
+    EnrollmentError,
+    enroll,
+    enroll_span_with_context,
+    enrollment_context,
+)
 from app.analyst.video_worker_client import VideoWorkerError, fetch_frame_to
 from app.analyst.visual_id import VisualIdError, enroll_face_from_image
 from jeromelu_shared.db import (
@@ -1222,71 +1227,81 @@ def bulk_assign_face_run(
                 },
             })
 
-            for idx, sp in enumerate(ordered):
-                seg_id = str(sp.segment_id)
-                yield _ndjson({
-                    "step": "turn",
-                    "status": "start",
-                    "detail": {
-                        "index": idx,
-                        "segment_id": seg_id,
-                        "start_ts": float(sp.start_ts),
-                        "end_ts": float(sp.end_ts),
-                    },
-                })
+            # Shared voice-enrollment setup. Without this every turn
+            # would re-download the source's full m4a from S3 and
+            # re-load the pyannote model — observed ~100s per turn,
+            # roughly 25× the per-turn cost of the actual embedding.
+            # The context tempdir holds the audio for the duration of
+            # the bulk; each enroll_span_with_context only ffmpeg-crops
+            # the turn's seconds and embeds the windows.
+            with enrollment_context(db, source_id) as voice_ctx:
+                for idx, sp in enumerate(ordered):
+                    seg_id = str(sp.segment_id)
+                    yield _ndjson({
+                        "step": "turn",
+                        "status": "start",
+                        "detail": {
+                            "index": idx,
+                            "segment_id": seg_id,
+                            "start_ts": float(sp.start_ts),
+                            "end_ts": float(sp.end_ts),
+                        },
+                    })
 
-                # Frame midpoint = where face is most likely to appear.
-                frame_ts = (float(sp.start_ts) + float(sp.end_ts)) / 2.0
-                with tempfile.TemporaryDirectory(prefix="jeromelu-bulk-frame-") as ftmp:
-                    frame_path = Path(ftmp) / "frame.jpg"
-                    try:
-                        _fetch_reassign_frame(source, frame_ts, frame_path)
-                    except HTTPException as exc:
-                        yield _ndjson({
-                            "step": "turn",
-                            "status": "error",
-                            "detail": {
-                                "index": idx,
-                                "segment_id": seg_id,
-                                "stage": "frame",
-                                "error": str(exc.detail),
-                            },
-                        })
-                        db.rollback()
-                        return
+                    # Frame midpoint = where face is most likely to appear.
+                    frame_ts = (float(sp.start_ts) + float(sp.end_ts)) / 2.0
+                    with tempfile.TemporaryDirectory(prefix="jeromelu-bulk-frame-") as ftmp:
+                        frame_path = Path(ftmp) / "frame.jpg"
+                        try:
+                            _fetch_reassign_frame(source, frame_ts, frame_path)
+                        except HTTPException as exc:
+                            yield _ndjson({
+                                "step": "turn",
+                                "status": "error",
+                                "detail": {
+                                    "index": idx,
+                                    "segment_id": seg_id,
+                                    "stage": "frame",
+                                    "error": str(exc.detail),
+                                },
+                            })
+                            db.rollback()
+                            return
 
+                        try:
+                            face_id, _det, _area = enroll_face_from_image(
+                                db,
+                                person_id=target_person_id,
+                                source_id=source_id,
+                                image_path=frame_path,
+                                frame_ts=frame_ts,
+                                created_by="manual",
+                            )
+                            if face_id:
+                                face_writes += 1
+                        except VisualIdError as exc:
+                            # Same skip-not-fail policy as single reassign.
+                            logger.warning(
+                                "Bulk face enrollment skipped for %s: %s", seg_id, exc
+                            )
+
+                    # Voiceprint enrollment from the turn's audio span,
+                    # reusing the shared context (no audio re-download,
+                    # no model re-load).
                     try:
-                        face_id, _det, _area = enroll_face_from_image(
+                        result = enroll_span_with_context(
                             db,
+                            voice_ctx,
                             person_id=target_person_id,
-                            source_id=source_id,
-                            image_path=frame_path,
-                            frame_ts=frame_ts,
+                            start_ts=float(sp.start_ts),
+                            end_ts=float(sp.end_ts),
                             created_by="manual",
                         )
-                        if face_id:
-                            face_writes += 1
-                    except VisualIdError as exc:
-                        # Same skip-not-fail policy as single reassign.
+                        voice_writes += result.voiceprints_written
+                    except EnrollmentError as exc:
                         logger.warning(
-                            "Bulk face enrollment skipped for %s: %s", seg_id, exc
+                            "Bulk voiceprint enrollment skipped for %s: %s", seg_id, exc
                         )
-
-                # Voiceprint enrollment from the turn's audio span.
-                try:
-                    result = enroll(
-                        db,
-                        person_id=target_person_id,
-                        source_id=source_id,
-                        start_ts=float(sp.start_ts),
-                        end_ts=float(sp.end_ts),
-                        created_by="manual",
-                    )
-                    voice_writes += result.voiceprints_written
-                except EnrollmentError as exc:
-                    logger.warning(
-                        "Bulk voiceprint enrollment skipped for %s: %s", seg_id, exc
-                    )
 
                 # Mark the turn manually corrected. Commit per-turn so
                 # the SourceSpeaker update is durable before we move on —

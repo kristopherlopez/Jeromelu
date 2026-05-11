@@ -20,6 +20,7 @@ to HNSW server-side k-NN is a Phase 5+ scale concern.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import math
 import shutil
@@ -121,25 +122,136 @@ def _convert_to_wav(src: Path, dst: Path) -> None:
         )
 
 
+def _crop_to_wav(src: Path, dst: Path, start_ts: float, end_ts: float) -> None:
+    """Crop ``src`` to ``[start_ts, end_ts]`` and write a 16 kHz mono WAV
+    to ``dst``. Sample-accurate (``-ss`` *after* ``-i``) at the cost of
+    decoding from the start of the file — acceptable for short turn
+    spans of a few seconds.
+    """
+    if shutil.which("ffmpeg") is None:
+        raise EnrollmentError("ffmpeg not found on PATH")
+    proc = subprocess.run(
+        [
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-i", str(src),
+            "-ss", f"{start_ts:.3f}",
+            "-to", f"{end_ts:.3f}",
+            "-ac", "1", "-ar", "16000",
+            str(dst),
+        ],
+        capture_output=True,
+    )
+    if proc.returncode != 0:
+        raise EnrollmentError(
+            f"ffmpeg crop+convert failed for [{start_ts:.2f}, {end_ts:.2f}]: "
+            f"{proc.stderr.decode('utf-8', errors='replace')}"
+        )
+
+
 # ---------------------------------------------------------------------------
 # Enrollment
 # ---------------------------------------------------------------------------
 
-def enroll(
+@dataclass
+class _EnrollmentContext:
+    """Shared setup for a batch of enrollments against the same source.
+
+    Created via :func:`enrollment_context` and consumed by
+    :func:`enroll_span_with_context`. Built once per bulk so the
+    expensive bits — full-audio download + pyannote model load — are
+    amortised across N spans instead of paid per span.
+    """
+    source_id: UUID
+    m4a_path: Path
+    tmpdir: Path
+    emb_inference: Any  # pyannote Inference; not typed to avoid the heavy import here
+
+
+@contextlib.contextmanager
+def enrollment_context(session: Session, source_id: UUID):
+    """Yield a shared enrollment context for repeated calls on the same
+    source. Use as ``with enrollment_context(db, src_id) as ctx: ...``
+    and pass ``ctx`` to :func:`enroll_span_with_context` per span.
+
+    Why this exists: ``enroll(...)`` downloads + converts the full
+    source audio and loads the pyannote model **on every call**. The
+    bulk-assign endpoint can rack up tens of those — observed ~100s
+    per turn (~10 min for a 5-turn batch) before this helper was
+    introduced. The context downloads once, loads once, and each span
+    only pays for ffmpeg crop + sliding-window embedding (~3s each).
+    """
+    source = session.query(Source).filter(Source.source_id == source_id).one_or_none()
+    if source is None:
+        raise EnrollmentError(f"no source with id {source_id}")
+    if not source.audio_s3_key:
+        raise EnrollmentError(
+            f"source {source_id} has no audio_s3_key — run Scout's "
+            "acquire_audio first"
+        )
+    if not settings.huggingface_api_key:
+        raise EnrollmentError(
+            "HUGGINGFACE_API_KEY is not configured — required to load the "
+            "embedding model"
+        )
+
+    # Lazy imports — pyannote pulls torch + a chunk of the pip world.
+    try:
+        from pyannote.audio import Inference, Model
+    except ImportError as exc:
+        raise EnrollmentError(
+            f"pyannote.audio not installed: {exc}. "
+            "Run `pip install -r services/api/requirements.txt`."
+        ) from exc
+
+    with tempfile.TemporaryDirectory(prefix="jeromelu-enroll-") as tmp:
+        tmpdir = Path(tmp)
+        m4a_path = tmpdir / "audio.m4a"
+        logger.info(
+            "Downloading audio for enrollment from s3://%s/%s",
+            settings.s3_audio_bucket, source.audio_s3_key,
+        )
+        _download_audio(source.audio_s3_key, m4a_path)
+
+        logger.info("Loading embedding model %s", EMBEDDING_MODEL)
+        emb_model = Model.from_pretrained(
+            EMBEDDING_MODEL,
+            use_auth_token=settings.huggingface_api_key,
+        )
+        try:
+            import torch
+            if torch.cuda.is_available():
+                emb_model = emb_model.to(torch.device("cuda"))
+        except Exception:
+            pass
+        emb_inference = Inference(emb_model, window="whole")
+
+        yield _EnrollmentContext(
+            source_id=source_id,
+            m4a_path=m4a_path,
+            tmpdir=tmpdir,
+            emb_inference=emb_inference,
+        )
+
+
+def enroll_span_with_context(
     session: Session,
+    ctx: _EnrollmentContext,
     *,
     person_id: UUID,
-    source_id: UUID,
     start_ts: float,
     end_ts: float,
     created_by: str = "manual",
 ) -> EnrollResult:
-    """Enroll a Person from a known span of source audio.
+    """Enroll one span using a pre-built ``ctx`` (see
+    :func:`enrollment_context`). Crops the source audio to just the
+    span before embedding — sliding-window sizes are unchanged but
+    we never reconvert the full 45-min file.
 
-    Quality gate: rejects spans shorter than ``MIN_TURN_DURATION``;
-    log-warns but accepts spans shorter than
-    ``SOFT_MIN_ENROLLMENT_DURATION``.
+    Voiceprint rows are written with the **original-timeline** start/end
+    timestamps so they index correctly against the source's audio later.
     """
+    from pyannote.core import Segment
+
     if end_ts <= start_ts:
         raise EnrollmentError(f"end_ts {end_ts} must be > start_ts {start_ts}")
     duration = end_ts - start_ts
@@ -155,89 +267,47 @@ def enroll(
             duration, SOFT_MIN_ENROLLMENT_DURATION,
         )
     if created_by not in ("manual", "auto-confirmed"):
-        raise EnrollmentError(f"created_by must be 'manual' or 'auto-confirmed', got {created_by!r}")
-
-    source = session.query(Source).filter(Source.source_id == source_id).one_or_none()
-    if source is None:
-        raise EnrollmentError(f"no source with id {source_id}")
-    if not source.audio_s3_key:
         raise EnrollmentError(
-            f"source {source_id} has no audio_s3_key — run Scout's "
-            "acquire_audio first"
+            f"created_by must be 'manual' or 'auto-confirmed', got {created_by!r}"
         )
 
-    if not settings.huggingface_api_key:
-        raise EnrollmentError(
-            "HUGGINGFACE_API_KEY is not configured — required to load the "
-            "embedding model"
-        )
+    span_wav = ctx.tmpdir / f"span_{start_ts:.3f}_{end_ts:.3f}.wav"
+    _crop_to_wav(ctx.m4a_path, span_wav, start_ts, end_ts)
 
-    # Lazy imports — heavy
-    try:
-        from pyannote.audio import Inference, Model
-        from pyannote.core import Segment
-    except ImportError as exc:
-        raise EnrollmentError(
-            f"pyannote.audio not installed: {exc}. "
-            "Run `pip install -r services/api/requirements.txt`."
-        ) from exc
+    # Sliding windows are computed against the cropped (zero-based) WAV,
+    # but the PersonVoiceprint rows record the original timeline.
+    windows = _sliding_windows(0.0, duration)
+    logger.info("Embedding %d sliding windows over the span", len(windows))
 
-    with tempfile.TemporaryDirectory(prefix="jeromelu-enroll-") as tmp:
-        tmpdir = Path(tmp)
-        m4a_path = tmpdir / "audio.m4a"
-        wav_path = tmpdir / "audio.wav"
-
-        logger.info("Downloading audio for enrollment from s3://%s/%s",
-                    settings.s3_audio_bucket, source.audio_s3_key)
-        _download_audio(source.audio_s3_key, m4a_path)
-
-        logger.info("Converting m4a -> 16 kHz mono WAV")
-        _convert_to_wav(m4a_path, wav_path)
-
-        logger.info("Loading embedding model %s", EMBEDDING_MODEL)
-        emb_model = Model.from_pretrained(
-            EMBEDDING_MODEL,
-            use_auth_token=settings.huggingface_api_key,
-        )
+    skipped = 0
+    rows: list[PersonVoiceprint] = []
+    for w_start, w_end in windows:
+        seg = Segment(w_start, w_end)
         try:
-            import torch
-            if torch.cuda.is_available():
-                emb_model = emb_model.to(torch.device("cuda"))
-        except Exception:
-            pass
-        emb_inference = Inference(emb_model, window="whole")
-
-        windows = _sliding_windows(start_ts, end_ts)
-        logger.info("Embedding %d sliding windows over the span", len(windows))
-
-        skipped = 0
-        rows: list[PersonVoiceprint] = []
-        for w_start, w_end in windows:
-            seg = Segment(w_start, w_end)
-            try:
-                emb = emb_inference.crop(str(wav_path), seg)
-            except Exception as exc:
-                logger.debug("Embedding failed for window %.2f-%.2f: %s",
-                             w_start, w_end, exc)
-                skipped += 1
-                continue
-            emb = np.asarray(emb).reshape(-1)
-            if emb.shape[0] != EMBEDDING_DIM:
-                raise EnrollmentError(
-                    f"unexpected embedding dim {emb.shape[0]} (expected {EMBEDDING_DIM})"
-                )
-            if not np.all(np.isfinite(emb)):
-                skipped += 1
-                continue
-            rows.append(PersonVoiceprint(
-                person_id=person_id,
-                source_id=source_id,
-                start_ts=float(w_start),
-                end_ts=float(w_end),
-                embedding=emb.tolist(),
-                embedding_model=EMBEDDING_MODEL,
-                created_by=created_by,
-            ))
+            emb = ctx.emb_inference.crop(str(span_wav), seg)
+        except Exception as exc:
+            logger.debug(
+                "Embedding failed for window %.2f-%.2f: %s", w_start, w_end, exc,
+            )
+            skipped += 1
+            continue
+        emb = np.asarray(emb).reshape(-1)
+        if emb.shape[0] != EMBEDDING_DIM:
+            raise EnrollmentError(
+                f"unexpected embedding dim {emb.shape[0]} (expected {EMBEDDING_DIM})"
+            )
+        if not np.all(np.isfinite(emb)):
+            skipped += 1
+            continue
+        rows.append(PersonVoiceprint(
+            person_id=person_id,
+            source_id=ctx.source_id,
+            start_ts=float(start_ts + w_start),
+            end_ts=float(start_ts + w_end),
+            embedding=emb.tolist(),
+            embedding_model=EMBEDDING_MODEL,
+            created_by=created_by,
+        ))
 
     if not rows:
         raise EnrollmentError(
@@ -248,15 +318,49 @@ def enroll(
     session.add_all(rows)
     session.commit()
 
+    # span_wav is cleaned up with the surrounding tempdir when the
+    # context exits — fine to leave it here for the rest of the bulk.
+
     return EnrollResult(
         person_id=person_id,
-        source_id=source_id,
+        source_id=ctx.source_id,
         start_ts=start_ts,
         end_ts=end_ts,
         voiceprints_written=len(rows),
         voiceprints_skipped=skipped,
         embedding_model=EMBEDDING_MODEL,
     )
+
+
+def enroll(
+    session: Session,
+    *,
+    person_id: UUID,
+    source_id: UUID,
+    start_ts: float,
+    end_ts: float,
+    created_by: str = "manual",
+) -> EnrollResult:
+    """Enroll a Person from a known span of source audio.
+
+    Quality gate: rejects spans shorter than ``MIN_TURN_DURATION``;
+    log-warns but accepts spans shorter than
+    ``SOFT_MIN_ENROLLMENT_DURATION``.
+
+    For batches against the same source, prefer the
+    :func:`enrollment_context` + :func:`enroll_span_with_context` pair
+    — this single-call wrapper rebuilds the audio + model context on
+    every invocation.
+    """
+    with enrollment_context(session, source_id) as ctx:
+        return enroll_span_with_context(
+            session,
+            ctx,
+            person_id=person_id,
+            start_ts=start_ts,
+            end_ts=end_ts,
+            created_by=created_by,
+        )
 
 
 # ---------------------------------------------------------------------------
