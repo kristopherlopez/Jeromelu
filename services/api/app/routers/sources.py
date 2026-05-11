@@ -1288,11 +1288,22 @@ def bulk_assign_face_run(
                         "Bulk voiceprint enrollment skipped for %s: %s", seg_id, exc
                     )
 
-                # Mark the turn manually corrected. Not committed yet —
-                # one DB transaction across the whole batch.
+                # Mark the turn manually corrected. Commit per-turn so
+                # the SourceSpeaker update is durable before we move on —
+                # both enroll_face_from_image and enroll() internally
+                # call session.commit() for their own writes, which in
+                # this multi-turn loop was leaving the per-turn dirty
+                # attribute change on `sp` unflushed even by subsequent
+                # inner commits. The empirical result was a successful
+                # batch that wrote 5 face embeddings + 27 voiceprints
+                # but zero attributed turns — face/voice landed via the
+                # inner commits while every sp update was lost. Per-turn
+                # commit also means refreshing the Faces tab mid-bulk
+                # reflects progress.
                 sp.speaker_person_id = target_person_id
                 sp.match_method = "manual"
                 sp.match_confidence = 1.0
+                db.commit()
 
                 yield _ndjson({
                     "step": "turn",
@@ -1304,6 +1315,9 @@ def bulk_assign_face_run(
                 })
 
             yield _ndjson({"step": "commit", "status": "start"})
+            # No-op safety commit — every turn already flushed. Kept so
+            # the event sequence the frontend listens for stays stable
+            # (commit start/done before result done).
             db.commit()
             yield _ndjson({"step": "commit", "status": "done"})
 
