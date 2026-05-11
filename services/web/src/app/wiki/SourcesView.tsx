@@ -10,7 +10,6 @@ import {
   Clock,
   PenLine,
   Search,
-  Smartphone,
   Video,
   Youtube,
 } from "lucide-react";
@@ -553,29 +552,61 @@ function SourceCard({ source }: { source: SourceListItem }) {
           </div>
         )}
         {isYouTube && source.canonical_url && (
-          <a
-            href={source.canonical_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Open on YouTube"
-            aria-label="Open on YouTube in new tab"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              marginTop: "auto",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 26,
-              height: 26,
-              borderRadius: "50%",
-              background: "#ff0033",
-              color: "#fff",
-              flexShrink: 0,
-              textDecoration: "none",
-            }}
-          >
-            <Youtube size={15} strokeWidth={2.2} />
-          </a>
+          isShort ? (
+            <a
+              href={`https://www.youtube.com/shorts/${youTubeVideoId(source.canonical_url)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open on YouTube Shorts"
+              aria-label="Open on YouTube Shorts in new tab"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                marginTop: "auto",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+                textDecoration: "none",
+              }}
+            >
+              <svg
+                width="22"
+                height="27"
+                viewBox="0 0 98.94 122.88"
+                aria-hidden="true"
+              >
+                <path
+                  d="M63.49 2.71c11.59-6.04 25.94-1.64 32.04 9.83 6.1 11.47 1.65 25.66-9.94 31.7l-9.53 5.01c8.21.3 16.04 4.81 20.14 12.52 6.1 11.47 1.66 25.66-9.94 31.7l-50.82 26.7c-11.59 6.04-25.94 1.64-32.04-9.83-6.1-11.47-1.65-25.66 9.94-31.7l9.53-5.01c-8.21-.3-16.04-4.81-20.14-12.52-6.1-11.47-1.65-25.66 9.94-31.7l50.82-26.7zM36.06 42.53l30.76 18.99-30.76 18.9V42.53z"
+                  fill="#f40407"
+                />
+                <path d="M36.06 42.53V80.42L66.82 61.52z" fill="#fff" />
+              </svg>
+            </a>
+          ) : (
+            <a
+              href={source.canonical_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open on YouTube"
+              aria-label="Open on YouTube in new tab"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                marginTop: "auto",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 26,
+                height: 26,
+                borderRadius: "50%",
+                background: "#ff0033",
+                color: "#fff",
+                flexShrink: 0,
+                textDecoration: "none",
+              }}
+            >
+              <Youtube size={15} strokeWidth={2.2} />
+            </a>
+          )
         )}
       </div>
 
@@ -643,27 +674,6 @@ function SourceCard({ source }: { source: SourceListItem }) {
             <PenLine size={11} />
             {source.claim_count} {source.claim_count === 1 ? "claim" : "claims"}
           </span>
-          {isShort && (
-            <span
-              title="YouTube Short (vertical 9:16)"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.25rem",
-                padding: "0.1rem 0.45rem",
-                borderRadius: 999,
-                border: `1px solid ${v.accent}`,
-                color: v.accent,
-                background: v.accentBg,
-                fontWeight: 700,
-                fontSize: "10px",
-                letterSpacing: "0.06em",
-                textTransform: "uppercase",
-              }}
-            >
-              <Smartphone size={10} /> Short
-            </span>
-          )}
           {published && (
             <span
               style={{
