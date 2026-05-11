@@ -507,6 +507,49 @@ python -m app.analyst.backfill_source_face_detections_cli <source_id>  # one
 
 Re-runs `visual_identify` with `force_local=True` + `force_reextract=True` so the local path runs end-to-end against the source's video. Cost ≈ 7-9 min CPU per source (video download + InsightFace at 1 fps). Idempotent — sources that already have detection rows are skipped.
 
+## Portrait detection — Slice B PR 2.5
+
+Multi-cam shows expose a class of clusters that aren't people: static wall art, framed portraits, posters. The face detector treats them the same as a real face, but they never speak, they never move, and bulk-assigning them to a Person silently pollutes the registry. `source_face_clusters` (migration 054) carries per-cluster metadata so we can tag them and hide them from the default runs view.
+
+### Heuristic
+
+After clustering, `analyse_clusters` computes per-cluster:
+
+- `mouth_open_std` — standard deviation of `mouth_opening` across the cluster's detections.
+- `centroid_std` — `sqrt(var(cx) + var(cy))` of bbox centres in source-frame pixels.
+- `temporal_density` — detections per second over the cluster's lifespan (capped at 1.0).
+
+Auto-classification (`_classify_cluster`):
+
+| Stat | Person | Portrait |
+|---|---|---|
+| `mouth_open_std` | > 0.005 (people talk/listen/breathe) | ~0.001-0.004 (frozen face) |
+| `centroid_std` | > 5 px (head sways even when sitting still) | < 1 px (perfectly static modulo detector jitter) |
+| `temporal_density` | depends on camera cuts (0.3-0.6 in multi-cam) | same — multi-cam puts portraits and hosts at similar density |
+
+Both `mouth_open_std < 0.005` AND `centroid_std < 5` must hold to tag `portrait`. Density was tested as a third gate but proved misleading in multi-cam — kept as a stored diagnostic. Clusters with `detection_count < 10` are tagged `noise`.
+
+Verified 2026-05-12 on a multi-cam Bloke In A Bar source: three known wall portraits scored `mouth_std ~0.003 + centroid_std < 0.5` and auto-tagged correctly; real hosts at `mouth_std > 0.018 + centroid_std > 14`. Zero false-positives on real people, ~70% recall on portraits (a couple of borderline clusters with `mouth_std ~0.006-0.008` need operator review).
+
+### Operator override
+
+`POST /api/sources/{source_id}/face-clusters/{cluster_id}` body `{kind?, label?, excluded?, notes?}`. Each field is "set if present, leave as-is if null". An empty-string `label` clears.
+
+Once the operator sets `kind` explicitly, subsequent runs of the analyser preserve it (the auto-tag only updates `detected_kind` and only changes `excluded` while `kind IS NULL`).
+
+### Runs view filtering
+
+`GET /api/sources/{source_id}/face-runs` filters out `excluded=true` clusters by default. Append `?include_excluded=true` to see them. The response includes `excluded_count` so the UI can show "N clusters hidden as portraits / noise" with a toggle.
+
+### Per-cluster UI
+
+Each cluster section in the Faces tab now shows:
+
+- Kind badge — `Person` / `Portrait` / `Noise`. Asterisk suffix indicates operator override (vs auto-tag).
+- `Exclude` / `Include` button — flips `excluded` AND sets `kind='portrait'` when excluding so the analyser doesn't re-include on next run.
+
+---
+
 ## Per-source clustering — Slice B PR 2
 
 Once detections are persisted, the runs view groups by **visual identity** (face cluster) instead of on-screen position. This is the fix for "the '?' run covers two different people in the same chair" — spatial clustering can't tell them apart, but ArcFace embeddings can.

@@ -200,6 +200,14 @@ export interface FaceRun {
   cluster_id?: number | null;
 }
 
+export type FaceClusterKind = "person" | "portrait" | "noise" | null;
+
+export interface FaceClusterStats {
+  mouth_open_std: number | null;
+  centroid_std: number | null;
+  temporal_density: number | null;
+}
+
 export interface FacePosition {
   position_id: number;
   /**
@@ -217,6 +225,16 @@ export interface FacePosition {
    * the spatial fallback and for the Outliers bucket.
    */
   cluster_id?: number | null;
+  /** Operator override kind. null = unreviewed. */
+  kind?: FaceClusterKind;
+  /** Heuristic-assigned kind. Same value as kind unless operator overrode. */
+  detected_kind?: FaceClusterKind;
+  /** Hidden from default view when true. */
+  excluded?: boolean;
+  /** Operator-provided friendly label override, distinct from the generated label. */
+  label_override?: string | null;
+  notes?: string | null;
+  stats?: FaceClusterStats | null;
 }
 
 export interface FaceRunsResponse {
@@ -225,4 +243,6 @@ export interface FaceRunsResponse {
   frame_width: number | null;
   frame_height: number | null;
   positions: FacePosition[];
+  /** Count of clusters filtered out as excluded (portraits/noise). */
+  excluded_count?: number;
 }

@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { API_BASE, apiFetch } from "@/lib/api";
-import type { FacePosition, FaceRun, FaceRunsResponse } from "@/lib/types";
+import type {
+  FaceClusterKind,
+  FacePosition,
+  FaceRun,
+  FaceRunsResponse,
+} from "@/lib/types";
 import AssignRunModal from "./AssignRunModal";
 
 // Top-N runs (by frame_count) rendered per section on initial load.
@@ -42,23 +47,54 @@ export default function FacesPanel({ sourceId, onSeek }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [assigning, setAssigning] = useState<FaceRun | null>(null);
+  const [showExcluded, setShowExcluded] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const r = await apiFetch<FaceRunsResponse>(`/api/sources/${sourceId}/face-runs`);
+      const r = await apiFetch<FaceRunsResponse>(
+        `/api/sources/${sourceId}/face-runs?include_excluded=${showExcluded}`,
+      );
       setData(r);
     } catch (e) {
       setError(String(e));
     } finally {
       setLoading(false);
     }
-  }, [sourceId]);
+  }, [sourceId, showExcluded]);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  // Toggle the kind of one cluster — used by the Exclude/Include
+  // button on each section header.
+  const overrideCluster = useCallback(
+    async (
+      clusterId: number,
+      patch: { excluded?: boolean; kind?: FaceClusterKind },
+    ) => {
+      try {
+        const resp = await fetch(
+          `${API_BASE}/api/sources/${sourceId}/face-clusters/${clusterId}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(patch),
+          },
+        );
+        if (!resp.ok) {
+          const text = await resp.text();
+          throw new Error(`API ${resp.status}: ${text}`);
+        }
+        refresh();
+      } catch (e) {
+        setError(String(e));
+      }
+    },
+    [sourceId, refresh],
+  );
 
   if (loading) {
     return (
@@ -82,8 +118,34 @@ export default function FacesPanel({ sourceId, onSeek }: Props) {
     );
   }
 
+  const hiddenCount = data.excluded_count ?? 0;
+
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto custom-scrollbar pr-2">
+      {(hiddenCount > 0 || showExcluded) && (
+        <div
+          className="flex items-center justify-between rounded border px-3 py-1.5 text-xs"
+          style={{
+            borderColor: "var(--border)",
+            backgroundColor: "var(--background-deep)",
+            color: "var(--foreground-secondary)",
+          }}
+        >
+          <span>
+            {showExcluded
+              ? `Showing excluded clusters too`
+              : `${hiddenCount} cluster${hiddenCount === 1 ? "" : "s"} hidden as portraits / noise`}
+          </span>
+          <button
+            type="button"
+            onClick={() => setShowExcluded((v) => !v)}
+            className="rounded border px-2 py-0.5 text-[10px] uppercase tracking-wider"
+            style={{ borderColor: "var(--border)" }}
+          >
+            {showExcluded ? "Hide excluded" : "Show excluded"}
+          </button>
+        </div>
+      )}
       {data.positions.map((pos) => (
         <PositionSection
           key={pos.position_id}
@@ -91,6 +153,7 @@ export default function FacesPanel({ sourceId, onSeek }: Props) {
           sourceId={sourceId}
           onSeek={onSeek}
           onAssign={setAssigning}
+          onOverride={overrideCluster}
         />
       ))}
       {assigning && (
@@ -110,16 +173,37 @@ export default function FacesPanel({ sourceId, onSeek }: Props) {
   );
 }
 
+function kindBadge(
+  kind: FaceClusterKind | undefined,
+  detectedKind: FaceClusterKind | undefined,
+): { text: string; color: string } | null {
+  const effective = kind ?? detectedKind;
+  if (!effective) return null;
+  switch (effective) {
+    case "portrait":
+      return { text: "Portrait", color: "#9ca3af" }; // grey-400
+    case "noise":
+      return { text: "Noise", color: "#9ca3af" };
+    case "person":
+      return { text: "Person", color: "var(--accent)" };
+  }
+}
+
 function PositionSection({
   position,
   sourceId,
   onSeek,
   onAssign,
+  onOverride,
 }: {
   position: FacePosition;
   sourceId: string;
   onSeek: (s: number) => void;
   onAssign: (run: FaceRun) => void;
+  onOverride: (
+    clusterId: number,
+    patch: { excluded?: boolean; kind?: FaceClusterKind },
+  ) => void;
 }) {
   // Sort runs by frame_count desc so the top entries are the most
   // screen-time-relevant — usually what the operator cares about for
@@ -140,9 +224,32 @@ function PositionSection({
       className="rounded border p-3"
       style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
     >
-      <header className="mb-2 flex items-baseline justify-between">
+      <header className="mb-2 flex items-baseline justify-between gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wider">
           {position.label}
+          {(() => {
+            const badge = kindBadge(position.kind, position.detected_kind);
+            if (!badge) return null;
+            const isOverride =
+              position.kind != null && position.kind !== position.detected_kind;
+            return (
+              <span
+                className="ml-2 rounded border px-1.5 py-0.5 text-[9px] font-normal uppercase tracking-wider"
+                style={{
+                  borderColor: badge.color,
+                  color: badge.color,
+                }}
+                title={
+                  isOverride
+                    ? `Operator override (detected: ${position.detected_kind ?? "—"})`
+                    : `Auto-detected`
+                }
+              >
+                {badge.text}
+                {isOverride ? "*" : ""}
+              </span>
+            );
+          })()}
           <span
             className="ml-2 font-normal normal-case"
             style={{ color: "var(--foreground-ghost)" }}
@@ -156,6 +263,32 @@ function PositionSection({
             )}
           </span>
         </h3>
+        {position.cluster_id !== null && position.cluster_id !== undefined && (
+          <button
+            type="button"
+            onClick={() => {
+              const nowExcluded = !position.excluded;
+              onOverride(position.cluster_id as number, {
+                excluded: nowExcluded,
+                // If hiding a real-person mistake, set kind=portrait
+                // so the auto-tag doesn't re-include on next analyse.
+                ...(nowExcluded ? { kind: "portrait" as const } : {}),
+              });
+            }}
+            className="rounded border px-2 py-0.5 text-[10px] uppercase tracking-wider whitespace-nowrap"
+            style={{
+              borderColor: "var(--border)",
+              color: "var(--foreground-secondary)",
+            }}
+            title={
+              position.excluded
+                ? "Include this cluster in the default runs view"
+                : "Exclude this cluster (mark as portrait / not a real person)"
+            }
+          >
+            {position.excluded ? "Include" : "Exclude"}
+          </button>
+        )}
       </header>
       <ul className="flex flex-col gap-1">
         {visibleRuns.map((run, idx) => (

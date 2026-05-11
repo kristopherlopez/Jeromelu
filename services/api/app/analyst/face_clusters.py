@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from uuid import UUID
 
 import numpy as np
@@ -31,7 +32,7 @@ from sklearn.cluster import HDBSCAN
 from sqlalchemy import update
 from sqlalchemy.orm import Session
 
-from jeromelu_shared.db import SourceFaceDetection
+from jeromelu_shared.db import SourceFaceCluster, SourceFaceDetection
 
 logger = logging.getLogger(__name__)
 
@@ -160,3 +161,214 @@ def cluster_source_detections(
         n_noise=n_noise,
         cluster_sizes=cluster_sizes,
     )
+
+
+# ---------------------------------------------------------------------------
+# Cluster auto-tagging — distinguish people from wall art / portraits / noise
+# ---------------------------------------------------------------------------
+
+#: Mouth-opening standard deviation below this is considered "frozen
+#: face" — a portrait or framed photo. Real people talking sit at
+#: 0.05-0.15; even silent listening shifts produce > 0.01 over a span
+#: of frames. 0.005 is well below detector jitter.
+PORTRAIT_MOUTH_STD = 0.005
+
+#: Bbox-centroid standard deviation in source-frame pixels below this
+#: indicates a static element. Detector jitter on a real bbox is ~1-2
+#: pixels; 5 keeps room for real people who barely move (rare but
+#: possible for a guest reading from a script).
+PORTRAIT_CENTROID_STD = 5.0
+
+#: Diagnostic only — not gated. Initially thought a portrait would
+#: appear in 90%+ of in-span frames, but multi-cam shows cut between
+#: camera angles, so wall art is only on screen ~50-60% of the time
+#: (same density as a host). Real signal is mouth + centroid stability.
+#: Kept as a stored stat so a future model can re-evaluate.
+PORTRAIT_TEMPORAL_DENSITY_HINT = 0.9
+
+#: Clusters smaller than this are tagged 'noise' — usually one-off
+#: misdetections at frame edges or partial faces. Excluded from the
+#: default runs view.
+NOISE_MIN_DETECTIONS = 10
+
+
+@dataclass
+class ClusterAnalysis:
+    cluster_id: int
+    detection_count: int
+    mouth_open_std: float
+    centroid_std: float
+    temporal_density: float
+    detected_kind: str  # 'person' | 'portrait' | 'noise'
+
+
+def _classify_cluster(
+    detection_count: int,
+    mouth_open_std: float,
+    centroid_std: float,
+    temporal_density: float,
+) -> str:
+    """Pure function so the heuristic is unit-testable and explainable.
+
+    Verified on multi-cam Bloke In A Bar source 2026-05-12: three known
+    wall-portrait clusters all landed at mouth_std ~0.003 + centroid_std
+    < 1 px; real hosts at mouth_std > 0.018 + centroid_std > 14 px.
+    Density was a red herring — multi-cam puts portraits and hosts at
+    the same density (~0.57) since each is only visible on certain
+    camera angles. Kept ``temporal_density`` as a stored diagnostic.
+    """
+    if detection_count < NOISE_MIN_DETECTIONS:
+        return "noise"
+    if (
+        mouth_open_std < PORTRAIT_MOUTH_STD
+        and centroid_std < PORTRAIT_CENTROID_STD
+    ):
+        return "portrait"
+    return "person"
+
+
+def analyse_clusters(session: Session, source_id: UUID) -> list[ClusterAnalysis]:
+    """Compute per-cluster stats over already-clustered detections and
+    upsert ``source_face_clusters`` rows. Auto-tags ``detected_kind``
+    via the heuristic above; operator overrides in ``kind`` are
+    preserved (the analyser never touches the operator-facing fields).
+
+    Idempotent: re-runs replace the stats / detected_kind on the
+    existing rows. Returns the list of per-cluster analyses.
+    """
+    rows = (
+        session.query(
+            SourceFaceDetection.cluster_id,
+            SourceFaceDetection.frame_ts,
+            SourceFaceDetection.bbox_x1,
+            SourceFaceDetection.bbox_y1,
+            SourceFaceDetection.bbox_x2,
+            SourceFaceDetection.bbox_y2,
+            SourceFaceDetection.mouth_opening,
+        )
+        .filter(SourceFaceDetection.source_id == source_id)
+        .all()
+    )
+    if not rows:
+        return []
+
+    # Bucket detections per cluster_id, including the noise bucket
+    # (cluster_id=NULL) so we can emit its row too.
+    by_cluster: dict[int | None, dict[str, list[float]]] = {}
+    for r in rows:
+        bucket = by_cluster.setdefault(r.cluster_id, {
+            "ts": [], "cx": [], "cy": [], "mouth": [],
+        })
+        bucket["ts"].append(float(r.frame_ts))
+        bucket["cx"].append((float(r.bbox_x1) + float(r.bbox_x2)) / 2.0)
+        bucket["cy"].append((float(r.bbox_y1) + float(r.bbox_y2)) / 2.0)
+        if r.mouth_opening is not None:
+            bucket["mouth"].append(float(r.mouth_opening))
+
+    analyses: list[ClusterAnalysis] = []
+    for cluster_id, data in by_cluster.items():
+        if cluster_id is None:
+            # The NULL bucket is HDBSCAN noise — always 'noise' kind by
+            # definition. Skip the heuristic to avoid divide-by-zero on
+            # tiny spans.
+            cnt = len(data["ts"])
+            analyses.append(ClusterAnalysis(
+                cluster_id=-1,  # use -1 sentinel; not stored — see below
+                detection_count=cnt,
+                mouth_open_std=0.0,
+                centroid_std=0.0,
+                temporal_density=0.0,
+                detected_kind="noise",
+            ))
+            continue
+
+        ts = np.asarray(data["ts"], dtype=np.float64)
+        cx = np.asarray(data["cx"], dtype=np.float64)
+        cy = np.asarray(data["cy"], dtype=np.float64)
+        mouth = (
+            np.asarray(data["mouth"], dtype=np.float64)
+            if data["mouth"] else np.zeros(1)
+        )
+
+        # std() on a single-element array is 0 by default — fine here,
+        # those clusters land in the 'noise' branch via count.
+        centroid_std = float(
+            np.sqrt(np.var(cx) + np.var(cy))
+        )
+        mouth_std = float(np.std(mouth))
+        span = float(ts.max() - ts.min())
+        # density = detections per second over the cluster's lifespan
+        # divided by the sampling rate (assumed 1 fps from visual_id).
+        # Cap at 1.0 so a cluster denser than the sampling rate (which
+        # shouldn't happen at 1 fps but might at higher rates) doesn't
+        # confuse the threshold.
+        density = min(1.0, len(ts) / max(1.0, span)) if span > 0 else 1.0
+
+        detected = _classify_cluster(
+            detection_count=len(ts),
+            mouth_open_std=mouth_std,
+            centroid_std=centroid_std,
+            temporal_density=density,
+        )
+        analyses.append(ClusterAnalysis(
+            cluster_id=cluster_id,
+            detection_count=len(ts),
+            mouth_open_std=mouth_std,
+            centroid_std=centroid_std,
+            temporal_density=density,
+            detected_kind=detected,
+        ))
+
+    # Upsert source_face_clusters rows. We never touch operator-set
+    # fields (kind, label, notes, attributed_person_id) — those persist
+    # across re-runs. The analyser writes detected_kind, stats, count,
+    # and sets `excluded=true` for first-time portrait/noise unless an
+    # operator override already exists.
+    now = datetime.now(timezone.utc)
+    for a in analyses:
+        # NULL cluster bucket is observability-only; skip persistence
+        # since the table's PK is (source_id, cluster_id) and we don't
+        # want a -1 sentinel row leaking into the runs view.
+        if a.cluster_id < 0:
+            continue
+        existing = session.query(SourceFaceCluster).filter(
+            SourceFaceCluster.source_id == source_id,
+            SourceFaceCluster.cluster_id == a.cluster_id,
+        ).first()
+        if existing is None:
+            session.add(SourceFaceCluster(
+                source_id=source_id,
+                cluster_id=a.cluster_id,
+                kind=None,  # operator-facing, unreviewed
+                excluded=(a.detected_kind in ("portrait", "noise")),
+                detection_count=a.detection_count,
+                mouth_open_std=a.mouth_open_std,
+                centroid_std=a.centroid_std,
+                temporal_density=a.temporal_density,
+                detected_kind=a.detected_kind,
+                created_at=now,
+                updated_at=now,
+            ))
+        else:
+            # Update stats + detected_kind but leave operator overrides
+            # alone. Re-set excluded only if the operator hasn't been
+            # here yet — heuristically: if `kind` is still NULL the
+            # operator hasn't reviewed, so the analyser's exclude
+            # decision is allowed to flip. Once kind is set, we trust
+            # the operator's intent.
+            existing.detection_count = a.detection_count
+            existing.mouth_open_std = a.mouth_open_std
+            existing.centroid_std = a.centroid_std
+            existing.temporal_density = a.temporal_density
+            existing.detected_kind = a.detected_kind
+            if existing.kind is None:
+                existing.excluded = (a.detected_kind in ("portrait", "noise"))
+            existing.updated_at = now
+    session.commit()
+
+    logger.info(
+        "Analysed %d clusters for source %s: %s",
+        len(analyses), source_id,
+        {a.detected_kind: sum(1 for x in analyses if x.detected_kind == a.detected_kind) for a in analyses},
+    )
+    return analyses

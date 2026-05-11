@@ -2,6 +2,7 @@ import json
 import logging
 import tempfile
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
 
@@ -11,7 +12,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
-from app.analyst.face_clusters import cluster_source_detections
+from app.analyst.face_clusters import analyse_clusters, cluster_source_detections
 from app.analyst.face_runs import (
     compute_face_runs,
     compute_face_runs_from_detections,
@@ -35,6 +36,7 @@ from jeromelu_shared.db import (
     Source,
     SourceChunk,
     SourceDocument,
+    SourceFaceCluster,
     SourceFaceDetection,
     SourceSpeaker,
 )
@@ -595,34 +597,112 @@ def get_face_crop(
 
 @router.post("/sources/{source_id}/face-clusters/recompute")
 def recompute_face_clusters(source_id: uuid.UUID, db: Session = Depends(get_db)):
-    """Re-run per-source face clustering and write ``cluster_id`` back
-    onto every ``source_face_detections`` row.
+    """Re-run per-source face clustering AND auto-tagging.
 
-    Idempotent: re-running re-clusters from the current detection set.
-    Useful after a backfill, or after new detections land for a source
-    that's been re-extracted. Heavy clients (CLI / cron) should call
-    this directly; the face-runs endpoint will also opportunistically
-    trigger it when it sees unclustered detections.
+    Two-pass:
+      1. ``cluster_source_detections`` — HDBSCAN over embeddings,
+         writes ``source_face_detections.cluster_id``.
+      2. ``analyse_clusters`` — per-cluster stats + heuristic
+         ``detected_kind`` (person / portrait / noise), upserts
+         ``source_face_clusters`` rows. Operator overrides in
+         ``kind`` / ``label`` / ``notes`` are preserved across re-runs.
 
-    Returns the cluster summary so the caller can sanity-check N
-    clusters vs expected number of people.
+    Idempotent. Returns both summaries so the caller can sanity-check.
     """
     source = db.query(Source).filter(Source.source_id == source_id).first()
     if not source:
         raise HTTPException(status_code=404, detail="Source not found")
 
     stats = cluster_source_detections(db, source_id)
+    analyses = analyse_clusters(db, source_id)
+    kind_counts: dict[str, int] = {}
+    for a in analyses:
+        kind_counts[a.detected_kind] = kind_counts.get(a.detected_kind, 0) + 1
     return {
         "source_id": str(stats.source_id),
         "n_detections": stats.n_detections,
         "n_clusters": stats.n_clusters,
         "n_noise": stats.n_noise,
         "cluster_sizes": stats.cluster_sizes,
+        "auto_tags": kind_counts,
+    }
+
+
+class ClusterOverrideRequest(BaseModel):
+    kind: str | None = Field(
+        default=None,
+        description="Override the auto-detected kind. 'person' / 'portrait' / 'noise' or null to clear.",
+    )
+    label: str | None = Field(
+        default=None,
+        max_length=200,
+        description="Friendly name override (e.g. 'Wall portrait — Brad Fittler'). Null to clear.",
+    )
+    excluded: bool | None = Field(
+        default=None,
+        description="Override the auto-excluded flag. Null = leave as-is.",
+    )
+    notes: str | None = Field(default=None, max_length=2000)
+
+
+@router.post("/sources/{source_id}/face-clusters/{cluster_id}")
+def override_face_cluster(
+    source_id: uuid.UUID,
+    cluster_id: int,
+    body: ClusterOverrideRequest,
+    db: Session = Depends(get_db),
+):
+    """Operator override on a cluster's metadata. Used to mark wall
+    portraits as ``kind='portrait', excluded=true`` or to give a
+    real-person cluster a friendly label before bulk-assign.
+
+    Validates that the cluster exists for this source. Only the fields
+    present in the request body are touched — null means "leave as-is",
+    NOT "clear to null" (use an explicit empty-string label to clear).
+    """
+    row = db.query(SourceFaceCluster).filter(
+        SourceFaceCluster.source_id == source_id,
+        SourceFaceCluster.cluster_id == cluster_id,
+    ).first()
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No cluster {cluster_id} for source {source_id}",
+        )
+
+    if body.kind is not None:
+        if body.kind not in ("person", "portrait", "noise"):
+            raise HTTPException(
+                status_code=400,
+                detail="kind must be 'person', 'portrait', or 'noise'",
+            )
+        row.kind = body.kind
+    if body.label is not None:
+        row.label = body.label or None  # empty string clears
+    if body.excluded is not None:
+        row.excluded = body.excluded
+    if body.notes is not None:
+        row.notes = body.notes or None
+
+    row.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    return {
+        "source_id": str(row.source_id),
+        "cluster_id": row.cluster_id,
+        "kind": row.kind,
+        "label": row.label,
+        "excluded": row.excluded,
+        "notes": row.notes,
+        "detected_kind": row.detected_kind,
     }
 
 
 @router.get("/sources/{source_id}/face-runs")
-def get_face_runs(source_id: uuid.UUID, db: Session = Depends(get_db)):
+def get_face_runs(
+    source_id: uuid.UUID,
+    include_excluded: bool = False,
+    db: Session = Depends(get_db),
+):
     """Return per-position runs of contiguous attribution for the
     Faces tab. Each run is one row in the UI: a stretch of frames at
     the same on-screen position (or face cluster, post-Slice-B) with
@@ -685,8 +765,27 @@ def get_face_runs(source_id: uuid.UUID, db: Session = Depends(get_db)):
                 source_id,
             )
             cluster_source_detections(db, source_id)
+            analyse_clusters(db, source_id)
+        else:
+            # Clustering already done, but the analyser may not have
+            # run yet (e.g. detections landed before mig 054). Run it
+            # if source_face_clusters is empty for this source.
+            cluster_meta_count = (
+                db.query(func.count())
+                .select_from(SourceFaceCluster)
+                .filter(SourceFaceCluster.source_id == source_id)
+                .scalar() or 0
+            )
+            if cluster_meta_count == 0:
+                logger.info(
+                    "Source %s has clustering but no metadata — analysing now",
+                    source_id,
+                )
+                analyse_clusters(db, source_id)
 
-        runs_payload = compute_face_runs_from_detections(db, source_id)
+        runs_payload = compute_face_runs_from_detections(
+            db, source_id, include_excluded=include_excluded,
+        )
         # Try to read frame dims from the cached face-track JSON for
         # the response — the detections table doesn't store them.
         # If the JSON isn't there it's fine; the UI tolerates null.
@@ -779,6 +878,7 @@ def get_face_runs(source_id: uuid.UUID, db: Session = Depends(get_db)):
         "frame_width": frame_width,
         "frame_height": frame_height,
         "positions": runs_payload["positions"],
+        "excluded_count": runs_payload.get("excluded_count", 0),
     }
 
 

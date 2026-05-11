@@ -30,7 +30,7 @@ from uuid import UUID
 from sqlalchemy import func as sa_func
 from sqlalchemy.orm import Session
 
-from jeromelu_shared.db import SourceFaceDetection
+from jeromelu_shared.db import SourceFaceCluster, SourceFaceDetection
 
 # Distance in source-frame pixels — two detections within this much of
 # each other's centre are "the same position". 120px is appropriate for
@@ -405,6 +405,8 @@ def detections_exist(session: Session, source_id: UUID) -> bool:
 def compute_face_runs_from_detections(
     session: Session,
     source_id: UUID,
+    *,
+    include_excluded: bool = False,
 ) -> dict:
     """Slice B PR 2 — build runs grouped by ``cluster_id`` instead of by
     spatial bbox position.
@@ -427,6 +429,18 @@ def compute_face_runs_from_detections(
         .order_by(SourceFaceDetection.frame_ts)
         .all()
     )
+
+    # Pull per-cluster metadata in one query — labels, kinds, exclusion
+    # flags. NULL cluster_id (HDBSCAN noise) has no row here; treated as
+    # the implicit Outliers bucket.
+    cluster_meta_rows = (
+        session.query(SourceFaceCluster)
+        .filter(SourceFaceCluster.source_id == source_id)
+        .all()
+    )
+    meta_by_cluster: dict[int, SourceFaceCluster] = {
+        m.cluster_id: m for m in cluster_meta_rows
+    }
 
     by_cluster: dict[int | None, list[dict]] = {}
     for r in rows:
@@ -451,10 +465,20 @@ def compute_face_runs_from_detections(
         items.append((None, by_cluster[None]))
 
     positions: list[dict] = []
+    excluded_count = 0
     # position_id starts from 0 for the response — independent of
     # cluster_id since clusters may include None and we want stable
     # per-source integer IDs for the UI.
     for pid, (cluster_id, bucket) in enumerate(items):
+        meta = meta_by_cluster.get(cluster_id) if cluster_id is not None else None
+
+        # Default-excluded clusters (portraits, noise) skip the UI
+        # unless explicitly requested. We still count them so the UI
+        # can show "N more clusters hidden — show all?".
+        if meta is not None and meta.excluded and not include_excluded:
+            excluded_count += 1
+            continue
+
         bucket.sort(key=lambda d: d["ts"])
         runs = _detect_runs_for_cluster(bucket)
         # Attach cluster_id to each run so the bulk-assign action can
@@ -465,13 +489,34 @@ def compute_face_runs_from_detections(
             sum(_bbox_centre(d["bbox"])[0] for d in bucket) / max(1, len(bucket)),
             sum(_bbox_centre(d["bbox"])[1] for d in bucket) / max(1, len(bucket)),
         )
+
+        # Label precedence: operator override > auto-generated.
+        label = (
+            meta.label if meta is not None and meta.label
+            else _cluster_label(cluster_id)
+        )
+
         positions.append({
             "position_id": pid,
-            "label": _cluster_label(cluster_id),
+            "label": label,
             "cluster_id": cluster_id,
             "centroid": list(centroid),
             "detection_count": len(bucket),
             "runs": runs,
+            # Slice B PR 2.5 — surface cluster metadata so the UI can
+            # render the kind tag + override controls. ``kind`` is the
+            # operator override (NULL if unreviewed); ``detected_kind``
+            # is the auto-tag the heuristic landed.
+            "kind": meta.kind if meta else None,
+            "detected_kind": meta.detected_kind if meta else None,
+            "excluded": bool(meta.excluded) if meta else False,
+            "label_override": meta.label if meta else None,
+            "notes": meta.notes if meta else None,
+            "stats": {
+                "mouth_open_std": meta.mouth_open_std if meta else None,
+                "centroid_std": meta.centroid_std if meta else None,
+                "temporal_density": meta.temporal_density if meta else None,
+            } if meta else None,
         })
 
-    return {"positions": positions}
+    return {"positions": positions, "excluded_count": excluded_count}

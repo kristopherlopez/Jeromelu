@@ -357,6 +357,63 @@ class SourceFaceDetection(Base):
     )
 
 
+class SourceFaceCluster(Base):
+    """Per-cluster metadata for face clusters within a source.
+
+    The detection-level table (mig 053) groups frames by ``cluster_id``;
+    this table puts a first-class home around the cluster itself for the
+    decisions an operator makes about it — kind (person / portrait /
+    noise), an optional label override, exclusion from the default runs
+    view, attributed person, and the diagnostic stats that informed the
+    auto-tag heuristic.
+
+    See migration 054.
+    """
+
+    __tablename__ = "source_face_clusters"
+
+    source_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sources.source_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    cluster_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    kind: Mapped[str | None] = mapped_column(Text)
+    label: Mapped[str | None] = mapped_column(Text)
+    excluded: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+    detection_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    mouth_open_std: Mapped[float | None] = mapped_column(Float)
+    centroid_std: Mapped[float | None] = mapped_column(Float)
+    temporal_density: Mapped[float | None] = mapped_column(Float)
+    detected_kind: Mapped[str | None] = mapped_column(Text)
+    attributed_person_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("people.person_id", ondelete="SET NULL"),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow,
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "kind IS NULL OR kind IN ('person', 'portrait', 'noise')",
+            name="ck_source_face_clusters_kind",
+        ),
+        CheckConstraint(
+            "detected_kind IS NULL OR detected_kind IN ('person', 'portrait', 'noise')",
+            name="ck_source_face_clusters_detected_kind",
+        ),
+        Index("idx_source_face_clusters_source", "source_id"),
+        Index(
+            "idx_source_face_clusters_kind",
+            "kind",
+            postgresql_where="kind IS NOT NULL",
+        ),
+    )
+
+
 class PersonVoiceprint(Base):
     """Voice fingerprint registry — Phase 3 of speaker identification.
 
