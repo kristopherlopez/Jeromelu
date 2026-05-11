@@ -150,16 +150,23 @@ def _handle_visual_identify(payload: dict[str, Any]) -> dict[str, Any]:
         cosine_threshold=cosine_threshold,
         agreement_threshold=agreement_threshold,
         registry=(registry_matrix, person_ids),
+        # Slice B PR 1.5 — emit per-detection embeddings to S3 so the
+        # API can persist SourceFaceDetection rows after the invoke.
+        # Forces a fresh extraction (no JSON-cache reuse), which is
+        # what we want — the npz needs the in-memory embeddings.
+        emit_detections_artefact=True,
     )
 
     logger.info(
-        "[Lineup] visual_identify ok: %d/%d turns matched, format=%s",
+        "[Lineup] visual_identify ok: %d/%d turns matched, format=%s, detections=%s",
         result.turns_visually_matched, len(pyannote_turns), result.video_format,
+        result.face_detections_s3_key or "(none)",
     )
     return {
         "status": "ok",
         "task": "visual_identify",
         "face_track_s3_key": result.face_track_s3_key,
+        "face_detections_s3_key": result.face_detections_s3_key,
         "duration_seconds": result.duration_seconds,
         "frames_processed": result.frames_processed,
         "frames_with_faces": result.frames_with_faces,

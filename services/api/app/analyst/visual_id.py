@@ -153,6 +153,12 @@ class VisualIdentifyResult:
     video_format: str  # 'multi_cam' | 'single_cam' | 'audio_only'
     turns_visually_matched: int
     per_turn: list[VisualMatch | None]
+    # Slice B PR 1.5 — npz artefact with per-detection embeddings,
+    # bboxes and metadata. Written when ``emit_detections_artefact=True``
+    # (the remote/GPU path uses this to round-trip embeddings to the API
+    # for SourceFaceDetection inserts). None on the local path which
+    # persists directly via ``_persist_face_detections``.
+    face_detections_s3_key: str | None = None
 
 
 class VisualIdError(Exception):
@@ -167,6 +173,16 @@ def _face_track_s3_key_from_audio(audio_s3_key: str) -> str:
     if audio_s3_key.endswith(".m4a"):
         return audio_s3_key[: -len(".m4a")] + ".face_track.json"
     return audio_s3_key + ".face_track.json"
+
+
+def _face_detections_s3_key_from_audio(audio_s3_key: str) -> str:
+    """Per-source embedding artefact key — sibling to the face-track
+    JSON. Used by the GPU container to round-trip per-detection
+    embeddings to the API for SourceFaceDetection inserts.
+    """
+    if audio_s3_key.endswith(".m4a"):
+        return audio_s3_key[: -len(".m4a")] + ".face_detections.npz"
+    return audio_s3_key + ".face_detections.npz"
 
 
 def _download_video(video_s3_key: str, dest: Path) -> None:
@@ -524,6 +540,7 @@ def visual_identify(
     source_id: UUID | None = None,
     force_local: bool = False,
     force_reextract: bool = False,
+    emit_detections_artefact: bool = False,
 ) -> VisualIdentifyResult:
     """Run face detection + matching over the source's video.
 
@@ -582,7 +599,16 @@ def visual_identify(
     # since face-to-Person matching happens at extract time. To force a
     # re-extract: pass ``force_reextract=True``, delete the JSON, or bump
     # FACE_TRACK_JSON_VERSION.
-    if not force_reextract and _face_track_object_exists(face_track_key):
+    #
+    # Reuse is also skipped when the caller asked for the npz artefact
+    # (emit_detections_artefact=True) — the cached JSON dropped
+    # embeddings, so there's nothing to emit. The caller would silently
+    # get a result without the artefact key otherwise.
+    if (
+        not force_reextract
+        and not emit_detections_artefact
+        and _face_track_object_exists(face_track_key)
+    ):
         try:
             existing = json.loads(download_raw(face_track_key))
         except Exception:
@@ -719,6 +745,13 @@ def visual_identify(
         if session is not None and source_id is not None:
             _persist_face_detections(session, source_id, frames)
 
+        # Slice B PR 1.5 — when running remotely (no DB access), emit
+        # the per-detection embeddings to an S3 npz so the API can
+        # consume them after the SageMaker invoke returns.
+        face_detections_key: str | None = None
+        if emit_detections_artefact:
+            face_detections_key = _emit_face_detections_npz(audio_s3_key, frames)
+
     distinct_persons = len({
         face.person_id
         for f in frames for face in f.faces
@@ -735,7 +768,73 @@ def visual_identify(
         video_format=video_format,
         turns_visually_matched=turns_matched,
         per_turn=per_turn,
+        face_detections_s3_key=face_detections_key,
     )
+
+
+def _emit_face_detections_npz(
+    audio_s3_key: str,
+    frames: list["FrameDetections"],
+) -> str | None:
+    """Slice B PR 1.5 — write a ``.npz`` of per-detection data to S3
+    so the GPU container can hand embeddings back to the API for
+    SourceFaceDetection inserts. Only the *remote* path uses this;
+    the local path persists directly via ``_persist_face_detections``.
+
+    Returns the S3 key (under ``settings.s3_raw_bucket``) or ``None``
+    if there were no valid detections.
+    """
+    import io
+
+    rows_ts: list[float] = []
+    rows_bbox: list[list[float]] = []
+    rows_det: list[float] = []
+    rows_emb: list[list[float]] = []
+    rows_mouth: list[float] = []
+    rows_person: list[str] = []
+    rows_match: list[float] = []
+    for f in frames:
+        for face in f.faces:
+            emb = np.asarray(face.embedding, dtype=np.float32).reshape(-1)
+            if emb.shape[0] != EMBEDDING_DIM or not np.all(np.isfinite(emb)):
+                continue
+            rows_ts.append(float(f.ts))
+            rows_bbox.append([float(x) for x in face.bbox])
+            rows_det.append(float(face.det_score))
+            rows_emb.append(emb.tolist())
+            # NaN sentinels for nullable floats — the API restores them
+            # to None on the way back into Postgres.
+            rows_mouth.append(
+                float(face.mouth_opening) if face.mouth_opening is not None else float("nan")
+            )
+            rows_person.append(str(face.person_id) if face.person_id else "")
+            rows_match.append(
+                float(face.similarity) if face.similarity is not None else float("nan")
+            )
+
+    if not rows_ts:
+        return None
+
+    key = _face_detections_s3_key_from_audio(audio_s3_key)
+    buf = io.BytesIO()
+    np.savez_compressed(
+        buf,
+        frame_ts=np.asarray(rows_ts, dtype=np.float32),
+        bbox=np.asarray(rows_bbox, dtype=np.float32),
+        det_score=np.asarray(rows_det, dtype=np.float32),
+        embedding=np.asarray(rows_emb, dtype=np.float32),
+        embedding_model=np.asarray([EMBEDDING_MODEL]),
+        mouth_opening=np.asarray(rows_mouth, dtype=np.float32),
+        matched_person_id=np.asarray(rows_person),
+        match_score=np.asarray(rows_match, dtype=np.float32),
+    )
+    buf.seek(0)
+    upload_raw(key, buf.read())
+    logger.info(
+        "Wrote %d detections to s3://%s/%s",
+        len(rows_ts), settings.s3_raw_bucket, key,
+    )
+    return key
 
 
 def _persist_face_detections(

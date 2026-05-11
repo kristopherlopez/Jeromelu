@@ -264,8 +264,29 @@ def visual_identify_remote(
             face_count=int(entry["face_count"]),
         ))
 
+    # Slice B PR 1.5 — if the container emitted a face_detections.npz,
+    # download it and persist one SourceFaceDetection row per detection
+    # so cluster_id can be populated by the per-source clustering pass
+    # and the runs view sees the same data the local path produces.
+    # Idempotent at the helper level (skips if source already has rows).
+    face_detections_key = response.get("face_detections_s3_key")
+    if face_detections_key:
+        try:
+            _persist_face_detections_from_npz(
+                session, audio_s3_key, face_detections_key,
+            )
+        except Exception as exc:
+            # Never fail the visual ID just because the side-artefact
+            # write didn't land. The face-track JSON + per-turn matches
+            # are already committed; the operator can backfill later.
+            logger.warning(
+                "Failed to persist face detections from %s: %s",
+                face_detections_key, exc,
+            )
+
     return VisualIdentifyResult(
         face_track_s3_key=response["face_track_s3_key"],
+        face_detections_s3_key=face_detections_key,
         duration_seconds=float(response.get("duration_seconds", 0.0)),
         frames_processed=int(response.get("frames_processed", 0)),
         frames_with_faces=int(response.get("frames_with_faces", 0)),
@@ -274,3 +295,93 @@ def visual_identify_remote(
         turns_visually_matched=int(response.get("turns_visually_matched", 0)),
         per_turn=per_turn,
     )
+
+
+def _persist_face_detections_from_npz(
+    session: Session,
+    audio_s3_key: str,
+    detections_s3_key: str,
+) -> int:
+    """Download the npz artefact emitted by the GPU container and
+    INSERT one SourceFaceDetection row per detection. Mirrors the
+    local ``_persist_face_detections`` shape so cluster_id + runs view
+    don't know which path produced the rows.
+
+    Idempotent: if the source already has detection rows, skips.
+    Returns the number of rows inserted.
+    """
+    import io
+    import numpy as np
+
+    from jeromelu_shared.db import Source, SourceFaceDetection
+    from jeromelu_shared.s3 import download_raw
+    from sqlalchemy import func as sa_func
+
+    # Resolve source_id from audio_s3_key. The container path doesn't
+    # ship it (the API context already knows the source); we look it up
+    # here so the helper can be called from any caller that has both
+    # keys handy.
+    source = session.query(Source).filter(
+        Source.audio_s3_key == audio_s3_key,
+    ).first()
+    if not source:
+        logger.warning(
+            "No source matches audio_s3_key=%s; skipping detection persistence",
+            audio_s3_key,
+        )
+        return 0
+
+    existing = session.query(sa_func.count(SourceFaceDetection.detection_id)).filter(
+        SourceFaceDetection.source_id == source.source_id,
+    ).scalar() or 0
+    if existing > 0:
+        logger.info(
+            "source_face_detections already populated for %s (%d rows); skip",
+            source.source_id, existing,
+        )
+        return 0
+
+    body = download_raw(detections_s3_key)
+    with np.load(io.BytesIO(body), allow_pickle=False) as npz:
+        frame_ts = npz["frame_ts"]
+        bboxes = npz["bbox"]
+        det_scores = npz["det_score"]
+        embeddings = npz["embedding"]
+        embedding_model = str(npz["embedding_model"][0])
+        mouth_openings = npz["mouth_opening"]
+        matched_person_ids = npz["matched_person_id"]
+        match_scores = npz["match_score"]
+
+    rows: list[SourceFaceDetection] = []
+    for i in range(len(frame_ts)):
+        pid_str = str(matched_person_ids[i])
+        rows.append(SourceFaceDetection(
+            source_id=source.source_id,
+            frame_ts=float(frame_ts[i]),
+            bbox_x1=float(bboxes[i][0]),
+            bbox_y1=float(bboxes[i][1]),
+            bbox_x2=float(bboxes[i][2]),
+            bbox_y2=float(bboxes[i][3]),
+            det_score=float(det_scores[i]),
+            embedding=[float(x) for x in embeddings[i]],
+            embedding_model=embedding_model,
+            mouth_opening=(
+                float(mouth_openings[i])
+                if np.isfinite(mouth_openings[i]) else None
+            ),
+            matched_person_id=UUID(pid_str) if pid_str else None,
+            match_score=(
+                float(match_scores[i]) if np.isfinite(match_scores[i]) else None
+            ),
+            cluster_id=None,
+        ))
+
+    if not rows:
+        return 0
+    session.add_all(rows)
+    session.commit()
+    logger.info(
+        "Persisted %d source_face_detections rows for %s (from remote npz)",
+        len(rows), source.source_id,
+    )
+    return len(rows)

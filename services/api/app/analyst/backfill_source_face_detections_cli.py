@@ -6,13 +6,13 @@ visual-ID'd before this migration have the face-track JSON cached in
 S3 but no detection rows in Postgres (the JSON dropped the embeddings).
 
 This script walks sources, picks the ones missing detections, and
-re-runs visual_identify with ``force_local=True`` + ``force_reextract=True``
-so the local path runs end-to-end and writes both the new JSON and the
-detection rows.
-
-Cost per source: ~7-9 min on CPU (download video + InsightFace at 1fps
-over the full duration). Run it on the sources you actually want to
-review with the runs view; not every source needs the backfill upfront.
+re-runs visual_identify with ``force_reextract=True`` so the visual ID
+pass runs end-to-end and writes both the new JSON and the detection
+rows. When ``LINEUP_REMOTE=1`` (the default), the SageMaker GPU
+endpoint handles the heavy lifting and round-trips embeddings via an
+S3 npz artefact (~3 min per source). With ``LINEUP_REMOTE=0`` or
+``force_local=True``, the local CPU path runs InsightFace at 1 fps
+(~3 hours per source on a typical laptop).
 
 Usage::
 
@@ -143,7 +143,12 @@ def backfill_one(session, source: Source) -> int:
                 video_s3_key=video_key,
                 pyannote_turns=pyannote_turns,
                 source_id=source.source_id,
-                force_local=True,
+                # Slice B PR 1.5: remote (GPU) path now round-trips
+                # embeddings via an npz artefact, so the backfill can
+                # use the SageMaker endpoint instead of doing local
+                # CPU InsightFace. ~3 min/source vs ~3 hr/source.
+                # Set force_local=True only if LINEUP_REMOTE is off or
+                # the endpoint is misbehaving.
                 force_reextract=True,
             )
     except VisualIdError as exc:
