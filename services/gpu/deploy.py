@@ -28,6 +28,12 @@ from botocore.exceptions import ClientError
 
 from jeromelu_shared.config import settings
 
+# Windows' default stdout codepage (cp1252) can't encode the em-dashes and
+# arrows the print/raise statements below use, which crashes the deploy
+# mid-flight on Windows shells. Force UTF-8 so the script is portable.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 
 #: T4 (g4dn) is ~50% cheaper than A10G (g5) at $0.736/hr in us-east-1.
 #: Pyannote 3.1 + InsightFace `buffalo_l` both fit comfortably in T4's
