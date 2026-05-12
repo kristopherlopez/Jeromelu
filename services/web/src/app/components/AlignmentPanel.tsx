@@ -163,6 +163,10 @@ export default function AlignmentPanel({ sourceId, onSeek }: Props) {
 
   return (
     <div className="flex h-full flex-col gap-6 overflow-y-auto custom-scrollbar pr-2">
+      <TranscriptByAttribution
+        timeline={data.timeline ?? []}
+        onSeek={onSeek}
+      />
       <TimelineList timeline={data.timeline ?? []} onSeek={onSeek} />
       <PairingsList pairings={data.dominant_pairings} alignmentResp={data} />
       <AlignmentMatrix
@@ -174,6 +178,266 @@ export default function AlignmentPanel({ sourceId, onSeek }: Props) {
         onSeek={onSeek}
       />
     </div>
+  );
+}
+
+// Cap before "Show all" expand — same shape as TimelineList. Sources
+// with very long transcripts (1000+ turns) would otherwise paint slowly
+// since each turn renders two paragraphs side-by-side.
+const TRANSCRIPT_INITIAL_LIMIT = 100;
+
+interface TranscriptByAttributionProps {
+  timeline: AlignmentTimelineRow[];
+  onSeek: (seconds: number) => void;
+}
+
+function TranscriptByAttribution({
+  timeline,
+  onSeek,
+}: TranscriptByAttributionProps) {
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll
+    ? timeline
+    : timeline.slice(0, TRANSCRIPT_INITIAL_LIMIT);
+  const hiddenCount = timeline.length - visible.length;
+
+  // Agreement-percentage denominator is "turns where both modalities
+  // had a name to attribute" — partial / none rows aren't meaningful
+  // comparisons. Same definition as the disagreements worklist.
+  const counts: Record<AlignmentAgreement, number> = {
+    agree: 0,
+    disagree: 0,
+    partial: 0,
+    none: 0,
+  };
+  for (const t of timeline) counts[t.agreement]++;
+  const bothAttributed = counts.agree + counts.disagree;
+  const agreementPct =
+    bothAttributed > 0
+      ? Math.round((counts.agree / bothAttributed) * 100)
+      : null;
+
+  return (
+    <section className="flex flex-col gap-2">
+      <h3
+        className="text-[11px] font-semibold uppercase tracking-wider"
+        style={{ color: "var(--foreground-ghost)" }}
+      >
+        Words by attribution
+      </h3>
+      <p className="text-[11px]" style={{ color: "var(--foreground-ghost)" }}>
+        Same speech, attributed two ways. Left column labels each turn by
+        the dominant on-screen face cluster's Person; right column by the
+        voice cluster's Person. Where the two disagree the row is tinted
+        red — those are the turns where one modality says it's someone
+        different than the other.
+      </p>
+      <div className="text-xs">
+        {agreementPct !== null ? (
+          <>
+            <strong>{agreementPct}%</strong>{" "}
+            <span style={{ color: "var(--foreground-ghost)" }}>
+              agreement when both modalities attribute ({counts.agree} of{" "}
+              {bothAttributed} turns) ·{" "}
+              {counts.disagree} disagree · {counts.partial} partial ·{" "}
+              {counts.none} no attribution either side
+            </span>
+          </>
+        ) : (
+          <span style={{ color: "var(--foreground-ghost)" }}>
+            No turns with both modalities attributed yet — assign a face
+            cluster and a voice cluster to see agreement.
+          </span>
+        )}
+      </div>
+
+      {timeline.length === 0 ? (
+        <div
+          className="rounded border px-3 py-2 text-xs"
+          style={{
+            borderColor: "var(--border)",
+            color: "var(--foreground-ghost)",
+          }}
+        >
+          No timeline rows.
+        </div>
+      ) : (
+        <>
+          {/* Column headers — single grid above so the labels stay sticky
+              with the rows when content scrolls. */}
+          <div
+            className="grid grid-cols-1 gap-2 text-[10px] font-semibold uppercase tracking-wider md:grid-cols-2"
+            style={{ color: "var(--foreground-ghost)" }}
+          >
+            <div>By face</div>
+            <div>By voice</div>
+          </div>
+          <ul className="flex flex-col gap-2">
+            {visible.map((row) => (
+              <TranscriptComparisonRow
+                key={row.segment_id}
+                row={row}
+                onSeek={onSeek}
+              />
+            ))}
+          </ul>
+        </>
+      )}
+
+      {hiddenCount > 0 && !showAll && (
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          className="self-start rounded border px-2 py-1 text-[10px]"
+          style={{
+            borderColor: "var(--border)",
+            color: "var(--foreground-secondary)",
+          }}
+        >
+          Show all {timeline.length} turns ({hiddenCount} hidden)
+        </button>
+      )}
+      {showAll && timeline.length > TRANSCRIPT_INITIAL_LIMIT && (
+        <button
+          type="button"
+          onClick={() => setShowAll(false)}
+          className="self-start rounded border px-2 py-1 text-[10px]"
+          style={{
+            borderColor: "var(--border)",
+            color: "var(--foreground-secondary)",
+          }}
+        >
+          Collapse to first {TRANSCRIPT_INITIAL_LIMIT}
+        </button>
+      )}
+    </section>
+  );
+}
+
+interface TranscriptComparisonRowProps {
+  row: AlignmentTimelineRow;
+  onSeek: (seconds: number) => void;
+}
+
+function TranscriptComparisonRow({
+  row,
+  onSeek,
+}: TranscriptComparisonRowProps) {
+  // Name fallbacks — voice always has a speaker_label, so we fall
+  // back to that when no Person is attributed. Face cluster may be
+  // null entirely (no detections in turn); show "—" in that case.
+  const faceName =
+    row.face_cluster_person_name ??
+    (row.face_cluster_id !== null ? `Cluster ${row.face_cluster_id}` : "—");
+  const voiceName =
+    row.voice_cluster_person_name ?? row.speaker_label;
+
+  // Tint only when there's actionable signal. Agree = the common
+  // case, leave plain so disagreements pop out. Partial gets a soft
+  // amber tint because "we only know half" is worth seeing.
+  const bgColor = (() => {
+    switch (row.agreement) {
+      case "disagree":
+        return "color-mix(in srgb, #f87171 12%, transparent)";
+      case "partial":
+        return "color-mix(in srgb, #fbbf24 8%, transparent)";
+      default:
+        return "transparent";
+    }
+  })();
+
+  const borderColor = (() => {
+    switch (row.agreement) {
+      case "disagree":
+        return "#f87171";
+      case "partial":
+        return "#fbbf24";
+      case "agree":
+        return "#4ade80";
+      default:
+        return "var(--border)";
+    }
+  })();
+
+  return (
+    <li
+      className="grid grid-cols-1 gap-x-3 gap-y-1 rounded border px-3 py-2 text-xs md:grid-cols-2"
+      style={{
+        borderColor,
+        backgroundColor: bgColor,
+      }}
+    >
+      {/* Both halves share the same time prefix + text. Only the
+          speaker label differs by column. */}
+      <div className="flex flex-col gap-1">
+        <div className="flex items-baseline gap-2">
+          <button
+            type="button"
+            onClick={() => onSeek(row.start_ts)}
+            className="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-mono"
+            style={{
+              color: "var(--accent)",
+              backgroundColor: "var(--surface)",
+              cursor: "pointer",
+            }}
+            title={`Jump to ${fmtTs(row.start_ts)}`}
+          >
+            ▸ {fmtTs(row.start_ts)}
+          </button>
+          <strong>{faceName}</strong>
+          <span
+            className="text-[10px]"
+            style={{ color: "var(--foreground-ghost)" }}
+          >
+            (face)
+          </span>
+        </div>
+        <div
+          className="leading-snug"
+          style={{ color: "var(--foreground-secondary)" }}
+        >
+          {row.preview_text || (
+            <em style={{ color: "var(--foreground-ghost)" }}>
+              (no transcript text)
+            </em>
+          )}
+        </div>
+      </div>
+      <div className="flex flex-col gap-1">
+        <div className="flex items-baseline gap-2">
+          <button
+            type="button"
+            onClick={() => onSeek(row.start_ts)}
+            className="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-mono"
+            style={{
+              color: "var(--accent)",
+              backgroundColor: "var(--surface)",
+              cursor: "pointer",
+            }}
+            title={`Jump to ${fmtTs(row.start_ts)}`}
+          >
+            ▸ {fmtTs(row.start_ts)}
+          </button>
+          <strong>{voiceName}</strong>
+          <span
+            className="text-[10px]"
+            style={{ color: "var(--foreground-ghost)" }}
+          >
+            (voice)
+          </span>
+        </div>
+        <div
+          className="leading-snug"
+          style={{ color: "var(--foreground-secondary)" }}
+        >
+          {row.preview_text || (
+            <em style={{ color: "var(--foreground-ghost)" }}>
+              (no transcript text)
+            </em>
+          )}
+        </div>
+      </div>
+    </li>
   );
 }
 

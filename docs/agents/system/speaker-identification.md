@@ -746,6 +746,12 @@ The `agreement` field classifies the row by comparing **cluster dominants** (not
 
 The row's left-edge bar is colour-coded by `agreement` (green / red / amber / grey) so the operator can scan the timeline for problems without reading every row.
 
+### Words by attribution — side-by-side transcript
+
+Above the per-turn cards, the Alignment tab leads with a two-column transcript: the same speech text is rendered twice, once labelled with the dominant on-screen face cluster's Person, once with the voice cluster's Person. Reading down the columns shows you what *would* have been attributed if you only had one modality. Disagreement rows are tinted red, partial rows amber; agreeing rows render plain so disagreements pop visually.
+
+A summary line at the top reports the agreement percentage across turns where both sides had a name to attribute (turns with only one modality named, or neither, are excluded from the denominator since they can't agree or disagree). The view is purely derived from the timeline payload — no extra round-trip.
+
 ### How overlap is computed
 
 1. **Detection-in-turn check.** Each `source_face_detections` row has a `frame_ts`. Each `source_speakers` row covers `[start_ts, end_ts]`. A detection lands in a turn when `start_ts <= frame_ts <= end_ts`. Turns don't overlap, so a detection lands in at most one — the walk breaks early once matched.
