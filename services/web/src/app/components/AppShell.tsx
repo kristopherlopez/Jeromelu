@@ -9,6 +9,7 @@ import { ThemeProvider, useTheme } from "./ThemeContext";
 import { TeamProvider } from "./TeamContext";
 import { ThemeApplier } from "./ThemeApplier";
 import { TransitionProvider, CONTENT_DELAY_MS, CONTENT_FADE_MS } from "./TransitionContext";
+import { PageHeaderProvider } from "./PageHeaderContext";
 
 function PageContent({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -54,8 +55,7 @@ function PageContent({ children }: { children: ReactNode }) {
   // Mirrors the exclusion list in JeromeluTopBar.
   const hasTopBar =
     pathname !== "/landing" &&
-    !pathname.startsWith("/admin") &&
-    !pathname.startsWith("/wiki/source");
+    !pathname.startsWith("/admin");
 
   return (
     <div
@@ -82,9 +82,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         <ThemeApplier />
         <AvatarEngineProvider>
           <TransitionProvider>
-            <JeromeluPresence />
-            <JeromeluTopBar />
-            <PageContent>{children}</PageContent>
+            <PageHeaderProvider>
+              <JeromeluPresence />
+              <JeromeluTopBar />
+              <PageContent>{children}</PageContent>
+            </PageHeaderProvider>
           </TransitionProvider>
         </AvatarEngineProvider>
       </TeamProvider>

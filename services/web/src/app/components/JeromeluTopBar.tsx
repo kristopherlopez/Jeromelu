@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Activity,
+  ArrowLeft,
   BookOpen,
   FileText,
   MessageCircle,
@@ -18,6 +19,7 @@ import { ConnectedAvatar } from "./ConnectedAvatar";
 import { useAvatarEngine } from "./AvatarEngine";
 import { useTheme } from "./ThemeContext";
 import { useTeam } from "./TeamContext";
+import { usePageHeader } from "./PageHeaderContext";
 import { TEAMS } from "./teams";
 import { LETTERS } from "./JeromeluLogo";
 import type { FeedResponse } from "../feed/feed-data";
@@ -101,10 +103,10 @@ export function JeromeluTopBar() {
   const { mode, setMode, isLight } = useTheme();
   const { slug: teamSlug, team, setTeam } = useTeam();
   const { triggerClip } = useAvatarEngine();
+  const { header: pageHeader } = usePageHeader();
 
   const isHome = pathname === "/landing";
   const isAdmin = pathname.startsWith("/admin");
-  const isStream = pathname.startsWith("/wiki/source");
 
   // Hooks must run unconditionally — early-return only after all hooks declared.
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
@@ -119,7 +121,7 @@ export function JeromeluTopBar() {
 
   // Activity feed — same data source as the old sidebar
   useEffect(() => {
-    if (isHome || isAdmin || isStream) return;
+    if (isHome || isAdmin) return;
     const apiBase = process.env.NEXT_PUBLIC_API_URL!;
     Promise.allSettled([
       fetch(`${apiBase}/api/feed?limit=20`).then((r) => r.json()) as Promise<FeedResponse>,
@@ -166,7 +168,7 @@ export function JeromeluTopBar() {
         return () => clearTimeout(t);
       }
     });
-  }, [isHome, isAdmin, isStream, pathname]);
+  }, [isHome, isAdmin, pathname]);
 
   // Click-outside to close the activity dropdown
   useEffect(() => {
@@ -229,7 +231,7 @@ export function JeromeluTopBar() {
   }, [recentActivity]);
 
   // Now safe to early-return
-  if (isHome || isAdmin || isStream) return null;
+  if (isHome || isAdmin) return null;
 
   // ── Theme tokens ──
   // Accent tokens always read from CSS vars — ThemeApplier writes the
@@ -285,7 +287,58 @@ export function JeromeluTopBar() {
         })}
       </button>
 
-      {/* ── Center: Pill nav ── */}
+      {/* ── Center: page header (if set) or pill nav ── */}
+      {pageHeader ? (
+        <div
+          className="flex-1 flex items-center gap-3 min-w-0 px-4"
+          style={{ overflow: "hidden" }}
+        >
+          {pageHeader.backHref && (
+            <Link
+              href={pageHeader.backHref}
+              className="flex items-center gap-1 shrink-0"
+              style={{
+                fontFamily: "Georgia, serif",
+                fontSize: "13px",
+                color: labelMuted,
+                textDecoration: "none",
+              }}
+            >
+              <ArrowLeft size={14} />
+              {pageHeader.backLabel ?? "Back"}
+            </Link>
+          )}
+          {pageHeader.title && (
+            <>
+              <span
+                aria-hidden
+                className="shrink-0"
+                style={{ color: labelDim, fontSize: "12px" }}
+              >
+                ·
+              </span>
+              <span
+                className="truncate"
+                style={{
+                  fontFamily: "Georgia, serif",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: labelHover,
+                  minWidth: 0,
+                }}
+                title={pageHeader.title}
+              >
+                {pageHeader.title}
+              </span>
+            </>
+          )}
+          {pageHeader.meta && (
+            <div className="flex items-center gap-2 shrink-0">
+              {pageHeader.meta}
+            </div>
+          )}
+        </div>
+      ) : (
       <nav className="flex-1 flex items-center justify-center gap-1 min-w-0 px-4">
         {NAV_ITEMS.map((item) => {
           const isActive =
@@ -332,6 +385,7 @@ export function JeromeluTopBar() {
           );
         })}
       </nav>
+      )}
 
       {/* ── Right: avatar + status + theme switcher ── */}
       <div className="flex items-center gap-3 shrink-0">
