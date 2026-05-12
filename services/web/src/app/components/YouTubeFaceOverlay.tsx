@@ -41,10 +41,11 @@ declare global {
   }
 }
 
-const COLOR_VOICE_FACE = "#22c55e";
-const COLOR_FACE_ONLY = "#f59e0b";
-const COLOR_VOICE_ONLY = "#3b82f6";
-const COLOR_UNKNOWN = "#737373";
+const COLOR_VOICE_FACE = "#22c55e";  // green — pipeline agreed (voice+face)
+const COLOR_FACE_ONLY = "#f59e0b";   // amber — face-only attribution
+const COLOR_VOICE_ONLY = "#3b82f6";  // blue — voice fired alone, or face ≠ speaker
+const COLOR_MANUAL = "#a855f7";      // purple — operator-confirmed via bulk-assign
+const COLOR_UNKNOWN = "#737373";     // grey — face has no person_id
 
 function pickColor(
   face: { person_id: string | null },
@@ -64,6 +65,8 @@ function pickColor(
       return COLOR_FACE_ONLY;
     case "voice":
       return COLOR_VOICE_ONLY;
+    case "manual":
+      return COLOR_MANUAL;
     default:
       return COLOR_UNKNOWN;
   }

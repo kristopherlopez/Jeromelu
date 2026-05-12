@@ -38,10 +38,14 @@ interface ClickableFace {
 // - face: face fired alone for this turn → medium trust.
 // - voice: voice fired alone — face is on screen but not the speaker →
 //          paint light-blue to flag "known person, not currently speaking".
-// - none/manual: grey.
+// - manual: operator-confirmed via cluster bulk-assign → highest trust,
+//           painted purple so a quick scan tells you how much of the
+//           video has been through manual review.
+// - none / unknown: grey.
 const COLOR_VOICE_FACE = "#22c55e";  // green
 const COLOR_FACE_ONLY = "#f59e0b";   // amber
 const COLOR_VOICE_ONLY = "#3b82f6";  // blue (face on screen but voice attributes elsewhere)
+const COLOR_MANUAL = "#a855f7";      // purple (operator-confirmed)
 const COLOR_UNKNOWN = "#737373";     // grey
 
 function pickColor(
@@ -66,6 +70,8 @@ function pickColor(
       return COLOR_FACE_ONLY;
     case "voice":
       return COLOR_VOICE_ONLY;
+    case "manual":
+      return COLOR_MANUAL;
     default:
       return COLOR_UNKNOWN;
   }

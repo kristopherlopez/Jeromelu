@@ -14,7 +14,7 @@ That attribution is what lets the rest of the system answer questions like *"Wha
 For each pyannote turn in `source_speakers`, this layer fills in:
 
 - `speaker_person_id` — the matched `Person`, when one was found
-- `match_method` — `voice`, `face`, `voice+face`, or NULL
+- `match_method` — `voice`, `face`, `voice+face`, `manual`, or NULL
 - `match_confidence` — score on the matched modality (averaged when both modalities agreed)
 - `audio_match_*` and `visual_match_*` — per-modality provenance (which Person each modality voted for, score) so disagreements stay inspectable
 
@@ -94,7 +94,7 @@ video (Scout)  ────> InsightFace @ 1 fps > face detections + 512-dim emb
 | **Voiceprint** | A 256-dim voice embedding from a known host's enrolled audio. Each enrollment span yields many — a sliding-window stack. Stored in `person_voiceprints`. |
 | **Face embedding** | A 512-dim ArcFace vector from a known host's face. Stored in `person_face_embeddings`. |
 | **ASD (Active Speaker Detection)** | Deciding which of several visible faces is speaking *right now*. We use a mouth-opening heuristic; model-based ASD is on the backlog. |
-| **Match method** | How a turn was attributed: `voice` (audio only), `face` (visual only), `voice+face` (both modalities agreed — highest confidence), NULL (no match, or modalities disagreed). Stored on `source_speakers.match_method`. |
+| **Match method** | How a turn was attributed: `voice` (audio only), `face` (visual only), `voice+face` (both modalities agreed — highest auto confidence), `manual` (operator-confirmed via cluster bulk-assign — highest overall confidence), NULL (no match, or modalities disagreed). Stored on `source_speakers.match_method`. Drives the review-UI overlay colour: green = `voice+face`, amber = `face`, blue = `voice` or face/voice disagreement, **purple = `manual`**, grey = NULL / unmatched. |
 | **Fusion** | The cross-modal vote that combines per-turn voice and face matches into a single `speaker_person_id`. See the [Fusion](#fusion--fuse_per_turnaudio_pid-audio_score-visual_pid-visual_score) table in [How it works](#how-it-works). |
 | **Lineup** | The internal / code name for this surface (voice + face + fusion). Surfaces in `LINEUP_REMOTE`, `services/gpu/`, the phase ledger. The operator-facing name is *Speaker Identification*. |
 
