@@ -57,7 +57,7 @@ or one-shot CLI invocations driven via `make` targets.
 - **Remote GPU** — SageMaker Async on `ml.g4dn.xlarge`, scale-to-zero. Container under `services/gpu/` bakes pyannote + InsightFace model weights at build time.
 
 ## Runtime / Infra
-- **Single Lightsail VM** (`micro_3_2`, Ubuntu 22.04) running Docker Compose: postgres, caddy, web, api.
+- **Single Lightsail VM** (`small_3_2`, Ubuntu 22.04) running Docker Compose: postgres, caddy, web, api.
 - **CloudFront** in front of `jeromelu.ai` and `www`; `api.jeromelu.ai` direct to Lightsail.
 - **Route 53** hosted zone; **ACM** in `us-east-1` for the CloudFront viewer cert.
 - **GitHub Actions** for CI: build → push to ECR → self-hosted runner on the Lightsail box runs `scripts/lightsail-deploy.sh` (which also syncs `scripts/cron.d/jeromelu` into `/etc/cron.d/`). Full pipeline overview in [`docs/ops/ci-cd.md`](../ops/ci-cd.md).

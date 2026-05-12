@@ -43,7 +43,7 @@ The full inventory lives in
 
 | Layer | Live resources | Provisioned via |
 |---|---|---|
-| Compute | Lightsail `jeromelu` (`micro_3_2`) + static IP + keypair + firewall | Console (Phase 11.1) |
+| Compute | Lightsail `jeromelu` (`small_3_2`) + static IP + keypair + firewall | Console (Phase 11.1) |
 | Edge | CloudFront `E2G6FL11A3JP8F` (HTTP-only origin) | Console (Phase 8) |
 | TLS | ACM cert in `us-east-1` | Console (Phase 2.3) |
 | DNS | Route 53 zone `Z0304833VPJJKDFO86WO` + 4 records | Console (Phases 2.1, 10, 11.5) |

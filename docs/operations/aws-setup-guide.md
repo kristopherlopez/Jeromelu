@@ -39,7 +39,7 @@ The V1 architecture is one Lightsail VM running Docker Compose, fronted by Cloud
    - Region: `Sydney (ap-southeast-2a)`
    - Platform: Linux/Unix
    - Blueprint: OS Only → Ubuntu 22.04 LTS
-   - Plan: **`micro_3_2` — $7/mo** (1 GB RAM, 2 vCPU, 40 GB SSD, 1 TB transfer). Note: in `ap-southeast-2` the $5 nano is 0.5 GB RAM only — too tight for this stack. Don't downgrade.
+   - Plan: **`small_3_2` — $12/mo** (2 GB RAM, 2 vCPU, 60 GB SSD, 3 TB transfer). Originally provisioned on `micro_3_2` ($7/mo, 1 GB RAM) but upsized to `small_3_2` on 2026-05-12 after the 1 GB box OOM'd during compose rolls. Note: in `ap-southeast-2` the $5 nano is 0.5 GB only and the $10 `small_ipv6_3_2` is IPv6-only — neither viable for this stack.
    - Identifier: `jeromelu` (the keypair below uses `jeromelu-prod`; Lightsail names are unique across resource types within a region, so don't reuse the suffix for the instance)
    - SSH key: create a new ED25519 key named `jeromelu-prod`. Download both halves; save private key in 1Password and copy the public key.
 2. **Networking → Static IP → Create static IP** named `jeromelu-ip`, attach to the instance.

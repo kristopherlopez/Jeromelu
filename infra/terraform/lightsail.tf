@@ -3,7 +3,7 @@
 #
 # Single-VM production environment in ap-southeast-2a:
 #
-#   instance     jeromelu        ubuntu_22_04, micro_3_2 ($7/mo)
+#   instance     jeromelu        ubuntu_22_04, small_3_2 ($12/mo)
 #   static IP    jeromelu-ip     attached to the instance (52.65.91.199)
 #   firewall     22 (operator), 80, 443 (public)
 #
@@ -34,7 +34,7 @@ resource "aws_lightsail_instance" "jeromelu" {
   name              = "jeromelu"
   availability_zone = "${var.aws_region}a"
   blueprint_id      = "ubuntu_22_04"
-  bundle_id         = "micro_3_2"
+  bundle_id         = "small_3_2"
   key_pair_name     = "jeromelu-prod"
 
   lifecycle {

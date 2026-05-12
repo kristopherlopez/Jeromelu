@@ -231,7 +231,7 @@ V0 architecture replaced by a single Lightsail VM running Docker Compose. See `d
 | Resource | Value |
 |----------|-------|
 | Instance name | `jeromelu` (note: Lightsail keypair `jeromelu-prod` already used the `-prod` suffix) |
-| Bundle | `micro_3_2` — $7/mo (1 GB RAM, 2 vCPU, 40 GB SSD, 1 TB egress) |
+| Bundle | `small_3_2` — $12/mo (2 GB RAM, 2 vCPU, 60 GB SSD, 3 TB egress). Upsized from `micro_3_2` ($7/mo, 1 GB) on 2026-05-12 via snapshot-and-rebuild — 1 GB box OOM'd under compose rolls. |
 | Blueprint | `ubuntu_22_04` |
 | Region / AZ | ap-southeast-2a |
 | Static IP | `52.65.91.199` (`jeromelu-ip`, attached) |
