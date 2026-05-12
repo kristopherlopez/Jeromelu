@@ -5,7 +5,7 @@ status: draft
 
 # Scout Charter Expansion (Draft)
 
-> Draft. Last reviewed: 2026-05-12.
+> Draft. Last reviewed: 2026-05-12. **Decisions D1–D7 locked 2026-05-12.** Ready for Phase 0 (doc reconciliation).
 >
 > Formalises the proposal in [`docs/pages/wiki/data-feeds.md`](../../pages/wiki/data-feeds.md) §"Scout's expanded charter": Scout's scope should grow from *media inventory* to *all external data acquisition*. This includes the SuperCoach scraper, NRL.com fetchers (matches, team lists, injuries, rounds), and any future external sources of truth. Cleaning, parsing, diarisation, and claim extraction stay with the Analyst.
 
@@ -45,7 +45,9 @@ A future Phase 5 could replace external cron with an in-process APScheduler if c
 
 ### D5. Skills disposition
 
-**Recommendation: skills stay; they become thin wrappers over the same endpoints.** The `scrape-supercoach` Claude Code skill keeps existing for ad-hoc operator runs. It calls the endpoint with admin auth rather than duplicating the fetch logic. No code splits between skill and endpoint.
+**Decision (locked): no Claude Code skills for deterministic fetchers.** The endpoint + cron is the surface. Ad-hoc operator runs use the endpoint directly (curl, a `make` target, or the admin UI when one exists), not a skill. The existing `scrape-supercoach` Claude Code skill is retired as part of Phase 1 — operators move to hitting the endpoint.
+
+The Claude Agent SDK remains the right tool for *agentic* work — Scout's existing media-discovery loop uses it, and any future build that needs a Claude agent to *orchestrate* a Scout fetch (e.g. as one tool call inside a larger reasoning loop) can call the same endpoint. The endpoint is the universal surface; skills are not on the critical path.
 
 ### D6. Audit granularity
 
@@ -160,13 +162,14 @@ This is the pattern Scout's media side already follows; the expansion just insta
 
 ### Phase 1 — One pipeline migrated end-to-end (the proof slice)
 
-Pick the smallest pipeline: **SuperCoach player roster**. It already has a working fetcher and a skill.
+Pick the smallest pipeline: **SuperCoach player roster**. It already has a working fetcher script and a skill (to be retired).
 
 - Move `scripts/data/fetchers/fetch_supercoach_players.py` → `services/api/app/scout/data/supercoach_roster.py` as a callable function (no behavioural changes).
 - Add `POST /api/admin/scout/supercoach-roster` endpoint that wraps the function in the agent audit pattern.
-- Update the `scrape-supercoach` skill to call the endpoint instead of running the script directly.
-- Schedule via external cron (or a `make` target with documented cadence) — daily.
-- Phase 1 done = the SuperCoach roster refreshes daily, an audit row lands per run, the skill still works for ad-hoc operator use, and `people`/`people_attributes` row counts move when the upstream data does.
+- Add a `make scout-supercoach-roster` target for ad-hoc operator runs that hits the endpoint with admin auth.
+- Retire the `scrape-supercoach` Claude Code skill — operators use the endpoint or the `make` target.
+- Schedule via external cron — daily.
+- Phase 1 done = the SuperCoach roster refreshes daily, an audit row lands per run, the `make` target works for ad-hoc operator use, the skill is retired, and `people`/`people_attributes` row counts move when the upstream data does.
 
 ### Phase 2 — SuperCoach per-round stats (the high-leverage one)
 
@@ -202,7 +205,7 @@ The roadmap items in [`scout.md` §4 "Multi-platform expansion"](../../agents/cr
 
 ## Architectural risks
 
-1. **Skill ↔ endpoint duality.** Maintaining a skill *and* an endpoint risks drift if the skill ever bypasses the endpoint. Mitigation per D5: the skill is a thin wrapper, no duplicated logic, single integration test that exercises skill → endpoint → DB end-to-end.
+1. **Endpoint is the only surface.** Per D5 there are no Claude Code skills for deterministic fetchers, so the duality risk doesn't exist. The remaining concern is that the `make` targets are kept in sync with the endpoint paths — handled by a single integration test that exercises the target → endpoint → DB path end-to-end.
 
 2. **NRL.com rate limits / unauthenticated endpoint volatility.** Hammering nrl.com endpoints could get blocked or break when they restructure. Mitigation: per-pipeline rate limiter (e.g. one request per second, configurable per module); each module logs unknown response fields to `agent_events` so we get signal when the source shape changes; cron cadences are conservative (daily, not hourly).
 
