@@ -2183,35 +2183,50 @@ def get_identity_alignment(source_id: uuid.UUID, db: Session = Depends(get_db)):
 
     payload = fetch_alignment(db, source_id)
 
+    # Collect every person_id referenced anywhere in the payload — one
+    # Person query resolves all the names. Timeline rows reference up to
+    # five different person columns per row, so the deduping matters.
     person_ids: set[uuid.UUID] = set()
+
+    def _add(value: str | None) -> None:
+        if value:
+            person_ids.add(uuid.UUID(value))
+
     for c in payload["face_clusters"]:
-        if c.get("dominant_person_id"):
-            person_ids.add(uuid.UUID(c["dominant_person_id"]))
+        _add(c.get("dominant_person_id"))
     for v in payload["voice_clusters"]:
-        if v.get("dominant_person_id"):
-            person_ids.add(uuid.UUID(v["dominant_person_id"]))
+        _add(v.get("dominant_person_id"))
     for d in payload["disagreements"]:
-        person_ids.add(uuid.UUID(d["speaker_person_id"]))
-        person_ids.add(uuid.UUID(d["face_person_id"]))
+        _add(d.get("speaker_person_id"))
+        _add(d.get("face_person_id"))
+    for t in payload["timeline"]:
+        _add(t.get("voice_cluster_person_id"))
+        _add(t.get("face_cluster_person_id"))
+        _add(t.get("audio_match_person_id"))
+        _add(t.get("visual_match_person_id"))
+        _add(t.get("speaker_person_id"))
 
     name_by_id: dict[str, str] = {}
     if person_ids:
         for p in db.query(Person).filter(Person.person_id.in_(person_ids)).all():
             name_by_id[str(p.person_id)] = p.canonical_name
 
+    def _name(value: str | None) -> str | None:
+        return name_by_id.get(value) if value else None
+
     for c in payload["face_clusters"]:
-        c["dominant_person_name"] = (
-            name_by_id.get(c["dominant_person_id"])
-            if c.get("dominant_person_id") else None
-        )
+        c["dominant_person_name"] = _name(c.get("dominant_person_id"))
     for v in payload["voice_clusters"]:
-        v["dominant_person_name"] = (
-            name_by_id.get(v["dominant_person_id"])
-            if v.get("dominant_person_id") else None
-        )
+        v["dominant_person_name"] = _name(v.get("dominant_person_id"))
     for d in payload["disagreements"]:
-        d["speaker_person_name"] = name_by_id.get(d["speaker_person_id"])
-        d["face_person_name"] = name_by_id.get(d["face_person_id"])
+        d["speaker_person_name"] = _name(d.get("speaker_person_id"))
+        d["face_person_name"] = _name(d.get("face_person_id"))
+    for t in payload["timeline"]:
+        t["voice_cluster_person_name"] = _name(t.get("voice_cluster_person_id"))
+        t["face_cluster_person_name"] = _name(t.get("face_cluster_person_id"))
+        t["audio_match_person_name"] = _name(t.get("audio_match_person_id"))
+        t["visual_match_person_name"] = _name(t.get("visual_match_person_id"))
+        t["speaker_person_name"] = _name(t.get("speaker_person_id"))
 
     return {
         "source_id": str(source_id),

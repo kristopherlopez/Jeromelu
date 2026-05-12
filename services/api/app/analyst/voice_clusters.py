@@ -197,14 +197,14 @@ def compute_voice_clusters(session: Session, source_id: UUID) -> dict:
         for r in raw_rows
     ]
 
-    preview_by_segment = _fetch_full_turn_text(
+    preview_by_segment = fetch_full_turn_text(
         session, [r.segment_id for r in rows],
     )
 
     return aggregate_clusters(rows, preview_by_segment)
 
 
-def _fetch_full_turn_text(
+def fetch_full_turn_text(
     session: Session, segment_ids: list[UUID],
 ) -> dict[UUID, str]:
     """Concatenate every ``source_chunks`` row's text by speaker_segment_id.

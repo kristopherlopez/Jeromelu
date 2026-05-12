@@ -374,6 +374,44 @@ export interface AlignmentDisagreement {
   active_overlap_count: number;
 }
 
+/** Per-turn alignment row in chronological order. Each row carries both
+ *  modalities' cluster dominants, per-turn face counts, per-modality
+ *  matches, the current attribution, and an agreement classification —
+ *  the follow-along view of the identity-review surface. */
+export type AlignmentAgreement = "agree" | "disagree" | "partial" | "none";
+
+export interface AlignmentTimelineRow {
+  segment_id: string;
+  start_ts: number;
+  end_ts: number;
+  duration: number;
+
+  speaker_label: string;
+  voice_cluster_person_id: string | null;
+  voice_cluster_person_name: string | null;
+
+  face_cluster_id: number | null;
+  face_cluster_person_id: string | null;
+  face_cluster_person_name: string | null;
+  total_face_count: number;
+  /** Face frames inside this turn that passed the mouth-opening ASD
+   *  threshold — "the visible face was probably speaking at that moment". */
+  active_face_count: number;
+
+  audio_match_person_id: string | null;
+  audio_match_person_name: string | null;
+  visual_match_person_id: string | null;
+  visual_match_person_name: string | null;
+
+  speaker_person_id: string | null;
+  speaker_person_name: string | null;
+  match_method: MatchMethod;
+  match_confidence: number | null;
+
+  agreement: AlignmentAgreement;
+  preview_text: string;
+}
+
 export interface IdentityAlignmentResponse {
   source_id: string;
   face_clusters: AlignmentFaceCluster[];
@@ -381,4 +419,5 @@ export interface IdentityAlignmentResponse {
   alignment: AlignmentRow[];
   dominant_pairings: AlignmentDominantPair[];
   disagreements: AlignmentDisagreement[];
+  timeline: AlignmentTimelineRow[];
 }

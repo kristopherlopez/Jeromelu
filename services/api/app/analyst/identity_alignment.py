@@ -27,6 +27,8 @@ from jeromelu_shared.db import (
     SourceSpeaker,
 )
 
+from app.analyst.voice_clusters import fetch_full_turn_text
+
 #: Local mirror of ``visual_id.MIN_ACTIVE_MOUTH_OPENING`` so this module
 #: doesn't pull the visual_id import chain (cv2, InsightFace, numpy)
 #: into unit tests. Kept in sync with the source-of-truth threshold —
@@ -65,11 +67,19 @@ class TurnRow:
     speaker_label: str | None
     speaker_person_id: UUID | None
     match_method: str | None
+    # Per-modality match columns (set during transcribe-time ID before
+    # fusion). Optional so existing test fixtures still build — defaults
+    # let callers ignore the fields when they only care about cluster
+    # alignment, not per-turn modality breakdown.
+    audio_match_person_id: UUID | None = None
+    visual_match_person_id: UUID | None = None
+    match_confidence: float | None = None
 
 
 def compute_alignment(
     detections: list[DetectionRow],
     speakers: list[TurnRow],
+    preview_by_segment: dict[UUID, str] | None = None,
 ) -> dict:
     """Cross-modal alignment between face clusters and voice clusters.
 
@@ -115,6 +125,11 @@ def compute_alignment(
     # the disagreement list can flag turns where voice attribution ≠
     # dominant face cluster's identity.
     per_turn_cluster_counts: dict[UUID, dict[int, int]] = {}
+    # Per-turn rollups for the timeline view — total face frames and
+    # the active subset (mouth_opening passed the ASD threshold) per
+    # turn, regardless of which cluster contributed.
+    per_turn_total_count: dict[UUID, int] = {}
+    per_turn_active_count: dict[UUID, int] = {}
 
     sorted_dets = sorted(detections, key=lambda d: d.frame_ts)
     sorted_turns = sorted(
@@ -136,10 +151,11 @@ def compute_alignment(
             label: str = turn.speaker_label  # type: ignore[assignment]
             key = (det.cluster_id, label)
             overlap_counts[key] = overlap_counts.get(key, 0) + 1
-            if (
+            is_active = (
                 det.mouth_opening is not None
                 and det.mouth_opening >= MIN_ACTIVE_MOUTH_OPENING
-            ):
+            )
+            if is_active:
                 active_overlap_counts[key] = (
                     active_overlap_counts.get(key, 0) + 1
                 )
@@ -149,6 +165,13 @@ def compute_alignment(
             cluster_counts[det.cluster_id] = (
                 cluster_counts.get(det.cluster_id, 0) + 1
             )
+            per_turn_total_count[turn.segment_id] = (
+                per_turn_total_count.get(turn.segment_id, 0) + 1
+            )
+            if is_active:
+                per_turn_active_count[turn.segment_id] = (
+                    per_turn_active_count.get(turn.segment_id, 0) + 1
+                )
             # A detection's frame_ts can only land in one turn (turns
             # don't overlap), so break early.
             break
@@ -165,6 +188,15 @@ def compute_alignment(
         per_turn_cluster_counts=per_turn_cluster_counts,
         active_overlap_counts=active_overlap_counts,
         face_stats=face_stats,
+    )
+    timeline = _compute_timeline(
+        speakers=speakers,
+        per_turn_cluster_counts=per_turn_cluster_counts,
+        per_turn_total_count=per_turn_total_count,
+        per_turn_active_count=per_turn_active_count,
+        face_stats=face_stats,
+        voice_stats=voice_stats,
+        preview_by_segment=preview_by_segment or {},
     )
 
     return {
@@ -194,6 +226,7 @@ def compute_alignment(
         "alignment": alignment,
         "dominant_pairings": dominant_pairings,
         "disagreements": disagreements,
+        "timeline": timeline,
     }
 
 
@@ -361,6 +394,95 @@ def _compute_disagreements(
     return out[:DISAGREEMENT_LIMIT]
 
 
+def _compute_timeline(
+    *,
+    speakers: list[TurnRow],
+    per_turn_cluster_counts: dict[UUID, dict[int, int]],
+    per_turn_total_count: dict[UUID, int],
+    per_turn_active_count: dict[UUID, int],
+    face_stats: dict[int, dict],
+    voice_stats: dict[str, dict],
+    preview_by_segment: dict[UUID, str],
+) -> list[dict]:
+    """Per-turn chronological timeline for the follow-along view.
+
+    One row per ``source_speakers`` turn with a non-NULL ``speaker_label``,
+    sorted by ``start_ts``. Each row carries both modalities' cluster
+    dominants, per-turn face counts (total + active), per-modality match
+    columns (independent of cluster dominance), the current attribution,
+    and an ``agreement`` classification:
+
+    - ``agree``     — both cluster dominants set, same Person.
+    - ``disagree``  — both set, different Person.
+    - ``partial``   — exactly one side set.
+    - ``none``      — neither side has a dominant Person.
+
+    The classification compares cluster dominants (the strong signal),
+    not per-turn modality matches — single-turn matches are noisier and
+    sit in the row as supplementary detail.
+    """
+    out: list[dict] = []
+    for turn in sorted(speakers, key=lambda t: t.start_ts):
+        if not turn.speaker_label:
+            continue
+
+        voice_dom = voice_stats.get(turn.speaker_label, {}).get(
+            "dominant_person_id",
+        )
+        cluster_counts = per_turn_cluster_counts.get(turn.segment_id)
+        face_cluster_id: int | None = None
+        face_dom: str | None = None
+        if cluster_counts:
+            face_cluster_id = max(
+                cluster_counts.items(), key=lambda kv: kv[1],
+            )[0]
+            face_dom = face_stats.get(face_cluster_id, {}).get(
+                "dominant_person_id",
+            )
+
+        if voice_dom and face_dom:
+            agreement = "agree" if voice_dom == face_dom else "disagree"
+        elif voice_dom or face_dom:
+            agreement = "partial"
+        else:
+            agreement = "none"
+
+        out.append({
+            "segment_id": str(turn.segment_id),
+            "start_ts": float(turn.start_ts),
+            "end_ts": float(turn.end_ts),
+            "duration": float(turn.end_ts - turn.start_ts),
+
+            "speaker_label": turn.speaker_label,
+            "voice_cluster_person_id": voice_dom,
+
+            "face_cluster_id": face_cluster_id,
+            "face_cluster_person_id": face_dom,
+            "total_face_count": per_turn_total_count.get(turn.segment_id, 0),
+            "active_face_count": per_turn_active_count.get(turn.segment_id, 0),
+
+            "audio_match_person_id": (
+                str(turn.audio_match_person_id)
+                if turn.audio_match_person_id else None
+            ),
+            "visual_match_person_id": (
+                str(turn.visual_match_person_id)
+                if turn.visual_match_person_id else None
+            ),
+
+            "speaker_person_id": (
+                str(turn.speaker_person_id)
+                if turn.speaker_person_id else None
+            ),
+            "match_method": turn.match_method,
+            "match_confidence": turn.match_confidence,
+
+            "agreement": agreement,
+            "preview_text": preview_by_segment.get(turn.segment_id, ""),
+        })
+    return out
+
+
 def fetch_alignment(session: Session, source_id: UUID) -> dict:
     """Load detections + speakers for the source and run
     :func:`compute_alignment`. Returns the same payload shape, plus
@@ -379,6 +501,7 @@ def fetch_alignment(session: Session, source_id: UUID) -> dict:
             "alignment": [],
             "dominant_pairings": [],
             "disagreements": [],
+            "timeline": [],
         }
 
     det_rows = (
@@ -413,6 +536,9 @@ def fetch_alignment(session: Session, source_id: UUID) -> dict:
             SourceSpeaker.speaker_label,
             SourceSpeaker.speaker_person_id,
             SourceSpeaker.match_method,
+            SourceSpeaker.audio_match_person_id,
+            SourceSpeaker.visual_match_person_id,
+            SourceSpeaker.match_confidence,
         )
         .filter(SourceSpeaker.document_id == doc.document_id)
         .all()
@@ -425,8 +551,18 @@ def fetch_alignment(session: Session, source_id: UUID) -> dict:
             speaker_label=r.speaker_label,
             speaker_person_id=r.speaker_person_id,
             match_method=r.match_method,
+            audio_match_person_id=r.audio_match_person_id,
+            visual_match_person_id=r.visual_match_person_id,
+            match_confidence=(
+                float(r.match_confidence)
+                if r.match_confidence is not None else None
+            ),
         )
         for r in speaker_rows
     ]
 
-    return compute_alignment(detections, speakers)
+    preview_by_segment = fetch_full_turn_text(
+        session, [s.segment_id for s in speakers],
+    )
+
+    return compute_alignment(detections, speakers, preview_by_segment)

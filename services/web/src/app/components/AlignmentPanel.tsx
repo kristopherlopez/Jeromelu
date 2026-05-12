@@ -4,11 +4,18 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { apiFetch } from "@/lib/api";
 import type {
+  AlignmentAgreement,
   AlignmentDisagreement,
   AlignmentDominantPair,
   AlignmentRow,
+  AlignmentTimelineRow,
   IdentityAlignmentResponse,
 } from "@/lib/types";
+
+// Timeline rows rendered before the operator hits "Show all". Sources
+// commonly have 400-700 turns; rendering them all at once works but
+// laggy scroll on first paint. 100 covers the typical review case.
+const TIMELINE_INITIAL_LIMIT = 100;
 
 interface Props {
   sourceId: string;
@@ -34,6 +41,48 @@ function confidenceColor(c: number): string {
   if (c >= 0.4) return "#fbbf24"; // amber
   if (c >= 0.15) return "#f97316"; // orange
   return "#f87171"; // red — barely-an-alignment
+}
+
+// Per-turn agreement colour — green when both modalities agree,
+// red when they disagree, amber when only one modality has a name,
+// grey when neither does. Used as a left-edge bar on timeline rows.
+function agreementColor(a: AlignmentAgreement): string {
+  switch (a) {
+    case "agree":
+      return "#4ade80";
+    case "disagree":
+      return "#f87171";
+    case "partial":
+      return "#fbbf24";
+    case "none":
+    default:
+      return "var(--foreground-ghost)";
+  }
+}
+
+// Match-method colour — matches the Voices/Faces tabs so the operator
+// sees the same colour vocabulary across surfaces.
+function methodColor(method: string | null): string {
+  switch (method) {
+    case "voice+face":
+      return "#4ade80";
+    case "voice":
+      return "#60a5fa";
+    case "face":
+      return "#fbbf24";
+    case "manual":
+      return "#c084fc";
+    default:
+      return "var(--foreground-ghost)";
+  }
+}
+
+function fmtTurnDuration(seconds: number): string {
+  if (seconds < 1) return `${seconds.toFixed(1)}s`;
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return `${m}m${s ? ` ${s}s` : ""}`;
 }
 
 function nameOrFallback(
@@ -114,6 +163,7 @@ export default function AlignmentPanel({ sourceId, onSeek }: Props) {
 
   return (
     <div className="flex h-full flex-col gap-6 overflow-y-auto custom-scrollbar pr-2">
+      <TimelineList timeline={data.timeline ?? []} onSeek={onSeek} />
       <PairingsList pairings={data.dominant_pairings} alignmentResp={data} />
       <AlignmentMatrix
         alignmentByPair={alignmentByPair}
@@ -124,6 +174,219 @@ export default function AlignmentPanel({ sourceId, onSeek }: Props) {
         onSeek={onSeek}
       />
     </div>
+  );
+}
+
+interface TimelineProps {
+  timeline: AlignmentTimelineRow[];
+  onSeek: (seconds: number) => void;
+}
+
+function TimelineList({ timeline, onSeek }: TimelineProps) {
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll
+    ? timeline
+    : timeline.slice(0, TIMELINE_INITIAL_LIMIT);
+  const hiddenCount = timeline.length - visible.length;
+
+  // Quick stats so the operator sees the agreement distribution before
+  // scrolling — same vocabulary as the row colour ramp.
+  const counts: Record<AlignmentAgreement, number> = {
+    agree: 0,
+    disagree: 0,
+    partial: 0,
+    none: 0,
+  };
+  for (const t of timeline) counts[t.agreement]++;
+
+  return (
+    <section className="flex flex-col gap-2">
+      <h3
+        className="text-[11px] font-semibold uppercase tracking-wider"
+        style={{ color: "var(--foreground-ghost)" }}
+      >
+        Timeline ({timeline.length} turn{timeline.length === 1 ? "" : "s"})
+      </h3>
+      <p className="text-[11px]" style={{ color: "var(--foreground-ghost)" }}>
+        Follow-along view — one row per turn in playback order. Each row
+        shows the voice cluster (label + dominant person), the dominant
+        face cluster during the turn, the current attribution, and the
+        speech. Left-edge bar is the agreement classification between
+        the two cluster dominants.
+      </p>
+      <div className="flex flex-wrap gap-2 text-[10px]">
+        {(["agree", "disagree", "partial", "none"] as const).map((k) => (
+          <span
+            key={k}
+            className="rounded px-1.5 py-0.5"
+            style={{
+              border: `1px solid ${agreementColor(k)}`,
+              color: agreementColor(k),
+            }}
+          >
+            {k}: {counts[k]}
+          </span>
+        ))}
+      </div>
+      {timeline.length === 0 ? (
+        <div
+          className="rounded border px-3 py-2 text-xs"
+          style={{
+            borderColor: "var(--border)",
+            color: "var(--foreground-ghost)",
+          }}
+        >
+          No timeline rows — source isn't transcribed, or restart the
+          API to pick up the latest endpoint shape.
+        </div>
+      ) : (
+        <ul className="flex flex-col gap-1">
+          {visible.map((row) => (
+            <TimelineRow key={row.segment_id} row={row} onSeek={onSeek} />
+          ))}
+        </ul>
+      )}
+      {hiddenCount > 0 && !showAll && (
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          className="self-start rounded border px-2 py-1 text-[10px]"
+          style={{
+            borderColor: "var(--border)",
+            color: "var(--foreground-secondary)",
+          }}
+        >
+          Show all {timeline.length} turns ({hiddenCount} hidden)
+        </button>
+      )}
+      {showAll && timeline.length > TIMELINE_INITIAL_LIMIT && (
+        <button
+          type="button"
+          onClick={() => setShowAll(false)}
+          className="self-start rounded border px-2 py-1 text-[10px]"
+          style={{
+            borderColor: "var(--border)",
+            color: "var(--foreground-secondary)",
+          }}
+        >
+          Collapse to first {TIMELINE_INITIAL_LIMIT}
+        </button>
+      )}
+    </section>
+  );
+}
+
+interface TimelineRowProps {
+  row: AlignmentTimelineRow;
+  onSeek: (seconds: number) => void;
+}
+
+function TimelineRow({ row, onSeek }: TimelineRowProps) {
+  const voiceName =
+    row.voice_cluster_person_name ??
+    (row.voice_cluster_person_id ? "(unknown)" : "—");
+  const faceName =
+    row.face_cluster_person_name ??
+    (row.face_cluster_person_id ? "(unknown)" : "—");
+  const attribName =
+    row.speaker_person_name ??
+    (row.speaker_person_id ? "(unknown)" : "Unattributed");
+  return (
+    <li
+      className="flex gap-2 rounded border text-xs"
+      style={{
+        borderColor: "var(--border)",
+        borderLeftWidth: "3px",
+        borderLeftColor: agreementColor(row.agreement),
+        backgroundColor: "var(--background-deep)",
+      }}
+    >
+      <div className="flex min-w-0 flex-1 flex-col gap-1 px-3 py-2">
+        {/* Top row — time + voice/face + attribution */}
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <button
+            type="button"
+            onClick={() => onSeek(row.start_ts)}
+            className="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-mono"
+            style={{
+              color: "var(--accent)",
+              backgroundColor: "var(--surface)",
+              cursor: "pointer",
+            }}
+            title={`Jump to ${fmtTs(row.start_ts)}`}
+          >
+            ▸ {fmtTs(row.start_ts)}–{fmtTs(row.end_ts)}
+          </button>
+          <span
+            className="shrink-0 text-[10px] font-mono"
+            style={{ color: "var(--foreground-ghost)" }}
+          >
+            ({fmtTurnDuration(row.duration)})
+          </span>
+          <span
+            className="shrink-0 text-[10px]"
+            style={{ color: "var(--foreground-ghost)" }}
+            title="Face frames in turn (active / total)"
+          >
+            {row.active_face_count}/{row.total_face_count} face frames
+          </span>
+        </div>
+
+        {/* Modality rows — voice + face + current attribution */}
+        <div className="grid grid-cols-1 gap-x-3 gap-y-0.5 text-[11px] md:grid-cols-3">
+          <div>
+            <span style={{ color: "var(--foreground-ghost)" }}>Voice </span>
+            <strong>{row.speaker_label}</strong>
+            <span style={{ color: "var(--foreground-ghost)" }}> → </span>
+            {voiceName}
+          </div>
+          <div>
+            <span style={{ color: "var(--foreground-ghost)" }}>Face </span>
+            {row.face_cluster_id !== null ? (
+              <strong>Cluster {row.face_cluster_id}</strong>
+            ) : (
+              <span style={{ color: "var(--foreground-ghost)" }}>—</span>
+            )}
+            <span style={{ color: "var(--foreground-ghost)" }}> → </span>
+            {faceName}
+          </div>
+          <div>
+            <span style={{ color: "var(--foreground-ghost)" }}>Attributed </span>
+            <strong>{attribName}</strong>
+            {row.match_method && (
+              <span
+                className="ml-1 inline-block rounded px-1 py-0.5 text-[9px]"
+                style={{
+                  border: `1px solid ${methodColor(row.match_method)}`,
+                  color: methodColor(row.match_method),
+                }}
+              >
+                {row.match_method}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Speech text — two-line clamp; full text via tooltip. */}
+        <div
+          className="leading-snug"
+          style={{
+            color: "var(--foreground-secondary)",
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}
+          title={row.preview_text || undefined}
+        >
+          {row.preview_text || (
+            <em style={{ color: "var(--foreground-ghost)" }}>
+              (no transcript text)
+            </em>
+          )}
+        </div>
+      </div>
+    </li>
   );
 }
 

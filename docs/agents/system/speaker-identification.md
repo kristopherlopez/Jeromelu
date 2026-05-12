@@ -714,9 +714,37 @@ This is the bridge between today's per-turn `fuse_per_turn` (local, in `fusion.p
   "disagreements": [{segment_id, start_ts, end_ts, speaker_label,
                      speaker_person_id, speaker_person_name,
                      face_cluster_id, face_person_id, face_person_name,
-                     active_overlap_count}, ...]
+                     active_overlap_count}, ...],
+  "timeline": [{segment_id, start_ts, end_ts, duration,
+                speaker_label,
+                voice_cluster_person_id, voice_cluster_person_name,
+                face_cluster_id,
+                face_cluster_person_id, face_cluster_person_name,
+                total_face_count, active_face_count,
+                audio_match_person_id, audio_match_person_name,
+                visual_match_person_id, visual_match_person_name,
+                speaker_person_id, speaker_person_name,
+                match_method, match_confidence,
+                agreement, preview_text}, ...]
 }
 ```
+
+### Timeline — chronological follow-along view
+
+The four older sections (matrix, pairings, disagreements) answer **"is the alignment clean?"** — statistical, cluster-level questions. The timeline answers **"what's happening at minute 23?"** — one row per turn in playback order, with both modalities side-by-side and the conversation text inline so the operator can follow the show and audit attribution simultaneously.
+
+Each row carries the time range, the voice cluster (`speaker_label` + the cluster's dominant person), the dominant face cluster *for that turn's window* (the cluster that contributed the most detections inside the turn — different from the cluster's overall dominance), per-turn face counts (total + active where mouth-opening passed ASD), the current `speaker_person_id` attribution with `match_method`, the per-modality match columns (`audio_match_*` / `visual_match_*`) for inspection, and the full concatenated speech text.
+
+The `agreement` field classifies the row by comparing **cluster dominants** (not per-turn matches — those are noisier):
+
+| `agreement` | Voice cluster | Face cluster | Meaning |
+|---|---|---|---|
+| `agree`    | Person X | Person X | Both modalities point at the same Person. Highest-trust row. |
+| `disagree` | Person X | Person Y | Modalities point at different Persons. Operator worklist. |
+| `partial`  | one set, other null | | Only one cluster is named — either nothing's enrolled on the other side, or the turn had no face frames. |
+| `none`     | null | null | Neither cluster is attributed. |
+
+The row's left-edge bar is colour-coded by `agreement` (green / red / amber / grey) so the operator can scan the timeline for problems without reading every row.
 
 ### How overlap is computed
 

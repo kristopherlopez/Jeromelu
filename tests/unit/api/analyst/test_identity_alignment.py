@@ -65,6 +65,7 @@ class TestCompute:
             "alignment": [],
             "dominant_pairings": [],
             "disagreements": [],
+            "timeline": [],
         }
 
     def test_face_clusters_sorted_by_detection_count_desc(self):
@@ -278,6 +279,129 @@ class TestCompute:
             turns.append(_turn(start, start + 1.0, label=f"SPEAKER_{i:02d}", person=PERSON_A))
         result = compute_alignment(dets, turns)
         assert len(result["disagreements"]) == DISAGREEMENT_LIMIT
+
+
+class TestTimeline:
+    def test_timeline_chronological_one_row_per_turn(self):
+        # Out-of-order input; timeline must be sorted by start_ts asc.
+        turns = [
+            _turn(200, 210, label="SPEAKER_01"),
+            _turn(0, 10, label="SPEAKER_00"),
+            _turn(100, 130, label="SPEAKER_00"),
+        ]
+        result = compute_alignment([], turns)
+        starts = [t["start_ts"] for t in result["timeline"]]
+        assert starts == [0.0, 100.0, 200.0]
+
+    def test_timeline_excludes_null_speaker_label(self):
+        # Turns without a pyannote label can't participate in voice
+        # clustering — leave them off the timeline.
+        turns = [
+            _turn(0, 10, label="SPEAKER_00"),
+            _turn(20, 30, label=None),
+        ]
+        result = compute_alignment([], turns)
+        assert len(result["timeline"]) == 1
+        assert result["timeline"][0]["speaker_label"] == "SPEAKER_00"
+
+    def test_timeline_row_carries_required_fields(self):
+        t = _turn(
+            10.5, 14.2, label="SPEAKER_00",
+            person=PERSON_A, match_method="voice+face",
+        )
+        # Add per-modality + confidence fields the wrapper would fill.
+        t = TurnRow(
+            segment_id=t.segment_id,
+            start_ts=t.start_ts,
+            end_ts=t.end_ts,
+            speaker_label=t.speaker_label,
+            speaker_person_id=t.speaker_person_id,
+            match_method=t.match_method,
+            audio_match_person_id=PERSON_A,
+            visual_match_person_id=PERSON_A,
+            match_confidence=0.91,
+        )
+        preview = {t.segment_id: "Some words spoken"}
+        result = compute_alignment([], [t], preview_by_segment=preview)
+        row = result["timeline"][0]
+        assert row["segment_id"] == str(t.segment_id)
+        assert row["start_ts"] == 10.5
+        assert row["end_ts"] == 14.2
+        assert row["duration"] == pytest.approx(3.7)
+        assert row["speaker_label"] == "SPEAKER_00"
+        assert row["speaker_person_id"] == str(PERSON_A)
+        assert row["match_method"] == "voice+face"
+        assert row["match_confidence"] == 0.91
+        assert row["audio_match_person_id"] == str(PERSON_A)
+        assert row["visual_match_person_id"] == str(PERSON_A)
+        assert row["preview_text"] == "Some words spoken"
+
+    def test_timeline_agreement_agree(self):
+        # Voice cluster dominated by PERSON_A; face cluster dominated by A.
+        dets = [_det(float(i), cluster=0, matched=PERSON_A) for i in range(10)]
+        turns = [_turn(0, 10, label="SPEAKER_00", person=PERSON_A)]
+        row = compute_alignment(dets, turns)["timeline"][0]
+        assert row["voice_cluster_person_id"] == str(PERSON_A)
+        assert row["face_cluster_person_id"] == str(PERSON_A)
+        assert row["agreement"] == "agree"
+        assert row["face_cluster_id"] == 0
+
+    def test_timeline_agreement_disagree(self):
+        # Voice cluster says A; face cluster says B.
+        dets = [_det(float(i), cluster=0, matched=PERSON_B) for i in range(10)]
+        turns = [_turn(0, 10, label="SPEAKER_00", person=PERSON_A)]
+        row = compute_alignment(dets, turns)["timeline"][0]
+        assert row["voice_cluster_person_id"] == str(PERSON_A)
+        assert row["face_cluster_person_id"] == str(PERSON_B)
+        assert row["agreement"] == "disagree"
+
+    def test_timeline_agreement_partial_voice_only(self):
+        # Voice attributed to A; no face detections in the turn.
+        turns = [_turn(0, 10, label="SPEAKER_00", person=PERSON_A)]
+        row = compute_alignment([], turns)["timeline"][0]
+        assert row["voice_cluster_person_id"] == str(PERSON_A)
+        assert row["face_cluster_person_id"] is None
+        assert row["face_cluster_id"] is None
+        assert row["agreement"] == "partial"
+
+    def test_timeline_agreement_partial_face_only(self):
+        # Face cluster dominated by A; voice cluster has no attribution.
+        dets = [_det(float(i), cluster=0, matched=PERSON_A) for i in range(10)]
+        turns = [_turn(0, 10, label="SPEAKER_00", person=None)]
+        row = compute_alignment(dets, turns)["timeline"][0]
+        assert row["voice_cluster_person_id"] is None
+        assert row["face_cluster_person_id"] == str(PERSON_A)
+        assert row["agreement"] == "partial"
+
+    def test_timeline_agreement_none(self):
+        # Turn unattributed and no face detections.
+        turns = [_turn(0, 10, label="SPEAKER_00", person=None)]
+        row = compute_alignment([], turns)["timeline"][0]
+        assert row["agreement"] == "none"
+
+    def test_timeline_face_counts_per_turn(self):
+        active_val = 0.06  # above MIN_ACTIVE_MOUTH_OPENING=0.045
+        passive_val = 0.02  # below
+        dets = (
+            [_det(float(i), cluster=0, mouth=active_val) for i in range(7)]
+            + [_det(float(i), cluster=0, mouth=passive_val) for i in range(7, 10)]
+        )
+        turns = [_turn(0, 10, label="SPEAKER_00")]
+        row = compute_alignment(dets, turns)["timeline"][0]
+        assert row["total_face_count"] == 10
+        assert row["active_face_count"] == 7
+
+    def test_timeline_face_cluster_is_dominant_in_turn(self):
+        # Two clusters overlap with the turn; the one with more frames
+        # is the dominant face cluster for that timeline row.
+        dets = (
+            [_det(float(i), cluster=1) for i in range(2)]
+            + [_det(float(i + 3), cluster=0) for i in range(7)]
+        )
+        turns = [_turn(0, 10, label="SPEAKER_00")]
+        row = compute_alignment(dets, turns)["timeline"][0]
+        # Cluster 0 had 7 frames, cluster 1 had 2 — dominant is 0.
+        assert row["face_cluster_id"] == 0
 
 
 if __name__ == "__main__":  # pragma: no cover
