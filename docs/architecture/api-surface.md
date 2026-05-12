@@ -215,8 +215,9 @@ Per-agent URL prefix for every admin endpoint. The shape:
 | `POST /api/admin/players/fetch-and-refresh` | `POST /api/admin/scout/supercoach-roster` | Scout | Phase 1 of charter; alias the legacy path |
 | `POST /api/admin/players/refresh-nrlcom` | `POST /api/admin/scout/nrlcom-roster` | Scout | Phase 3 of charter — separate pipeline |
 | `POST /api/admin/teams/seed` | `POST /api/admin/scout/teams/seed` | Scout | Identity acquisition |
-| `POST /api/admin/ingest` | `POST /api/admin/analyst/ingest` | Analyst | Transcript ingest is Analyst territory |
-| `POST /api/admin/ingest-raw` | `POST /api/admin/analyst/ingest-raw` | Analyst | Same |
+| `POST /api/admin/ingest` | `POST /api/admin/analyst/ingest` | Analyst | Transcript ingest — Analyst territory (Q4 resolved) |
+| `POST /api/admin/ingest-raw` | `POST /api/admin/analyst/ingest-raw` | Analyst | Raw transcript ingest — Analyst territory (Q4 resolved) |
+| *(future)* | `POST /api/admin/scout/ingest` | Scout | Scout's audio-acquisition path (currently CLI-only via `make collect-audio`). HTTP-wraps when needed; namespace reserved alongside `analyst/ingest` per Q4 |
 | `POST /api/admin/update-clean-text` | `POST /api/admin/analyst/cleaning/override` | Analyst | Operator override of cleaned chunk |
 | `GET /api/admin/transcript-test-files` | `GET /api/admin/analyst/dev/transcript-fixtures` | Analyst | Dev tool, namespaced |
 | `GET /api/admin/transcript-diff/{filename}` | `GET /api/admin/analyst/dev/transcript-fixtures/{filename}/diff` | Analyst | Dev tool, namespaced |
@@ -224,7 +225,7 @@ Per-agent URL prefix for every admin endpoint. The shape:
 | `GET /api/admin/presenters/by-channel/{channel_id}` | `GET /api/admin/analyst/presenters/by-channel/{channel_id}` | Analyst | |
 | `POST /api/admin/presenters/candidates/{id}/confirm` | `POST /api/admin/analyst/presenters/candidates/{id}/confirm` | Analyst | |
 | `POST /api/admin/presenters/candidates/{id}/reject` | `POST /api/admin/analyst/presenters/candidates/{id}/reject` | Analyst | |
-| `POST /api/admin/presenters/scout/{channel_id}` | `POST /api/admin/analyst/presenters/scout/{channel_id}` | Analyst | The name "scout" inside the path is confusing — separate from the Scout crew member; rename if possible |
+| `POST /api/admin/presenters/scout/{channel_id}` | `POST /api/admin/analyst/presenters/discover/{channel_id}` | Analyst | Verb renamed `scout` → `discover` to avoid collision with the Scout crew member (Q1 resolved) |
 | `GET /api/sources/{source_id}/face-runs` | `GET /api/admin/analyst/sources/{source_id}/face-runs` | Analyst | Face admin moves out of the public /api/sources/* namespace |
 | `POST /api/sources/{source_id}/face-runs/assign` | `POST /api/admin/analyst/sources/{source_id}/face-runs/assign` | Analyst | |
 | `POST /api/sources/{source_id}/face-runs/move-run` | `POST /api/admin/analyst/sources/{source_id}/face-runs/move-run` | Analyst | |
@@ -328,16 +329,50 @@ These don't fit the agent-aligned model and stay where they are:
 - **Health** — `/health`.
 - **Squad admin** — `/api/admin/squad/*` is operator-only SuperCoach gameplay, not crew work.
 
+### Explicit read/write split for `/api/sources/*` (Q5)
+
+After migration, `/api/sources/*` is **read-only and public**; every administrative operation that mutates source data lives under `/api/admin/analyst/sources/*`. The frontend (source-review page) calls **both** namespaces:
+
+| Frontend action | Endpoint | Namespace |
+|---|---|---|
+| Render the source page (video, transcript, claims) | `GET /api/sources/{source_id}` | Public |
+| List all sources for the index | `GET /api/sources` | Public |
+| Rename a speaker segment | `PATCH /api/admin/analyst/speakers/{segment_id}` | Admin (Analyst) |
+| Reassign a speaker | `POST /api/admin/analyst/sources/{source_id}/speakers/{segment_id}/reassign` | Admin (Analyst) |
+| Recompute face clusters | `POST /api/admin/analyst/sources/{source_id}/face-clusters/recompute` | Admin (Analyst) |
+| Bulk-assign a face run | `POST /api/admin/analyst/sources/{source_id}/face-runs/assign` | Admin (Analyst) |
+| Regenerate face track | `POST /api/admin/analyst/sources/{source_id}/face-track/regenerate` | Admin (Analyst) |
+| ...etc. for every face/speaker mutation | `POST/PATCH /api/admin/analyst/sources/{source_id}/*` | Admin (Analyst) |
+
+Frontend code that today bundles read + write under `/api/sources/{id}/*` will need a small refactor at Phase C of the migration to call the new admin paths. Read paths keep working unchanged.
+
 ---
 
-## Open questions
+## Resolved questions (2026-05-12)
 
-1. **The "presenter scout" naming collision.** `POST /api/admin/presenters/scout/{channel_id}` uses "scout" as a verb (presenter-identification scout), but it's an Analyst operation — confusing alongside the Scout crew member's endpoints. Rename when migrating (e.g. `POST /api/admin/analyst/presenters/discover/{channel_id}`).
-2. **Public face/speaker endpoints.** Today the face/speaker management endpoints sit under `/api/sources/{source_id}/*` mixed with public reads. The proposal moves them to `/api/admin/analyst/sources/{source_id}/*`. Confirm the frontend code can be updated; if a public consumer is hitting them, plan a caller migration first.
-3. **`/api/admin/teams/seed` ownership.** Currently a one-off seed, listed here as Scout (identity acquisition). If Scout owns identity per the charter, this is fine. If we keep team identity as a separate concern, it might want its own home.
-4. **`/api/admin/ingest` vs Scout's audio acquisition.** The endpoint names overlap conceptually. Scout owns audio acquisition (download from YouTube → S3); Analyst owns ingestion of transcribed content. Worth checking what `/api/admin/ingest` actually does — if it triggers Scout's audio acquisition, it might want to move under Scout instead.
-5. **`/api/sources` vs `/api/admin/analyst/sources/*`.** Mixed namespace under `/api/sources/*` after migration: read-side stays under `/api/sources/*` (public), write-side moves to `/api/admin/analyst/sources/*`. Acceptable but worth being explicit so frontend code knows where to look for each.
-6. **Should Bookkeeper get a public read surface?** The Alignment Index, advisor accuracy leaderboard, and consensus shifts are all user-facing. Probably as `/api/ledger/*` (ledger page) rather than `/api/bookkeeper/*` — readers shouldn't care about agent attribution.
+1. **The "presenter scout" naming collision.**
+   *Question:* `POST /api/admin/presenters/scout/{channel_id}` uses "scout" as a verb, but it's an Analyst operation — confusing alongside the Scout crew member's endpoints.
+   **Resolution: rename the verb.** New path is `POST /api/admin/analyst/presenters/discover/{channel_id}`. Migration map updated accordingly.
+
+2. **Public face/speaker endpoints.**
+   *Question:* Today's face/speaker mutations sit under `/api/sources/{source_id}/*` mixed with public reads. Move to `/api/admin/analyst/sources/*`?
+   **Resolution: yes, move to Analyst.** The full read/write split is now explicit (see §"Explicit read/write split for `/api/sources/*`" above). Public `/api/sources/*` stays; every mutation goes under `/api/admin/analyst/sources/*`. Frontend will need a small refactor at Phase C.
+
+3. **`/api/admin/teams/seed` ownership.**
+   *Question:* One-off seed of team identity rows — Scout or its own concern?
+   **Resolution: Scout owns it.** New teams enter rarely (~once a season at most) so the pipeline is very slow-moving, but identity acquisition is a Scout responsibility per D1 of the charter regardless of cadence. Path becomes `POST /api/admin/scout/teams/seed`.
+
+4. **`/api/admin/ingest` vs Scout's audio acquisition.**
+   *Question:* The names overlap; both Scout and Analyst have "ingest"-shaped work.
+   **Resolution: both namespaces are valid; they refer to different work.** `POST /api/admin/analyst/ingest` (and `/ingest-raw`) handle transcript persistence — Analyst's territory. `POST /api/admin/scout/ingest` is the future HTTP wrapper for Scout's audio acquisition (currently CLI-only via `make collect-audio`); namespace reserved for when that becomes an admin endpoint. Migration map carries both.
+
+5. **`/api/sources` vs `/api/admin/analyst/sources/*` clarity.**
+   *Question:* Mixed namespace risk after migration.
+   **Resolution: be explicit.** Read-only public lives at `/api/sources/*`; every write goes to `/api/admin/analyst/sources/*`. Documented in §"Explicit read/write split for `/api/sources/*`" with a per-action mapping table.
+
+6. **Bookkeeper public read surface.**
+   *Question:* The Alignment Index / advisor accuracy / consensus shifts are user-facing. `/api/ledger/*` or `/api/bookkeeper/*`?
+   **Resolution: move to the appropriate agent owner when built.** Today none of these endpoints exist. When they ship: admin operations (refresh alignment index, recompute consensus) at `/api/admin/bookkeeper/*`; the **public ledger surface** (what the Ledger page reads) lands under its own feature path — `/api/ledger/*` is the natural choice, consistent with `/api/wiki/*` and `/api/feed/*` being feature-aligned rather than agent-aligned. Users don't think in agents; readers do think in pages.
 
 ---
 
