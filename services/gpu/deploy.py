@@ -29,12 +29,16 @@ from botocore.exceptions import ClientError
 from jeromelu_shared.config import settings
 
 
-#: T4 (g4dn) is cheapest but capacity is tight in ap-southeast-2 — saw
-#: `InsufficientInstanceCapacity` errors. A10G (g5) is newer, faster,
-#: more readily available; ~2× the price (~$1.40/hr) but still <$1/source
-#: at ~5 min GPU per source. Easy revert: change back to ml.g4dn.xlarge
-#: when you see capacity is back.
-INSTANCE_TYPE = "ml.g5.xlarge"
+#: T4 (g4dn) is ~50% cheaper than A10G (g5) at $0.736/hr in us-east-1.
+#: Pyannote 3.1 + InsightFace `buffalo_l` both fit comfortably in T4's
+#: 16 GB VRAM. The original switch to g5 was a workaround for Sydney
+#: g4dn capacity — irrelevant now that the endpoint lives in us-east-1.
+#: T4 is ~30-50% slower per request than A10G, which doesn't matter
+#: because everything is already async.
+#:
+#: If a new workload needs more VRAM (>16 GB) or much faster step time,
+#: bump back to ml.g5.xlarge and accept the ~2× hourly.
+INSTANCE_TYPE = "ml.g4dn.xlarge"
 
 
 def _account_id(region: str) -> str:
@@ -62,7 +66,13 @@ def _model_name(endpoint: str, image_tag: str) -> str:
 
 
 def _config_name(endpoint: str, image_tag: str) -> str:
-    return f"{endpoint}-cfg-{image_tag}"
+    # Include the instance family (e.g. "g4dn", "g5") so a change to
+    # INSTANCE_TYPE produces a fresh config name and `update_endpoint`
+    # actually rolls forward. Without this suffix the "config already
+    # exists, skipping" guard in _create_or_update_endpoint_config
+    # silently swallows hardware changes.
+    instance_family = INSTANCE_TYPE.split(".")[1]  # "ml.g4dn.xlarge" → "g4dn"
+    return f"{endpoint}-cfg-{image_tag}-{instance_family}"
 
 
 def _create_or_update_model(sm, *, model_name: str, image: str, role: str, hf_token: str) -> None:

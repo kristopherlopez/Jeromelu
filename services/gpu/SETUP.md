@@ -170,7 +170,7 @@ make lineup-build
 
 # Create / update the SageMaker model + endpoint config + endpoint, and
 # wait for the endpoint to enter `InService`. First deployment takes
-# ~5–10 min while SageMaker provisions the g5.xlarge instance and pulls
+# ~5–10 min while SageMaker provisions the g4dn.xlarge instance and pulls
 # the image.
 make lineup-deploy
 ```
@@ -228,8 +228,8 @@ the new image, then drains the old one. No request loss.
 
 ## Cost notes
 
-- **Per source:** ~$0.13 GPU compute (~5 min on `ml.g5.xlarge` at $1.40/hr)
-  + ~$0.001 cross-region S3 transfer + $0.30 Deepgram = **~$0.43/source**.
+- **Per source:** ~$0.10 GPU compute (~7-8 min on `ml.g4dn.xlarge` at $0.736/hr)
+  + ~$0.001 cross-region S3 transfer + $0.30 Deepgram = **~$0.40/source**.
 - **Storage:** ECR ~$0.30/month for the 3 GB image. SageMaker model
   storage is a few cents. Staging bucket is empty between runs.
 - **Idle:** $0 on SageMaker Async (scale-to-zero).
@@ -240,10 +240,10 @@ the new image, then drains the old one. No request loss.
   `aws logs tail /aws/sagemaker/Endpoints/jeromelu-lineup-async --follow --region us-east-1`
   for the Python traceback.
 - Endpoint stuck `Updating` for > 15 min → likely waiting on instance
-  provisioning. Check the Service Quotas console for `ml.g5.xlarge`
+  provisioning. Check the Service Quotas console for `ml.g4dn.xlarge`
   availability in `us-east-1`.
 - Endpoint goes `Failed` with "InsufficientInstanceCapacity" → AWS is
-  out of `ml.g5.xlarge` in this region right now. Try a different region
+  out of `ml.g4dn.xlarge` in this region right now. Try a different region
   per § 6, or wait an hour and redeploy.
 - "AccessDenied" in container logs touching the staging bucket → re-check
   the inline policy on `JeromeluSagemakerLineup` includes
