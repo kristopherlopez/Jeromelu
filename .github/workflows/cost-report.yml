@@ -1,0 +1,33 @@
+name: Daily cost report
+
+# Sends an AWS spend + resource inventory email to kristopher.lopez@gmail.com.
+# Cron is in UTC. 22:00 UTC = 08:00 AEST next day; pick whatever time works
+# for landing the report at the start of your morning.
+
+on:
+  schedule:
+    - cron: "0 22 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install boto3
+        run: pip install --quiet 'boto3>=1.34'
+
+      - name: Run cost report
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ap-southeast-2
+        run: python scripts/cost_report.py

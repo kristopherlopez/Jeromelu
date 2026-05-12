@@ -5,13 +5,14 @@ tags: [area/operations]
 # CI/CD pipeline
 
 Single source of truth for what GitHub Actions does in this repo, end to end.
-Three workflows live under `.github/workflows/`:
+Four workflows live under `.github/workflows/`:
 
 | Workflow | Trigger | What it does |
 |---|---|---|
 | `deploy.yml` | push to `master`, `workflow_dispatch` | Build api/web images → push to ECR → restart compose stack on Lightsail → invalidate CloudFront. |
 | `tests.yml` | PR / push to `master` | `pytest tests/unit` + `tsc --noEmit` on `services/web`. Runs unconditionally — does NOT gate `deploy.yml` (yet). |
 | `terraform.yml` | PR / push touching `infra/terraform/**` | `fmt -check` + `init` + `validate` + `plan`; comments the plan on PRs. **Apply stays manual.** |
+| `cost-report.yml` | `schedule: cron '0 22 * * *'` (22:00 UTC daily), `workflow_dispatch` | Runs `scripts/cost_report.py`: queries Cost Explorer for MTD spend by service + projection, describes the live resources, ships an HTML email via SES from `reports@jeromelu.ai` to `kristopher.lopez@gmail.com`. |
 
 The deploy workflow runs the actual deploy step on a **self-hosted GitHub
 Actions runner installed on the Lightsail box itself** — not via SSH from a
@@ -90,6 +91,28 @@ Runs on every PR (and master push) that touches `infra/terraform/**` or the work
 `-lock=false` is intentional: the plan-only IAM identity has `ReadOnlyAccess` and cannot write the S3 lockfile. Plan is read-only against state, so concurrent plans don't corrupt anything. Local apply (with admin creds) still locks normally.
 
 **Apply is manual** from an operator workstation with admin AWS creds. Auto-apply will stay off until the team is large enough to justify expanding the apply IAM identity. See [`docs/operations/iac-runbook.md`](../operations/iac-runbook.md) for the apply procedure.
+
+---
+
+## `cost-report.yml` — daily spend + inventory email
+
+Runs at 22:00 UTC (08:00 AEST). Generates an HTML+plaintext email with:
+
+- Month-to-date AWS spend total, by-service breakdown, and a linear month-end projection.
+- Prior month's total (for quick comparison).
+- Running resources: Lightsail bundle + state, SageMaker endpoint instance type + desired/current count + autoscaling min/max, and S3 bucket list.
+
+Uses the existing `jeromelu-cicd` GitHub Actions secrets — the IAM policy is extended in `infra/terraform/iam.tf` with `ce:GetCostAndUsage`, a handful of describe-* perms, and scoped `ses:SendEmail`. SES sender + recipient identities live in `infra/terraform/ses.tf`.
+
+### One-time setup after the first `terraform apply`
+
+`aws_ses_email_identity.kris` triggers AWS to send a verification email to `kristopher.lopez@gmail.com`. **Click the link in that inbox once.** Until you do, the workflow fails on `SendEmail` with `Email address is not verified`. After clicking, the identity stays verified indefinitely.
+
+The domain identity (`jeromelu.ai`) auto-verifies once Route53 propagates the DKIM CNAMEs (~5-15 min). Terraform's `aws_ses_domain_identity_verification` blocks `apply` until SES confirms — so if `terraform apply` finishes, DKIM is good.
+
+### Testing without waiting for cron
+
+Trigger the workflow manually: **Actions → Daily cost report → Run workflow**. Or `gh workflow run cost-report.yml`.
 
 ---
 

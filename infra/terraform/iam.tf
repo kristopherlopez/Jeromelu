@@ -72,6 +72,42 @@ data "aws_iam_policy_document" "cicd" {
       "arn:aws:cloudfront::${var.aws_account_id}:distribution/${var.cloudfront_distribution_id}",
     ]
   }
+
+  # Daily cost report (.github/workflows/cost-report.yml) reads MTD spend
+  # via Cost Explorer, describes the live resources we report on, and
+  # ships an email via SES. All read-only except for ses:SendEmail.
+  statement {
+    sid       = "CostExplorerRead"
+    effect    = "Allow"
+    actions   = ["ce:GetCostAndUsage"]
+    resources = ["*"] # Cost Explorer does not support resource-level scoping.
+  }
+
+  statement {
+    sid    = "DescribeResourcesForReport"
+    effect = "Allow"
+    actions = [
+      "lightsail:GetInstance",
+      "sagemaker:DescribeEndpoint",
+      "sagemaker:DescribeEndpointConfig",
+      "application-autoscaling:DescribeScalableTargets",
+      "s3:ListAllMyBuckets",
+    ]
+    resources = ["*"] # Describe APIs above are account-scoped, not resource-scoped.
+  }
+
+  statement {
+    sid    = "SESSendCostReport"
+    effect = "Allow"
+    actions = [
+      "ses:SendEmail",
+      "ses:SendRawEmail",
+    ]
+    resources = [
+      aws_ses_domain_identity.jeromelu.arn,
+      aws_ses_email_identity.kris.arn,
+    ]
+  }
 }
 
 resource "aws_iam_user_policy" "cicd" {

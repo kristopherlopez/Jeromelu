@@ -19,6 +19,7 @@ coverage.
 | V0 orphan teardown | yes (PR3) | Out-of-band script — see [`cleanup-v0.sh`](cleanup-v0.sh) |
 | CI workflow (`.github/workflows/terraform.yml`) | yes (PR4) — live 2026-04-30 | Plan-on-PR, comment plan; apply stays manual until apply IAM is sorted |
 | Lineup GPU (Phase 5.5) | yes — `lineup.tf` | ECR `jeromelu/lineup-gpu` + S3 `jeromelu-sagemaker-async` (both `us-east-1`) + IAM role `JeromeluSagemakerLineup` + Application Auto Scaling target & policies (scale-to-zero on `jeromelu-lineup-async/AllTraffic`). SageMaker model/config/endpoint themselves stay imperative — see [`services/gpu/deploy.py`](../../services/gpu/deploy.py). |
+| SES + daily cost report | yes — `ses.tf` | Verified domain identity `jeromelu.ai` (DKIM via Route53) + verified email identity `kristopher.lopez@gmail.com` (sandbox recipient — click the link AWS sends to that inbox on first apply). The `jeromelu-cicd` policy is extended with `ce:GetCostAndUsage`, a handful of describe-* perms, and scoped `ses:SendEmail`. Drives [`scripts/cost_report.py`](../../scripts/cost_report.py) via [`.github/workflows/cost-report.yml`](../../.github/workflows/cost-report.yml). |
 
 ## What is **not** managed by Terraform
 
