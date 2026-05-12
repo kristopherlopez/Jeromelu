@@ -343,6 +343,17 @@ scout-supercoach-roster:
 	curl -s -X POST "$(API)/api/admin/scout/supercoach-roster$(if $(SEASON),?season=$(SEASON))" \
 		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
 
+# Per-round (or Totals) SuperCoach stats fetch + upsert into player_rounds.
+# ROUND is required: 0 = Totals (cumulative / pre-season), 1-30 = per-round.
+# Audit-wrapped under agent_id='scout', detail_json.pipeline='supercoach-stats'.
+# Usage: make scout-supercoach-stats ADMIN_KEY=xxx ROUND=N [SEASON=2026] [API=...]
+scout-supercoach-stats:
+ifndef ROUND
+	$(error ROUND= required (0 for Totals, 1-30 for per-round))
+endif
+	curl -s -X POST "$(API)/api/admin/scout/supercoach-stats?round=$(ROUND)$(if $(SEASON),&season=$(SEASON))" \
+		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
+
 # nrl.com profile-page enrichment — walks every current player row,
 # fetches their nrl.com profile, parses the JSON-LD, and promotes dob /
 # image_url / birthplace_text / height_cm / weight_kg. Sequential, ~2-3

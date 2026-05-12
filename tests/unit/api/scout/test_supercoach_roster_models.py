@@ -24,19 +24,11 @@ from pydantic import ValidationError
 from app.scout.supercoach_roster.models import SuperCoachPlayer
 
 
-FIXTURE_PATH = (
-    Path(__file__).resolve().parents[4]
-    / "fixtures"
-    / "scout"
-    / "supercoach_roster"
-    / "canonical_response.json"
-)
-
-
 @pytest.fixture(scope="module")
-def fixture_players() -> list[dict]:
+def fixture_players(fixtures_dir: Path) -> list[dict]:
     """The canonical SuperCoach response fixture as raw dicts."""
-    return json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+    path = fixtures_dir / "scout" / "supercoach_roster" / "canonical_response.json"
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def test_canonical_fixture_parses(fixture_players):
