@@ -192,44 +192,84 @@ def compute_voice_clusters(session: Session, source_id: UUID) -> dict:
         for r in raw_rows
     ]
 
+    spans = [(r.segment_id, r.start_ts, r.end_ts) for r in rows]
     preview_by_segment = fetch_full_turn_text(
-        session, [r.segment_id for r in rows],
+        session, spans, document_id=doc.document_id,
     )
 
     return aggregate_clusters(rows, preview_by_segment)
 
 
 def fetch_full_turn_text(
-    session: Session, segment_ids: list[UUID],
+    session: Session,
+    spans: list[tuple[UUID, float, float]],
+    document_id: UUID,
 ) -> dict[UUID, str]:
-    """Concatenate every ``source_chunks`` row's text by speaker_segment_id.
+    """Concatenate every ``source_chunks`` row that *overlaps in time* with
+    each turn's ``[start_ts, end_ts]`` window.
 
-    One indexed query across all segments — cheaper than per-cluster
-    queries even on long sources. ``clean_text`` is preferred; falls
-    back to ``raw_text`` when the cleaner hasn't run. Chunks are joined
-    with spaces in chunk-start order so the result reads like the
-    speaker talking continuously.
+    Why overlap, not FK lookup: pyannote turn boundaries are finer-grained
+    than Deepgram utterance boundaries. The transcription merge assigns
+    each utterance to one turn via ``source_chunks.speaker_segment_id``
+    (max-overlap). With ~5× more pyannote turns than Deepgram utterances
+    on typical podcasts, querying by FK leaves most turns with no text
+    even though words *were* spoken during their window. Timestamp
+    overlap surfaces every chunk that fell in the turn's window, so
+    every turn shows what was said — at the cost that two adjacent turns
+    sharing one long utterance both show the same sentence.
+
+    Loads all chunks for the document in one query, then buckets in
+    Python via :func:`bucket_chunks_to_spans`. The pure-Python step is
+    unit-testable; the SQL load is trivial at podcast scale.
     """
-    if not segment_ids:
+    if not spans:
         return {}
     chunk_rows = (
         session.query(
-            SourceChunk.speaker_segment_id,
             SourceChunk.start_ts,
+            SourceChunk.end_ts,
             SourceChunk.clean_text,
             SourceChunk.raw_text,
         )
-        .filter(SourceChunk.speaker_segment_id.in_(segment_ids))
-        .order_by(SourceChunk.speaker_segment_id, SourceChunk.start_ts)
+        .filter(SourceChunk.document_id == document_id)
+        .filter(SourceChunk.start_ts.isnot(None))
+        .filter(SourceChunk.end_ts.isnot(None))
+        .order_by(SourceChunk.start_ts)
         .all()
     )
-    parts_by_segment: dict[UUID, list[str]] = {}
-    for seg_id, _ts, clean_text, raw_text in chunk_rows:
+    chunks: list[tuple[float, float, str]] = []
+    for start_ts, end_ts, clean_text, raw_text in chunk_rows:
         text = (clean_text or raw_text or "").strip()
         if not text:
             continue
-        parts_by_segment.setdefault(seg_id, []).append(text)
-    return {
-        seg_id: " ".join(parts)
-        for seg_id, parts in parts_by_segment.items()
-    }
+        chunks.append((float(start_ts), float(end_ts), text))
+    return bucket_chunks_to_spans(chunks, spans)
+
+
+def bucket_chunks_to_spans(
+    chunks: list[tuple[float, float, str]],
+    spans: list[tuple[UUID, float, float]],
+) -> dict[UUID, str]:
+    """Pure-Python: bucket chunk texts into spans they overlap in time.
+
+    Spans don't have to be sorted on input — the function sorts a copy
+    internally so the inner loop can early-break once we've walked past
+    a chunk's end. Output keys are every span's ``segment_id`` (even
+    spans with zero overlapping chunks, which map to ``""``).
+
+    A chunk is considered to overlap a span when
+    ``chunk.start <= span.end AND chunk.end >= span.start`` — touching
+    boundaries count, since pyannote turn boundaries and Deepgram
+    utterance boundaries are independently estimated and often sit a
+    fraction of a second apart.
+    """
+    out: dict[UUID, list[str]] = {seg_id: [] for seg_id, _s, _e in spans}
+    spans_sorted = sorted(spans, key=lambda s: s[1])
+    for chunk_start, chunk_end, text in chunks:
+        for seg_id, span_start, span_end in spans_sorted:
+            if span_end < chunk_start:
+                continue
+            if span_start > chunk_end:
+                break
+            out[seg_id].append(text)
+    return {seg_id: " ".join(parts) for seg_id, parts in out.items()}

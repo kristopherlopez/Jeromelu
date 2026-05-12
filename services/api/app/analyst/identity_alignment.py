@@ -562,7 +562,9 @@ def fetch_alignment(session: Session, source_id: UUID) -> dict:
     ]
 
     preview_by_segment = fetch_full_turn_text(
-        session, [s.segment_id for s in speakers],
+        session,
+        [(s.segment_id, s.start_ts, s.end_ts) for s in speakers],
+        document_id=doc.document_id,
     )
 
     return compute_alignment(detections, speakers, preview_by_segment)

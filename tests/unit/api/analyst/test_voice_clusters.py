@@ -10,7 +10,11 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from app.analyst.voice_clusters import TurnRow, aggregate_clusters
+from app.analyst.voice_clusters import (
+    TurnRow,
+    aggregate_clusters,
+    bucket_chunks_to_spans,
+)
 
 PERSON_A = uuid4()
 PERSON_B = uuid4()
@@ -206,6 +210,86 @@ class TestAggregateClusters:
         t = _turn("SPEAKER_00")
         result = aggregate_clusters([t], preview_by_segment={})
         assert result["speakers"][0]["turns"][0]["preview_text"] == ""
+
+
+class TestBucketChunksToSpans:
+    def test_empty_returns_empty(self):
+        assert bucket_chunks_to_spans([], []) == {}
+
+    def test_empty_chunks_yields_empty_strings_per_span(self):
+        # A span with no overlapping chunks still appears in the output
+        # — the Voices tab caller relies on every span being keyed so
+        # the "(no transcript text)" fallback fires for the right turns.
+        s = uuid4()
+        result = bucket_chunks_to_spans([], [(s, 0.0, 10.0)])
+        assert result == {s: ""}
+
+    def test_chunk_fully_inside_span_attributed(self):
+        s = uuid4()
+        result = bucket_chunks_to_spans(
+            [(2.0, 5.0, "hello world")],
+            [(s, 0.0, 10.0)],
+        )
+        assert result == {s: "hello world"}
+
+    def test_chunk_outside_span_not_attributed(self):
+        s = uuid4()
+        result = bucket_chunks_to_spans(
+            [(20.0, 25.0, "way later")],
+            [(s, 0.0, 10.0)],
+        )
+        assert result == {s: ""}
+
+    def test_chunk_crossing_two_adjacent_spans_attributed_to_both(self):
+        # This is the explicit reason for the overlap approach: a
+        # Deepgram utterance that crosses a pyannote turn boundary
+        # should appear on both turns (each turn covers part of the
+        # utterance window). Both turns get the full text — small
+        # redundancy is the cost for ensuring every turn has text.
+        a = uuid4()
+        b = uuid4()
+        result = bucket_chunks_to_spans(
+            [(4.0, 7.0, "spanning sentence")],
+            [(a, 0.0, 5.0), (b, 5.0, 10.0)],
+        )
+        assert result[a] == "spanning sentence"
+        assert result[b] == "spanning sentence"
+
+    def test_multiple_chunks_in_one_span_joined_with_spaces(self):
+        s = uuid4()
+        result = bucket_chunks_to_spans(
+            [
+                (0.0, 1.0, "first"),
+                (1.5, 2.5, "second"),
+                (3.0, 4.0, "third"),
+            ],
+            [(s, 0.0, 10.0)],
+        )
+        assert result == {s: "first second third"}
+
+    def test_unsorted_spans_handled(self):
+        # Spans can be passed in any order — internally sorted so the
+        # early-break logic works regardless of insertion order.
+        a = uuid4()
+        b = uuid4()
+        result = bucket_chunks_to_spans(
+            [(0.5, 1.5, "in A"), (10.5, 11.5, "in B")],
+            # B first, then A — out of chronological order.
+            [(b, 10.0, 12.0), (a, 0.0, 2.0)],
+        )
+        assert result[a] == "in A"
+        assert result[b] == "in B"
+
+    def test_touching_boundaries_count_as_overlap(self):
+        # Pyannote turn ends at 5.0; Deepgram chunk starts at 5.0.
+        # Independent estimators land on these boundaries +/- a few ms;
+        # treating "touching" as overlap avoids dropping text on the seam.
+        a = uuid4()
+        result = bucket_chunks_to_spans(
+            [(5.0, 7.0, "edge case")],
+            [(a, 0.0, 5.0)],
+        )
+        assert result == {a: "edge case"}
 
 
 if __name__ == "__main__":  # pragma: no cover
