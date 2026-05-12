@@ -350,18 +350,34 @@ _CLUSTER_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 
 def _cluster_label(cluster_id: int | None) -> str:
-    """Stable, human-friendly identifier per cluster within a source.
-
-    cluster_id 0 → "Cluster A", 1 → "Cluster B", ... 25 → "Cluster Z",
-    then "Cluster 27" onwards. ``None`` (HDBSCAN noise) → "Outliers".
-    The clustering pass already re-ranks labels by size descending, so
-    "Cluster A" is always the most-detected face in the video.
-    """
+    """Legacy label based on the underlying DB cluster_id. Kept for
+    the spatial-fallback runs path (``compute_face_runs``) where
+    position_id == cluster_id. The detection-backed path uses
+    :func:`_visible_label` so hidden portrait clusters don't leave
+    gaps in the visible letter sequence."""
     if cluster_id is None:
         return "Outliers"
     if 0 <= cluster_id < len(_CLUSTER_LETTERS):
         return f"Cluster {_CLUSTER_LETTERS[cluster_id]}"
     return f"Cluster {cluster_id + 1}"
+
+
+def _visible_label(cluster_id: int | None, visible_idx: int) -> str:
+    """Label by position in the visible list — so the operator sees
+    Cluster A, B, C, … sequentially regardless of how many portraits
+    or noise clusters HDBSCAN produced underneath. ``cluster_id=None``
+    is always rendered as "Outliers" (the HDBSCAN-noise bucket).
+
+    Without this, a source with three portraits at cluster_ids 1, 2, 3
+    auto-excluded would show visible clusters labelled A, E, L — the
+    gaps in the letter sequence read as "where are B/C/D?" when in
+    fact they're the hidden portraits.
+    """
+    if cluster_id is None:
+        return "Outliers"
+    if 0 <= visible_idx < len(_CLUSTER_LETTERS):
+        return f"Cluster {_CLUSTER_LETTERS[visible_idx]}"
+    return f"Cluster {visible_idx + 1}"
 
 
 def _detect_runs_for_cluster(detections: list[dict]) -> list[dict]:
@@ -466,9 +482,11 @@ def compute_face_runs_from_detections(
 
     positions: list[dict] = []
     excluded_count = 0
-    # position_id starts from 0 for the response — independent of
-    # cluster_id since clusters may include None and we want stable
-    # per-source integer IDs for the UI.
+    # visible_idx only increments for clusters that survive the
+    # exclusion filter, so the letter labels (A, B, C, ...) are
+    # sequential in the visible list — no gaps caused by hidden
+    # portraits / noise clusters underneath.
+    visible_idx = 0
     for pid, (cluster_id, bucket) in enumerate(items):
         meta = meta_by_cluster.get(cluster_id) if cluster_id is not None else None
 
@@ -490,10 +508,10 @@ def compute_face_runs_from_detections(
             sum(_bbox_centre(d["bbox"])[1] for d in bucket) / max(1, len(bucket)),
         )
 
-        # Label precedence: operator override > auto-generated.
+        # Label precedence: operator override > visible-position auto-label.
         label = (
             meta.label if meta is not None and meta.label
-            else _cluster_label(cluster_id)
+            else _visible_label(cluster_id, visible_idx)
         )
 
         # Dominant person across the cluster's detections. Most clusters
@@ -542,5 +560,6 @@ def compute_face_runs_from_detections(
                 "temporal_density": meta.temporal_density if meta else None,
             } if meta else None,
         })
+        visible_idx += 1
 
     return {"positions": positions, "excluded_count": excluded_count}
