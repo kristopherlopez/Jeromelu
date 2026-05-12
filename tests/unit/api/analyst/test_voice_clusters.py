@@ -186,17 +186,15 @@ class TestAggregateClusters:
         assert previews[0.0] == "Cleary is the top buy this week"
         assert previews[20.0] == "Yeah but you can't compare those two"
 
-    def test_preview_text_truncated_on_long_input(self):
+    def test_preview_text_long_input_passes_through_unmodified(self):
+        # No server-side truncation — the operator needs the whole turn
+        # to follow the conversation.
         t = _turn("SPEAKER_00", start=0, end=10)
-        # 600-char text — should be truncated to ~300 chars with a soft
-        # word-boundary break + ellipsis.
-        text = ("a " * 300).strip()
-        result = aggregate_clusters([t], {t.segment_id: text})
+        long_text = ("word " * 500).strip()
+        result = aggregate_clusters([t], {t.segment_id: long_text})
         preview = result["speakers"][0]["turns"][0]["preview_text"]
-        assert preview.endswith("…")
-        # Truncated to the cap with at most a few extra chars from the
-        # ellipsis. 310 is conservative headroom.
-        assert len(preview) <= 310
+        assert preview == long_text
+        assert "…" not in preview
 
     def test_preview_text_short_input_passes_through(self):
         t = _turn("SPEAKER_00", start=0, end=10)

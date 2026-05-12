@@ -29,12 +29,6 @@ from jeromelu_shared.db import SourceChunk, SourceDocument, SourceSpeaker
 #: capture acoustic variation across the cluster's timeline.
 VOICEPRINT_SAMPLE_LIMIT = 10
 
-#: Length cap for per-turn ``preview_text``. Long enough to read what
-#: the speaker actually said, short enough that one cluster's worth of
-#: turns doesn't bloat the JSON. Lines that exceed this get a soft
-#: word-boundary truncation + ellipsis.
-_PREVIEW_TRUNCATE_AT = 300
-
 
 @dataclass(frozen=True)
 class TurnRow:
@@ -103,7 +97,10 @@ def aggregate_clusters(
 
         # Every turn in the cluster, sorted chronologically so the
         # operator scans the conversation in playback order. Symmetric
-        # with the Faces tab's per-cluster run list.
+        # with the Faces tab's per-cluster run list. ``preview_text`` is
+        # the full concatenated chunk text — no truncation — so the
+        # operator can read what was actually said without clicking
+        # through to the transcript tab.
         chrono_turns = sorted(turns, key=lambda t: t.start_ts)
         turns_out = [
             {
@@ -116,9 +113,7 @@ def aggregate_clusters(
                 ),
                 "match_method": t.match_method,
                 "has_embedding": t.has_embedding,
-                "preview_text": _truncate(
-                    preview_by_segment.get(t.segment_id, ""),
-                ),
+                "preview_text": preview_by_segment.get(t.segment_id, ""),
             }
             for t in chrono_turns
         ]
@@ -238,14 +233,3 @@ def fetch_full_turn_text(
         seg_id: " ".join(parts)
         for seg_id, parts in parts_by_segment.items()
     }
-
-
-def _truncate(text: str) -> str:
-    if len(text) <= _PREVIEW_TRUNCATE_AT:
-        return text
-    # Snip on the last space before the cap so we don't break mid-word.
-    head = text[:_PREVIEW_TRUNCATE_AT]
-    space = head.rfind(" ")
-    if space > _PREVIEW_TRUNCATE_AT * 0.5:
-        head = head[:space]
-    return head + "…"

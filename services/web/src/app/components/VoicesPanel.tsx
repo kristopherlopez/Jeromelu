@@ -344,18 +344,7 @@ function VoiceTurnRow({ turn, onSeek }: TurnRowProps) {
       />
       <span
         className="min-w-0 flex-1 leading-snug"
-        style={{
-          color: "var(--foreground-secondary)",
-          // Two-line clamp; full text is in the API response and the
-          // tooltip below carries it for power users. Tailwind doesn't
-          // ship line-clamp by default in older configs so we set the
-          // properties directly.
-          display: "-webkit-box",
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: "vertical",
-          overflow: "hidden",
-        }}
-        title={turn.preview_text || undefined}
+        style={{ color: "var(--foreground-secondary)" }}
       >
         {turn.preview_text || (
           <em style={{ color: "var(--foreground-ghost)" }}>

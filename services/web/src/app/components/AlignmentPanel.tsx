@@ -367,17 +367,10 @@ function TimelineRow({ row, onSeek }: TimelineRowProps) {
           </div>
         </div>
 
-        {/* Speech text — two-line clamp; full text via tooltip. */}
+        {/* Speech text — full concatenated turn text, no truncation. */}
         <div
           className="leading-snug"
-          style={{
-            color: "var(--foreground-secondary)",
-            display: "-webkit-box",
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: "vertical",
-            overflow: "hidden",
-          }}
-          title={row.preview_text || undefined}
+          style={{ color: "var(--foreground-secondary)" }}
         >
           {row.preview_text || (
             <em style={{ color: "var(--foreground-ghost)" }}>
