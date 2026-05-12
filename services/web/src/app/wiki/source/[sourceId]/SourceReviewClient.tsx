@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, User, Calendar, Video, PenLine, Hourglass, Smartphone } from "lucide-react";
-import type { SourceDetailResponse, SourceListItem } from "@/lib/types";
+import type { SourceDetailResponse, Speaker, SourceListItem } from "@/lib/types";
+import { apiFetch } from "@/lib/api";
 import { useIsYouTubeShort } from "@/lib/useIsYouTubeShort";
 import { usePageHeader } from "@/app/components/PageHeaderContext";
 import YouTubePlayer, { type YouTubePlayerHandle } from "@/app/components/YouTubePlayer";
@@ -22,7 +23,15 @@ interface Props {
 }
 
 export default function SourceReviewClient({ data, allSources }: Props) {
-  const { source, claims, chunks, speakers } = data;
+  const { source, claims, chunks } = data;
+  // Speakers is in local state (not a prop reference) because the
+  // bulk-assign flow rewrites speaker_person_id on hundreds of rows and
+  // the overlay's labels depend on it. Without lifting this, the overlay
+  // would refetch the regenerated face-track JSON (via faceTrackVersion)
+  // but still resolve every face.person_id against the stale, page-load
+  // speaker list — producing the "matched" fallback label instead of
+  // the person's name until the user hard-refreshes the page.
+  const [speakers, setSpeakers] = useState<Speaker[]>(data.speakers ?? []);
   const [currentTime, setCurrentTime] = useState(0);
   const [activeTab, setActiveTab] = useState<"transcript" | "claims" | "faces">("transcript");
   // Bumped after a successful face cluster assign so the overlay
@@ -30,6 +39,20 @@ export default function SourceReviewClient({ data, allSources }: Props) {
   // with the API's no-cache header, that's how the per-frame bbox
   // colouring catches up after the operator labels a cluster.
   const [faceTrackVersion, setFaceTrackVersion] = useState(0);
+
+  const refreshSpeakers = useCallback(async () => {
+    try {
+      const fresh = await apiFetch<SourceDetailResponse>(
+        `/api/sources/${source.source_id}`,
+      );
+      setSpeakers(fresh.speakers ?? []);
+    } catch (err) {
+      // Non-fatal: the overlay still shows "matched" for un-resolved
+      // person_ids, which is a clear "DB has it but UI hasn't caught
+      // up yet" signal. A console error is enough — no toast needed.
+      console.error("Failed to refresh speakers after cluster assign:", err);
+    }
+  }, [source.source_id]);
   // Three video surfaces, picked in priority order:
   //   1. YouTubeFaceOverlay — canvas drawn over the YouTube iframe.
   //      Default for any YouTube source with a face-track JSON. The
@@ -358,7 +381,15 @@ export default function SourceReviewClient({ data, allSources }: Props) {
               <FacesPanel
                 sourceId={source.source_id}
                 onSeek={handleSeek}
-                onClusterAssigned={() => setFaceTrackVersion((v) => v + 1)}
+                onClusterAssigned={() => {
+                  // Two refreshes triggered together: the overlay needs
+                  // the regenerated face-track JSON (via key remount)
+                  // AND the lifted speakers list so the name resolves
+                  // against the new speaker_person_id rows. Doing only
+                  // one leaves the label stuck on "matched".
+                  setFaceTrackVersion((v) => v + 1);
+                  void refreshSpeakers();
+                }}
               />
             ) : (
               <ClaimsList
