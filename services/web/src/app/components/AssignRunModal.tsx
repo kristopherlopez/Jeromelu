@@ -29,10 +29,15 @@ type Selection =
   | { kind: "existing"; person: PersonSummary }
   | { kind: "new"; name: string };
 
-type TurnStatus = "pending" | "running" | "done" | "error";
+type PhaseStatus = "pending" | "running" | "done" | "skip" | "error";
+
+/** The three streamed phases the SQL-only bulk-assign emits, plus the
+ *  framing person/result events. Per-turn events are gone — the loop
+ *  was replaced by a single SQL UPDATE. */
+type Phase = "cluster_face" | "attribute" | "commit";
 
 interface StreamEvent {
-  step: "person" | "cluster_face" | "turn" | "commit" | "result" | "unknown";
+  step: "person" | Phase | "result" | "unknown" | "turn";
   status: "start" | "done" | "skip" | "error";
   detail?: unknown;
 }
@@ -93,13 +98,14 @@ export default function AssignRunModal({
   const [selected, setSelected] = useState<Selection | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // One status per overlapping turn, indexed by position in the turns
-  // array (matches the API's emitted index).
-  const [turnStatus, setTurnStatus] = useState<TurnStatus[]>(() =>
-    turns.map(() => "pending"),
-  );
-  const [commitStatus, setCommitStatus] =
-    useState<TurnStatus>("pending");
+  // Three-row phase checklist replaces the old per-turn list. cluster_face
+  // is only emitted in cluster mode; the row stays "pending" if we're
+  // in the legacy fallback path.
+  const [phases, setPhases] = useState<Record<Phase, PhaseStatus>>({
+    cluster_face: "pending",
+    attribute: "pending",
+    commit: "pending",
+  });
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -126,48 +132,43 @@ export default function AssignRunModal({
         { step: evt.step, status: evt.status, detail: evt.detail },
       );
       setError(detail);
-      // Mark the turn that was running as errored, if any.
-      setTurnStatus((prev) => {
-        const next = [...prev];
-        const idx =
-          evt.detail !== null && typeof evt.detail === "object"
-            ? (evt.detail as { index?: number }).index
-            : undefined;
-        if (typeof idx === "number" && idx >= 0 && idx < next.length) {
-          next[idx] = "error";
-        }
-        return next;
-      });
-      if (evt.step === "commit") setCommitStatus("error");
+      // Mark the phase that was running as errored, if any.
+      if (
+        evt.step === "cluster_face" ||
+        evt.step === "attribute" ||
+        evt.step === "commit"
+      ) {
+        setPhases((prev) => ({ ...prev, [evt.step as Phase]: "error" }));
+      }
       return;
     }
 
-    if (evt.step === "turn") {
-      const idx =
-        evt.detail !== null && typeof evt.detail === "object"
-          ? (evt.detail as { index?: number }).index
-          : undefined;
-      if (typeof idx !== "number") return;
-      setTurnStatus((prev) => {
-        const next = [...prev];
-        if (evt.status === "start") next[idx] = "running";
-        else if (evt.status === "done") next[idx] = "done";
-        else if (evt.status === "error") next[idx] = "error";
-        return next;
+    if (
+      evt.step === "cluster_face" ||
+      evt.step === "attribute" ||
+      evt.step === "commit"
+    ) {
+      const phase = evt.step as Phase;
+      setPhases((prev) => {
+        let status: PhaseStatus = prev[phase];
+        if (evt.status === "start") status = "running";
+        else if (evt.status === "done") status = "done";
+        else if (evt.status === "skip") status = "skip";
+        return { ...prev, [phase]: status };
       });
-    } else if (evt.step === "commit") {
-      if (evt.status === "start") setCommitStatus("running");
-      else if (evt.status === "done") setCommitStatus("done");
     }
-    // person + result handled implicitly above.
+    // person + result + (legacy) turn events handled implicitly.
   };
 
   const handleSave = async () => {
     if (!selected) return;
     setSubmitting(true);
     setError(null);
-    setTurnStatus(turns.map(() => "pending"));
-    setCommitStatus("pending");
+    setPhases({
+      cluster_face: "pending",
+      attribute: "pending",
+      commit: "pending",
+    });
     try {
       const personFields =
         selected.kind === "existing"
@@ -232,16 +233,26 @@ export default function AssignRunModal({
 
   if (typeof document === "undefined") return null;
 
-  const statusIcon = (s: TurnStatus): string =>
-    s === "pending" ? "○" : s === "running" ? "⟳" : s === "done" ? "✓" : "✗";
-  const statusColor = (s: TurnStatus): string =>
+  const statusIcon = (s: PhaseStatus): string =>
+    s === "pending"
+      ? "○"
+      : s === "running"
+        ? "⟳"
+        : s === "done"
+          ? "✓"
+          : s === "skip"
+            ? "—"
+            : "✗";
+  const statusColor = (s: PhaseStatus): string =>
     s === "pending"
       ? "var(--foreground-ghost)"
       : s === "running"
         ? "var(--accent)"
         : s === "done"
           ? "var(--accent)"
-          : "#f87171";
+          : s === "skip"
+            ? "var(--foreground-ghost)"
+            : "#f87171";
 
   const overlay = (
     <div
@@ -290,65 +301,69 @@ export default function AssignRunModal({
             className="rounded border px-3 py-2 text-xs"
             style={{ borderColor: "var(--accent)" }}
           >
-            Saving will reassign all <strong>{turns.length}</strong> overlapping
+            Saving will attribute all <strong>{turns.length}</strong> overlapping
             speaker turn{turns.length === 1 ? "" : "s"} to{" "}
             <strong>
               {selected.kind === "existing"
                 ? selected.person.canonical_name
                 : selected.name}
             </strong>
-            , write a face embedding from each turn's midpoint, and a voiceprint
-            from each turn's audio. Single transaction — partial failures roll
-            back the whole batch.
+            {clusterId !== null && clusterId !== undefined && (
+              <>
+                {" "}and copy up to 10 face exemplars from the cluster's
+                highest-confidence detections into their face registry.
+              </>
+            )}
+            {" "}Single transaction — partial failures roll back the whole
+            batch. Voice enrollment is intentionally skipped at bulk-assign
+            time; a future workflow will sample representative turns for the
+            voiceprint registry separately.
           </div>
         )}
 
         {submitting && (
           <ul
-            className="flex max-h-72 flex-col gap-1 overflow-y-auto rounded border px-3 py-2 text-xs custom-scrollbar"
+            className="flex flex-col gap-1 rounded border px-3 py-2 text-xs"
             style={{
               borderColor: "var(--border)",
               backgroundColor: "var(--background-deep)",
             }}
           >
-            {turns.map((t, i) => (
+            {(
+              [
+                {
+                  key: "cluster_face" as Phase,
+                  label: `Copy face exemplars from cluster (${turns.length} turns to attribute)`,
+                },
+                {
+                  key: "attribute" as Phase,
+                  label: `Attribute ${turns.length} turn${turns.length === 1 ? "" : "s"} to person`,
+                },
+                {
+                  key: "commit" as Phase,
+                  label: "Commit transaction",
+                },
+              ] as const
+            ).map(({ key, label }) => (
               <li
-                key={t.segment_id}
-                className="flex items-center gap-2 tabular-nums"
-                style={{ color: statusColor(turnStatus[i]) }}
+                key={key}
+                className="flex items-center gap-2"
+                style={{ color: statusColor(phases[key]) }}
               >
                 <span
                   className="inline-block w-4 text-center"
                   style={{
                     animation:
-                      turnStatus[i] === "running"
+                      phases[key] === "running"
                         ? "spin 1s linear infinite"
                         : undefined,
                   }}
                 >
-                  {statusIcon(turnStatus[i])}
+                  {statusIcon(phases[key])}
                 </span>
-                <span>
-                  Turn {i + 1} ({fmtTs(t.start_ts)}–{fmtTs(t.end_ts)})
-                  {t.speaker_label ? ` — ${t.speaker_label}` : ""}
-                </span>
+                <span>{label}</span>
               </li>
             ))}
-            <li
-              className="mt-1 flex items-center gap-2 border-t pt-1"
-              style={{ color: statusColor(commitStatus), borderColor: "var(--border)" }}
-            >
-              <span
-                className="inline-block w-4 text-center"
-                style={{
-                  animation:
-                    commitStatus === "running" ? "spin 1s linear infinite" : undefined,
-                }}
-              >
-                {statusIcon(commitStatus)}
-              </span>
-              <span>Commit transaction</span>
-            </li>
             <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
           </ul>
         )}

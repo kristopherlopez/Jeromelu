@@ -586,14 +586,19 @@ After clustering, cluster IDs are re-ranked **by size descending** so cluster 0 
 
 ### Bulk-assign on clusters
 
-`POST /api/sources/{source_id}/face-runs/assign` now accepts an optional `cluster_id`. When supplied:
+`POST /api/sources/{source_id}/face-runs/assign` body `{cluster_id?, segment_ids[], person_id?|new_person_name?}`. SQL-only flow — no per-turn loop, no worker calls:
 
-1. Pulls the top `CLUSTER_EMBEDDING_SAMPLE_LIMIT=10` detections by `det_score` from `source_face_detections` for that cluster.
-2. Copies their embeddings straight into `person_face_embeddings` as exemplars (`created_by="manual"`). **Skips the per-turn frame fetch + InsightFace re-detect** — those exemplars are higher-quality (real cluster members) and cheaper (no worker round-trip, no model load) than per-turn midpoints.
-3. Voice enrollment + `source_speakers` updates proceed per turn as before.
-4. After the loop, a single bulk UPDATE on `source_face_detections.matched_person_id` re-attributes every detection in the cluster — so the runs view reflects the new attribution on the next refresh.
+1. **Face exemplars** (cluster mode only): copy top `CLUSTER_EMBEDDING_SAMPLE_LIMIT=10` detections by `det_score` from `source_face_detections` into `person_face_embeddings` (`created_by='manual'`).
+2. **Bulk attribute**: one `UPDATE source_speakers SET speaker_person_id, match_method='manual', match_confidence=1.0 WHERE segment_id = ANY(...)`. Replaces the previous per-turn loop.
+3. **Cluster-wide detection update** (cluster mode): one `UPDATE source_face_detections SET matched_person_id WHERE cluster_id=X`.
+4. **Cluster metadata stamp** (cluster mode): `source_face_clusters.attributed_person_id` set to the target so the cluster table mirrors the detection writes.
+5. Single commit.
 
-A new `cluster_face` event is emitted in the NDJSON stream (`start` then `done` with `exemplars_written`). The modal's existing event loop tolerates the unknown step type — it's silently logged today, but if you want a visible row it's a small addition.
+Total elapsed time is independent of cluster size — a 510-segment cluster completes in ~2 s. The earlier per-turn loop ran pyannote voice enrollment for every segment, producing thousands of voiceprints over ~5 minutes wall time; that was way over the kNN registry's useful scale and made every cluster-assign slower than the matching it enabled.
+
+**Voice enrollment is intentionally NOT done by this endpoint.** A future voice-focused workflow will sample 5-10 representative turns per cluster (longest spans / stratified across timeline) and enroll voiceprints from those, capping the registry contribution per cluster-assign.
+
+NDJSON event sequence: `person done` → `cluster_face start/done` (cluster mode) → `attribute start/done` → `commit start/done` → `result done`. Fixed three-phase shape regardless of `segment_ids` length; the modal's checklist is three rows.
 
 ### What's left for Slice B PR 3
 

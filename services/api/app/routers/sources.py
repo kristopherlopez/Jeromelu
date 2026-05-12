@@ -1441,22 +1441,29 @@ def bulk_assign_face_run(
 ):
     """Bulk reassign every source_speakers turn in ``body.segment_ids``
     to the same target Person. Used by the Faces tab when the operator
-    confirms a face-position run belongs to a known speaker.
+    confirms a cluster belongs to a known speaker.
 
-    Streams ``application/x-ndjson`` like the single reassign endpoint.
-    Events:
+    SQL-only flow — no per-turn loop, no per-turn worker calls.
 
-      ``person`` done           — Person resolved (created if needed).
-      ``turn`` start/done/error — one pair per segment_id, in order.
-      ``commit`` start/done     — single end-of-batch commit so partial
-                                  failures roll back ALL writes.
-      ``result`` done           — totals across the batch.
+      ``person`` done             — Person resolved (created if needed).
+      ``cluster_face`` start/done — Copy up to N detection embeddings
+                                    into person_face_embeddings as
+                                    exemplars (cluster mode only).
+      ``attribute`` start/done    — One UPDATE on source_speakers for
+                                    every segment_id in the batch.
+      ``commit`` start/done       — Single transaction commit.
+      ``result`` done             — Totals across the batch.
 
-    The whole batch is one transaction. If turn N fails mid-stream, the
-    handler emits a ``turn`` error event, then rolls back — turns 1..N-1
-    are not persisted. Idempotent retries are safe: the new-Person path
-    reuses an existing row by canonical name, and SourceSpeaker updates
-    are pure overwrites.
+    The whole batch is one transaction. Idempotent retries are safe:
+    the new-Person path reuses an existing row by canonical name, and
+    SourceSpeaker updates are pure overwrites.
+
+    Voice enrollment is intentionally **NOT** done here. Per-turn
+    voice enrollment over a 510-segment cluster produces 3,000-8,000
+    voiceprints — way over the kNN registry's useful scale — and was
+    the dominant cost in earlier iterations. A separate voice-focused
+    workflow will sample a handful of representative turns per
+    cluster-assign in a future change.
     """
     source = db.query(Source).filter(Source.source_id == source_id).first()
     if not source:
@@ -1555,7 +1562,6 @@ def bulk_assign_face_run(
 
     def stream() -> Iterator[bytes]:
         face_writes = 0
-        voice_writes = 0
         try:
             yield _ndjson({
                 "step": "person",
@@ -1567,13 +1573,13 @@ def bulk_assign_face_run(
                 },
             })
 
-            # Cluster mode (Slice B PR 2): the detections table already
-            # holds high-quality embeddings for every face in this
-            # cluster, so we copy the top-N as person_face_embeddings
-            # exemplars instead of fetching frames + re-running
-            # InsightFace per turn. Massive perf win (~3-5s saved per
-            # turn) AND better evidence (multiple angles/lighting from
-            # actual cluster members vs single midpoint frame).
+            # ---- Face exemplars (cluster mode only) -----------------
+            # The detections table already holds high-quality embeddings
+            # for every face in the cluster. We copy the top-N by
+            # det_score into person_face_embeddings as exemplars —
+            # cheaper and richer evidence than running InsightFace at
+            # each turn's midpoint (which often catches the wrong
+            # person on screen anyway).
             if use_cluster:
                 yield _ndjson({
                     "step": "cluster_face",
@@ -1597,136 +1603,47 @@ def bulk_assign_face_run(
                 ]
                 db.add_all(exemplar_rows)
                 db.commit()
-                face_writes += len(exemplar_rows)
+                face_writes = len(exemplar_rows)
                 yield _ndjson({
                     "step": "cluster_face",
                     "status": "done",
                     "detail": {
                         "cluster_id": body.cluster_id,
-                        "exemplars_written": len(exemplar_rows),
+                        "exemplars_written": face_writes,
                     },
                 })
 
-            # Shared voice-enrollment setup. Without this every turn
-            # would re-download the source's full m4a from S3 and
-            # re-load the pyannote model — observed ~100s per turn,
-            # roughly 25× the per-turn cost of the actual embedding.
-            # The context tempdir holds the audio for the duration of
-            # the bulk; each enroll_span_with_context only ffmpeg-crops
-            # the turn's seconds and embeds the windows.
-            #
-            # For larger batches, also pre-convert the full m4a to WAV
-            # so pyannote can crop natively per window instead of doing
-            # a per-span ffmpeg crop. ~30s one-time cost; pays for
-            # itself above ~10 spans. 510-span clusters drop from ~25
-            # minutes to ~5 minutes.
-            prefetch_wav = len(ordered) > 10
-            with enrollment_context(
-                db, source_id, prefetch_wav=prefetch_wav,
-            ) as voice_ctx:
-                for idx, sp in enumerate(ordered):
-                    seg_id = str(sp.segment_id)
-                    yield _ndjson({
-                        "step": "turn",
-                        "status": "start",
-                        "detail": {
-                            "index": idx,
-                            "segment_id": seg_id,
-                            "start_ts": float(sp.start_ts),
-                            "end_ts": float(sp.end_ts),
-                        },
-                    })
+            # ---- Bulk SP attribution --------------------------------
+            # Replaces the previous per-turn loop. One UPDATE statement,
+            # all segment_ids at once. The earlier implementation
+            # iterated turns and ran voice enrollment per turn — for a
+            # 510-segment cluster that was ~5 minutes of pyannote work
+            # to produce 3,000-8,000 voiceprints, way over the registry's
+            # useful kNN scale. Voice enrollment from cluster assigns is
+            # deferred to a dedicated voice-focused pass; see
+            # speaker-identification.md § Bulk-assign.
+            yield _ndjson({"step": "attribute", "status": "start"})
+            turns_updated = db.execute(
+                sa_update(SourceSpeaker)
+                .where(
+                    SourceSpeaker.segment_id.in_(body.segment_ids),
+                )
+                .values(
+                    speaker_person_id=target_person_id,
+                    match_method="manual",
+                    match_confidence=1.0,
+                )
+            ).rowcount or 0
+            yield _ndjson({
+                "step": "attribute",
+                "status": "done",
+                "detail": {"turns_updated": turns_updated},
+            })
 
-                    # Per-turn face enrollment only when cluster mode is
-                    # off — otherwise the cluster-face step above
-                    # already wrote richer exemplars.
-                    if use_cluster:
-                        pass
-                    else:
-                        # Frame midpoint = where face is most likely to appear.
-                        frame_ts = (float(sp.start_ts) + float(sp.end_ts)) / 2.0
-                        with tempfile.TemporaryDirectory(prefix="jeromelu-bulk-frame-") as ftmp:
-                            frame_path = Path(ftmp) / "frame.jpg"
-                            try:
-                                _fetch_reassign_frame(source, frame_ts, frame_path)
-                            except HTTPException as exc:
-                                yield _ndjson({
-                                    "step": "turn",
-                                    "status": "error",
-                                    "detail": {
-                                        "index": idx,
-                                        "segment_id": seg_id,
-                                        "stage": "frame",
-                                        "error": str(exc.detail),
-                                    },
-                                })
-                                db.rollback()
-                                return
-
-                            try:
-                                face_id, _det, _area = enroll_face_from_image(
-                                    db,
-                                    person_id=target_person_id,
-                                    source_id=source_id,
-                                    image_path=frame_path,
-                                    frame_ts=frame_ts,
-                                    created_by="manual",
-                                )
-                                if face_id:
-                                    face_writes += 1
-                            except VisualIdError as exc:
-                                # Same skip-not-fail policy as single reassign.
-                                logger.warning(
-                                    "Bulk face enrollment skipped for %s: %s", seg_id, exc
-                                )
-
-                    # Voiceprint enrollment from the turn's audio span,
-                    # reusing the shared context (no audio re-download,
-                    # no model re-load).
-                    try:
-                        result = enroll_span_with_context(
-                            db,
-                            voice_ctx,
-                            person_id=target_person_id,
-                            start_ts=float(sp.start_ts),
-                            end_ts=float(sp.end_ts),
-                            created_by="manual",
-                        )
-                        voice_writes += result.voiceprints_written
-                    except EnrollmentError as exc:
-                        logger.warning(
-                            "Bulk voiceprint enrollment skipped for %s: %s", seg_id, exc
-                        )
-
-                # Mark the turn manually corrected. Commit per-turn so
-                # the SourceSpeaker update is durable before we move on —
-                # both enroll_face_from_image and enroll() internally
-                # call session.commit() for their own writes, which in
-                # this multi-turn loop was leaving the per-turn dirty
-                # attribute change on `sp` unflushed even by subsequent
-                # inner commits. The empirical result was a successful
-                # batch that wrote 5 face embeddings + 27 voiceprints
-                # but zero attributed turns — face/voice landed via the
-                # inner commits while every sp update was lost. Per-turn
-                # commit also means refreshing the Faces tab mid-bulk
-                # reflects progress.
-                sp.speaker_person_id = target_person_id
-                sp.match_method = "manual"
-                sp.match_confidence = 1.0
-                db.commit()
-
-                yield _ndjson({
-                    "step": "turn",
-                    "status": "done",
-                    "detail": {
-                        "index": idx,
-                        "segment_id": seg_id,
-                    },
-                })
-
-            # Cluster mode: re-attribute every detection in the cluster
-            # so the next /face-runs call shows them as the new person
-            # rather than the old (or NULL) one. Single bulk UPDATE.
+            # ---- Cluster-wide detection attribution -----------------
+            # Updates matched_person_id on every detection in the
+            # cluster so the next /face-runs call shows them as the new
+            # person. Cheap UPDATE; runs only in cluster mode.
             cluster_detections_updated = 0
             if use_cluster:
                 cluster_detections_updated = db.execute(
@@ -1737,12 +1654,24 @@ def bulk_assign_face_run(
                     )
                     .values(matched_person_id=target_person_id)
                 ).rowcount or 0
-                db.commit()
 
+            # Also stamp source_face_clusters.attributed_person_id so
+            # the cluster table is consistent with the detections.
+            if use_cluster:
+                db.execute(
+                    sa_update(SourceFaceCluster)
+                    .where(
+                        SourceFaceCluster.source_id == source_id,
+                        SourceFaceCluster.cluster_id == body.cluster_id,
+                    )
+                    .values(
+                        attributed_person_id=target_person_id,
+                        updated_at=datetime.now(timezone.utc),
+                    )
+                )
+
+            # ---- Commit + result ------------------------------------
             yield _ndjson({"step": "commit", "status": "start"})
-            # No-op safety commit — every turn already flushed. Kept so
-            # the event sequence the frontend listens for stays stable
-            # (commit start/done before result done).
             db.commit()
             yield _ndjson({"step": "commit", "status": "done"})
 
@@ -1753,9 +1682,9 @@ def bulk_assign_face_run(
                     "person_id": str(target_person_id),
                     "person_name": person_name,
                     "person_created": person_created,
-                    "turns_updated": len(ordered),
+                    "turns_updated": turns_updated,
                     "face_embeddings_written": face_writes,
-                    "voiceprints_written": voice_writes,
+                    "voiceprints_written": 0,  # voice enrollment deferred — see docstring
                     "cluster_detections_updated": cluster_detections_updated,
                     "match_method": "manual",
                 },
