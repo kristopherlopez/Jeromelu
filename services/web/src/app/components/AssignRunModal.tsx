@@ -31,16 +31,31 @@ type Selection =
 
 type PhaseStatus = "pending" | "running" | "done" | "skip" | "error";
 
-/** The three streamed phases the SQL-only bulk-assign emits, plus the
+/** The streamed phases the SQL-only bulk-assign emits, plus the
  *  framing person/result events. Per-turn events are gone — the loop
- *  was replaced by a single SQL UPDATE. */
-type Phase = "cluster_face" | "attribute" | "commit";
+ *  was replaced by a single SQL UPDATE.
+ *
+ *  ``regen_face_track`` runs after commit and rebuilds the cached
+ *  face-track JSON so the YouTube overlay reflects the new attribution.
+ *  Failure here means the DB is correct but the overlay is stale — the
+ *  user must see the row turn red and retry via the regenerate endpoint. */
+type Phase = "cluster_face" | "attribute" | "commit" | "regen_face_track";
 
 interface StreamEvent {
   step: "person" | Phase | "result" | "unknown" | "turn";
   status: "start" | "done" | "skip" | "error";
   detail?: unknown;
 }
+
+// The textual label shown in the running checklist. Kept separate
+// from the wire step name so the user-facing copy can change without
+// breaking the protocol contract.
+const PHASE_LABELS: Record<Phase, string> = {
+  cluster_face: "Copy face exemplars from cluster",
+  attribute: "Attribute speaker turns to person",
+  commit: "Commit transaction",
+  regen_face_track: "Refresh overlay face-track JSON",
+};
 
 function fmtTs(s: number): string {
   const m = Math.floor(s / 60);
@@ -105,6 +120,7 @@ export default function AssignRunModal({
     cluster_face: "pending",
     attribute: "pending",
     commit: "pending",
+    regen_face_track: "pending",
   });
 
   useEffect(() => {
@@ -136,7 +152,8 @@ export default function AssignRunModal({
       if (
         evt.step === "cluster_face" ||
         evt.step === "attribute" ||
-        evt.step === "commit"
+        evt.step === "commit" ||
+        evt.step === "regen_face_track"
       ) {
         setPhases((prev) => ({ ...prev, [evt.step as Phase]: "error" }));
       }
@@ -146,7 +163,8 @@ export default function AssignRunModal({
     if (
       evt.step === "cluster_face" ||
       evt.step === "attribute" ||
-      evt.step === "commit"
+      evt.step === "commit" ||
+      evt.step === "regen_face_track"
     ) {
       const phase = evt.step as Phase;
       setPhases((prev) => {
@@ -168,6 +186,7 @@ export default function AssignRunModal({
       cluster_face: "pending",
       attribute: "pending",
       commit: "pending",
+      regen_face_track: "pending",
     });
     try {
       const personFields =
@@ -333,7 +352,7 @@ export default function AssignRunModal({
               [
                 {
                   key: "cluster_face" as Phase,
-                  label: `Copy face exemplars from cluster (${turns.length} turns to attribute)`,
+                  label: `${PHASE_LABELS.cluster_face} (${turns.length} turns to attribute)`,
                 },
                 {
                   key: "attribute" as Phase,
@@ -341,7 +360,11 @@ export default function AssignRunModal({
                 },
                 {
                   key: "commit" as Phase,
-                  label: "Commit transaction",
+                  label: PHASE_LABELS.commit,
+                },
+                {
+                  key: "regen_face_track" as Phase,
+                  label: PHASE_LABELS.regen_face_track,
                 },
               ] as const
             ).map(({ key, label }) => (

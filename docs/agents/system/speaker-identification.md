@@ -593,12 +593,20 @@ After clustering, cluster IDs are re-ranked **by size descending** so cluster 0 
 3. **Cluster-wide detection update** (cluster mode): one `UPDATE source_face_detections SET matched_person_id WHERE cluster_id=X`.
 4. **Cluster metadata stamp** (cluster mode): `source_face_clusters.attributed_person_id` set to the target so the cluster table mirrors the detection writes.
 5. Single commit.
+6. **Regenerate cached face-track JSON** from the post-commit DB state via `regenerate_face_track_json_from_detections` (`services/api/app/analyst/visual_id.py`). The DB is source of truth, but the YouTube overlay reads the cached JSON — without this step, the assign would land in the DB invisibly and the overlay would keep showing `?` for the cluster. Surfaced as its own NDJSON step (`regen_face_track`) so an S3-write failure is visible to the operator instead of silently leaving the JSON stale.
 
 Total elapsed time is independent of cluster size — a 510-segment cluster completes in ~2 s. The earlier per-turn loop ran pyannote voice enrollment for every segment, producing thousands of voiceprints over ~5 minutes wall time; that was way over the kNN registry's useful scale and made every cluster-assign slower than the matching it enabled.
 
 **Voice enrollment is intentionally NOT done by this endpoint.** A future voice-focused workflow will sample 5-10 representative turns per cluster (longest spans / stratified across timeline) and enroll voiceprints from those, capping the registry contribution per cluster-assign.
 
-NDJSON event sequence: `person done` → `cluster_face start/done` (cluster mode) → `attribute start/done` → `commit start/done` → `result done`. Fixed three-phase shape regardless of `segment_ids` length; the modal's checklist is three rows.
+NDJSON event sequence: `person done` → `cluster_face start/done` (cluster mode) → `attribute start/done` → `commit start/done` → `regen_face_track start/done` → `result done`. Fixed shape regardless of `segment_ids` length; the modal's checklist is four rows.
+
+#### Recovering from a failed regen
+
+If the `regen_face_track` step errors (S3 outage, creds rotated mid-flight), the DB is still consistent but the cached JSON is stale — the overlay will show `?` for the freshly-assigned cluster until the JSON is rewritten. Two recovery paths, both idempotent:
+
+- `POST /api/sources/{source_id}/face-track/regenerate` — thin wrapper around the same helper. Returns the new key, detection count, and distinct-persons count.
+- `python -m app.analyst.regen_face_track_cli <source-uuid>` — same helper from the shell. Supports `--all --stale-only` to walk every source and only rewrite those whose cached JSON disagrees with the DB. Used as the retroactive fix for sources assigned before the inline regen was wired in (anything before commit fixing the `Source` import in `visual_id.py`).
 
 ### What's left for Slice B PR 3
 

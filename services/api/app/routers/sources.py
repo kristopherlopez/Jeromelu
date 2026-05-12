@@ -1024,6 +1024,67 @@ def get_face_track(source_id: uuid.UUID, db: Session = Depends(get_db)):
     )
 
 
+@router.post("/sources/{source_id}/face-track/regenerate")
+def regenerate_face_track(source_id: uuid.UUID, db: Session = Depends(get_db)):
+    """Rebuild the cached face-track JSON in S3 from the current
+    ``source_face_detections`` state.
+
+    Use cases:
+      - Manual recovery when a bulk-assign's inline regen failed.
+      - Retroactive fix for sources assigned before the inline regen
+        was wired in (i.e. anything attributed before commit ade028a).
+
+    Idempotent: re-running on a source already in sync is harmless;
+    the JSON is byte-identical except for embedding-order ties.
+    """
+    source = db.query(Source).filter(Source.source_id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    if not source.audio_s3_key:
+        raise HTTPException(status_code=400, detail="Source has no audio_s3_key")
+
+    try:
+        key = regenerate_face_track_json_from_detections(db, source_id)
+    except Exception as exc:
+        logger.exception("Manual face-track regen failed for %s", source_id)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Regen failed: {type(exc).__name__}: {exc}",
+        ) from exc
+    if not key:
+        # Helper returns None when there's no cached JSON to base
+        # metadata off, or no detections to write. Both are operator-
+        # actionable — surface as 404 rather than a confusing 200/null.
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "No face-track JSON or no detections to regenerate from. "
+                "Run visual_identify first."
+            ),
+        )
+
+    distinct_persons = (
+        db.query(SourceFaceDetection.matched_person_id)
+        .filter(
+            SourceFaceDetection.source_id == source_id,
+            SourceFaceDetection.matched_person_id.isnot(None),
+        )
+        .distinct()
+        .count()
+    )
+    detection_count = (
+        db.query(func.count(SourceFaceDetection.detection_id))
+        .filter(SourceFaceDetection.source_id == source_id)
+        .scalar() or 0
+    )
+    return {
+        "source_id": str(source_id),
+        "face_track_s3_key": key,
+        "detections": detection_count,
+        "distinct_persons": distinct_persons,
+    }
+
+
 class SpeakerRenameRequest(BaseModel):
     speaker_label: str = Field(min_length=1, max_length=200)
 
@@ -1680,21 +1741,43 @@ def bulk_assign_face_run(
                     )
                 )
 
-            # ---- Commit + result ------------------------------------
+            # ---- Commit ---------------------------------------------
             yield _ndjson({"step": "commit", "status": "start"})
             db.commit()
+            yield _ndjson({"step": "commit", "status": "done"})
 
-            # Refresh the cached face-track JSON in S3 so the overlay
-            # sees the new attribution without a full visual_identify
-            # re-extract. Best-effort: never fail the assign on this.
+            # ---- Regenerate face-track JSON -------------------------
+            # The DB is the source of truth for attribution, but the
+            # YouTube overlay reads the cached face-track JSON in S3.
+            # If this regen fails the operator must know — silently
+            # logging a warning is what produced 2026-05-11's stale-JSON
+            # incident where a manually-assigned cluster showed "?" in
+            # the overlay even though the DB had it correctly attributed.
+            #
+            # Treated as a real stream step. On failure: surface the
+            # error and stop emitting result — the assign succeeded in
+            # the DB but the UI must trigger a retry via the standalone
+            # /face-track/regenerate endpoint before the overlay is
+            # consistent again.
+            yield _ndjson({"step": "regen_face_track", "status": "start"})
             try:
                 regenerate_face_track_json_from_detections(db, source_id)
             except Exception as exc:
-                logger.warning(
-                    "Face-track JSON regen failed for %s: %s", source_id, exc,
+                logger.exception(
+                    "Face-track JSON regen failed for %s after bulk-assign",
+                    source_id,
                 )
-
-            yield _ndjson({"step": "commit", "status": "done"})
+                yield _ndjson({
+                    "step": "regen_face_track",
+                    "status": "error",
+                    "detail": (
+                        f"{type(exc).__name__}: {exc}. DB updated; retry via "
+                        f"POST /api/sources/{source_id}/face-track/regenerate "
+                        "to refresh the overlay."
+                    ),
+                })
+                return
+            yield _ndjson({"step": "regen_face_track", "status": "done"})
 
             yield _ndjson({
                 "step": "result",

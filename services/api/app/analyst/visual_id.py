@@ -40,7 +40,7 @@ import numpy as np
 from sqlalchemy.orm import Session
 
 from jeromelu_shared.config import settings
-from jeromelu_shared.db import PersonFaceEmbedding, SourceFaceDetection
+from jeromelu_shared.db import PersonFaceEmbedding, Source, SourceFaceDetection
 from jeromelu_shared.s3 import download_raw, get_s3_client, upload_raw
 from sqlalchemy import func as sa_func
 
