@@ -284,6 +284,17 @@ PORTRAIT_MIN_DETECTIONS = 1000
 #: moved, it's wall art.
 PORTRAIT_CENTROID_STRICT = 2.0
 
+#: Bbox area as a fraction of frame area, below which a cluster is
+#: classified as a background portrait — even when mouth_std exceeds
+#: the portrait ceiling. Background-shelf portraits are typically tiny
+#: in frame (low-resolution lip landmark detection on a small printed
+#: face is noisy, pushing mouth_std into the 0.008-0.011 range), but
+#: the bbox itself stays small. Real hosts even in long shots stay
+#: above 0.25 % of the frame. Verified 2026-05-12 on Round 9 Review:
+#: confirmed wall art (H, I) at 0.09-0.11 %; smallest real-host
+#: clusters (L, N) at 0.29-0.42 %.
+PORTRAIT_SMALL_BBOX_FRACTION = 0.002
+
 #: Diagnostic only — not gated. Initially thought a portrait would
 #: appear in 90%+ of in-span frames, but multi-cam shows cut between
 #: camera angles, so wall art is only on screen ~50-60% of the time
@@ -304,6 +315,7 @@ class ClusterAnalysis:
     mouth_open_std: float
     centroid_std: float
     temporal_density: float
+    bbox_area_fraction_mean: float  # diagnostic; drives the small-bbox rule
     detected_kind: str  # 'person' | 'portrait' | 'noise'
 
 
@@ -312,37 +324,44 @@ def _classify_cluster(
     mouth_open_std: float,
     centroid_std: float,
     temporal_density: float,
+    bbox_area_fraction_mean: float,
 ) -> str:
     """Pure function so the heuristic is unit-testable and explainable.
 
-    Two portrait paths:
+    Three portrait paths, in priority order:
 
-    - **Strict-centroid**: bbox is essentially static (centroid_std <
-      PORTRAIT_CENTROID_STRICT). Catches bolted-to-the-wall portraits
-      seen in a single camera angle.
-    - **Multi-cam mouth-only**: bbox jitter doesn't disqualify a
-      portrait, because multi-cam shows frame the same wall art
-      slightly differently per camera angle (~10-20 px centroid_std).
-      The discriminator is sustained zero mouth movement plus enough
-      detections that the estimate is reliable.
+    - **Strict-centroid**: bbox is essentially static. Catches
+      bolted-to-the-wall portraits seen in a single camera angle.
+    - **Quiet-mouth**: mouth never moves AND there are enough
+      detections to trust that statistically. Catches multi-cam wall
+      art where the bbox jitter from per-camera framing differences
+      pushes centroid_std out of strict range but the lips never
+      actually move (real talkers sit at mouth_std ≥ 0.013, real
+      silent listeners at ≥ 0.006).
+    - **Small-bbox**: cluster is consistently tiny in frame AND has
+      enough detections. Background-shelf portraits are low-resolution
+      in the source, so their lip landmarks jitter (mouth_std lands in
+      the 0.008-0.011 range — too high for the quiet-mouth rule) while
+      the bbox itself stays small.
 
-    Density is stored as a diagnostic only — it turned out to be a
-    red herring across both single- and multi-cam sources.
+    Density is stored as a diagnostic only — turned out to be a red
+    herring across both single- and multi-cam sources.
     """
     if detection_count < NOISE_MIN_DETECTIONS:
         return "noise"
     # Strong portrait signal: bbox is essentially static.
     if centroid_std < PORTRAIT_CENTROID_STRICT:
         return "portrait"
-    # Multi-cam wall art: mouth never moves, and there are enough
-    # detections to trust that statistically. Real silent listeners
-    # appear intermittently and stay below PORTRAIT_MIN_DETECTIONS;
-    # wall art is continuously on-frame in its camera's cuts and easily
-    # clears it.
-    if (
-        detection_count >= PORTRAIT_MIN_DETECTIONS
-        and mouth_open_std < PORTRAIT_MOUTH_STD
-    ):
+    # Below this detection-count floor the per-cluster stats are too
+    # noisy to trust either of the next two rules; a short, sparse
+    # cluster could spuriously look flat-mouthed or small.
+    if detection_count < PORTRAIT_MIN_DETECTIONS:
+        return "person"
+    # Multi-cam wall art: mouth never moves.
+    if mouth_open_std < PORTRAIT_MOUTH_STD:
+        return "portrait"
+    # Background portrait: too small to be a host even in a long shot.
+    if bbox_area_fraction_mean < PORTRAIT_SMALL_BBOX_FRACTION:
         return "portrait"
     return "person"
 
@@ -375,15 +394,31 @@ def analyse_clusters(session: Session, source_id: UUID) -> list[ClusterAnalysis]
     # Bucket detections per cluster_id, including the noise bucket
     # (cluster_id=NULL) so we can emit its row too.
     by_cluster: dict[int | None, dict[str, list[float]]] = {}
+    # Frame area is derived from the largest bbox extents across all
+    # detections for this source — over a long video, faces appear
+    # close to the frame edges, so max(bbox_x2) and max(bbox_y2)
+    # approximate the source resolution. Using this instead of fetching
+    # the cached face-track JSON avoids an S3 round-trip per analyse run.
+    max_x2 = 1.0
+    max_y2 = 1.0
     for r in rows:
         bucket = by_cluster.setdefault(r.cluster_id, {
-            "ts": [], "cx": [], "cy": [], "mouth": [],
+            "ts": [], "cx": [], "cy": [], "mouth": [], "area": [],
         })
         bucket["ts"].append(float(r.frame_ts))
         bucket["cx"].append((float(r.bbox_x1) + float(r.bbox_x2)) / 2.0)
         bucket["cy"].append((float(r.bbox_y1) + float(r.bbox_y2)) / 2.0)
+        bucket["area"].append(
+            (float(r.bbox_x2) - float(r.bbox_x1))
+            * (float(r.bbox_y2) - float(r.bbox_y1))
+        )
         if r.mouth_opening is not None:
             bucket["mouth"].append(float(r.mouth_opening))
+        if float(r.bbox_x2) > max_x2:
+            max_x2 = float(r.bbox_x2)
+        if float(r.bbox_y2) > max_y2:
+            max_y2 = float(r.bbox_y2)
+    frame_area = max_x2 * max_y2
 
     analyses: list[ClusterAnalysis] = []
     for cluster_id, data in by_cluster.items():
@@ -398,6 +433,7 @@ def analyse_clusters(session: Session, source_id: UUID) -> list[ClusterAnalysis]
                 mouth_open_std=0.0,
                 centroid_std=0.0,
                 temporal_density=0.0,
+                bbox_area_fraction_mean=0.0,
                 detected_kind="noise",
             ))
             continue
@@ -405,6 +441,7 @@ def analyse_clusters(session: Session, source_id: UUID) -> list[ClusterAnalysis]
         ts = np.asarray(data["ts"], dtype=np.float64)
         cx = np.asarray(data["cx"], dtype=np.float64)
         cy = np.asarray(data["cy"], dtype=np.float64)
+        areas = np.asarray(data["area"], dtype=np.float64)
         mouth = (
             np.asarray(data["mouth"], dtype=np.float64)
             if data["mouth"] else np.zeros(1)
@@ -423,12 +460,14 @@ def analyse_clusters(session: Session, source_id: UUID) -> list[ClusterAnalysis]
         # shouldn't happen at 1 fps but might at higher rates) doesn't
         # confuse the threshold.
         density = min(1.0, len(ts) / max(1.0, span)) if span > 0 else 1.0
+        area_fraction_mean = float(areas.mean()) / frame_area
 
         detected = _classify_cluster(
             detection_count=len(ts),
             mouth_open_std=mouth_std,
             centroid_std=centroid_std,
             temporal_density=density,
+            bbox_area_fraction_mean=area_fraction_mean,
         )
         analyses.append(ClusterAnalysis(
             cluster_id=cluster_id,
@@ -436,6 +475,7 @@ def analyse_clusters(session: Session, source_id: UUID) -> list[ClusterAnalysis]
             mouth_open_std=mouth_std,
             centroid_std=centroid_std,
             temporal_density=density,
+            bbox_area_fraction_mean=area_fraction_mean,
             detected_kind=detected,
         ))
 
