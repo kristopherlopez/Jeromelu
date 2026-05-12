@@ -4,7 +4,7 @@ tags: [area/todo, status/in-progress]
 
 # Speaker Identification — Voice + Visual Fusion
 
-> **Status:** Phase 1 ✅ + Phase 2 ✅ + Phase 3 ✅ + Phase 4a ✅ + Phase 4-asd ✅ + Phase 4b-display ✅ + Phase 4b-display-v2 (ephemeral video + YouTube overlay) ✅ + Phase 5.5 (remote GPU) ✅ shipped. Voice + face fusion + face overlay live. Lineup runs on a SageMaker Async endpoint in `us-east-1` when `LINEUP_REMOTE=1`; full fresh-source pipeline drops from ~50 min CPU → **~3 min** wall time (pyannote 91 s, visual ID 75 s, Deepgram + DB writes ~30 s). Per-source video files are no longer persisted — overlay draws on the YouTube iframe; visual ID yt-dlps into a 24h-lifecycle staging key and deletes after. **Phase 4b-action (click-to-reassign) and Phase 5 (compounding) remain.**
+> **Status:** Phase 1 ✅ + Phase 2 ✅ + Phase 3 ✅ + Phase 4a ✅ + Phase 4-asd ✅ + Phase 4b-display ✅ + Phase 4b-display-v2 (ephemeral video + YouTube overlay) ✅ + Phase 4b-action (click-to-reassign) ✅ + Phase 5.5 (remote GPU) ✅ + **Voices tab (cluster-level voice assign) ✅** shipped. Voice + face fusion + face overlay live. Lineup runs on a SageMaker Async endpoint in `us-east-1` when `LINEUP_REMOTE=1`; full fresh-source pipeline drops from ~50 min CPU → **~3 min** wall time (pyannote 91 s, visual ID 75 s, Deepgram + DB writes ~30 s). Per-source video files are no longer persisted — overlay draws on the YouTube iframe; visual ID yt-dlps into a 24h-lifecycle staging key and deletes after. **Phase 5 (cross-modal compounding) remains.**
 
 **Phase:** Analyst quality / identification
 **Priority:** Unlocks per-speaker quote attribution, ledger weighting by host, host-specific consensus.
@@ -399,6 +399,19 @@ New module `services/api/app/analyst/fusion.py`:
   2. New row in `person_face_embeddings` with `created_by='manual'`.
   3. New row in `person_voiceprints` with `created_by='manual'` (using the audio span of that turn).
 - Transcript pane next to it shows the per-turn `audio_match_score` / `visual_match_score` for inspection.
+
+### Voices tab — cluster-level voice assign — **SHIPPED 2026-05-12**
+
+The voice-focused workflow the face-runs/assign endpoint explicitly deferred. Pyannote already tags every `source_speakers` row with a per-source `SPEAKER_NN` cluster label, so no clustering pass is needed — the Voices tab is pure aggregation, mirroring the Faces tab's cluster-level ergonomic.
+
+- ✅ `services/api/app/analyst/voice_clusters.py` — `aggregate_clusters(rows, preview_by_segment)` (pure) + `compute_voice_clusters(session, source_id)` (DB wrapper). Returns per-cluster turn_count, total_seconds, embedding_eligible_count, dominant_person, match_method_breakdown, plus the 5 longest sample turns with preview text.
+- ✅ `GET /api/sources/{source_id}/voice-clusters` — read endpoint; resolves dominant_person_name in one Person query.
+- ✅ `POST /api/sources/{source_id}/voice-clusters/{speaker_label}/assign` — NDJSON-streaming SQL-only bulk assign. Phases: `person` → `voice_enrol` (copy up to 10 medoid embeddings from `source_speakers.embedding` into `person_voiceprints` with `created_by='manual'`, `skip` event when no eligible turns) → `attribute` (one UPDATE on `source_speakers` matching `document_id` + `speaker_label`, sets `speaker_person_id` + `match_method='manual'`) → `commit`.
+- ✅ Voiceprint promotion uses the per-turn medoid wespeaker vector pyannote wrote at diarisation — same model the matcher uses, no audio re-fetch, instant. Voice analogue of the face side's "copy top-N detections into person_face_embeddings".
+- ✅ `services/web/src/app/components/VoicesPanel.tsx` + `AssignVoiceModal.tsx`. Tab wired into `SourceReviewClient.tsx` alongside Faces and Claims. Sample turns click-to-seek the YouTube player.
+- ✅ `tests/unit/api/analyst/test_voice_clusters.py` — 13 pure-function tests over `aggregate_clusters` covering grouping, ordering, dominant-person mode, match-method breakdown, sample selection, NULL-embedding handling, preview-text truncation.
+
+This converts the in-app voice enrolment story from "operator finds a clean monologue span and runs `make enroll-voice` from the CLI" to "operator clicks `Assign` on a pyannote cluster". `make enroll-voice` still exists for the bootstrap case where a specific span is wanted; the Voices tab is the cluster-level path for everything else.
 
 ### Phase 5 — Cross-modal compounding (3 days)
 

@@ -652,6 +652,42 @@ What persists across runs: the **face-track JSON** (small, durable, the artefact
 
 The review UI overlays the face-track JSON directly on the YouTube iframe via `services/web/src/app/components/YouTubeFaceOverlay.tsx`. No local mp4 is required to draw boxes — bboxes scale from the JSON's `frame_width`/`frame_height` to the iframe's render size.
 
+## Voices tab — cluster-level voiceprint assign
+
+A `Voices` tab on `/wiki/source/{source_id}` (alongside `Transcript`, `Claims`, and `Faces`) shows each pyannote speaker as one section: a per-source group of every `source_speakers` row that shares a `speaker_label`. Unlike the Faces tab (which has to run HDBSCAN over per-detection ArcFace embeddings to *find* the clusters), the Voices tab has nothing to cluster — pyannote already tags every turn with `SPEAKER_NN` at diarisation time. The tab is pure aggregation.
+
+The per-cluster `Assign` action is the operator analogue of `make enroll-voice` but ergonomically symmetric with the Faces tab's `Assign`: one click attributes every turn in the cluster to a chosen Person *and* writes a small number of voiceprint exemplars from the cluster's longest turns into the registry. Subsequent re-transcribes of any source recognise that voice without further operator effort.
+
+### Endpoints
+
+- `GET /api/sources/{source_id}/voice-clusters` — aggregates `source_speakers` by `speaker_label` (skipping NULL labels) and returns `{speakers: [{speaker_label, turn_count, total_seconds, embedding_eligible_count, dominant_person_id, dominant_person_name, dominant_share, match_method_breakdown, sample_turns: [...]}]}`. Sorted by `total_seconds` descending. `dominant_person_*` is the mode of `speaker_person_id` across the cluster's turns; the `match_method_breakdown` shows how each turn was attributed so the operator can see at a glance whether the cluster is currently `voice+face` confirmed, face-only, or unattributed.
+
+- `POST /api/sources/{source_id}/voice-clusters/{speaker_label}/assign` — body `{person_id?: uuid, new_person_name?: string}` (exactly one). Streams `application/x-ndjson` events: `person done` → `voice_enrol start/done` (or `skip` when no eligible turns) → `attribute start/done` → `commit start/done` → `result done`. Single transaction; idempotent retries are safe (the SourceSpeaker update is a pure overwrite, voiceprints are append-only).
+
+### How a cluster assign maps to DB writes
+
+1. **Resolve Person.** Look up by `person_id`, or canonical-name-lookup-or-create for `new_person_name` (case-insensitive). New Persons get committed before the streamed steps so a mid-stream failure can't leave a phantom row referenced by half-written exemplars.
+
+2. **Promote medoid voiceprints.** Pick up to `VOICEPRINT_SAMPLE_LIMIT=10` `source_speakers` rows from the cluster, ordered by `(end_ts − start_ts)` descending — longest turns first, on the assumption that longer spans give cleaner, less-overlapped exemplars. Each row's medoid `embedding` (the 256-dim wespeaker vector pyannote produced at diarisation) is copied verbatim into `person_voiceprints` with `created_by='manual'`. Turns with NULL `embedding` (sub-300ms — see [Quality gates](#quality-gates)) are filtered out; if the cluster has none eligible, the step emits a `skip` event and the assign still proceeds with attribution-only.
+
+3. **Bulk attribute.** One UPDATE: `UPDATE source_speakers SET speaker_person_id=…, match_method='manual', match_confidence=1.0 WHERE document_id=… AND speaker_label=…`. Targets every turn in the cluster — not a frontend-supplied segment_id list. Total elapsed time is independent of cluster size.
+
+4. **Commit.** Single transaction. No face-track JSON to regenerate — voice cluster assign doesn't touch the visual side.
+
+### Why medoid copy, not fresh enrolment
+
+The medoid is the same wespeaker model the matcher uses, it's already in the DB (pyannote wrote it at diarisation time), and the per-window-vote machinery downstream tolerates medoid granularity fine — each voiceprint is one vote among many. Re-running `enroll_span_with_context` against the audio would produce ~17 sliding-window voiceprints per sampled turn instead of one medoid, but the *audio is the same audio*; the marginal vote-density isn't worth the S3 fetch + wespeaker pass per assign. This is the voice equivalent of face-runs/assign's "copy top-N detections into person_face_embeddings" — symmetric in shape, symmetric in cost.
+
+The original `make enroll-voice` CLI still exists for the bootstrap workflow where the operator has a specific clean monologue span in mind and doesn't want pyannote's turn boundaries to constrain the enrolment. The Voices tab is the in-app, cluster-level path for everything else.
+
+### Limitations
+
+- **Pyannote clusters are per-source.** SPEAKER_01 on one episode and SPEAKER_01 on another are unrelated labels; the same person across episodes gets different cluster ids. Cross-source identity propagation comes from the registry growing — each voice cluster assign adds exemplars that future episodes match against.
+- **No `Move` action at the turn level.** Pyannote's turn boundaries are accepted as-is; if a turn is misattributed within a cluster (e.g. the host laughs during a guest's monologue and pyannote merges them), the existing per-turn reassign click on the face overlay handles it. The Voices tab operates at cluster granularity only.
+- **Voice cluster assigns don't regenerate the face-track JSON.** The cached JSON only carries face/visual identity; speaker-label-driven attribution shows up via `source_speakers.speaker_person_id`, which the overlay reads directly from the lifted speakers list.
+
+---
+
 ## Backlog
 
 - **Real audio-sync ASD model.** The mouth-opening heuristic gets us from 55 % → 77 % visual precision but misses reaction-shot false positives (laughing during someone else's monologue still passes the density gate). A model that takes face crops + audio mel-spectrograms and predicts speaking probability (Light-ASD, TalkNet, LoCoNet) would close the remaining gap. None are pip-packaged — they'd need vendoring.

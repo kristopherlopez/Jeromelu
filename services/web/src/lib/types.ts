@@ -258,3 +258,46 @@ export interface FaceRunsResponse {
   /** Count of clusters filtered out as excluded (portraits/noise). */
   excluded_count?: number;
 }
+
+// Voices tab — pyannote voice clusters aggregated per source. Pyannote
+// already produces a per-source clustering (SPEAKER_NN labels on every
+// turn), so this surface is pure aggregation over source_speakers — no
+// HDBSCAN pass needed. Mirrors the FacePosition shape so the Voices
+// panel can share the cluster-header / sample-row layout.
+export interface VoiceClusterSampleTurn {
+  segment_id: string;
+  start_ts: number;
+  end_ts: number;
+  /** Opening utterance of the turn, truncated to ~120 chars. Empty
+   *  when the turn has no corresponding source_chunk row yet. */
+  preview_text: string;
+}
+
+export interface VoiceCluster {
+  /** pyannote label — e.g. "SPEAKER_00". Never null in this surface. */
+  speaker_label: string;
+  turn_count: number;
+  total_seconds: number;
+  /** How many of this cluster's turns have a non-NULL embedding and so
+   *  could contribute a voiceprint at bulk-assign time. Sub-300ms turns
+   *  have NULL embeddings (see speaker-identification.md § Quality gates)
+   *  and are excluded from the eligible count. */
+  embedding_eligible_count: number;
+  /** Majority speaker_person_id across the cluster's turns. null when
+   *  no turn is attributed yet. */
+  dominant_person_id: string | null;
+  dominant_person_name: string | null;
+  /** Fraction of turns that share dominant_person_id (0..1). */
+  dominant_share: number | null;
+  /** Per-match-method tally over the cluster's turns. "null" key is the
+   *  count of unattributed turns. */
+  match_method_breakdown: Record<string, number>;
+  /** Longest 5 (capped) turns with non-NULL embedding, re-sorted by
+   *  start_ts so the operator hears them in conversational order. */
+  sample_turns: VoiceClusterSampleTurn[];
+}
+
+export interface VoiceClustersResponse {
+  source_id: string;
+  speakers: VoiceCluster[];
+}

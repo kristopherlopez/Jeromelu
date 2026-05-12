@@ -24,6 +24,10 @@ from app.analyst.identify_voice import (
     enroll_span_with_context,
     enrollment_context,
 )
+from app.analyst.voice_clusters import (
+    VOICEPRINT_SAMPLE_LIMIT,
+    compute_voice_clusters,
+)
 from app.analyst.video_worker_client import VideoWorkerError, fetch_frame_to
 from app.analyst.visual_id import (
     VisualIdError,
@@ -37,6 +41,7 @@ from jeromelu_shared.db import (
     ClaimChunk,
     Person,
     PersonFaceEmbedding,
+    PersonVoiceprint,
     Source,
     SourceChunk,
     SourceDocument,
@@ -1850,6 +1855,293 @@ def bulk_assign_face_run(
             })
         except Exception as exc:
             logger.exception("bulk reassign failed mid-stream")
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            yield _ndjson({
+                "step": "unknown",
+                "status": "error",
+                "detail": f"{type(exc).__name__}: {exc}",
+            })
+
+    return StreamingResponse(stream(), media_type="application/x-ndjson")
+
+
+# ---------------------------------------------------------------------------
+# Voice clusters — the speaker-label equivalent of the face-runs surface.
+#
+# Pyannote already tags every source_speakers row with a per-source cluster
+# label (SPEAKER_00 / SPEAKER_01 / ...). The /voice-clusters endpoint is a
+# pure aggregation over that — no clustering pass to run, no embedding-matrix
+# load. The /voice-clusters/{label}/assign endpoint mirrors face-runs/assign:
+# resolve/create a Person, copy a handful of representative medoid embeddings
+# from source_speakers.embedding into person_voiceprints (so the registry
+# grows from this assign too), then bulk-UPDATE source_speakers in one SQL
+# statement.
+# ---------------------------------------------------------------------------
+
+
+@router.get("/sources/{source_id}/voice-clusters")
+def get_voice_clusters(source_id: uuid.UUID, db: Session = Depends(get_db)):
+    """List the pyannote voice clusters for this source, with per-cluster
+    summary stats and the current dominant attribution.
+
+    Resolves ``dominant_person_name`` for each cluster in a single Person
+    query — same pattern as ``/face-runs``. Returns ``{speakers: [...]}``
+    sorted by total airtime descending.
+    """
+    source = db.query(Source).filter(Source.source_id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+
+    payload = compute_voice_clusters(db, source_id)
+
+    person_ids: set[uuid.UUID] = set()
+    for sp in payload["speakers"]:
+        if sp.get("dominant_person_id"):
+            person_ids.add(uuid.UUID(sp["dominant_person_id"]))
+    name_by_id: dict[str, str] = {}
+    if person_ids:
+        for p in db.query(Person).filter(Person.person_id.in_(person_ids)).all():
+            name_by_id[str(p.person_id)] = p.canonical_name
+
+    for sp in payload["speakers"]:
+        sp["dominant_person_name"] = (
+            name_by_id.get(sp["dominant_person_id"])
+            if sp.get("dominant_person_id") else None
+        )
+
+    return {
+        "source_id": str(source_id),
+        "speakers": payload["speakers"],
+    }
+
+
+class VoiceClusterAssignRequest(BaseModel):
+    person_id: uuid.UUID | None = Field(
+        default=None,
+        description=(
+            "Existing Person to attribute every turn in the cluster to. "
+            "Mutually exclusive with ``new_person_name``."
+        ),
+    )
+    new_person_name: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description=(
+            "Canonical name of a Person to create (or reuse, case-insensitive). "
+            "Mutually exclusive with ``person_id``."
+        ),
+    )
+
+
+@router.post("/sources/{source_id}/voice-clusters/{speaker_label}/assign")
+def bulk_assign_voice_cluster(
+    source_id: uuid.UUID,
+    speaker_label: str,
+    body: VoiceClusterAssignRequest,
+    db: Session = Depends(get_db),
+):
+    """Bulk-attribute every ``source_speakers`` row with the given
+    ``speaker_label`` to a single Person, and seed the voiceprint registry
+    from a handful of representative turns in the cluster.
+
+    SQL-only flow — no audio re-fetch, no per-turn pyannote pass.
+
+      ``person`` done             — Person resolved (created if needed).
+      ``voice_enrol`` start/done  — Copy up to ``VOICEPRINT_SAMPLE_LIMIT``
+                                    medoid embeddings from
+                                    ``source_speakers.embedding`` into
+                                    ``person_voiceprints``. ``skip`` event
+                                    when the cluster has no non-NULL
+                                    embedding rows (all turns were
+                                    sub-300ms).
+      ``attribute`` start/done    — One UPDATE on source_speakers,
+                                    WHERE document_id=… AND speaker_label=…
+      ``commit`` start/done       — Single transaction commit.
+      ``result`` done             — Totals across the batch.
+
+    Voice enrolment from the per-turn medoid (vs the original sliding-window
+    extraction in ``enroll_voice_cli``) is intentional: the medoid is already
+    in the DB after diarisation, it's the same wespeaker model the matcher
+    uses, and the per-window-vote machinery downstream is robust to medoid
+    granularity. This keeps the assign action instant — the equivalent of
+    face-runs/assign's "copy top-N detections into person_face_embeddings".
+    """
+    source = db.query(Source).filter(Source.source_id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    if (body.person_id is None) == (body.new_person_name is None):
+        raise HTTPException(
+            status_code=400,
+            detail="Provide exactly one of `person_id` or `new_person_name`",
+        )
+
+    doc = (
+        db.query(SourceDocument)
+        .filter(SourceDocument.source_id == source_id)
+        .first()
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Source has no document")
+
+    # Pre-check: cluster must have at least one turn. Validate before the
+    # stream starts so malformed input surfaces as 4xx, not mid-stream.
+    cluster_turn_count = (
+        db.query(func.count(SourceSpeaker.segment_id))
+        .filter(
+            SourceSpeaker.document_id == doc.document_id,
+            SourceSpeaker.speaker_label == speaker_label,
+        )
+        .scalar() or 0
+    )
+    if cluster_turn_count == 0:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"No source_speakers rows for label={speaker_label!r} in "
+                f"source {source_id}"
+            ),
+        )
+
+    # Resolve Person up-front and commit. enroll-voice-cli flushed-only
+    # rows have hit FK violation in cross-session bulk paths before; the
+    # face-runs/assign endpoint solved this by committing the new Person
+    # before any per-turn writes. Mirror the same pattern.
+    person_created = False
+    if body.person_id is not None:
+        person = db.query(Person).filter(Person.person_id == body.person_id).first()
+        if not person:
+            raise HTTPException(status_code=404, detail="Person not found")
+    else:
+        new_name = (body.new_person_name or "").strip()
+        if not new_name:
+            raise HTTPException(status_code=400, detail="`new_person_name` is empty")
+        person = (
+            db.query(Person)
+            .filter(func.lower(Person.canonical_name) == new_name.lower())
+            .first()
+        )
+        if not person:
+            person = Person(canonical_name=new_name)
+            db.add(person)
+            db.commit()
+            person_created = True
+    target_person_id = person.person_id
+    person_name = person.canonical_name
+
+    # Pick the medoid embeddings to promote — longest turns first, on the
+    # assumption that longer spans give cleaner, less-overlapped acoustic
+    # exemplars. Filtered to rows with non-NULL embedding so the
+    # sub-300ms-turn NULLs (see speaker-identification.md § Quality gates)
+    # never reach the registry.
+    sample_rows = (
+        db.query(SourceSpeaker)
+        .filter(
+            SourceSpeaker.document_id == doc.document_id,
+            SourceSpeaker.speaker_label == speaker_label,
+            SourceSpeaker.embedding.isnot(None),
+            SourceSpeaker.embedding_model.isnot(None),
+        )
+        .order_by((SourceSpeaker.end_ts - SourceSpeaker.start_ts).desc())
+        .limit(VOICEPRINT_SAMPLE_LIMIT)
+        .all()
+    )
+
+    def stream() -> Iterator[bytes]:
+        try:
+            yield _ndjson({
+                "step": "person",
+                "status": "done",
+                "detail": {
+                    "person_id": str(target_person_id),
+                    "person_name": person_name,
+                    "person_created": person_created,
+                },
+            })
+
+            # ---- Voiceprint promotion -------------------------------
+            voiceprints_written = 0
+            if not sample_rows:
+                yield _ndjson({
+                    "step": "voice_enrol",
+                    "status": "skip",
+                    "detail": (
+                        "No turns with non-NULL embedding in this cluster — "
+                        "speaker_person_id will still be set, but no "
+                        "voiceprints can be written. Re-run diarisation if "
+                        "this is unexpected."
+                    ),
+                })
+            else:
+                yield _ndjson({
+                    "step": "voice_enrol",
+                    "status": "start",
+                    "detail": {"sample_size": len(sample_rows)},
+                })
+                voiceprint_rows = [
+                    PersonVoiceprint(
+                        person_id=target_person_id,
+                        source_id=source_id,
+                        start_ts=float(sp.start_ts),
+                        end_ts=float(sp.end_ts),
+                        embedding=list(sp.embedding),
+                        embedding_model=sp.embedding_model,
+                        created_by="manual",
+                    )
+                    for sp in sample_rows
+                ]
+                db.add_all(voiceprint_rows)
+                db.flush()
+                voiceprints_written = len(voiceprint_rows)
+                yield _ndjson({
+                    "step": "voice_enrol",
+                    "status": "done",
+                    "detail": {"voiceprints_written": voiceprints_written},
+                })
+
+            # ---- Bulk SP attribution --------------------------------
+            yield _ndjson({"step": "attribute", "status": "start"})
+            turns_updated = db.execute(
+                sa_update(SourceSpeaker)
+                .where(
+                    SourceSpeaker.document_id == doc.document_id,
+                    SourceSpeaker.speaker_label == speaker_label,
+                )
+                .values(
+                    speaker_person_id=target_person_id,
+                    match_method="manual",
+                    match_confidence=1.0,
+                )
+            ).rowcount or 0
+            yield _ndjson({
+                "step": "attribute",
+                "status": "done",
+                "detail": {"turns_updated": turns_updated},
+            })
+
+            # ---- Commit ---------------------------------------------
+            yield _ndjson({"step": "commit", "status": "start"})
+            db.commit()
+            yield _ndjson({"step": "commit", "status": "done"})
+
+            yield _ndjson({
+                "step": "result",
+                "status": "done",
+                "detail": {
+                    "person_id": str(target_person_id),
+                    "person_name": person_name,
+                    "person_created": person_created,
+                    "speaker_label": speaker_label,
+                    "turns_updated": turns_updated,
+                    "voiceprints_written": voiceprints_written,
+                    "match_method": "manual",
+                },
+            })
+        except Exception as exc:
+            logger.exception("voice-cluster assign failed mid-stream")
             try:
                 db.rollback()
             except Exception:
