@@ -31,7 +31,13 @@ from jeromelu_shared.scraping.nrl import STAT_DB_COLUMNS
 
 from ...deps import get_db
 from ...routers.admin import require_admin
-from .fetcher import SuperCoachStatsFetchError, fetch_strict
+from .._s3_archive import archive_response
+from .fetcher import (
+    SuperCoachStatsFetchError,
+    extract_rows,
+    fetch_stats_raw,
+)
+from .models import SuperCoachPlayerStats
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +156,30 @@ def run_supercoach_stats(
     upserted = 0
 
     try:
-        players = fetch_strict(season=season, round=round)
+        # Fetch raw paginated jqGrid rows, archive to S3 (D10), then extract+strict-parse.
+        raw_rows = fetch_stats_raw(season=season, round=round)
+        if not raw_rows:
+            raise SuperCoachStatsFetchError(
+                f"Empty response for season={season} round={round}"
+            )
+
+        archive_key = archive_response(
+            source="nrlsupercoachstats",
+            pipeline="stats",
+            identity_path=f"{season}/round-{round:02d}.json",
+            payload={"season": season, "round": round, "rows": raw_rows},
+        )
+        detail["s3_archive_key"] = archive_key
+        if archive_key is None:
+            detail["s3_archive_failed"] = True
+
+        extracted = extract_rows(raw_rows)
+        if not extracted:
+            raise SuperCoachStatsFetchError(
+                f"Zero parseable rows after extraction (raw: {len(raw_rows)})"
+            )
+        # Strict-parse per D8 — drift in any field raises ValidationError.
+        players = [SuperCoachPlayerStats.model_validate(p) for p in extracted]
         fetched = len(players)
         as_dicts = [p.model_dump() for p in players]
         upserted = _upsert_player_rounds(

@@ -13,6 +13,7 @@ The actual fetch/persist logic is shared with the legacy
 from __future__ import annotations
 
 import logging
+from datetime import date, datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -28,10 +29,15 @@ from jeromelu_shared.players.roster import (
     RosterPreconditionError,
     refresh_roster,
 )
+from jeromelu_shared.players.supercoach import (
+    SuperCoachFetchError,
+    fetch_supercoach_roster,
+)
 
 from ...deps import get_db
 from ...routers.admin import require_admin
-from .fetcher import SuperCoachFetchError, fetch_strict
+from .._s3_archive import archive_response
+from .models import SuperCoachPlayer
 
 logger = logging.getLogger(__name__)
 
@@ -110,16 +116,34 @@ def run_supercoach_roster(
     detail: dict[str, Any] = {"pipeline": PIPELINE, "mode": "fetch-and-refresh"}
     refresh_result: dict[str, Any] = {}
     fetched = 0
+    effective_season = season or date.today().year
 
     try:
-        players = fetch_strict(season=season)
-        fetched = len(players)
+        # Fetch raw, archive to S3 (D10), then strict-parse.
+        raw_players = fetch_supercoach_roster(season=season)
+        fetched = len(raw_players)
+
+        archive_key = archive_response(
+            source="supercoach",
+            pipeline="classic/players-cf",
+            identity_path=(
+                f"{effective_season}/"
+                f"{datetime.now(timezone.utc).strftime('%Y%m%d')}.json"
+            ),
+            payload=raw_players,
+        )
+        detail["s3_archive_key"] = archive_key
+        if archive_key is None:
+            detail["s3_archive_failed"] = True
+
+        # Strict-parse per D8 (any drift here raises ValidationError).
+        players = [SuperCoachPlayer.model_validate(p) for p in raw_players]
         # refresh_roster expects list[dict]; model_dump gets us back to the
         # plain dict shape the SCD-2 logic was written against.
         sc_players_dicts = [p.model_dump() for p in players]
         logger.info(
-            "scout/supercoach-roster: fetched %d players (season=%s, source=%s, run_id=%s)",
-            fetched, season, source, run_id,
+            "scout/supercoach-roster: fetched %d players (season=%s, source=%s, run_id=%s, s3=%s)",
+            fetched, season, source, run_id, archive_key,
         )
         refresh_result = refresh_roster(db, sc_players_dicts, source=source)
         detail.update({"fetched": fetched, **refresh_result})
