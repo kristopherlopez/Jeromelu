@@ -48,6 +48,22 @@ DEFAULT_MIN_CLUSTER_SIZE = 20
 #: faces clipped at frame edges) as outliers.
 DEFAULT_MIN_SAMPLES = 5
 
+#: HDBSCAN's mutual-reachability metric is O(N²) regardless of the
+#: nominal algorithm — KD-tree and Ball-tree both degenerate at the
+#: 512-dim embeddings ArcFace emits (curse of dimensionality). Above
+#: this cutoff we cluster a random subsample, then assign every
+#: remaining detection to the nearest cluster centroid by cosine.
+#: 5,000 is empirically ~3-5 s on a typical laptop; 39k unsampled took
+#: 10+ minutes and blocked the API thread.
+CLUSTER_SAMPLE_MAX = 5000
+
+#: Cosine similarity below this between a detection and its nearest
+#: cluster centroid → label it noise (cluster_id NULL) rather than
+#: forcing it into a cluster it doesn't really belong to. Same role
+#: as HDBSCAN's -1 noise tag, applied to the post-hoc centroid
+#: assignment step.
+CENTROID_NOISE_THRESHOLD = 0.35
+
 
 @dataclass
 class ClusterStats:
@@ -92,74 +108,151 @@ def cluster_source_detections(
 
     detection_ids = [r.detection_id for r in rows]
     # pgvector returns lists when accessed via the ORM — stack into a
-    # (N, 512) float32 array. ArcFace embeddings aren't L2-normalised
-    # by default; HDBSCAN with metric='cosine' handles that for us
-    # (cosine distance is scale-invariant).
+    # (N, 512) float32 array, then L2-normalise. With unit vectors the
+    # cosine of two embeddings is just their dot product, which makes
+    # the centroid-assignment step downstream a single matmul.
     embeddings = np.asarray([r.embedding for r in rows], dtype=np.float32)
-    logger.info(
-        "Clustering %d detections for source %s (min_cluster=%d, min_samples=%d)",
-        len(rows), source_id, min_cluster_size, min_samples,
-    )
+    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+    # Guard against any zero-norm vectors (would produce NaNs and
+    # silently kill the cluster pass). ArcFace doesn't emit them in
+    # practice, but defensive divide costs nothing.
+    norms[norms == 0] = 1.0
+    embeddings = embeddings / norms
 
-    # Adjust thresholds for very small sources — clamping prevents the
-    # "min_cluster_size > n_samples" sklearn raise on early backfills
-    # or short clips that produced fewer detections than the default.
-    effective_min_cluster = min(min_cluster_size, max(2, len(rows) // 4))
-    effective_min_samples = min(min_samples, effective_min_cluster)
+    n_total = len(rows)
+    # Subsample for large sources. HDBSCAN is O(N²) in mutual-reachability
+    # regardless of the nominal ``algorithm`` (KD-tree degenerates at
+    # 512 dims), so we cluster a representative sample and propagate
+    # cluster_ids to the rest via nearest-centroid cosine.
+    if n_total > CLUSTER_SAMPLE_MAX:
+        rng = np.random.default_rng(42)
+        sample_idx = rng.choice(n_total, size=CLUSTER_SAMPLE_MAX, replace=False)
+        sample_idx.sort()
+        sample_embeddings = embeddings[sample_idx]
+        # Don't scale min_cluster_size down to "preserve" small clusters
+        # — that just over-fragments the dominant hosts (HDBSCAN finds
+        # density variations within a real cluster). Keep the threshold
+        # absolute: a cluster must have ≥ min_cluster_size detections
+        # in the *sample*, which corresponds to ≥ min_cluster_size/scale
+        # detections in the original. For a 5k/39k sample with min=20,
+        # that's ~156 original detections, ~2.5 min of cumulative screen
+        # time — a sensible floor for "worth surfacing as a row".
+        cluster_min = min_cluster_size
+        sample_min = min_samples
+        logger.info(
+            "Clustering %d detections for source %s via %d-row sample "
+            "(min_cluster=%d, min_samples=%d)",
+            n_total, source_id, CLUSTER_SAMPLE_MAX, cluster_min, sample_min,
+        )
+    else:
+        sample_idx = None
+        sample_embeddings = embeddings
+        # Original clamp logic — prevents min_cluster_size > n_samples
+        # raising sklearn on early backfills or tiny sources.
+        cluster_min = min(min_cluster_size, max(2, n_total // 4))
+        sample_min = min(min_samples, cluster_min)
+        logger.info(
+            "Clustering %d detections for source %s (min_cluster=%d, min_samples=%d)",
+            n_total, source_id, cluster_min, sample_min,
+        )
+
     clusterer = HDBSCAN(
-        metric="cosine",
-        min_cluster_size=effective_min_cluster,
-        min_samples=effective_min_samples,
-        # `excluded` algorithm names like prims_balltree don't accept
-        # cosine; brute-force pairwise is fine at single-digit thousands.
+        metric="euclidean",
+        min_cluster_size=cluster_min,
+        min_samples=sample_min,
+        # Brute is fine at ≤ CLUSTER_SAMPLE_MAX and gives deterministic
+        # output; ``auto`` is no faster in 512-dim and adds variability.
         algorithm="brute",
     )
-    labels = clusterer.fit_predict(embeddings)
+    sample_labels = clusterer.fit_predict(sample_embeddings)
 
     # Re-rank cluster labels so the biggest cluster is 0, second-biggest
     # is 1, etc. Stable: same data → same labels, useful for the UI's
     # "Cluster A / B / C" naming convention.
-    real_labels = [int(lbl) for lbl in labels if lbl != -1]
+    real_labels = [int(lbl) for lbl in sample_labels if lbl != -1]
     sizes_per_label: dict[int, int] = {}
     for lbl in real_labels:
         sizes_per_label[lbl] = sizes_per_label.get(lbl, 0) + 1
     ranked = sorted(sizes_per_label.items(), key=lambda kv: -kv[1])
     relabel = {old: new for new, (old, _) in enumerate(ranked)}
 
-    n_noise = 0
-    per_detection_cluster: list[int | None] = []
-    for lbl in labels:
-        if lbl == -1:
-            per_detection_cluster.append(None)
-            n_noise += 1
+    if sample_idx is None:
+        # Direct path — every detection got a label from HDBSCAN.
+        per_detection_cluster: list[int | None] = []
+        for lbl in sample_labels:
+            per_detection_cluster.append(None if lbl == -1 else relabel[int(lbl)])
+    else:
+        # Compute per-cluster centroids on the sample, then assign every
+        # detection (sampled + unsampled) to the nearest centroid by
+        # cosine. Detections with no centroid above the noise threshold
+        # are labelled NULL, matching HDBSCAN's -1 semantics for the
+        # downstream UI.
+        cluster_count = len(ranked)
+        if cluster_count == 0:
+            # HDBSCAN found nothing on the sample — extremely rare in
+            # practice but possible for very noisy sources. Mark
+            # everything as noise; the operator can re-run later after
+            # collecting more detections.
+            per_detection_cluster = [None] * n_total
         else:
-            per_detection_cluster.append(relabel[int(lbl)])
+            centroids = np.zeros((cluster_count, embeddings.shape[1]), dtype=np.float32)
+            for new_id, (old_lbl, _) in enumerate(ranked):
+                mask = sample_labels == old_lbl
+                c = sample_embeddings[mask].mean(axis=0)
+                cn = float(np.linalg.norm(c))
+                centroids[new_id] = c / cn if cn > 0 else c
+            # Cosine similarity = dot product on L2-normalised vectors.
+            # (N, D) @ (D, K) → (N, K). Memory: N*K floats — ~3 MB at
+            # N=39k, K=20. Trivial.
+            sims = embeddings @ centroids.T
+            nearest = sims.argmax(axis=1)
+            best_sim = sims.max(axis=1)
+            per_detection_cluster = [
+                int(nearest[i]) if best_sim[i] >= CENTROID_NOISE_THRESHOLD else None
+                for i in range(n_total)
+            ]
 
-    # Write back. One UPDATE per detection — clean, predictable, and at
-    # ~2700 rows still single-digit seconds. If this becomes a bottleneck
-    # at higher scale, batch into per-cluster updates using
-    # detection_id IN (...).
-    for det_id, cluster_id in zip(detection_ids, per_detection_cluster):
+    # Group detection_ids by final cluster_id so we issue one UPDATE per
+    # cluster (≤ ~20 statements) instead of one per detection (39k+ on
+    # long sources). Same end state, orders-of-magnitude fewer
+    # round-trips to Postgres.
+    by_cluster: dict[int | None, list] = {}
+    n_noise = 0
+    for det_id, cid in zip(detection_ids, per_detection_cluster):
+        if cid is None:
+            n_noise += 1
+        by_cluster.setdefault(cid, []).append(det_id)
+
+    for cluster_id, ids in by_cluster.items():
         session.execute(
             update(SourceFaceDetection)
-            .where(SourceFaceDetection.detection_id == det_id)
+            .where(SourceFaceDetection.detection_id.in_(ids))
             .values(cluster_id=cluster_id),
         )
     session.commit()
 
-    cluster_sizes = [size for _, size in ranked]
+    # Final cluster_sizes is *full-detection* counts, not sample counts.
+    # The earlier `ranked` array reflects HDBSCAN's view of the sample,
+    # which is misleading when the operator reads it as "size of cluster
+    # in this source" — they want the count of detections actually
+    # tagged with each cluster_id.
+    cluster_sizes_final = sorted(
+        [len(ids) for cid, ids in by_cluster.items() if cid is not None],
+        reverse=True,
+    )
+
     logger.info(
         "Clustered %d detections for source %s → %d cluster(s), %d noise. Sizes: %s",
-        len(rows), source_id, len(cluster_sizes), n_noise,
-        cluster_sizes[:10] + (["..."] if len(cluster_sizes) > 10 else []),
+        len(rows), source_id, len(cluster_sizes_final), n_noise,
+        cluster_sizes_final[:10] + (["..."] if len(cluster_sizes_final) > 10 else []),
     )
 
     return ClusterStats(
         source_id=source_id,
         n_detections=len(rows),
-        n_clusters=len(cluster_sizes),
+        n_clusters=len(cluster_sizes_final),
         n_noise=n_noise,
-        cluster_sizes=cluster_sizes,
+        cluster_sizes=cluster_sizes_final,
     )
 
 
