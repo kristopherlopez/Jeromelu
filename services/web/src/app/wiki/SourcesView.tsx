@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -12,7 +12,8 @@ import {
   Search,
   Video,
 } from "lucide-react";
-import type { SourceListItem } from "@/lib/types";
+import type { SourceListItem, SourceListResponse } from "@/lib/types";
+import { apiFetch } from "@/lib/api";
 import { useIsYouTubeShort } from "@/lib/useIsYouTubeShort";
 
 type Voice = NonNullable<SourceListItem["voice"]>;
@@ -174,37 +175,15 @@ function VoiceChip({ voice }: { voice: Voice }) {
 
 type SortKey = "newest" | "oldest" | "most_claims" | "alpha";
 
-function sortSources(items: SourceListItem[], sort: SortKey): SourceListItem[] {
-  const out = [...items];
-  switch (sort) {
-    case "newest":
-      return out.sort((a, b) => {
-        if (!a.published_at) return 1;
-        if (!b.published_at) return -1;
-        return new Date(b.published_at).getTime() - new Date(a.published_at).getTime();
-      });
-    case "oldest":
-      return out.sort((a, b) => {
-        if (!a.published_at) return 1;
-        if (!b.published_at) return -1;
-        return new Date(a.published_at).getTime() - new Date(b.published_at).getTime();
-      });
-    case "most_claims":
-      return out.sort((a, b) => b.claim_count - a.claim_count);
-    case "alpha":
-      return out.sort((a, b) => a.title.localeCompare(b.title));
-  }
-}
-
 /* ══════════════════════════════════════════════════════
    Top-level Sources view
    ══════════════════════════════════════════════════════ */
 
-export default function SourcesView({ sources }: { sources: SourceListItem[] }) {
+export default function SourcesView() {
   return (
     <>
       <SourcesHero />
-      <SourcesIndex sources={sources} />
+      <SourcesIndex />
     </>
   );
 }
@@ -259,30 +238,78 @@ function SourcesHero() {
   );
 }
 
-/* ── Sources index (search + sort + grid + load more) ── */
+/* ── Sources index (server-paginated search + sort + grid + load more) ── */
 
-const PAGE_SIZE = 9;
+const PAGE_SIZE = 30;
+const SEARCH_DEBOUNCE_MS = 250;
 
-function SourcesIndex({ sources }: { sources: SourceListItem[] }) {
+function SourcesIndex() {
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortKey>("newest");
-  const [visible, setVisible] = useState(PAGE_SIZE);
+  const [items, setItems] = useState<SourceListItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState(false);
 
-  const filtered = useMemo(() => {
-    let result = sources;
-    if (search) {
-      const q = search.toLowerCase();
-      result = result.filter(
-        (s) =>
-          s.title.toLowerCase().includes(q) ||
-          (s.creator_name?.toLowerCase().includes(q) ?? false),
-      );
-    }
-    return sortSources(result, sort);
-  }, [sources, search, sort]);
+  // Debounce search input → actual query.
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
-  const shown = filtered.slice(0, visible);
-  const hasMore = filtered.length > visible;
+  // First page / refetch on search or sort change. `lastReqId` defends
+  // against out-of-order responses when the user types fast.
+  const lastReqId = useRef(0);
+  useEffect(() => {
+    const reqId = ++lastReqId.current;
+    setLoading(true);
+    setError(false);
+    const params = new URLSearchParams({
+      limit: String(PAGE_SIZE),
+      offset: "0",
+      sort,
+    });
+    if (search) params.set("search", search);
+    apiFetch<SourceListResponse>(`/api/sources?${params}`)
+      .then((res) => {
+        if (reqId !== lastReqId.current) return;
+        setItems(res.items);
+        setTotal(res.total);
+        setHasMore(res.has_more);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (reqId !== lastReqId.current) return;
+        setError(true);
+        setLoading(false);
+      });
+  }, [search, sort]);
+
+  const loadMore = () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const reqId = lastReqId.current;
+    const params = new URLSearchParams({
+      limit: String(PAGE_SIZE),
+      offset: String(items.length),
+      sort,
+    });
+    if (search) params.set("search", search);
+    apiFetch<SourceListResponse>(`/api/sources?${params}`)
+      .then((res) => {
+        if (reqId !== lastReqId.current) return;
+        setItems((prev) => [...prev, ...res.items]);
+        setHasMore(res.has_more);
+        setLoadingMore(false);
+      })
+      .catch(() => {
+        if (reqId !== lastReqId.current) return;
+        setLoadingMore(false);
+      });
+  };
 
   return (
     <section style={{ marginBottom: "3rem" }}>
@@ -313,21 +340,40 @@ function SourcesIndex({ sources }: { sources: SourceListItem[] }) {
               marginLeft: "0.4rem",
             }}
           >
-            ({filtered.length})
+            ({total})
           </span>
         </h2>
         <SourcesControls
-          search={search}
-          onSearch={(q) => {
-            setSearch(q);
-            setVisible(PAGE_SIZE);
-          }}
+          search={searchInput}
+          onSearch={setSearchInput}
           sort={sort}
-          onSort={(s) => setSort(s)}
+          onSort={setSort}
         />
       </div>
 
-      {shown.length === 0 ? (
+      {loading && items.length === 0 ? (
+        <div
+          style={{
+            textAlign: "center",
+            padding: "3rem 0",
+            color: v.inkFaint,
+            fontSize: "14px",
+          }}
+        >
+          Loading sources…
+        </div>
+      ) : error ? (
+        <div
+          style={{
+            textAlign: "center",
+            padding: "3rem 0",
+            color: v.inkFaint,
+            fontSize: "14px",
+          }}
+        >
+          Couldn&rsquo;t load sources. Try again.
+        </div>
+      ) : items.length === 0 ? (
         <div
           style={{
             textAlign: "center",
@@ -343,16 +389,17 @@ function SourcesIndex({ sources }: { sources: SourceListItem[] }) {
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
           style={{ gap: "1rem" }}
         >
-          {shown.map((s) => (
+          {items.map((s) => (
             <SourceCard key={s.source_id} source={s} />
           ))}
         </div>
       )}
 
-      {hasMore && (
+      {hasMore && !error && (
         <div style={{ marginTop: "1.5rem", textAlign: "center" }}>
           <button
-            onClick={() => setVisible((n) => n + PAGE_SIZE)}
+            onClick={loadMore}
+            disabled={loadingMore}
             style={{
               fontSize: "13px",
               fontWeight: 600,
@@ -361,11 +408,12 @@ function SourcesIndex({ sources }: { sources: SourceListItem[] }) {
               border: `1px solid ${v.border}`,
               borderRadius: 6,
               padding: "0.6rem 1.2rem",
-              cursor: "pointer",
+              cursor: loadingMore ? "default" : "pointer",
               fontFamily: "inherit",
+              opacity: loadingMore ? 0.5 : 1,
             }}
           >
-            Load more sources
+            {loadingMore ? "Loading…" : "Load more sources"}
           </button>
         </div>
       )}

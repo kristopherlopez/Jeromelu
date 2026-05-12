@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func
@@ -123,8 +123,14 @@ def get_stats(db: Session = Depends(get_db)):
 
 
 @router.get("/sources")
-def list_sources(db: Session = Depends(get_db)):
-    """List every row in the sources table, with claim counts.
+def list_sources(
+    db: Session = Depends(get_db),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    search: str | None = Query(None),
+    sort: str = Query("newest", pattern="^(newest|oldest|most_claims|alpha)$"),
+):
+    """Paginated list of sources with claim counts.
 
     Includes sources with no transcript yet (queued, failed, or freshly
     discovered) so the wiki can surface ingestion state. Unprocessed
@@ -133,6 +139,10 @@ def list_sources(db: Session = Depends(get_db)):
     Each row carries an optional ``voice`` block (channel slug / name /
     logo_url) so the wiki Sources index can render a voice chip that
     links through to the channel's wiki page.
+
+    The full sources table is ~100k+ rows; un-paginated reads ship tens
+    of MB. Callers should pass a sensible ``limit`` and use ``total`` /
+    ``has_more`` in the response to drive pagination UI.
     """
     claim_count_sq = (
         db.query(
@@ -144,13 +154,36 @@ def list_sources(db: Session = Depends(get_db)):
         .subquery()
     )
 
-    rows = (
+    search_filter = None
+    if search:
+        like = f"%{search}%"
+        search_filter = func.lower(Source.title).like(func.lower(like)) | func.lower(
+            Source.creator_name
+        ).like(func.lower(like))
+
+    count_query = db.query(func.count(Source.source_id))
+    if search_filter is not None:
+        count_query = count_query.filter(search_filter)
+    total = count_query.scalar() or 0
+
+    rows_query = (
         db.query(Source, claim_count_sq.c.claim_count)
         .options(joinedload(Source.channel))
         .outerjoin(claim_count_sq, claim_count_sq.c.source_id == Source.source_id)
-        .order_by(Source.published_at.desc().nullslast())
-        .all()
     )
+    if search_filter is not None:
+        rows_query = rows_query.filter(search_filter)
+
+    if sort == "newest":
+        rows_query = rows_query.order_by(Source.published_at.desc().nullslast())
+    elif sort == "oldest":
+        rows_query = rows_query.order_by(Source.published_at.asc().nullslast())
+    elif sort == "most_claims":
+        rows_query = rows_query.order_by(claim_count_sq.c.claim_count.desc().nullslast())
+    elif sort == "alpha":
+        rows_query = rows_query.order_by(Source.title.asc())
+
+    rows = rows_query.limit(limit).offset(offset).all()
 
     def _voice(src: Source) -> dict | None:
         ch = src.channel
@@ -174,7 +207,9 @@ def list_sources(db: Session = Depends(get_db)):
                 "voice": _voice(src),
             }
             for src, claim_count in rows
-        ]
+        ],
+        "total": total,
+        "has_more": offset + len(rows) < total,
     }
 
 

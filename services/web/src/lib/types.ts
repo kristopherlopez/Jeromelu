@@ -16,6 +16,8 @@ export interface SourceListItem {
 
 export interface SourceListResponse {
   items: SourceListItem[];
+  total: number;
+  has_more: boolean;
 }
 
 export interface ChunkDetail {

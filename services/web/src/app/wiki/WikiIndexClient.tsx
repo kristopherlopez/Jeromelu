@@ -115,19 +115,22 @@ export default function WikiIndexClient({
     ? (initialType as EntityKey)
     : null;
 
-  // /api/sources is large (currently unbounded — tens of MB) so it's fetched
-  // client-side after hydration rather than blocking SSR. Counts and sample
-  // avatars render once it lands.
+  // Dashboard tile needs total count + ~4 sample voices. Fetch a small
+  // slice with the newest sort to cover both — SourcesView does its own
+  // paginated fetching when the user navigates to /wiki?type=sources.
   const [sources, setSources] = useState<SourceListItem[]>([]);
+  const [sourceTotal, setSourceTotal] = useState(0);
   useEffect(() => {
     let cancelled = false;
-    apiFetch<SourceListResponse>("/api/sources")
+    apiFetch<SourceListResponse>("/api/sources?limit=50&sort=newest")
       .then((res) => {
-        if (!cancelled) setSources(res.items);
+        if (cancelled) return;
+        setSources(res.items);
+        setSourceTotal(res.total);
       })
       .catch(() => {
-        // Leave sources empty on failure — dashboard shows 0 count rather
-        // than blocking the page.
+        // Leave empty on failure — dashboard shows 0 count rather than
+        // blocking the page.
       });
     return () => {
       cancelled = true;
@@ -143,9 +146,9 @@ export default function WikiIndexClient({
     <div className="min-h-screen">
       <div className="max-w-5xl mx-auto px-6 py-8">
         {filterKey ? (
-          <EntityView entityKey={filterKey} pages={filtered} sources={sources} />
+          <EntityView entityKey={filterKey} pages={filtered} />
         ) : (
-          <DashboardView pages={pages} sources={sources} sourceCount={sources.length} />
+          <DashboardView pages={pages} sources={sources} sourceCount={sourceTotal} />
         )}
       </div>
     </div>
@@ -159,11 +162,9 @@ export default function WikiIndexClient({
 function EntityView({
   entityKey,
   pages,
-  sources,
 }: {
   entityKey: EntityKey;
   pages: WikiPageSummary[];
-  sources: SourceListItem[];
 }) {
   if (entityKey === "voices") {
     return <VoicesView pages={pages} />;
@@ -172,7 +173,7 @@ function EntityView({
     return <PlayersIndexView pages={pages} />;
   }
   if (entityKey === "sources") {
-    return <SourcesView sources={sources} />;
+    return <SourcesView />;
   }
 
   const label = ENTITY_CONFIG[entityKey].label;

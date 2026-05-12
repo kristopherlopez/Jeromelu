@@ -22,9 +22,11 @@ export default async function SourceDetailPage({ params }: Props) {
     notFound();
   }
 
-  let allSources: SourceListResponse = { items: [] };
+  let allSources: SourceListResponse = { items: [], total: 0, has_more: false };
   try {
-    allSources = await apiFetch<SourceListResponse>("/api/sources");
+    // Related-sources panel only needs ~5 matches by same creator, so cap the
+    // fetch — the full sources table is ~100k+ rows.
+    allSources = await apiFetch<SourceListResponse>("/api/sources?limit=200");
   } catch {
     // Non-critical — related sources just won't show
   }

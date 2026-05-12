@@ -181,7 +181,7 @@ Migrations:
 | `GET /api/wiki/pages/{slug}/revisions` | Full revision history |
 | `GET /api/wiki/recent-changes` | Recent revisions across all pages |
 | `GET /api/wiki/channels/{slug}/episodes` | Latest sources (episodes) for a channel-backed page, ordered by `published_at` desc. Returns title, thumbnail, duration, canonical URL, ingestion status. Powers the "Latest episodes" panel in `ChannelView`. |
-| `GET /api/sources` | Every row in `sources`, with `claim_count` and an optional `voice` block (`slug`, `name`, `logo_url`) joined from `channels`. Powers the wiki Sources index and its voice chips. Unprocessed sources have `claim_count=0`; legacy rows without `channel_id` have `voice: null`. |
+| `GET /api/sources` | Paginated list of sources with `claim_count` and an optional `voice` block (`slug`, `name`, `logo_url`) joined from `channels`. Query params: `limit` (default 100, max 500), `offset`, `search` (matches title/creator_name), `sort` (`newest`\|`oldest`\|`most_claims`\|`alpha`). Returns `{items, total, has_more}`. Powers the wiki Sources index and its voice chips. Unprocessed sources have `claim_count=0`; legacy rows without `channel_id` have `voice: null`. |
 
 The `linked_pages` response field maps each `[[slug]]` found in the content to `{title, page_type}`, enabling the frontend to render wiki-links with correct display names and routes without extra API calls.
 
