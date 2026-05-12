@@ -261,25 +261,27 @@ def cluster_source_detections(
 # ---------------------------------------------------------------------------
 
 #: Mouth-opening standard deviation below this is considered "frozen
-#: face" — a portrait or framed photo. Real people talking sit at
-#: 0.05-0.15; even silent listening shifts produce > 0.01 over a span
-#: of frames. 0.005 is well below detector jitter.
-PORTRAIT_MOUTH_STD = 0.005
+#: face" — a portrait or framed photo. Real talkers sit at 0.013+;
+#: 0.006 is the empirical ceiling on Round 9 Review confirmed wall-art
+#: clusters (B=0.0044, C=0.0014, E=0.0054, F=0.0043, G=0.0026).
+PORTRAIT_MOUTH_STD = 0.006
 
-#: Bbox-centroid standard deviation in source-frame pixels below this
-#: combined with low mouth_std indicates a portrait. Detector jitter
-#: on a real bbox is ~1-2 pixels; 5 keeps room for real people who
-#: barely move (rare but possible for a guest reading from a script).
-PORTRAIT_CENTROID_STD = 5.0
+#: When mouth_std clears the portrait bar, ignore centroid jitter
+#: entirely — multi-cam shows frame wall art at slightly different
+#: positions per camera angle (~10-20 px centroid_std even for a
+#: bolted-to-the-wall portrait), so centroid alone can't separate them
+#: from a person who sits still. The detection-count gate is what
+#: discriminates: wall art is always on screen in its camera's cuts and
+#: accumulates thousands of detections; a real silent listener appears
+#: only intermittently and stays below this floor (Cluster L on the
+#: source above was 473 detections with mouth_std 0.0052 — not wall
+#: art per operator review).
+PORTRAIT_MIN_DETECTIONS = 1000
 
 #: When centroid_std is essentially zero, it's a portrait regardless
 #: of mouth_std. Lip landmarks can jitter on a frozen face producing
 #: modest mouth_std up to ~0.01, but if the bbox itself has never
-#: moved, it's wall art. Verified 2026-05-12: 4 clusters with
-#: centroid_std in 0.1-0.3 range and mouth_std 0.005-0.009 were all
-#: confirmed portraits the original AND-gate missed. Real hosts in
-#: the same source had centroid_std > 12 px — large gap with no
-#: ambiguity in between.
+#: moved, it's wall art.
 PORTRAIT_CENTROID_STRICT = 2.0
 
 #: Diagnostic only — not gated. Initially thought a portrait would
@@ -313,27 +315,33 @@ def _classify_cluster(
 ) -> str:
     """Pure function so the heuristic is unit-testable and explainable.
 
-    Verified on multi-cam Bloke In A Bar source 2026-05-12: three known
-    wall-portrait clusters all landed at mouth_std ~0.003 + centroid_std
-    < 1 px; real hosts at mouth_std > 0.018 + centroid_std > 14 px.
-    Density was a red herring — multi-cam puts portraits and hosts at
-    the same density (~0.57) since each is only visible on certain
-    camera angles. Kept ``temporal_density`` as a stored diagnostic.
+    Two portrait paths:
+
+    - **Strict-centroid**: bbox is essentially static (centroid_std <
+      PORTRAIT_CENTROID_STRICT). Catches bolted-to-the-wall portraits
+      seen in a single camera angle.
+    - **Multi-cam mouth-only**: bbox jitter doesn't disqualify a
+      portrait, because multi-cam shows frame the same wall art
+      slightly differently per camera angle (~10-20 px centroid_std).
+      The discriminator is sustained zero mouth movement plus enough
+      detections that the estimate is reliable.
+
+    Density is stored as a diagnostic only — it turned out to be a
+    red herring across both single- and multi-cam sources.
     """
     if detection_count < NOISE_MIN_DETECTIONS:
         return "noise"
-    # Strong portrait signal: bbox is essentially static. Don't gate on
-    # mouth_std here — landmark jitter on a frozen face can push it as
-    # high as 0.01 even though nothing's actually moving.
+    # Strong portrait signal: bbox is essentially static.
     if centroid_std < PORTRAIT_CENTROID_STRICT:
         return "portrait"
-    # Moderate portrait signal: both mouth and centroid are flat. Kept
-    # so a face with mild centroid drift but no mouth activity (e.g.
-    # poster catching a breeze, or a less-static framed photo) still
-    # auto-tags correctly.
+    # Multi-cam wall art: mouth never moves, and there are enough
+    # detections to trust that statistically. Real silent listeners
+    # appear intermittently and stay below PORTRAIT_MIN_DETECTIONS;
+    # wall art is continuously on-frame in its camera's cuts and easily
+    # clears it.
     if (
-        mouth_open_std < PORTRAIT_MOUTH_STD
-        and centroid_std < PORTRAIT_CENTROID_STD
+        detection_count >= PORTRAIT_MIN_DETECTIONS
+        and mouth_open_std < PORTRAIT_MOUTH_STD
     ):
         return "portrait"
     return "person"
