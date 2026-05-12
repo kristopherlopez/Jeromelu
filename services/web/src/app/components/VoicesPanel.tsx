@@ -158,7 +158,9 @@ interface SectionProps {
 function VoiceClusterSection({ cluster, onSeek, onAssign }: SectionProps) {
   const [showAll, setShowAll] = useState(false);
 
-  const breakdownEntries = Object.entries(cluster.match_method_breakdown).sort(
+  const breakdownEntries = Object.entries(
+    cluster.match_method_breakdown ?? {},
+  ).sort(
     // Stable display order — known methods first, then null.
     (a, b) => {
       const order = ["voice+face", "voice", "face", "manual", "null"];
@@ -166,10 +168,14 @@ function VoiceClusterSection({ cluster, onSeek, onAssign }: SectionProps) {
     },
   );
 
-  const visibleTurns = showAll
-    ? cluster.turns
-    : cluster.turns.slice(0, TURNS_INITIAL_LIMIT);
-  const hiddenCount = cluster.turns.length - visibleTurns.length;
+  // Defensive default — a stale API serving the pre-comprehensive
+  // payload (sample_turns) won't crash the panel. The cluster just
+  // renders with an empty turn list; restart the API to see the data.
+  const turns = cluster.turns ?? [];
+  const firstTs = cluster.first_ts ?? 0;
+  const lastTs = cluster.last_ts ?? 0;
+  const visibleTurns = showAll ? turns : turns.slice(0, TURNS_INITIAL_LIMIT);
+  const hiddenCount = turns.length - visibleTurns.length;
 
   return (
     <section
@@ -192,7 +198,7 @@ function VoiceClusterSection({ cluster, onSeek, onAssign }: SectionProps) {
             >
               {cluster.turn_count} turn{cluster.turn_count === 1 ? "" : "s"} ·{" "}
               {fmtDuration(cluster.total_seconds)} ·{" "}
-              {fmtTs(cluster.first_ts)}–{fmtTs(cluster.last_ts)}
+              {fmtTs(firstTs)}–{fmtTs(lastTs)}
             </span>
           </div>
           <div className="text-[11px]" style={{ color: "var(--foreground-secondary)" }}>
@@ -261,10 +267,10 @@ function VoiceClusterSection({ cluster, onSeek, onAssign }: SectionProps) {
             color: "var(--foreground-secondary)",
           }}
         >
-          Show all {cluster.turns.length} turns ({hiddenCount} hidden)
+          Show all {turns.length} turns ({hiddenCount} hidden)
         </button>
       )}
-      {showAll && cluster.turns.length > TURNS_INITIAL_LIMIT && (
+      {showAll && turns.length > TURNS_INITIAL_LIMIT && (
         <button
           type="button"
           onClick={() => setShowAll(false)}
@@ -276,6 +282,15 @@ function VoiceClusterSection({ cluster, onSeek, onAssign }: SectionProps) {
         >
           Collapse to first {TURNS_INITIAL_LIMIT}
         </button>
+      )}
+      {/* Empty-state signal — a stale API or a not-yet-transcribed
+          source produces a cluster with zero turns in the payload. */}
+      {turns.length === 0 && (
+        <div className="text-[10px]" style={{ color: "var(--foreground-ghost)" }}>
+          No turns returned for this cluster — either the API is serving an
+          older response shape (restart uvicorn to pick up the latest
+          voice_clusters.py) or the source isn't fully transcribed.
+        </div>
       )}
 
       {/* Eligibility footnote — only when the cluster has any non-eligible
