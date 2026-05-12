@@ -67,6 +67,22 @@ Tied to D2 — single `agent_id='scout'`, pipeline discriminator in `detail_json
 | `nrlcom-rounds` | `(season, round_number)` on `rounds` |
 | `youtube-discovery` | `(platform, kind, external_id)` on `scout_candidates` (existing) |
 
+### D8. Upstream schema drift — test-fail, never silent-adapt
+
+**Decision (locked 2026-05-12):** Every Scout scraper module ships with **endpoint-drift tests**. When the upstream source's response shape changes — new fields, removed fields, renamed fields, type changes, response-shape reorganisation — the test fails loudly and routes to the user. The agent does not auto-adapt or degrade to partial data.
+
+**Why:** External sources (`nrl.com`, `supercoach.com.au`, `nrlsupercoachstats.com`, Zero Tackle) are out of our control. Silent degradation — e.g. a renamed field becoming null in every row — would propagate wrong/incomplete content downstream into the wiki. The user wants to be the one who decides the response: rewrite the parser, wait for the source to revert, accept the change, switch sources.
+
+**Concrete contract** (applies to every module under `services/api/app/scout/data/`):
+
+1. **Fixture in repo.** Each module ships with `tests/fixtures/scout/<pipeline>/canonical_response.json` — a known-good sample of the upstream response.
+2. **Strict Pydantic parsing.** Response models use `Config.extra = 'forbid'` so unknown fields raise rather than getting silently dropped.
+3. **Drift test.** `tests/integration/scout/<pipeline>/test_response_shape.py` parses the fixture with the live model and asserts the shape; **and** has a "live mode" variant (env-flagged) that fetches the real endpoint and runs the same assertion.
+4. **Actionable failure messages.** Test output names the endpoint and the specific drift — e.g. *"nrl.com /draw/data: unknown field `is_byzantine_round` on match object"* — so the fix is targeted.
+5. **Drift surfaces to a human.** Either CI runs the live-mode drift tests on a schedule, or a separate cron pings the live endpoint and runs the parser. Failures go to the user, not into a silent log.
+
+This decision tightens the mitigation language that was previously in Risk #4 ("logs unknown fields rather than crashing") into a hard requirement.
+
 ---
 
 ## The expanded charter
@@ -165,11 +181,12 @@ This is the pattern Scout's media side already follows; the expansion just insta
 Pick the smallest pipeline: **SuperCoach player roster**. It already has a working fetcher script and a skill (to be retired).
 
 - Move `scripts/data/fetchers/fetch_supercoach_players.py` → `services/api/app/scout/data/supercoach_roster.py` as a callable function (no behavioural changes).
+- **Add the D8 drift fixture and test:** `tests/fixtures/scout/supercoach-roster/canonical_response.json` + `tests/integration/scout/supercoach-roster/test_response_shape.py` (Pydantic-strict, live-mode env-flagged). This is the pattern every subsequent pipeline copies — getting it right on Phase 1 means it's cheap to apply for Phases 2-4.
 - Add `POST /api/admin/scout/supercoach-roster` endpoint that wraps the function in the agent audit pattern.
 - Add a `make scout-supercoach-roster` target for ad-hoc operator runs that hits the endpoint with admin auth.
 - Retire the `scrape-supercoach` Claude Code skill — operators use the endpoint or the `make` target.
 - Schedule via external cron — daily.
-- Phase 1 done = the SuperCoach roster refreshes daily, an audit row lands per run, the `make` target works for ad-hoc operator use, the skill is retired, and `people`/`people_attributes` row counts move when the upstream data does.
+- Phase 1 done = the SuperCoach roster refreshes daily, an audit row lands per run, the drift test runs in CI (fixture-mode) and on a schedule (live-mode), the `make` target works for ad-hoc operator use, the skill is retired, and `people`/`people_attributes` row counts move when the upstream data does.
 
 ### Phase 2 — SuperCoach per-round stats (the high-leverage one)
 
@@ -211,7 +228,7 @@ The roadmap items in [`scout.md` §4 "Multi-platform expansion"](../../agents/cr
 
 3. **One-process overload.** All Scout pipelines running in the API process means a hung fetcher blocks API throughput. Mitigation: endpoints kick off the fetch as a FastAPI background task with hard wall-clock bounds (matching Scout's media pattern); endpoint returns the `run_id` immediately rather than waiting for completion.
 
-4. **Schema drift in fetcher outputs.** SuperCoach API or NRL.com endpoint shapes can change silently — new fields, renamed fields, removed fields. Mitigation: each module validates the response against a Pydantic schema and logs unknown fields rather than crashing on them.
+4. **Schema drift in fetcher outputs.** SuperCoach API or NRL.com endpoint shapes can change silently — new fields, renamed fields, removed fields. Mitigation is locked in **D8**: strict Pydantic parsing + fixture-backed drift tests + live-mode scheduled runs that surface failures to the user. The agent does not auto-adapt.
 
 5. **Bookkeeper-shaped hole in the crew docs.** Moving acquisition out of Bookkeeper's territory leaves [`bookkeeper.md`](../../agents/crew/bookkeeper.md) with a smaller, less-clearly-defined scope. Mitigation: Phase 0 doc updates explicitly redefine Bookkeeper as the *derivation/math* layer over Scout-fetched data — alignment indices, accuracy scores, trend extraction, breakeven-trajectory math. Not nothing, but narrower than today.
 
@@ -233,6 +250,7 @@ Effectively **zero** for the deterministic pipelines (no LLM calls). The agent_a
 |---|---|
 | Unit (`tests/unit/api/scout/data/`) | Each module's response parser + upsert logic with a mocked HTTP client. Fast, deterministic. |
 | Integration (`tests/integration/scout/`) | Round-trip against a fixture HTTP server that serves canned SuperCoach / NRL.com responses. Validates the endpoint wrapper, audit row creation, idempotency on re-run. |
+| **Drift detection** (`tests/integration/scout/<pipeline>/test_response_shape.py`) | Per D8: fixture-backed shape assertion + env-flagged live-mode variant that fetches the real endpoint. Fails on any unknown field, missing field, or type change. Live-mode runs on a schedule so upstream drift surfaces to the user, not into a silent log. |
 | Smoke (manual) | Operator runs each new endpoint once against the live source in staging; reviews the audit row and the upserted rows. |
 
 No eval suite — these are deterministic fetchers. The eval suite belongs to the Analyst's claim-extraction and the Archivist's prose composition, not to Scout.
