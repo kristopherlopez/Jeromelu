@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, User, Calendar, Video, PenLine, Hourglass, Smartphone } from "lucide-react";
 import type { SourceDetailResponse, SourceListItem } from "@/lib/types";
 import { useIsYouTubeShort } from "@/lib/useIsYouTubeShort";
+import { usePageHeader } from "@/app/components/PageHeaderContext";
 import YouTubePlayer, { type YouTubePlayerHandle } from "@/app/components/YouTubePlayer";
 import VideoOverlay, { type VideoOverlayHandle } from "@/app/components/VideoOverlay";
 import YouTubeFaceOverlay, {
@@ -24,6 +25,11 @@ export default function SourceReviewClient({ data, allSources }: Props) {
   const { source, claims, chunks, speakers } = data;
   const [currentTime, setCurrentTime] = useState(0);
   const [activeTab, setActiveTab] = useState<"transcript" | "claims" | "faces">("transcript");
+  // Bumped after a successful face cluster assign so the overlay
+  // remounts and re-fetches the regenerated face-track JSON. Combined
+  // with the API's no-cache header, that's how the per-frame bbox
+  // colouring catches up after the operator labels a cluster.
+  const [faceTrackVersion, setFaceTrackVersion] = useState(0);
   // Three video surfaces, picked in priority order:
   //   1. YouTubeFaceOverlay — canvas drawn over the YouTube iframe.
   //      Default for any YouTube source with a face-track JSON. The
@@ -100,6 +106,51 @@ export default function SourceReviewClient({ data, allSources }: Props) {
         : "YouTube"
       : source.source_type;
 
+  const publishedLabel = source.published_at
+    ? new Date(source.published_at).toLocaleDateString("en-AU", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : null;
+
+  const { setHeader } = usePageHeader();
+  useEffect(() => {
+    setHeader({
+      backHref: "/wiki?type=sources",
+      backLabel: "Back",
+      title: source.title,
+      meta: (
+        <>
+          {isShort && (
+            <span
+              className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+              style={{
+                borderColor: "var(--accent)",
+                color: "var(--accent)",
+                backgroundColor:
+                  "color-mix(in srgb, var(--accent) 12%, transparent)",
+              }}
+              title="This video was uploaded as a YouTube Short (vertical 9:16)"
+            >
+              <Smartphone size={11} />
+              Short
+            </span>
+          )}
+          {publishedLabel && (
+            <span
+              className="hidden md:inline text-xs"
+              style={{ color: "var(--foreground-ghost)" }}
+            >
+              {publishedLabel}
+            </span>
+          )}
+        </>
+      ),
+    });
+    return () => setHeader(null);
+  }, [setHeader, source.title, isShort, publishedLabel]);
+
   // Sources without chunks haven't been transcribed yet — the video still
   // plays, but transcript and claims tabs need a placeholder so the panel
   // doesn't look broken.
@@ -115,50 +166,14 @@ export default function SourceReviewClient({ data, allSources }: Props) {
   })();
 
   return (
-    <main className="min-h-screen">
-      {/* Header */}
-      <div className="flex items-center gap-3 border-b px-4 py-3 lg:px-6" style={{ borderColor: "var(--border)" }}>
-        <Link
-          href="/wiki/source"
-          className="flex items-center gap-1 text-sm transition-colors" style={{ color: "var(--foreground-secondary)" }}
-        >
-          <ArrowLeft size={16} />
-          Back
-        </Link>
-        <h1 className="flex-1 truncate text-sm font-semibold" style={{ color: "var(--foreground)" }}>
-          {source.title}
-        </h1>
-        {isShort && (
-          <span
-            className="hidden sm:inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
-            style={{
-              borderColor: "var(--accent)",
-              color: "var(--accent)",
-              backgroundColor: "color-mix(in srgb, var(--accent) 12%, transparent)",
-            }}
-            title="This video was uploaded as a YouTube Short (vertical 9:16)"
-          >
-            <Smartphone size={11} />
-            Short
-          </span>
-        )}
-        {source.published_at && (
-          <span className="hidden text-xs sm:block" style={{ color: "var(--foreground-ghost)" }}>
-            {new Date(source.published_at).toLocaleDateString("en-AU", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            })}
-          </span>
-        )}
-      </div>
-
+    <main>
       {/* Main content */}
-      <div className="flex flex-col lg:flex-row lg:h-[calc(100vh-49px)]">
+      <div className="flex flex-col lg:flex-row lg:h-[calc(100vh-56px)]">
         {/* Left: Video + Metadata (sticky) */}
-        <div className="w-full lg:w-[50%] p-4 lg:p-6 flex flex-col gap-4 lg:sticky lg:top-0 lg:self-start lg:max-h-[calc(100vh-49px)] lg:overflow-y-auto custom-scrollbar">
+        <div className="w-full lg:w-[50%] p-4 lg:p-6 flex flex-col gap-4 lg:sticky lg:top-0 lg:self-start lg:max-h-[calc(100vh-56px)] lg:overflow-y-auto custom-scrollbar">
           {useYouTubeOverlay ? (
             <YouTubeFaceOverlay
+              key={`yt-${faceTrackVersion}`}
               ref={ytOverlayRef}
               videoUrl={source.canonical_url!}
               faceTrackUrl={source.face_track_url}
@@ -168,6 +183,7 @@ export default function SourceReviewClient({ data, allSources }: Props) {
             />
           ) : useLegacyOverlay ? (
             <VideoOverlay
+              key={`legacy-${faceTrackVersion}`}
               ref={overlayRef}
               videoUrl={source.video_url!}
               faceTrackUrl={source.face_track_url}
@@ -339,7 +355,11 @@ export default function SourceReviewClient({ data, allSources }: Props) {
                 onSeek={handleSeek}
               />
             ) : activeTab === "faces" ? (
-              <FacesPanel sourceId={source.source_id} onSeek={handleSeek} />
+              <FacesPanel
+                sourceId={source.source_id}
+                onSeek={handleSeek}
+                onClusterAssigned={() => setFaceTrackVersion((v) => v + 1)}
+              />
             ) : (
               <ClaimsList
                 claims={claims}

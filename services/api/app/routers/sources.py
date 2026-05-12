@@ -25,7 +25,11 @@ from app.analyst.identify_voice import (
     enrollment_context,
 )
 from app.analyst.video_worker_client import VideoWorkerError, fetch_frame_to
-from app.analyst.visual_id import VisualIdError, enroll_face_from_image
+from app.analyst.visual_id import (
+    VisualIdError,
+    enroll_face_from_image,
+    regenerate_face_track_json_from_detections,
+)
 from jeromelu_shared.db import (
     Channel,
     Claim,
@@ -1010,7 +1014,13 @@ def get_face_track(source_id: uuid.UUID, db: Session = Depends(get_db)):
         # for a given (source, JSON_VERSION). Bumping FACE_TRACK_JSON_VERSION
         # produces a new artefact, but the API path stays the same; clients
         # that need a fresh copy should hard-refresh.
-        headers={"Cache-Control": "public, max-age=300"},
+        # Cache-Control: no-cache → browser revalidates every fetch.
+        # Necessary so the overlay picks up regenerated face-track JSON
+        # immediately after a bulk-assign instead of waiting out a TTL.
+        # The JSON is small (~5 MB) and only loaded once per page view,
+        # so the always-revalidate cost is negligible. ETag-based
+        # revalidation would be a future optimisation if this becomes hot.
+        headers={"Cache-Control": "no-cache"},
     )
 
 
@@ -1673,6 +1683,17 @@ def bulk_assign_face_run(
             # ---- Commit + result ------------------------------------
             yield _ndjson({"step": "commit", "status": "start"})
             db.commit()
+
+            # Refresh the cached face-track JSON in S3 so the overlay
+            # sees the new attribution without a full visual_identify
+            # re-extract. Best-effort: never fail the assign on this.
+            try:
+                regenerate_face_track_json_from_detections(db, source_id)
+            except Exception as exc:
+                logger.warning(
+                    "Face-track JSON regen failed for %s: %s", source_id, exc,
+                )
+
             yield _ndjson({"step": "commit", "status": "done"})
 
             yield _ndjson({

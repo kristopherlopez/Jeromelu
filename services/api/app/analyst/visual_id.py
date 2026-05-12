@@ -901,6 +901,103 @@ def _persist_face_detections(
     return len(rows)
 
 
+def regenerate_face_track_json_from_detections(
+    session: Session,
+    source_id: UUID,
+) -> str | None:
+    """Slice B PR 2.7 — rebuild the face-track JSON in S3 from the
+    current state of ``source_face_detections`` so the overlay shows
+    the latest attribution without a full visual_identify re-extract.
+
+    Called after bulk-assign (and any other write that changes
+    ``matched_person_id`` / ``match_score`` per detection) so the
+    review-UI overlay reflects the operator's changes on next refresh.
+
+    Metadata fields (frame_width / frame_height / video_format /
+    sample_rate / embedding_model) are read from the existing JSON so
+    we don't have to reconstruct them — those are constants of the
+    extraction, not of the attribution.
+
+    Returns the S3 key of the regenerated JSON, or ``None`` when the
+    source has no detections / no cached JSON to update.
+    """
+    source = session.query(Source).filter(Source.source_id == source_id).first()
+    if not source or not source.audio_s3_key:
+        return None
+
+    face_track_key = _face_track_s3_key_from_audio(source.audio_s3_key)
+
+    # Read existing metadata. If the cached JSON is missing we'd be
+    # guessing at frame_width/height; bail rather than write a half-
+    # correct artefact.
+    try:
+        existing = json.loads(download_raw(face_track_key))
+    except Exception:
+        logger.warning(
+            "Cannot regenerate face-track for %s: cached JSON missing",
+            source_id,
+        )
+        return None
+
+    detections = (
+        session.query(SourceFaceDetection)
+        .filter(SourceFaceDetection.source_id == source_id)
+        .order_by(SourceFaceDetection.frame_ts)
+        .all()
+    )
+    if not detections:
+        return None
+
+    by_frame: dict[float, list[dict]] = {}
+    for d in detections:
+        ts = float(d.frame_ts)
+        face = {
+            "bbox": [
+                float(d.bbox_x1), float(d.bbox_y1),
+                float(d.bbox_x2), float(d.bbox_y2),
+            ],
+            "det_score": float(d.det_score),
+            "person_id": str(d.matched_person_id) if d.matched_person_id else None,
+            "similarity": (
+                float(d.match_score) if d.match_score is not None else None
+            ),
+            "mouth_opening": (
+                float(d.mouth_opening) if d.mouth_opening is not None else None
+            ),
+        }
+        by_frame.setdefault(ts, []).append(face)
+
+    frames = sorted(
+        [{"ts": ts, "faces": faces} for ts, faces in by_frame.items()],
+        key=lambda f: f["ts"],
+    )
+
+    payload = {
+        "json_version": FACE_TRACK_JSON_VERSION,
+        "embedding_model": existing.get("embedding_model", EMBEDDING_MODEL),
+        "embedding_dim": existing.get("embedding_dim", EMBEDDING_DIM),
+        "sample_rate": existing.get("sample_rate", FRAME_SAMPLE_RATE),
+        "video_s3_key": existing.get("video_s3_key", source.video_s3_key or ""),
+        "video_format": existing.get(
+            "video_format", source.video_format or "audio_only",
+        ),
+        "duration_seconds": existing.get(
+            "duration_seconds",
+            max((f["ts"] for f in frames), default=0.0),
+        ),
+        "frame_width": existing.get("frame_width"),
+        "frame_height": existing.get("frame_height"),
+        "frames": frames,
+    }
+
+    upload_raw(face_track_key, json.dumps(payload, ensure_ascii=False))
+    logger.info(
+        "Regenerated face-track JSON for %s (%d frames, %d detections)",
+        source_id, len(frames), len(detections),
+    )
+    return face_track_key
+
+
 def enroll_face_from_image(
     session: Session,
     *,

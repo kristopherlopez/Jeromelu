@@ -85,6 +85,9 @@ interface Props {
   sourceId: string;
   /** Seek the video preview when an operator clicks a row. */
   onSeek: (seconds: number) => void;
+  /** Called after a cluster assign succeeds so the parent can refresh
+   *  the face overlay (which reads the cached face-track JSON). */
+  onClusterAssigned?: () => void;
 }
 
 function fmtTs(s: number): string {
@@ -105,7 +108,11 @@ function runBorderColor(run: FaceRun): string {
   return run.person_id ? "var(--accent)" : "var(--foreground-ghost)";
 }
 
-export default function FacesPanel({ sourceId, onSeek }: Props) {
+export default function FacesPanel({
+  sourceId,
+  onSeek,
+  onClusterAssigned,
+}: Props) {
   const [data, setData] = useState<FaceRunsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -282,6 +289,11 @@ export default function FacesPanel({ sourceId, onSeek }: Props) {
             // Refresh so the row's person_name updates and the
             // overlapping_turns reflect their new attribution.
             refresh();
+            // Tell the parent (SourceReviewClient) so it can remount
+            // the face overlay — its face-track JSON has been
+            // regenerated server-side and the new attribution colours
+            // need a fresh fetch.
+            onClusterAssigned?.();
           }}
         />
       )}
