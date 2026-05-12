@@ -65,7 +65,7 @@ def _upsert_team_supercoach_ids(
             "abbrev": sc_team.abbrev,
             "feed_name": sc_team.feed_name,
             "name": sc_team.name,
-            "competition": sc_team.competition,
+            "competition": sc_team.competition.model_dump(),
         }
         team_row.metadata_json = meta
         matched += 1

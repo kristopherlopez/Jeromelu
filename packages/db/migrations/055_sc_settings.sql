@@ -15,12 +15,18 @@ CREATE TABLE IF NOT EXISTS sc_settings (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     season          INTEGER NOT NULL,
     captured_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    captured_date   DATE GENERATED ALWAYS AS (captured_at::DATE) STORED,
+    captured_date   DATE NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC')::DATE,
     mode            TEXT NOT NULL DEFAULT 'classic',  -- classic | draft
     payload         JSONB NOT NULL,
     s3_archive_key  TEXT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Application-side responsibility: keep captured_date == captured_at::date.
+-- The route helper sets both consistently; the conflict resolution uses
+-- captured_date directly. Generated columns over timestamptz aren't
+-- supported by Postgres (the cast is non-immutable), so we use a plain
+-- column with a matching default and let the writer be the source of truth.
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_sc_settings_season_date_mode
     ON sc_settings(season, captured_date, mode);
