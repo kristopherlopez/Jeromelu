@@ -24,9 +24,9 @@ removes a moving-target firewall problem.
 
 Pipeline stages:
 
-1. **`detect-changes`** — `dorny/paths-filter` flags whether `api`, `web`, or `db` paths changed. Sets job-level outputs that gate every downstream job.
-2. **`build-and-push`** (matrix: api, web) — only fires for the service whose paths changed. Builds the Dockerfile and pushes two tags to ECR: `${github.sha}` and `latest`.
-3. **`deploy-lightsail`** — runs on the self-hosted runner (`runs-on: [self-hosted, jeromelu-prod]`). `cd /opt/jeromelu`, `git pull --ff-only`, then runs `scripts/lightsail-deploy.sh`. The script `docker compose pull web api`, `up -d web api`, prunes old images, and re-syncs `scripts/cron.d/jeromelu` into `/etc/cron.d/`.
+1. **`detect-changes`** — `dorny/paths-filter@v3` flags whether `api`, `web`, `video_worker`, `db`, or `deploy_only` paths changed. Sets job-level outputs that gate every downstream job. `deploy_only` covers `scripts/lightsail-deploy.sh`, `scripts/cron.d/**`, `docker/docker-compose.prod.yml`, and `docker/Caddyfile` — changes that need a redeploy of the existing images but no new image build.
+2. **`build-and-push`** (matrix: api, web, video-worker) — only fires for the service whose paths changed. Builds the Dockerfile and pushes two tags to ECR: `${github.sha}` and `latest`.
+3. **`deploy-lightsail`** — runs on the self-hosted runner (`runs-on: [self-hosted, jeromelu-prod]`) when any of `api / web / video_worker / deploy_only` changed. `cd /opt/jeromelu`, `git pull --ff-only`, then runs `scripts/lightsail-deploy.sh`. The script logs into ECR and then rolls api → web → video-worker **one at a time** (`stop` → `pull` → `up -d --no-deps`), pruning between iterations. Serial rollout is mandatory: the box is a 1 GB `micro_3_2` and parallel pulls + 2× running containers wedge it (memory exhaustion → swap thrash → dockerd hang → runner offline). Brief per-service downtime is the explicit trade.
 4. **`invalidate-cdn`** — only on web changes. `aws cloudfront create-invalidation` against distribution `E2G6FL11A3JP8F`.
 5. **`migrate`** — **notify-only.** When `db` paths change the job prints instructions to run `packages/db/migrate.sh` from the box manually. No automatic schema changes.
 
