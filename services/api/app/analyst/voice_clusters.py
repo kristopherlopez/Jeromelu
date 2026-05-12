@@ -10,6 +10,8 @@ embedding-matrix load, just a group-by over ``source_speakers.speaker_label``.
 Mirrors the per-cluster shape produced by
 ``face_runs.compute_face_runs_from_detections`` so the frontend can
 reuse the same per-cluster layout and bulk-assign modal contract.
+Each cluster exposes *every* turn (not just a 5-sample preview) so the
+review surface is as comprehensive as the Faces tab's runs view.
 """
 
 from __future__ import annotations
@@ -21,21 +23,17 @@ from sqlalchemy.orm import Session
 
 from jeromelu_shared.db import SourceChunk, SourceDocument, SourceSpeaker
 
-#: Sample turns surfaced per cluster for operator preview / click-to-listen.
-#: Five is enough for the operator to confirm the voice without overflowing
-#: the cluster header.
-SAMPLE_TURN_LIMIT = 5
-
 #: Cap on medoid voiceprints written per cluster assign. Mirrors
 #: ``CLUSTER_EMBEDDING_SAMPLE_LIMIT=10`` on the face side — small enough
 #: that one cluster-assign can't bloat the kNN registry, big enough to
 #: capture acoustic variation across the cluster's timeline.
 VOICEPRINT_SAMPLE_LIMIT = 10
 
-#: Length cap for ``sample_turns[].preview_text``. Long enough to give the
-#: operator context, short enough that five samples fit cleanly under the
-#: cluster header.
-_PREVIEW_TRUNCATE_AT = 120
+#: Length cap for per-turn ``preview_text``. Long enough to read what
+#: the speaker actually said, short enough that one cluster's worth of
+#: turns doesn't bloat the JSON. Lines that exceed this get a soft
+#: word-boundary truncation + ellipsis.
+_PREVIEW_TRUNCATE_AT = 300
 
 
 @dataclass(frozen=True)
@@ -64,6 +62,11 @@ def aggregate_clusters(
     Returns one entry per ``speaker_label`` ordered by total airtime
     descending. Rows with a NULL ``speaker_label`` must be filtered out
     by the caller — they don't belong to any cluster.
+
+    Each cluster's ``turns`` list contains *every* turn in the cluster,
+    sorted chronologically by ``start_ts``. Each turn carries its
+    time range, duration, current attribution, match_method, and the
+    concatenated chunk text covered by that turn.
     """
     preview_by_segment = preview_by_segment or {}
 
@@ -76,6 +79,8 @@ def aggregate_clusters(
         turn_count = len(turns)
         total_seconds = sum(t.end_ts - t.start_ts for t in turns)
         embedding_eligible = sum(1 for t in turns if t.has_embedding)
+        first_ts = min(t.start_ts for t in turns)
+        last_ts = max(t.end_ts for t in turns)
 
         breakdown: dict[str, int] = {}
         for t in turns:
@@ -96,32 +101,39 @@ def aggregate_clusters(
             dominant_person_id = dom_pid
             dominant_share = dom_count / turn_count
 
-        # Sample turns — longest with non-NULL embedding, then re-sorted
-        # by start_ts so the operator sees them in conversational order.
-        eligible = [t for t in turns if t.has_embedding]
-        eligible.sort(key=lambda t: -(t.end_ts - t.start_ts))
-        sampled = sorted(eligible[:SAMPLE_TURN_LIMIT], key=lambda t: t.start_ts)
-        sample_turns = [
+        # Every turn in the cluster, sorted chronologically so the
+        # operator scans the conversation in playback order. Symmetric
+        # with the Faces tab's per-cluster run list.
+        chrono_turns = sorted(turns, key=lambda t: t.start_ts)
+        turns_out = [
             {
                 "segment_id": str(t.segment_id),
                 "start_ts": float(t.start_ts),
                 "end_ts": float(t.end_ts),
+                "duration": float(t.end_ts - t.start_ts),
+                "speaker_person_id": (
+                    str(t.speaker_person_id) if t.speaker_person_id else None
+                ),
+                "match_method": t.match_method,
+                "has_embedding": t.has_embedding,
                 "preview_text": _truncate(
                     preview_by_segment.get(t.segment_id, ""),
                 ),
             }
-            for t in sampled
+            for t in chrono_turns
         ]
 
         speakers.append({
             "speaker_label": label,
             "turn_count": turn_count,
             "total_seconds": float(total_seconds),
+            "first_ts": float(first_ts),
+            "last_ts": float(last_ts),
             "embedding_eligible_count": embedding_eligible,
             "dominant_person_id": dominant_person_id,
             "dominant_share": dominant_share,
             "match_method_breakdown": breakdown,
-            "sample_turns": sample_turns,
+            "turns": turns_out,
         })
 
     speakers.sort(key=lambda s: -s["total_seconds"])
@@ -139,6 +151,11 @@ def compute_voice_clusters(session: Session, source_id: UUID) -> dict:
     voiceprint enrolment (via ``embedding_eligible_count``) so the
     assign modal can warn when a cluster has nothing to write into
     ``person_voiceprints``.
+
+    For every turn the wrapper concatenates the text of every
+    ``source_chunks`` row that joins back to it — the full speech for
+    the turn, not just the opening utterance — so the Voices tab can
+    show what was said. One indexed query, regardless of cluster count.
     """
     doc = (
         session.query(SourceDocument)
@@ -180,44 +197,55 @@ def compute_voice_clusters(session: Session, source_id: UUID) -> dict:
         for r in raw_rows
     ]
 
-    # Decide the per-cluster sample set up-front so the preview-text
-    # fetch is one query across every sample turn, not one per cluster.
-    sample_segment_ids: list[UUID] = []
-    by_label: dict[str, list[TurnRow]] = {}
-    for r in rows:
-        by_label.setdefault(r.speaker_label, []).append(r)
-    for turns in by_label.values():
-        eligible = sorted(
-            (t for t in turns if t.has_embedding),
-            key=lambda t: -(t.end_ts - t.start_ts),
-        )
-        sample_segment_ids.extend(t.segment_id for t in eligible[:SAMPLE_TURN_LIMIT])
-
-    preview_by_segment: dict[UUID, str] = {}
-    if sample_segment_ids:
-        chunk_rows = (
-            session.query(
-                SourceChunk.speaker_segment_id,
-                SourceChunk.clean_text,
-                SourceChunk.raw_text,
-            )
-            .filter(SourceChunk.speaker_segment_id.in_(sample_segment_ids))
-            .order_by(SourceChunk.start_ts)
-            .all()
-        )
-        # First chunk per segment wins — opening utterance usually
-        # carries more identifying content than mid-turn filler.
-        # ``clean_text`` is preferred but may be NULL on older rows.
-        for seg_id, clean_text, raw_text in chunk_rows:
-            if seg_id in preview_by_segment:
-                continue
-            text = (clean_text or raw_text or "").strip()
-            preview_by_segment[seg_id] = text
+    preview_by_segment = _fetch_full_turn_text(
+        session, [r.segment_id for r in rows],
+    )
 
     return aggregate_clusters(rows, preview_by_segment)
+
+
+def _fetch_full_turn_text(
+    session: Session, segment_ids: list[UUID],
+) -> dict[UUID, str]:
+    """Concatenate every ``source_chunks`` row's text by speaker_segment_id.
+
+    One indexed query across all segments — cheaper than per-cluster
+    queries even on long sources. ``clean_text`` is preferred; falls
+    back to ``raw_text`` when the cleaner hasn't run. Chunks are joined
+    with spaces in chunk-start order so the result reads like the
+    speaker talking continuously.
+    """
+    if not segment_ids:
+        return {}
+    chunk_rows = (
+        session.query(
+            SourceChunk.speaker_segment_id,
+            SourceChunk.start_ts,
+            SourceChunk.clean_text,
+            SourceChunk.raw_text,
+        )
+        .filter(SourceChunk.speaker_segment_id.in_(segment_ids))
+        .order_by(SourceChunk.speaker_segment_id, SourceChunk.start_ts)
+        .all()
+    )
+    parts_by_segment: dict[UUID, list[str]] = {}
+    for seg_id, _ts, clean_text, raw_text in chunk_rows:
+        text = (clean_text or raw_text or "").strip()
+        if not text:
+            continue
+        parts_by_segment.setdefault(seg_id, []).append(text)
+    return {
+        seg_id: " ".join(parts)
+        for seg_id, parts in parts_by_segment.items()
+    }
 
 
 def _truncate(text: str) -> str:
     if len(text) <= _PREVIEW_TRUNCATE_AT:
         return text
-    return text[:_PREVIEW_TRUNCATE_AT].rsplit(" ", 1)[0] + "…"
+    # Snip on the last space before the cap so we don't break mid-word.
+    head = text[:_PREVIEW_TRUNCATE_AT]
+    space = head.rfind(" ")
+    if space > _PREVIEW_TRUNCATE_AT * 0.5:
+        head = head[:space]
+    return head + "…"

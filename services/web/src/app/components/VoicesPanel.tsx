@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import type {
   VoiceCluster,
+  VoiceClusterTurn,
   VoiceClustersResponse,
 } from "@/lib/types";
 import AssignVoiceModal from "./AssignVoiceModal";
@@ -17,6 +18,12 @@ interface Props {
    *  source detail (speakers list drives the overlay match-method colour). */
   onClusterAssigned?: () => void;
 }
+
+// Turns per cluster rendered before the operator hits "Show all". Hosts on
+// long podcasts can rack up 400+ turns per cluster; rendering them all by
+// default works but slows interactive scrolling. 50 covers the common
+// review case and the expand is one click.
+const TURNS_INITIAL_LIMIT = 50;
 
 function fmtTs(s: number): string {
   const m = Math.floor(s / 60);
@@ -31,6 +38,15 @@ function fmtDuration(seconds: number): string {
   return `${m}m ${String(s).padStart(2, "0")}s`;
 }
 
+function fmtTurnDuration(seconds: number): string {
+  // Tight format for the per-row badge — most turns are 1-30s.
+  if (seconds < 1) return `${seconds.toFixed(1)}s`;
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return `${m}m${s ? ` ${s}s` : ""}`;
+}
+
 function pct(n: number | null): string {
   if (n === null) return "—";
   return `${Math.round(n * 100)}%`;
@@ -39,7 +55,7 @@ function pct(n: number | null): string {
 // Match-method colours — same mapping as the YouTube overlay so the
 // Voices tab reads consistently with the face boxes drawn over the
 // player. See speaker-identification.md § Concepts → Match method.
-function methodColor(method: string): string {
+function methodColor(method: string | null): string {
   switch (method) {
     case "voice+face":
       return "#4ade80"; // green
@@ -140,6 +156,8 @@ interface SectionProps {
 }
 
 function VoiceClusterSection({ cluster, onSeek, onAssign }: SectionProps) {
+  const [showAll, setShowAll] = useState(false);
+
   const breakdownEntries = Object.entries(cluster.match_method_breakdown).sort(
     // Stable display order — known methods first, then null.
     (a, b) => {
@@ -147,6 +165,11 @@ function VoiceClusterSection({ cluster, onSeek, onAssign }: SectionProps) {
       return order.indexOf(a[0]) - order.indexOf(b[0]);
     },
   );
+
+  const visibleTurns = showAll
+    ? cluster.turns
+    : cluster.turns.slice(0, TURNS_INITIAL_LIMIT);
+  const hiddenCount = cluster.turns.length - visibleTurns.length;
 
   return (
     <section
@@ -156,7 +179,7 @@ function VoiceClusterSection({ cluster, onSeek, onAssign }: SectionProps) {
         backgroundColor: "var(--background-deep)",
       }}
     >
-      {/* Header row — label, totals, current dominant person, assign button. */}
+      {/* Header row — label, totals, time range, current dominant person, assign. */}
       <header className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-0.5">
           <div className="flex items-baseline gap-2">
@@ -168,7 +191,8 @@ function VoiceClusterSection({ cluster, onSeek, onAssign }: SectionProps) {
               style={{ color: "var(--foreground-ghost)" }}
             >
               {cluster.turn_count} turn{cluster.turn_count === 1 ? "" : "s"} ·{" "}
-              {fmtDuration(cluster.total_seconds)}
+              {fmtDuration(cluster.total_seconds)} ·{" "}
+              {fmtTs(cluster.first_ts)}–{fmtTs(cluster.last_ts)}
             </span>
           </div>
           <div className="text-[11px]" style={{ color: "var(--foreground-secondary)" }}>
@@ -209,8 +233,8 @@ function VoiceClusterSection({ cluster, onSeek, onAssign }: SectionProps) {
             key={method}
             className="rounded px-1.5 py-0.5"
             style={{
-              border: `1px solid ${methodColor(method)}`,
-              color: methodColor(method),
+              border: `1px solid ${methodColor(method === "null" ? null : method)}`,
+              color: methodColor(method === "null" ? null : method),
             }}
           >
             {method}: {count}
@@ -218,40 +242,40 @@ function VoiceClusterSection({ cluster, onSeek, onAssign }: SectionProps) {
         ))}
       </div>
 
-      {/* Sample turns — click to seek the player. */}
-      {cluster.sample_turns.length > 0 && (
+      {/* Per-turn list — every turn in chronological order. */}
+      {visibleTurns.length > 0 && (
         <ul className="flex flex-col gap-1">
-          {cluster.sample_turns.map((t) => (
-            <li
-              key={t.segment_id}
-              className="flex items-baseline gap-2 text-xs"
-            >
-              <button
-                type="button"
-                onClick={() => onSeek(t.start_ts)}
-                className="shrink-0 rounded px-1 py-0.5 text-[11px] font-mono"
-                style={{
-                  color: "var(--accent)",
-                  backgroundColor: "var(--surface)",
-                  cursor: "pointer",
-                }}
-                title={`Jump to ${fmtTs(t.start_ts)}`}
-              >
-                ▸ {fmtTs(t.start_ts)}
-              </button>
-              <span
-                className="min-w-0 truncate"
-                style={{ color: "var(--foreground-secondary)" }}
-              >
-                {t.preview_text || (
-                  <em style={{ color: "var(--foreground-ghost)" }}>
-                    (no transcript text)
-                  </em>
-                )}
-              </span>
-            </li>
+          {visibleTurns.map((t) => (
+            <VoiceTurnRow key={t.segment_id} turn={t} onSeek={onSeek} />
           ))}
         </ul>
+      )}
+
+      {hiddenCount > 0 && !showAll && (
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          className="self-start rounded border px-2 py-1 text-[10px]"
+          style={{
+            borderColor: "var(--border)",
+            color: "var(--foreground-secondary)",
+          }}
+        >
+          Show all {cluster.turns.length} turns ({hiddenCount} hidden)
+        </button>
+      )}
+      {showAll && cluster.turns.length > TURNS_INITIAL_LIMIT && (
+        <button
+          type="button"
+          onClick={() => setShowAll(false)}
+          className="self-start rounded border px-2 py-1 text-[10px]"
+          style={{
+            borderColor: "var(--border)",
+            color: "var(--foreground-secondary)",
+          }}
+        >
+          Collapse to first {TURNS_INITIAL_LIMIT}
+        </button>
       )}
 
       {/* Eligibility footnote — only when the cluster has any non-eligible
@@ -264,5 +288,66 @@ function VoiceClusterSection({ cluster, onSeek, onAssign }: SectionProps) {
         </div>
       )}
     </section>
+  );
+}
+
+interface TurnRowProps {
+  turn: VoiceClusterTurn;
+  onSeek: (seconds: number) => void;
+}
+
+function VoiceTurnRow({ turn, onSeek }: TurnRowProps) {
+  const color = methodColor(turn.match_method);
+  return (
+    <li className="flex items-baseline gap-2 text-xs">
+      <button
+        type="button"
+        onClick={() => onSeek(turn.start_ts)}
+        className="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-mono"
+        style={{
+          color: "var(--accent)",
+          backgroundColor: "var(--surface)",
+          cursor: "pointer",
+        }}
+        title={`Jump to ${fmtTs(turn.start_ts)}`}
+      >
+        ▸ {fmtTs(turn.start_ts)}–{fmtTs(turn.end_ts)}
+      </button>
+      <span
+        className="shrink-0 text-[10px] font-mono"
+        style={{ color: "var(--foreground-ghost)" }}
+        title="Turn duration"
+      >
+        ({fmtTurnDuration(turn.duration)})
+      </span>
+      {/* Method dot — small coloured marker by attribution method.
+          Matches the per-method tags in the cluster header. */}
+      <span
+        className="shrink-0 inline-block h-1.5 w-1.5 rounded-full"
+        style={{ backgroundColor: color }}
+        title={`match_method: ${turn.match_method ?? "null"}`}
+      />
+      <span
+        className="min-w-0 flex-1 leading-snug"
+        style={{
+          color: "var(--foreground-secondary)",
+          // Two-line clamp; full text is in the API response and the
+          // tooltip below carries it for power users. Tailwind doesn't
+          // ship line-clamp by default in older configs so we set the
+          // properties directly.
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
+        }}
+        title={turn.preview_text || undefined}
+      >
+        {turn.preview_text || (
+          <em style={{ color: "var(--foreground-ghost)" }}>
+            (no transcript text)
+          </em>
+        )}
+      </span>
+    </li>
   );
 }

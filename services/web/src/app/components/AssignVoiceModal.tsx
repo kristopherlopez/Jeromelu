@@ -224,12 +224,8 @@ export default function AssignVoiceModal({
             : "#f87171";
 
   const eligible = cluster.embedding_eligible_count;
-  const firstTs = cluster.sample_turns.length
-    ? cluster.sample_turns[0].start_ts
-    : 0;
-  const lastTs = cluster.sample_turns.length
-    ? cluster.sample_turns[cluster.sample_turns.length - 1].end_ts
-    : 0;
+  const firstTs = cluster.first_ts;
+  const lastTs = cluster.last_ts;
 
   const overlay = (
     <div

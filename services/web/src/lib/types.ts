@@ -263,13 +263,25 @@ export interface FaceRunsResponse {
 // already produces a per-source clustering (SPEAKER_NN labels on every
 // turn), so this surface is pure aggregation over source_speakers — no
 // HDBSCAN pass needed. Mirrors the FacePosition shape so the Voices
-// panel can share the cluster-header / sample-row layout.
-export interface VoiceClusterSampleTurn {
+// panel can share the cluster-header / per-row layout.
+export interface VoiceClusterTurn {
   segment_id: string;
   start_ts: number;
   end_ts: number;
-  /** Opening utterance of the turn, truncated to ~120 chars. Empty
-   *  when the turn has no corresponding source_chunk row yet. */
+  duration: number;
+  /** Current attribution. null if the turn isn't attributed to a
+   *  Person yet. */
+  speaker_person_id: string | null;
+  /** How this attribution was made — drives the row colour-coding so
+   *  the operator can see at a glance which turns were 'voice+face'
+   *  confirmed vs face-only vs manually assigned vs unresolved. */
+  match_method: MatchMethod;
+  /** False for sub-300ms turns whose embedding is NULL — these can't
+   *  contribute to voiceprint enrolment but are still shown for review. */
+  has_embedding: boolean;
+  /** Full concatenated text of every chunk in this turn, soft-truncated
+   *  to ~300 chars with an ellipsis. Empty when the turn has no
+   *  source_chunks rows yet (transcription gap). */
   preview_text: string;
 }
 
@@ -278,6 +290,10 @@ export interface VoiceCluster {
   speaker_label: string;
   turn_count: number;
   total_seconds: number;
+  /** Earliest start_ts across the cluster's turns. */
+  first_ts: number;
+  /** Latest end_ts across the cluster's turns. */
+  last_ts: number;
   /** How many of this cluster's turns have a non-NULL embedding and so
    *  could contribute a voiceprint at bulk-assign time. Sub-300ms turns
    *  have NULL embeddings (see speaker-identification.md § Quality gates)
@@ -292,9 +308,8 @@ export interface VoiceCluster {
   /** Per-match-method tally over the cluster's turns. "null" key is the
    *  count of unattributed turns. */
   match_method_breakdown: Record<string, number>;
-  /** Longest 5 (capped) turns with non-NULL embedding, re-sorted by
-   *  start_ts so the operator hears them in conversational order. */
-  sample_turns: VoiceClusterSampleTurn[];
+  /** Every turn in the cluster, sorted chronologically by start_ts. */
+  turns: VoiceClusterTurn[];
 }
 
 export interface VoiceClustersResponse {
