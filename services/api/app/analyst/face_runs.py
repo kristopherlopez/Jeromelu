@@ -439,8 +439,21 @@ def compute_face_runs_from_detections(
     faces / scene transitions, but occasionally a one-shot guest who
     just didn't pass the min-cluster-size gate.
     """
+    # Don't load the full ORM rows — the embedding column is a 512-dim
+    # pgvector that's ~80 MB at 39k detections and not used here. Pull
+    # only the seven scalar columns we touch. Saves both the network
+    # round-trip and the pgvector deserialisation.
     rows = (
-        session.query(SourceFaceDetection)
+        session.query(
+            SourceFaceDetection.frame_ts,
+            SourceFaceDetection.bbox_x1,
+            SourceFaceDetection.bbox_y1,
+            SourceFaceDetection.bbox_x2,
+            SourceFaceDetection.bbox_y2,
+            SourceFaceDetection.matched_person_id,
+            SourceFaceDetection.match_score,
+            SourceFaceDetection.cluster_id,
+        )
         .filter(SourceFaceDetection.source_id == source_id)
         .order_by(SourceFaceDetection.frame_ts)
         .all()
