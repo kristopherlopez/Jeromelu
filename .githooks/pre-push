@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Pre-push: run `tsc --noEmit` on services/web if the push range touches it.
+#
+# CI runs the same check unconditionally in .github/workflows/tests.yml — this
+# hook is the fast local mirror that catches the failure before it hits CI.
+# Skip the hook with `git push --no-verify` (not recommended).
+#
+# Enable per clone:
+#   git config --local core.hooksPath .githooks
+
+set -euo pipefail
+
+ZERO=0000000000000000000000000000000000000000
+
+push_touches_web() {
+    while read -r _local_ref local_sha _remote_ref remote_sha; do
+        if [ "$local_sha" = "$ZERO" ]; then
+            continue  # branch delete — nothing to check
+        fi
+        if [ "$remote_sha" = "$ZERO" ]; then
+            # New branch on remote — diff against the merge-base with origin/master.
+            base="$(git merge-base "$local_sha" origin/master 2>/dev/null || true)"
+            range="${base:-${local_sha}~1}..${local_sha}"
+        else
+            range="${remote_sha}..${local_sha}"
+        fi
+        if git diff --name-only "$range" 2>/dev/null | grep -q '^services/web/'; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+if ! push_touches_web; then
+    exit 0
+fi
+
+echo "→ pre-push: typechecking services/web (tsc --noEmit)"
+
+if [ ! -d services/web/node_modules ]; then
+    echo "  services/web/node_modules missing." >&2
+    echo "  Run: (cd services/web && npm ci)" >&2
+    echo "  Or bypass with: git push --no-verify   (not recommended)" >&2
+    exit 1
+fi
+
+(cd services/web && npm run --silent typecheck)

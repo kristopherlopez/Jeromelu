@@ -5,11 +5,12 @@ tags: [area/operations]
 # CI/CD pipeline
 
 Single source of truth for what GitHub Actions does in this repo, end to end.
-Two workflows live under `.github/workflows/`:
+Three workflows live under `.github/workflows/`:
 
 | Workflow | Trigger | What it does |
 |---|---|---|
 | `deploy.yml` | push to `master`, `workflow_dispatch` | Build api/web images → push to ECR → restart compose stack on Lightsail → invalidate CloudFront. |
+| `tests.yml` | PR / push to `master` | `pytest tests/unit` + `tsc --noEmit` on `services/web`. Runs unconditionally — does NOT gate `deploy.yml` (yet). |
 | `terraform.yml` | PR / push touching `infra/terraform/**` | `fmt -check` + `init` + `validate` + `plan`; comments the plan on PRs. **Apply stays manual.** |
 
 The deploy workflow runs the actual deploy step on a **self-hosted GitHub
@@ -43,9 +44,32 @@ Anything outside those globs does not trigger CI builds or deploys.
 
 - **`services/gpu`** — the GPU container deploys out-of-band via `services/gpu/build_and_push.sh` + `services/gpu/deploy.py` (different runtime, different cadence — SageMaker Async on `ml.g4dn.xlarge`).
 - **Database migrations** — notify-only by design. Apply on the box.
-- **Tests / lint** — not yet wired into CI; tests run via `make test` locally.
+- **Tests + web typecheck** — run in `tests.yml` (see below). Not yet a hard gate on `deploy.yml`, but failures still show as red status checks on the commit.
 
 If a new service should ride this pipeline, add a path filter to `detect-changes`, a matrix entry to `build-and-push`, and update this document.
+
+---
+
+## `tests.yml` — unit tests + web typecheck
+
+Runs on every PR and every push to `master`. Two jobs in parallel:
+
+1. **`unit`** — `pytest tests/unit` against `requirements-test.txt`. Lightweight by design: the ML stack (torch, pyannote, deepgram, insightface, opencv) is deliberately excluded. See `tests/README.md` for tier layout.
+2. **`web-typecheck`** — `tsc --noEmit` on `services/web`. Runs **unconditionally** (no paths-filter), because the Docker build in `deploy.yml` IS gated by paths-filter — a broken TS import landing in a non-web commit would otherwise stay invisible until the next web-touching commit. This job surfaces the failure at the originating commit. ~1-2 min.
+
+Neither job currently gates `deploy.yml`. Promote to a hard gate by adding `needs: [unit, web-typecheck]` on `deploy-lightsail` once they prove stable.
+
+### Local mirror — pre-push hook
+
+A bash hook under `.githooks/pre-push` runs the same `tsc --noEmit` locally if the push range touches `services/web/`. It catches the failure before it hits CI and saves a round-trip.
+
+Enable per clone (one-time):
+
+```bash
+git config --local core.hooksPath .githooks
+```
+
+The hook is a no-op for pushes that don't touch `services/web/`. If `services/web/node_modules` is missing it prints `npm ci` instructions and exits 1 rather than silently passing. Bypass with `git push --no-verify` (not recommended).
 
 ### Why `latest`, not `${github.sha}`, in the deploy step
 

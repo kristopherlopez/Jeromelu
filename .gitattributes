@@ -1,0 +1,2 @@
+# Force LF on git hooks — bash chokes on CRLF in the shebang line.
+.githooks/* text eol=lf
