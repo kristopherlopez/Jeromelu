@@ -69,7 +69,7 @@ class TestConfigName:
     def test_combines_endpoint_and_tag_with_cfg_marker(self):
         # The 'cfg' segment makes endpoint-config rows visually distinct
         # from model rows in the SageMaker console.
-        assert _config_name("jeromelu-lineup-async", "v3") == "jeromelu-lineup-async-cfg-v3"
+        assert _config_name("jeromelu-lineup-async", "v3") == "jeromelu-lineup-async-cfg-v3-g4dn"
 
     def test_does_not_collide_with_model_name(self):
         endpoint, tag = "ep", "v1"
