@@ -13,6 +13,7 @@ from .routers.sources import router as sources_router
 from .routers.squad import router as squad_router
 from .routers.teams import router as teams_router
 from .routers.wiki import router as wiki_router
+from .scout.supercoach_roster import router as scout_supercoach_roster_router
 
 app = FastAPI(title="Jeromelu API", version="0.3.1")
 
@@ -36,6 +37,8 @@ app.include_router(recon_router, prefix="/api")
 app.include_router(squad_router, prefix="/api")
 app.include_router(teams_router, prefix="/api")
 app.include_router(wiki_router, prefix="/api")
+# Scout pipelines — folder per pipeline per Scout charter D9
+app.include_router(scout_supercoach_roster_router, prefix="/api")
 
 
 @app.get("/health")

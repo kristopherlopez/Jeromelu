@@ -38,12 +38,9 @@ from jeromelu_shared.players.roster import (
     refresh_roster,
     seed_roster,
 )
-from jeromelu_shared.players.supercoach import (
-    SuperCoachFetchError,
-    fetch_supercoach_roster,
-)
 
 from ..deps import get_db
+from ..scout.supercoach_roster.routes import run_supercoach_roster
 from .admin import require_admin
 
 logger = logging.getLogger(__name__)
@@ -101,35 +98,22 @@ def refresh_players(
 @router.post(
     "/admin/players/fetch-and-refresh",
     dependencies=[Depends(require_admin)],
+    deprecated=True,
 )
 def fetch_and_refresh_players(
     season: int | None = Query(default=None, description="SC season year (defaults to current year)"),
     source: str = Query(default="supercoach"),
     db: Session = Depends(get_db),
 ):
-    """Fetch the SC roster server-side, then run the standard SCD-2 refresh.
+    """**Deprecated alias.** Use ``POST /admin/scout/supercoach-roster`` instead.
 
-    Cron-friendly weekly entry point: no payload, just an admin key.
-    The API container itself does the outbound GET to supercoach.com.au's
-    unauthenticated ``players-cf`` endpoint, validates the response covers
-    all 17 NRL clubs and ≥400 players, and pipes the result through the
-    same ``refresh_roster`` used by ``/admin/players/refresh``.
+    Per the Scout charter expansion (D6 + D9), this pipeline is now owned by
+    Scout, lives under ``services/api/app/scout/supercoach_roster/``, and is
+    audited as ``agent_id='scout'`` with ``detail_json.pipeline='supercoach-roster'``.
+    This route remains live for back-compat and calls into the same handler;
+    new callers should use the canonical path.
     """
-    try:
-        sc_players = fetch_supercoach_roster(season=season)
-    except SuperCoachFetchError as e:
-        # 502: upstream looked wrong. Don't run the diff against a bad payload.
-        raise HTTPException(status_code=502, detail=f"SC fetch failed: {e}")
-
-    logger.info(
-        "admin/players/fetch-and-refresh: fetched %d players (season=%s, source=%s)",
-        len(sc_players), season, source,
-    )
-    try:
-        result = refresh_roster(db, sc_players, source=source)
-    except RosterPreconditionError as e:
-        raise HTTPException(status_code=409, detail=str(e))
-    return {"ok": True, "fetched": len(sc_players), **result}
+    return run_supercoach_roster(db, season=season, source=source)
 
 
 @router.post(

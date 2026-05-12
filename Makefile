@@ -326,8 +326,21 @@ prod-refresh-players:
 # JSON from a laptop" step. Cron-friendly. Wire to crontab on the
 # Lightsail box for the weekly Tuesday refresh.
 # Usage: make prod-fetch-and-refresh-players ADMIN_KEY=xxx [SEASON=2026]
+# DEPRECATED: prefer scout-supercoach-roster below — the new canonical name
+# per the Scout charter expansion (D9 / agent-aligned URL structure).
 prod-fetch-and-refresh-players:
 	curl -s -X POST "$(PROD_API)/api/admin/players/fetch-and-refresh$(if $(SEASON),?season=$(SEASON))" \
+		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
+
+# Canonical name for the SuperCoach roster refresh per the Scout charter
+# expansion. Hits the new POST /api/admin/scout/supercoach-roster endpoint,
+# which is audit-wrapped (one agent_runs row per call, agent_id='scout',
+# detail_json.pipeline='supercoach-roster') and parsed through strict
+# Pydantic models per D8.
+# Usage: make scout-supercoach-roster ADMIN_KEY=xxx [SEASON=2026] [API=$PROD_API|http://localhost:8000]
+API ?= $(PROD_API)
+scout-supercoach-roster:
+	curl -s -X POST "$(API)/api/admin/scout/supercoach-roster$(if $(SEASON),?season=$(SEASON))" \
 		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
 
 # nrl.com profile-page enrichment — walks every current player row,
