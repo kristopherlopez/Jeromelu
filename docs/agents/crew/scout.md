@@ -56,16 +56,26 @@ Scout       →  Analyst    →  Bookkeeper + Critic  →  Jaromelu
 6. **Source health / liveness monitoring** — detecting stalled channels, 404 sources, transcript fetch failures, caption regenerations. *Backlog* — not built.
 7. **Multi-platform expansion** — instantiate the same shape (discovery → approval → enumerate → refresh → extract) for podcasts (RSS), Twitter/X, blogs/news, Reddit. *Backlog* — schema is platform-agnostic; code is YouTube-only.
 
-**Data acquisition (in design per the charter expansion):**
+**Data acquisition (per the charter expansion):**
 
-Each pipeline lives as a folder under `services/api/app/scout/<pipeline_name>/` per D9 — fetcher, Pydantic models, admin route, README all in the same folder. Fronted by a `POST /api/admin/scout/<pipeline>` admin endpoint driven by cron. All write under `agent_id='scout'` with `detail_json.pipeline=<name>`. Idempotency contract per D7, drift tests per D8.
+Each pipeline lives as a folder under `services/api/app/scout/<pipeline_name>/` per D9 — fetcher, Pydantic models, admin route, README all in the same folder. Fronted by a `POST /api/admin/scout/<pipeline>` admin endpoint driven by cron. **Each fetch writes the raw upstream response to S3 first** (D10); DB extraction is downstream (D13). Trust hierarchy `nrl.com > supercoach.com.au > nrlsupercoachstats.com` (D11). All write under `agent_id='scout'` with `detail_json.pipeline=<name>`. Idempotency per D7, drift tests per D8.
 
-8. **SuperCoach player roster** — refresh `people`, `people_attributes`, `people_roles` from SuperCoach API. *Phase 1.*
-9. **SuperCoach per-round stats** — pull stats per round into `player_rounds`. **Highest-leverage pipeline** for the wiki since it unblocks every player page's `## Current Form` and `## Price Analysis`. *Phase 2.*
-10. **NRL.com matches + draw** — populate `matches` from the NRL.com draw and match-centre endpoints. *Phase 3.*
-11. **NRL.com team lists** — populate `match_team_lists` from NRL.com team-list endpoints. *Phase 3.*
-12. **NRL.com casualty ward** — new pipeline, populates `injuries` from the public casualty-ward JSON. *Phase 4.*
-13. **NRL.com round metadata** — new pipeline, populates `rounds` from the draw endpoint. *Phase 4.*
+**supercoach.com.au pipelines:**
+8. **`supercoach_roster`** — refresh `people` / `people_attributes` / `people_roles` from `players-cf`; also captures `notes[]` (editorial commentary → claims) and `player_stats[]` (per-round) inline. *Phase 1 — shipped.*
+9. **`supercoach_teams`** — 17 SC teams; weekly. Cross-references `teams.metadata_json.supercoach`. *Phase 2.5.*
+10. **`supercoach_settings`** — SC game rules per season (lockouts, scoring config, captains/emergencies/dual-position rules). *Phase 2.5.*
+11. **`supercoach_draft_*`** — parallel of the above three for SC Draft mode. *Optional.*
+
+**nrl.com pipelines (canonical NRL data per D11):**
+12. **`nrlcom_draw`** — fixtures + scheduling per (competition, season, round). Historical reach back to 1908. *Phase 3.*
+13. **`nrlcom_match_centre`** ★ — per-match goldmine: lineups, ~58-field per-player stat sheets, 100+ typed timeline events, officials, scoring narrative, venue/weather/attendance. **Highest-leverage single pipeline.** Historical back to 2000 (full) / 1990 (thin). *Phase 3.*
+14. **`nrlcom_casualty_ward`** — official league-wide injury roll, daily. *Phase 4.*
+15. **`nrlcom_ladder`** — team standings + 22 per-team metrics (form, streak, records, margins). *Phase 4.*
+16. **`nrlcom_stats`** — pre-computed statistical leaderboards (top-25 per category). *Phase 4.5.*
+17. **`nrlcom_players_roster`** — per-team NRL.com profile listing (DOB, image, etc.); folder-organise the existing `players/nrlcom_refresh.py`. *Phase 4.5.*
+
+**nrlsupercoachstats.com pipelines:**
+18. **`supercoach_stats`** — per-round jqGrid stats with SC scoring breakdown (base/attack/playmaking/power/negative), breakeven, magic number, consistency metrics. *Phase 2 — shipped.*
 
 ### What Scout DOES NOT cover
 
@@ -99,16 +109,26 @@ Scout's outputs are raw inventory rows only — Extract + Load, never Transform.
 
 **Data writes (per the charter expansion):**
 
+Every pipeline writes to **S3 (raw response)** + **DB (extracted projection)** per D10. The DB writes below reflect the post-extraction shape:
+
 | Table | What Scout writes | Module folder | Phase |
 |---|---|---|---|
-| `people` | Roster upsert from SuperCoach | `scout/supercoach_roster/` | 1 |
-| `people_attributes` | Position, height, weight, contract from SuperCoach | `scout/supercoach_roster/` | 1 |
-| `people_roles` | Primary role from SuperCoach (players today; advisors later via Analyst) | `scout/supercoach_roster/` | 1 |
-| `player_rounds` | Per-round stats from SuperCoach | `scout/supercoach_stats/` | 2 |
-| `matches` | Fixtures + results from NRL.com draw + match centre | `scout/nrlcom_matches/` | 3 |
-| `match_team_lists` | Lineups from NRL.com team-list endpoint | `scout/nrlcom_teamlists/` | 3 |
-| `injuries` | Casualty-ward state from NRL.com | `scout/nrlcom_injuries/` | 4 (new pipeline) |
-| `rounds` | Round metadata from NRL.com draw | `scout/nrlcom_rounds/` | 4 (new pipeline) |
+| `people` | Roster upsert from SC `players-cf` | `scout/supercoach_roster/` | 1 ✅ |
+| `people_attributes` | Position / team / contract (SCD-2); enriched by NRL.com profile data | `scout/supercoach_roster/` + `scout/nrlcom_players_roster/` | 1 ✅ / 4.5 |
+| `people_roles` | Primary role tenure (SCD-2) | `scout/supercoach_roster/` | 1 ✅ |
+| `claims` + `quotes` (from SC `notes[]`) | SC editorial commentary on players | `scout/supercoach_roster/` (extractor) | 2.5 |
+| `teams.metadata_json.supercoach` | SC team IDs cross-reference | `scout/supercoach_teams/` | 2.5 |
+| `sc_settings` (new) | SC game rules per season | `scout/supercoach_settings/` | 2.5 |
+| `player_rounds` | Per-round stats — D11 merge of nrlcom match-centre + nrlsupercoachstats jqGrid | `scout/supercoach_stats/` + `scout/nrlcom_match_centre/` (extractor merges) | 2 ✅ / 3 |
+| `matches` | Fixtures, results, score, venue, attendance, weather | `scout/nrlcom_draw/` + `scout/nrlcom_match_centre/` (extractor) | 3 |
+| `match_team_lists` | Lineups from match-centre `positionGroups` + `players[]` | `scout/nrlcom_match_centre/` (extractor) | 3 |
+| `player_match_stats` (new) | Per-player per-match 58-field stat line | `scout/nrlcom_match_centre/` (extractor) | 3 |
+| `match_timeline` (new) | 100+ typed timeline events per match | `scout/nrlcom_match_centre/` (extractor) | 3 |
+| `match_officials` (new) | Referee + touch judges + bunker per match | `scout/nrlcom_match_centre/` (extractor) | 3 |
+| `rounds` | Round metadata derived from draw | `scout/nrlcom_draw/` (extractor) | 3 |
+| `injuries` | Official casualty-ward state | `scout/nrlcom_casualty_ward/` | 4 |
+| `team_standings` (new) | Ladder positions + 22 per-team metrics | `scout/nrlcom_ladder/` | 4 |
+| `stat_leaderboards` (new) | Pre-computed top-25 leaderboards | `scout/nrlcom_stats/` | 4.5 |
 
 Scout writes **nothing** to `source_documents`, `source_speakers`, `source_chunks` (Analyst's transcription writes), `source_chapters`, `source_annotations`, `quotes`, `claims`, `claim_chunks`, `claim_associations`, `consensus_snapshots`, `predictions`, `decisions`, `wiki_pages`, or any reasoning/output table. If a Scout-voiced UI line mentions parsed content (e.g. *"deep dive on Munster"*), that content was generated by a downstream agent and is being *surfaced through* Scout's voice mode — not produced by Scout itself.
 
