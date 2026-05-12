@@ -78,11 +78,25 @@ function pickColor(
 }
 
 function speakerAt(speakers: Speaker[], ts: number): Speaker | null {
-  // Linear scan; sample sizes here are well under 1k turns.
-  for (const sp of speakers) {
-    if (ts >= sp.start_ts && ts <= sp.end_ts) return sp;
+  // Binary search by start_ts (speakers passed in sorted). Earlier
+  // linear scan was fine for podcasts < 1h but stalled the rAF loop on
+  // 3h sources with 2k+ turns.
+  if (speakers.length === 0) return null;
+  let lo = 0;
+  let hi = speakers.length - 1;
+  let candidate = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >>> 1;
+    if (speakers[mid].start_ts <= ts) {
+      candidate = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
   }
-  return null;
+  if (candidate < 0) return null;
+  const sp = speakers[candidate];
+  return ts <= sp.end_ts ? sp : null;
 }
 
 function frameAt(frames: FaceTrackFrame[], ts: number, sampleRate: number): FaceTrackFrame | null {
@@ -164,6 +178,20 @@ const VideoOverlay = forwardRef<VideoOverlayHandle, Props>(
       [speakers],
     );
 
+    // O(1) person_id → name lookup; see YouTubeFaceOverlay for the
+    // perf rationale.
+    const personNameById = useMemo(() => {
+      const m = new Map<string, string>();
+      for (const sp of speakers) {
+        if (sp.speaker_person_id && sp.speaker_person_name) {
+          m.set(sp.speaker_person_id, sp.speaker_person_name);
+        }
+      }
+      return m;
+    }, [speakers]);
+
+    const lastDrawKeyRef = useRef<string>("");
+
     const draw = useCallback(() => {
       const video = videoRef.current;
       const canvas = canvasRef.current;
@@ -172,17 +200,29 @@ const VideoOverlay = forwardRef<VideoOverlayHandle, Props>(
       // Match canvas pixel size to the rendered display size.
       // (Avoids the 300x150 default ignoring the wrapper's aspect-ratio.)
       const rect = video.getBoundingClientRect();
-      if (canvas.width !== rect.width || canvas.height !== rect.height) {
+      const resized =
+        canvas.width !== rect.width || canvas.height !== rect.height;
+      if (resized) {
         canvas.width = rect.width;
         canvas.height = rect.height;
       }
+
+      const ts = video.currentTime;
+      const frame = frameAt(frames, ts, sampleRate);
+      const active = speakerAt(sortedSpeakers, ts);
+
+      // Skip the redraw when the matched frame, active speaker, and
+      // canvas size are unchanged — current pixels are still correct.
+      const drawKey = frame
+        ? `${frame.ts}|${active?.segment_id ?? ""}|${canvas.width}x${canvas.height}`
+        : `none|${active?.segment_id ?? ""}|${canvas.width}x${canvas.height}`;
+      if (!resized && drawKey === lastDrawKeyRef.current) return;
+      lastDrawKeyRef.current = drawKey;
 
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      const ts = video.currentTime;
-      const frame = frameAt(frames, ts, sampleRate);
       if (!frame) return;
 
       const sourceW = video.videoWidth || (videoSize?.w ?? rect.width);
@@ -191,8 +231,6 @@ const VideoOverlay = forwardRef<VideoOverlayHandle, Props>(
 
       const sx = canvas.width / sourceW;
       const sy = canvas.height / sourceH;
-
-      const active = speakerAt(sortedSpeakers, ts);
 
       ctx.lineWidth = 2;
       ctx.font = "12px system-ui, sans-serif";
@@ -211,10 +249,10 @@ const VideoOverlay = forwardRef<VideoOverlayHandle, Props>(
         ctx.strokeRect(x, y, w, h);
 
         // Label badge above the box, or below if the box is at the top.
-        const lookup = sortedSpeakers.find(
-          (sp) => sp.speaker_person_id && sp.speaker_person_id === face.person_id,
-        );
-        const label = lookup?.speaker_person_name ?? (face.person_id ? "matched" : "?");
+        const personName = face.person_id
+          ? personNameById.get(face.person_id)
+          : undefined;
+        const label = personName ?? (face.person_id ? "matched" : "?");
         const conf =
           face.similarity != null ? ` ${(face.similarity * 100).toFixed(0)}%` : "";
         const text = `${label}${conf}`;
@@ -259,7 +297,7 @@ const VideoOverlay = forwardRef<VideoOverlayHandle, Props>(
         }
         return prev;
       });
-    }, [frames, sampleRate, sortedSpeakers, videoSize]);
+    }, [frames, sampleRate, sortedSpeakers, personNameById, videoSize]);
 
     // Animation loop — runs whenever the video is playing.
     const tick = useCallback(() => {

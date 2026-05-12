@@ -73,10 +73,26 @@ function pickColor(
 }
 
 function speakerAt(speakers: Speaker[], ts: number): Speaker | null {
-  for (const sp of speakers) {
-    if (ts >= sp.start_ts && ts <= sp.end_ts) return sp;
+  // Binary search by start_ts. Speakers are expected to be sorted —
+  // the caller passes sortedSpeakers. Long sources (3h+) have thousands
+  // of turns; the previous linear scan was the hot spot of every rAF
+  // tick.
+  if (speakers.length === 0) return null;
+  let lo = 0;
+  let hi = speakers.length - 1;
+  let candidate = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >>> 1;
+    if (speakers[mid].start_ts <= ts) {
+      candidate = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
   }
-  return null;
+  if (candidate < 0) return null;
+  const sp = speakers[candidate];
+  return ts <= sp.end_ts ? sp : null;
 }
 
 function frameAt(
@@ -172,6 +188,27 @@ const YouTubeFaceOverlay = forwardRef<YouTubeFaceOverlayHandle, Props>(
       [speakers],
     );
 
+    // O(1) person_id → name lookup. Replaces the per-face Array.find()
+    // that ran on every draw tick — for long sources (2k+ speakers,
+    // 3-4 faces/frame, 60 fps), the find() was hundreds of thousands of
+    // iterations per second of nothing but property reads.
+    const personNameById = useMemo(() => {
+      const m = new Map<string, string>();
+      for (const sp of speakers) {
+        if (sp.speaker_person_id && sp.speaker_person_name) {
+          m.set(sp.speaker_person_id, sp.speaker_person_name);
+        }
+      }
+      return m;
+    }, [speakers]);
+
+    // Cache the last-drawn state so the rAF loop can early-return when
+    // neither the matched frame nor the active speaker has changed.
+    // YouTube emits time updates at video-frame rate (60Hz) but the
+    // face-track is sampled at 1Hz — without this guard, 59 out of every
+    // 60 ticks redrew the exact same bboxes.
+    const lastDrawKeyRef = useRef<string>("");
+
     const draw = useCallback(() => {
       const canvas = canvasRef.current;
       const player = playerRef.current;
@@ -185,14 +222,12 @@ const YouTubeFaceOverlay = forwardRef<YouTubeFaceOverlayHandle, Props>(
       // and the canvas fill it via `inset-0 absolute`, so its rect is
       // also the canvas's render size.
       const rect = wrap.getBoundingClientRect();
-      if (canvas.width !== rect.width || canvas.height !== rect.height) {
+      const resized =
+        canvas.width !== rect.width || canvas.height !== rect.height;
+      if (resized) {
         canvas.width = rect.width;
         canvas.height = rect.height;
       }
-
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       // Ad detection: the IFrame API has no public ad event, but
       // getCurrentTime() reports the *currently playing media*'s clock
@@ -207,6 +242,9 @@ const YouTubeFaceOverlay = forwardRef<YouTubeFaceOverlayHandle, Props>(
         playerDur > 0 &&
         Math.abs(playerDur - sourceDuration) > 5;
       if (inAd) {
+        const ctxAd = canvas.getContext("2d");
+        if (ctxAd) ctxAd.clearRect(0, 0, canvas.width, canvas.height);
+        lastDrawKeyRef.current = "ad";
         setClickableFaces((prev) => (prev.length === 0 ? prev : []));
         return;
       }
@@ -218,6 +256,22 @@ const YouTubeFaceOverlay = forwardRef<YouTubeFaceOverlayHandle, Props>(
       }
 
       const frame = frameAt(frames, ts, sampleRate);
+      const active = speakerAt(sortedSpeakers, ts);
+
+      // Early-return when nothing visible has changed. Bboxes and labels
+      // only depend on (frame, active speaker, canvas size) — if all
+      // three are the same as the last draw, the existing canvas is
+      // still correct and we'd just be redrawing identical pixels.
+      const drawKey = frame
+        ? `${frame.ts}|${active?.segment_id ?? ""}|${canvas.width}x${canvas.height}`
+        : `none|${active?.segment_id ?? ""}|${canvas.width}x${canvas.height}`;
+      if (!resized && drawKey === lastDrawKeyRef.current) return;
+      lastDrawKeyRef.current = drawKey;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
       if (!frame) {
         setClickableFaces((prev) => (prev.length === 0 ? prev : []));
         return;
@@ -228,8 +282,6 @@ const YouTubeFaceOverlay = forwardRef<YouTubeFaceOverlayHandle, Props>(
       // here.)
       const sx = canvas.width / sourceW;
       const sy = canvas.height / sourceH;
-
-      const active = speakerAt(sortedSpeakers, ts);
 
       ctx.lineWidth = 2;
       ctx.font = "12px system-ui, sans-serif";
@@ -247,10 +299,10 @@ const YouTubeFaceOverlay = forwardRef<YouTubeFaceOverlayHandle, Props>(
         ctx.strokeStyle = color;
         ctx.strokeRect(x, y, w, h);
 
-        const lookup = sortedSpeakers.find(
-          (sp) => sp.speaker_person_id && sp.speaker_person_id === face.person_id,
-        );
-        const label = lookup?.speaker_person_name ?? (face.person_id ? "matched" : "?");
+        const personName = face.person_id
+          ? personNameById.get(face.person_id)
+          : undefined;
+        const label = personName ?? (face.person_id ? "matched" : "?");
         const conf =
           face.similarity != null ? ` ${(face.similarity * 100).toFixed(0)}%` : "";
         const text = `${label}${conf}`;
@@ -296,6 +348,7 @@ const YouTubeFaceOverlay = forwardRef<YouTubeFaceOverlayHandle, Props>(
       frames,
       sampleRate,
       sortedSpeakers,
+      personNameById,
       playerReady,
       sourceW,
       sourceH,

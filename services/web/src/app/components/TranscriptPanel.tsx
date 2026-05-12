@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Pencil } from "lucide-react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import type { TranscriptChunk, ClaimDetail, Speaker } from "@/lib/types";
 import { apiPatch } from "@/lib/api";
 import { CLAIM_TYPE_COLORS } from "@/lib/constants";
@@ -132,35 +133,60 @@ export default function TranscriptPanel({
   const [editingSegmentId, setEditingSegmentId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
 
-  // Auto-scroll to active chunk
   const scrollRef = useRef<HTMLDivElement>(null);
-  const activeChunkRef = useRef<HTMLSpanElement>(null);
+
+  // Virtualize turns. 3h podcasts produce 1000+ turns — mounting them
+  // all freezes the page on initial render. We virtualize at the turn
+  // level (not chunk level) so the within-turn structure stays simple
+  // and the speaker-rename / claim-overlay logic doesn't need to know
+  // anything about windowing.
+  const virtualizer = useVirtualizer({
+    count: turns.length,
+    getScrollElement: () => scrollRef.current,
+    // Conservative starting estimate. measureElement (below) replaces
+    // this with the real height on first mount of each row.
+    estimateSize: () => 110,
+    overscan: 8,
+  });
+
+  // Index of the turn containing the active timestamp. Recomputed only
+  // when currentTime crosses a turn boundary so the auto-scroll effect
+  // doesn't fire every video-frame tick.
+  const activeTurnIndex = useMemo(() => {
+    if (turns.length === 0) return -1;
+    // Turns are in chronological order — find the last one whose
+    // startTs <= currentTime. Binary search keeps this cheap on very
+    // long sources.
+    let lo = 0;
+    let hi = turns.length - 1;
+    let found = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >>> 1;
+      if (turns[mid].startTs <= currentTime) {
+        found = mid;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    return found;
+  }, [turns, currentTime]);
+
+  const lastScrolledIndex = useRef(-1);
   const lastScrollTime = useRef(0);
 
   useEffect(() => {
-    if (activeChunkRef.current && scrollRef.current) {
-      const now = Date.now();
-      if (now - lastScrollTime.current < 2000) return;
-      lastScrollTime.current = now;
-
-      const container = scrollRef.current;
-      const el = activeChunkRef.current;
-      const elTop = el.offsetTop - container.offsetTop;
-      const elBottom = elTop + el.offsetHeight;
-      const scrollTop = container.scrollTop;
-      const viewHeight = container.clientHeight;
-
-      if (
-        elTop < scrollTop + viewHeight * 0.2 ||
-        elBottom > scrollTop + viewHeight * 0.8
-      ) {
-        container.scrollTo({
-          top: elTop - viewHeight * 0.35,
-          behavior: "smooth",
-        });
-      }
-    }
-  }, [currentTime]);
+    if (activeTurnIndex < 0) return;
+    if (activeTurnIndex === lastScrolledIndex.current) return;
+    const now = Date.now();
+    if (now - lastScrollTime.current < 800) return;
+    lastScrolledIndex.current = activeTurnIndex;
+    lastScrollTime.current = now;
+    virtualizer.scrollToIndex(activeTurnIndex, {
+      align: "center",
+      behavior: "smooth",
+    });
+  }, [activeTurnIndex, virtualizer]);
 
   async function commitRename(segmentId: string, originalLabel: string | null) {
     const next = editValue.trim();
@@ -200,8 +226,19 @@ export default function TranscriptPanel({
         ref={scrollRef}
         className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-3 min-h-0 custom-scrollbar"
       >
-        <div className="text-[0.8125rem] leading-[1.8] flex flex-col gap-3">
-          {turns.map((turn, turnIdx) => {
+        <div
+          className="text-[0.8125rem] leading-[1.8] relative"
+          style={{
+            // The virtualizer needs a known total height for its absolute-
+            // positioned rows. Without this the scroll container would
+            // collapse and the virtualization would see height=0.
+            height: virtualizer.getTotalSize(),
+            width: "100%",
+          }}
+        >
+          {virtualizer.getVirtualItems().map((virtualRow) => {
+            const turn = turns[virtualRow.index];
+            const turnIdx = virtualRow.index;
             const color = speakerColor(turn.speakerLabel);
             const displayLabel =
               effectiveLabel(turn.speakerLabel) ?? "Unknown";
@@ -211,10 +248,19 @@ export default function TranscriptPanel({
             return (
               <div
                 key={`turn-${turnIdx}`}
+                ref={virtualizer.measureElement}
+                data-index={virtualRow.index}
                 className="flex flex-col"
                 style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  transform: `translateY(${virtualRow.start}px)`,
                   borderLeft: `2px solid ${color}`,
                   paddingLeft: "10px",
+                  // Match the previous flex-gap-3 vertical rhythm.
+                  paddingBottom: "12px",
                 }}
               >
                 {/* Turn header */}
@@ -313,7 +359,6 @@ export default function TranscriptPanel({
                           <span style={{ display: "block", height: "0.5em" }} />
                         )}
                         <span
-                          ref={isActive ? activeChunkRef : undefined}
                           className="cursor-pointer transition-colors duration-300"
                           onClick={() => onSeek(ts)}
                           style={{
