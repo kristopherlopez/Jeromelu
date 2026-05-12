@@ -746,9 +746,19 @@ The `agreement` field classifies the row by comparing **cluster dominants** (not
 
 The row's left-edge bar is colour-coded by `agreement` (green / red / amber / grey) so the operator can scan the timeline for problems without reading every row.
 
+### Words by face cluster — Phase 1 of face-driven re-segmentation
+
+At the top of the Alignment tab, before the side-by-side / timeline / matrix sections, a new "Words by face cluster" section renders the **transcript as determined by face**: Deepgram chunks (one per utterance — ~5× finer-grained than pyannote turns) grouped into consecutive runs of the same dominant on-screen face cluster. Each paragraph is a stretch of speech where one Person was visible; when face changes, a new paragraph begins.
+
+Alongside the runs, the response carries `conflated_turn_ids` — pyannote turn ids whose chunks attribute to more than one distinct face cluster. These are the **over-merged turns**: pyannote heard "one speaker" but face evidence says two or more. Each face_run is rendered with a CONFLATED badge (red tint) when any of its `pyannote_turn_ids` is in this set.
+
+This is **diagnostic** for the over-merging problem documented in [Phase 2 — face-driven sub-segmentation](../../todo/speaker-identification-plan.md): we visualise the conflation pattern first to confirm it's real and quantify how often it happens. Phase 2 builds on this by physically re-cutting pyannote turns at face transitions and re-extracting voiceprints from the cleaner sub-spans — but only worthwhile if Phase 1 confirms heavy conflation across sources.
+
+**Why pyannote `community-1` matters here.** The default diarization pipeline is now `pyannote/speaker-diarization-community-1` (was `3.1`) — improved segmentation on similar-voice speakers. If `community-1` cuts cleanly at face transitions out of the box, `conflated_turn_ids` will be empty (or near-empty) on most sources and Phase 2's invasive re-segmentation pipeline isn't needed. If conflation is still high, Phase 2 is the next layer.
+
 ### Words by attribution — side-by-side transcript
 
-Above the per-turn cards, the Alignment tab leads with a two-column transcript: the same speech text is rendered twice, once labelled with the dominant on-screen face cluster's Person, once with the voice cluster's Person. Reading down the columns shows you what *would* have been attributed if you only had one modality. Disagreement rows are tinted red, partial rows amber; agreeing rows render plain so disagreements pop visually.
+Below the face transcript, the Alignment tab continues with a two-column comparison: the same speech text is rendered twice, once labelled with the dominant on-screen face cluster's Person, once with the voice cluster's Person. Reading down the columns shows you what *would* have been attributed if you only had one modality. Disagreement rows are tinted red, partial rows amber; agreeing rows render plain so disagreements pop visually.
 
 A summary line at the top reports the agreement percentage across turns where both sides had a name to attribute (turns with only one modality named, or neither, are excluded from the denominator since they can't agree or disagree). The view is purely derived from the timeline payload — no extra round-trip.
 

@@ -33,7 +33,13 @@ class Settings(BaseSettings):
     deepgram_api_key: str = ""
     deepgram_model: str = "nova-3"
     huggingface_api_key: str = ""  # required for pyannote (gated model)
-    pyannote_model: str = "pyannote/speaker-diarization-3.1"
+    # Pyannote diarization pipeline. ``community-1`` (2024) supersedes
+    # 3.1 with improved segmentation on similar-voice speakers — the
+    # acoustic-confusion class where 3.1 over-merges. The embedding
+    # model (wespeaker, 256-dim) is loaded separately and unchanged,
+    # so person_voiceprints stays schema-compatible. Override per-source
+    # via env var if a re-test against 3.1 is needed.
+    pyannote_model: str = "pyannote/speaker-diarization-community-1"
 
     # Phase 5.5 — Lineup on SageMaker Async. When `lineup_remote` is true,
     # diarize.py / visual_id.py dispatch to the remote endpoint instead

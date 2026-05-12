@@ -4,7 +4,8 @@ Phase 2: replaces Deepgram's diarizer end-to-end. For an audio object
 already in S3:
 
     1. Download audio, convert to 16 kHz mono WAV.
-    2. Run pyannote/speaker-diarization-3.1 → list of speaker turns.
+    2. Run the configured pyannote diarization pipeline (default
+       ``pyannote/speaker-diarization-community-1``) → list of speaker turns.
     3. For each turn, compute sliding-window embeddings (2 s window,
        0.5 s hop) using pyannote/wespeaker-voxceleb-resnet34-LM (256-dim,
        the embedder bundled with the diarization pipeline). Pick the
@@ -86,9 +87,10 @@ def _get_pipeline():
     if not settings.huggingface_api_key:
         raise DiarizationError(
             "HUGGINGFACE_API_KEY is not configured. Accept the model license at "
-            "https://huggingface.co/pyannote/speaker-diarization-3.1 (and the "
-            "two sub-models — segmentation-3.0 and wespeaker-voxceleb-resnet34-LM) "
-            "and put your token in .env as HUGGINGFACE_API_KEY=hf_..."
+            f"https://huggingface.co/{settings.pyannote_model} (and the "
+            "underlying sub-models the pipeline pulls in — segmentation + "
+            "wespeaker-voxceleb-resnet34-LM) and put your token in .env as "
+            "HUGGINGFACE_API_KEY=hf_..."
         )
     try:
         from pyannote.audio import Pipeline
@@ -345,9 +347,10 @@ def diarize(audio_s3_key: str, *, force: bool = False) -> DiarizeResult:
     if not settings.huggingface_api_key:
         raise DiarizationError(
             "HUGGINGFACE_API_KEY is not configured. Accept the model license at "
-            "https://huggingface.co/pyannote/speaker-diarization-3.1 (and the "
-            "two sub-models — segmentation-3.0 and wespeaker-voxceleb-resnet34-LM) "
-            "and put your token in .env as HUGGINGFACE_API_KEY=hf_..."
+            f"https://huggingface.co/{settings.pyannote_model} (and the "
+            "underlying sub-models the pipeline pulls in — segmentation + "
+            "wespeaker-voxceleb-resnet34-LM) and put your token in .env as "
+            "HUGGINGFACE_API_KEY=hf_..."
         )
 
     pyannote_key = _pyannote_s3_key_from_audio(audio_s3_key)

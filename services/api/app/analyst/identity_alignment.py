@@ -22,6 +22,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from jeromelu_shared.db import (
+    SourceChunk,
     SourceDocument,
     SourceFaceDetection,
     SourceSpeaker,
@@ -76,10 +77,26 @@ class TurnRow:
     match_confidence: float | None = None
 
 
+@dataclass(frozen=True)
+class ChunkRow:
+    """Minimal source_chunks projection consumed by face_transcript.
+
+    Used in Phase 1 (face-driven transcript view). Chunks are the
+    Deepgram utterance granularity — ~5× finer than pyannote turns —
+    so they're the right unit for "what was said when face X was on
+    screen?"
+    """
+    chunk_id: UUID
+    start_ts: float
+    end_ts: float
+    text: str
+
+
 def compute_alignment(
     detections: list[DetectionRow],
     speakers: list[TurnRow],
     preview_by_segment: dict[UUID, str] | None = None,
+    chunks: list[ChunkRow] | None = None,
 ) -> dict:
     """Cross-modal alignment between face clusters and voice clusters.
 
@@ -198,6 +215,12 @@ def compute_alignment(
         voice_stats=voice_stats,
         preview_by_segment=preview_by_segment or {},
     )
+    face_transcript_result = _compute_face_transcript(
+        chunks=chunks or [],
+        detections=detections,
+        speakers=speakers,
+        face_stats=face_stats,
+    )
 
     return {
         "face_clusters": [
@@ -227,6 +250,8 @@ def compute_alignment(
         "dominant_pairings": dominant_pairings,
         "disagreements": disagreements,
         "timeline": timeline,
+        "face_transcript": face_transcript_result["face_runs"],
+        "conflated_turn_ids": face_transcript_result["conflated_turn_ids"],
     }
 
 
@@ -483,6 +508,174 @@ def _compute_timeline(
     return out
 
 
+def _compute_face_transcript(
+    *,
+    chunks: list[ChunkRow],
+    detections: list[DetectionRow],
+    speakers: list[TurnRow],
+    face_stats: dict[int, dict],
+) -> dict:
+    """Phase 1 of face-driven re-segmentation: a face-clustered view of
+    the conversation, plus a list of pyannote turns where face evidence
+    says the speaker changed mid-turn.
+
+    Returns ``{face_runs, conflated_turn_ids}``:
+
+    - ``face_runs``: chunks grouped into consecutive runs of the same
+      dominant face cluster. Each run carries its time window, the
+      concatenated text, the dominant face cluster id + person, and
+      the pyannote turn ids it overlaps. This is the "transcript as
+      determined by face".
+    - ``conflated_turn_ids``: pyannote turn ids that contain more than
+      one face run — pyannote merged across a face transition, which is
+      almost always a real speaker boundary. The operator worklist for
+      Phase 2 re-segmentation.
+
+    The pure-Python work is the dominant-face-per-chunk pass plus the
+    run-detection walk. Both are linear in input size at podcast scale.
+    """
+    if not chunks:
+        return {"face_runs": [], "conflated_turn_ids": []}
+
+    # Per-chunk dominant face cluster — most detections falling in the
+    # chunk's [start_ts, end_ts] window. Ties broken by cluster_id asc.
+    # NULL when no detection overlapped.
+    sorted_dets = sorted(detections, key=lambda d: d.frame_ts)
+    sorted_chunks = sorted(chunks, key=lambda c: c.start_ts)
+
+    # Interval walk: assign each detection to the chunk(s) covering its
+    # frame_ts. Frames between chunks (Deepgram pause) belong to no
+    # chunk; we drop them.
+    chunk_cluster_counts: dict[UUID, dict[int, int]] = {}
+    chunk_idx = 0
+    for det in sorted_dets:
+        if det.cluster_id is None:
+            continue
+        # Advance chunk_idx to the first chunk whose end_ts >= frame_ts.
+        while (
+            chunk_idx < len(sorted_chunks)
+            and sorted_chunks[chunk_idx].end_ts < det.frame_ts
+        ):
+            chunk_idx += 1
+        if chunk_idx >= len(sorted_chunks):
+            break
+        chunk = sorted_chunks[chunk_idx]
+        if chunk.start_ts > det.frame_ts:
+            continue  # detection fell in a gap between chunks
+        counts = chunk_cluster_counts.setdefault(chunk.chunk_id, {})
+        counts[det.cluster_id] = counts.get(det.cluster_id, 0) + 1
+
+    chunk_dominant_cluster: dict[UUID, int | None] = {}
+    for chunk in sorted_chunks:
+        counts = chunk_cluster_counts.get(chunk.chunk_id)
+        if not counts:
+            chunk_dominant_cluster[chunk.chunk_id] = None
+            continue
+        # Stable tiebreak on cluster_id asc keeps face_runs grouping
+        # deterministic across runs.
+        best = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[0]
+        chunk_dominant_cluster[chunk.chunk_id] = best[0]
+
+    # Group consecutive same-cluster chunks into face_runs. None breaks
+    # the run as a distinct value — "no face on screen" is a meaningful
+    # segment of its own.
+    face_runs: list[dict] = []
+    cur: list[ChunkRow] = []
+    cur_cluster: int | None = -1  # sentinel: nothing yet
+    for chunk in sorted_chunks:
+        cluster = chunk_dominant_cluster[chunk.chunk_id]
+        if cluster != cur_cluster and cur:
+            face_runs.append(_face_run_from_chunks(
+                cur, cur_cluster, speakers, face_stats,
+            ))
+            cur = []
+        cur.append(chunk)
+        cur_cluster = cluster
+    if cur:
+        face_runs.append(_face_run_from_chunks(
+            cur, cur_cluster, speakers, face_stats,
+        ))
+
+    # Conflation: for each pyannote turn, walk the chunks whose
+    # MIDPOINT falls inside the turn's window and collect their
+    # dominant face clusters. A turn with more than one distinct
+    # non-None cluster contains face transitions pyannote merged
+    # across — the operator worklist for Phase 2 re-segmentation.
+    #
+    # Using chunk midpoints (not face_run boundaries) avoids false
+    # positives at turn boundaries: a face_run ending exactly when
+    # the next turn starts shouldn't get attributed to that next turn
+    # just because the touching-boundary overlap rule says so.
+    sorted_speakers = sorted(speakers, key=lambda t: t.start_ts)
+    turn_clusters: dict[UUID, set[int]] = {}
+    speaker_idx = 0
+    for chunk in sorted_chunks:
+        cluster = chunk_dominant_cluster.get(chunk.chunk_id)
+        if cluster is None:
+            continue
+        midpoint = (chunk.start_ts + chunk.end_ts) / 2.0
+        while (
+            speaker_idx < len(sorted_speakers)
+            and sorted_speakers[speaker_idx].end_ts < midpoint
+        ):
+            speaker_idx += 1
+        for i in range(speaker_idx, len(sorted_speakers)):
+            turn = sorted_speakers[i]
+            if turn.start_ts > midpoint:
+                break
+            if turn.start_ts <= midpoint <= turn.end_ts:
+                turn_clusters.setdefault(turn.segment_id, set()).add(cluster)
+                break  # midpoint can only be in one turn
+    conflated = [
+        str(tid)
+        for tid, clusters in turn_clusters.items()
+        if len(clusters) > 1
+    ]
+
+    return {
+        "face_runs": face_runs,
+        "conflated_turn_ids": sorted(conflated),
+    }
+
+
+def _face_run_from_chunks(
+    run_chunks: list[ChunkRow],
+    cluster_id: int | None,
+    speakers: list[TurnRow],
+    face_stats: dict[int, dict],
+) -> dict:
+    """Materialise a single face_run from a list of consecutive chunks
+    that share a dominant face cluster. Joins the chunks' text, picks
+    the start/end ts from the boundary chunks, and finds every pyannote
+    turn whose [start_ts, end_ts] overlaps the run."""
+    start_ts = run_chunks[0].start_ts
+    end_ts = run_chunks[-1].end_ts
+    text = " ".join(c.text for c in run_chunks if c.text).strip()
+
+    person_id: str | None = None
+    if cluster_id is not None:
+        person_id = face_stats.get(cluster_id, {}).get("dominant_person_id")
+
+    # Pyannote turn ids this run overlaps in time. Touching boundaries
+    # count, same as bucket_chunks_to_spans semantics.
+    overlapping_turns = [
+        str(t.segment_id)
+        for t in speakers
+        if t.end_ts >= start_ts and t.start_ts <= end_ts
+    ]
+
+    return {
+        "face_cluster_id": cluster_id,
+        "face_cluster_person_id": person_id,
+        "start_ts": float(start_ts),
+        "end_ts": float(end_ts),
+        "duration": float(end_ts - start_ts),
+        "chunk_count": len(run_chunks),
+        "text": text,
+        "pyannote_turn_ids": overlapping_turns,
+    }
+
+
 def fetch_alignment(session: Session, source_id: UUID) -> dict:
     """Load detections + speakers for the source and run
     :func:`compute_alignment`. Returns the same payload shape, plus
@@ -502,6 +695,8 @@ def fetch_alignment(session: Session, source_id: UUID) -> dict:
             "dominant_pairings": [],
             "disagreements": [],
             "timeline": [],
+            "face_transcript": [],
+            "conflated_turn_ids": [],
         }
 
     det_rows = (
@@ -567,4 +762,30 @@ def fetch_alignment(session: Session, source_id: UUID) -> dict:
         document_id=doc.document_id,
     )
 
-    return compute_alignment(detections, speakers, preview_by_segment)
+    chunk_rows = (
+        session.query(
+            SourceChunk.chunk_id,
+            SourceChunk.start_ts,
+            SourceChunk.end_ts,
+            SourceChunk.clean_text,
+            SourceChunk.raw_text,
+        )
+        .filter(SourceChunk.document_id == doc.document_id)
+        .filter(SourceChunk.start_ts.isnot(None))
+        .filter(SourceChunk.end_ts.isnot(None))
+        .order_by(SourceChunk.start_ts)
+        .all()
+    )
+    chunks = [
+        ChunkRow(
+            chunk_id=r.chunk_id,
+            start_ts=float(r.start_ts),
+            end_ts=float(r.end_ts),
+            text=(r.clean_text or r.raw_text or "").strip(),
+        )
+        for r in chunk_rows
+    ]
+
+    return compute_alignment(
+        detections, speakers, preview_by_segment, chunks=chunks,
+    )

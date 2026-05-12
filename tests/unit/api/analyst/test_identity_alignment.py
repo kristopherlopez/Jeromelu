@@ -13,6 +13,7 @@ from app.analyst.identity_alignment import (
     DISAGREEMENT_LIMIT,
     MIN_ACTIVE_MOUTH_OPENING,
     MIN_OVERLAP_COUNT,
+    ChunkRow,
     DetectionRow,
     TurnRow,
     compute_alignment,
@@ -66,6 +67,8 @@ class TestCompute:
             "dominant_pairings": [],
             "disagreements": [],
             "timeline": [],
+            "face_transcript": [],
+            "conflated_turn_ids": [],
         }
 
     def test_face_clusters_sorted_by_detection_count_desc(self):
@@ -402,6 +405,141 @@ class TestTimeline:
         row = compute_alignment(dets, turns)["timeline"][0]
         # Cluster 0 had 7 frames, cluster 1 had 2 — dominant is 0.
         assert row["face_cluster_id"] == 0
+
+
+def _chunk(start: float, end: float, text: str = "hello world") -> ChunkRow:
+    return ChunkRow(
+        chunk_id=uuid4(),
+        start_ts=start,
+        end_ts=end,
+        text=text,
+    )
+
+
+class TestFaceTranscript:
+    def test_empty_chunks_yields_empty(self):
+        result = compute_alignment([], [], chunks=[])
+        assert result["face_transcript"] == []
+        assert result["conflated_turn_ids"] == []
+
+    def test_chunks_without_overlapping_detections_have_null_cluster(self):
+        # Chunk has no detections in its window → cluster_id stays None.
+        chunks = [_chunk(0, 5, "alone")]
+        result = compute_alignment([], [], chunks=chunks)
+        runs = result["face_transcript"]
+        assert len(runs) == 1
+        assert runs[0]["face_cluster_id"] is None
+        assert runs[0]["text"] == "alone"
+
+    def test_consecutive_same_cluster_chunks_merged_into_one_run(self):
+        # Three chunks all with cluster 0 → one face_run.
+        chunks = [
+            _chunk(0, 5, "one"),
+            _chunk(5, 10, "two"),
+            _chunk(10, 15, "three"),
+        ]
+        # Detections placing cluster 0 inside each chunk window.
+        dets = [
+            _det(float(i), cluster=0)
+            for i in range(15)
+        ]
+        result = compute_alignment(dets, [], chunks=chunks)
+        runs = result["face_transcript"]
+        assert len(runs) == 1
+        assert runs[0]["face_cluster_id"] == 0
+        assert runs[0]["text"] == "one two three"
+        assert runs[0]["chunk_count"] == 3
+
+    def test_face_cluster_change_starts_new_run(self):
+        # Two chunks under cluster 0, two under cluster 1 → two runs.
+        chunks = [
+            _chunk(0, 5, "denan A"),
+            _chunk(5, 10, "denan B"),
+            _chunk(10, 15, "tyson A"),
+            _chunk(15, 20, "tyson B"),
+        ]
+        dets = (
+            [_det(float(i), cluster=0) for i in range(10)]
+            + [_det(float(i + 10), cluster=1) for i in range(10)]
+        )
+        result = compute_alignment(dets, [], chunks=chunks)
+        runs = result["face_transcript"]
+        assert len(runs) == 2
+        assert runs[0]["face_cluster_id"] == 0
+        assert runs[0]["text"] == "denan A denan B"
+        assert runs[1]["face_cluster_id"] == 1
+        assert runs[1]["text"] == "tyson A tyson B"
+
+    def test_conflated_turn_id_when_two_face_runs_inside_one_pyannote_turn(self):
+        # One pyannote turn spans 0..20s.
+        # Inside it: cluster 0 chunks 0..10, then cluster 1 chunks 10..20.
+        # Two face runs → pyannote turn is conflated.
+        chunks = [
+            _chunk(0, 10, "denan"),
+            _chunk(10, 20, "tyson"),
+        ]
+        dets = (
+            [_det(float(i), cluster=0) for i in range(10)]
+            + [_det(float(i + 10), cluster=1) for i in range(10)]
+        )
+        turn = _turn(0, 20, label="SPEAKER_00")
+        result = compute_alignment(dets, [turn], chunks=chunks)
+        assert result["conflated_turn_ids"] == [str(turn.segment_id)]
+
+    def test_no_conflation_when_face_runs_match_one_pyannote_turn_each(self):
+        # Pyannote made two turns at the face boundary — no conflation.
+        chunks = [
+            _chunk(0, 10, "denan"),
+            _chunk(10, 20, "tyson"),
+        ]
+        dets = (
+            [_det(float(i), cluster=0) for i in range(10)]
+            + [_det(float(i + 10), cluster=1) for i in range(10)]
+        )
+        turns = [
+            _turn(0, 10, label="SPEAKER_00"),
+            _turn(10, 20, label="SPEAKER_01"),
+        ]
+        result = compute_alignment(dets, turns, chunks=chunks)
+        assert result["conflated_turn_ids"] == []
+
+    def test_no_face_run_does_not_conflate_a_turn(self):
+        # A turn with one face-cluster run and one no-face run shouldn't
+        # be conflated — silence/off-screen is not a speaker change.
+        chunks = [
+            _chunk(0, 10, "denan"),
+            _chunk(10, 20, "still denan, but the camera cut away"),
+        ]
+        dets = [_det(float(i), cluster=0) for i in range(10)]  # only first chunk
+        turn = _turn(0, 20, label="SPEAKER_00")
+        result = compute_alignment(dets, [turn], chunks=chunks)
+        # Two face_runs (cluster=0 then cluster=None), but None doesn't
+        # count toward conflation.
+        assert result["conflated_turn_ids"] == []
+
+    def test_face_run_pyannote_turn_ids_lists_overlapping_turns(self):
+        # One face run spans 0..20s and overlaps two pyannote turns.
+        chunks = [_chunk(0, 10, "a"), _chunk(10, 20, "b")]
+        dets = [_det(float(i), cluster=0) for i in range(20)]
+        turn_a = _turn(0, 10, label="SPEAKER_00")
+        turn_b = _turn(10, 20, label="SPEAKER_01")
+        result = compute_alignment(dets, [turn_a, turn_b], chunks=chunks)
+        run = result["face_transcript"][0]
+        ids = set(run["pyannote_turn_ids"])
+        assert ids == {str(turn_a.segment_id), str(turn_b.segment_id)}
+
+    def test_dominant_cluster_tie_broken_by_cluster_id_asc(self):
+        # 2 frames each from cluster 0 and 1 in a single chunk — ties
+        # break on cluster_id ascending for determinism.
+        chunks = [_chunk(0, 5, "tied")]
+        dets = [
+            _det(1.0, cluster=1),
+            _det(2.0, cluster=0),
+            _det(3.0, cluster=1),
+            _det(4.0, cluster=0),
+        ]
+        run = compute_alignment(dets, [], chunks=chunks)["face_transcript"][0]
+        assert run["face_cluster_id"] == 0
 
 
 if __name__ == "__main__":  # pragma: no cover

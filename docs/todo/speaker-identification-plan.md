@@ -4,7 +4,7 @@ tags: [area/todo, status/in-progress]
 
 # Speaker Identification — Voice + Visual Fusion
 
-> **Status:** Phase 1 ✅ + Phase 2 ✅ + Phase 3 ✅ + Phase 4a ✅ + Phase 4-asd ✅ + Phase 4b-display ✅ + Phase 4b-display-v2 (ephemeral video + YouTube overlay) ✅ + Phase 4b-action (click-to-reassign) ✅ + Phase 5.5 (remote GPU) ✅ + **Voices tab (cluster-level voice assign) ✅** + **Identity alignment (face × voice matrix, read-only) ✅** shipped. Voice + face fusion + face overlay live. Lineup runs on a SageMaker Async endpoint in `us-east-1` when `LINEUP_REMOTE=1`; full fresh-source pipeline drops from ~50 min CPU → **~3 min** wall time (pyannote 91 s, visual ID 75 s, Deepgram + DB writes ~30 s). Per-source video files are no longer persisted — overlay draws on the YouTube iframe; visual ID yt-dlps into a 24h-lifecycle staging key and deletes after. **Phase 5 (cross-modal compounding) remains.**
+> **Status:** Phase 1 ✅ + Phase 2 ✅ + Phase 3 ✅ + Phase 4a ✅ + Phase 4-asd ✅ + Phase 4b-display ✅ + Phase 4b-display-v2 (ephemeral video + YouTube overlay) ✅ + Phase 4b-action (click-to-reassign) ✅ + Phase 5.5 (remote GPU) ✅ + **Voices tab (cluster-level voice assign) ✅** + **Identity alignment (face × voice matrix, read-only) ✅** + **Pyannote community-1 upgrade ✅** + **Face-driven re-segmentation Phase 1 (diagnostic) ✅** shipped. Voice + face fusion + face overlay live. Lineup runs on a SageMaker Async endpoint in `us-east-1` when `LINEUP_REMOTE=1`; full fresh-source pipeline drops from ~50 min CPU → **~3 min** wall time (pyannote 91 s, visual ID 75 s, Deepgram + DB writes ~30 s). Per-source video files are no longer persisted — overlay draws on the YouTube iframe; visual ID yt-dlps into a 24h-lifecycle staging key and deletes after. **Phase 5 (cross-modal compounding) remains.**
 
 **Phase:** Analyst quality / identification
 **Priority:** Unlocks per-speaker quote attribution, ledger weighting by host, host-specific consensus.
@@ -423,6 +423,28 @@ Read-only diagnostic over the two independent clusterings of the same conversati
 - ✅ `tests/unit/api/analyst/test_identity_alignment.py` — 17 tests covering overlap counting, active-vs-passive split, share computation, NULL handling, greedy pairing 1:1 invariant, disagreement detection + sorting + cap.
 
 Today the tab is read-only. The next layer — one-shot dual assign and asymmetric-error backfill — is action on top of this same matrix.
+
+### Pyannote diarization upgrade 3.1 → community-1 — **SHIPPED 2026-05-13**
+
+Drop-in pipeline swap; embedding model (wespeaker, 256-dim) unchanged so `person_voiceprints` stays schema-compatible.
+
+- ✅ `pyannote_model` default in `packages/shared/jeromelu_shared/config.py` flipped to `pyannote/speaker-diarization-community-1`.
+- ✅ Error-message URLs in `diarize.py` switched from hardcoded `3.1` to f-string against `settings.pyannote_model` so the operator gets the right HF page to license-accept regardless of which model the env points at.
+- ✅ Docs note: user must accept the new model's license at `https://huggingface.co/pyannote/speaker-diarization-community-1` before the next `make diarize`.
+
+The motivation is the over-merging behaviour 3.1 shows on similar-voice speakers — same accent, same mic, same room produces conflated SPEAKER_NN labels. community-1 is reported to segment more cleanly on this class. Re-diarize a known-conflated source post-upgrade to measure the delta before deciding whether the deeper Phase 2 (face-driven re-segmentation) is needed.
+
+### Face-driven re-segmentation Phase 1 — diagnostic view — **SHIPPED 2026-05-13**
+
+The visibility layer for the over-merging problem. Builds on already-stored data only — no schema changes, no audio re-fetch.
+
+- ✅ `compute_alignment` extended with `face_transcript` (Deepgram chunks grouped into consecutive runs of the same dominant on-screen face cluster) + `conflated_turn_ids` (pyannote turn ids whose chunks attribute to more than one face cluster). Pure helper `_compute_face_transcript`; conflation detection uses chunk-midpoint inside turn for strict semantics (touching-boundary overlap caused false positives on adjacent turns).
+- ✅ `fetch_alignment` now pulls `SourceChunk` rows for the document and passes them through.
+- ✅ Router resolves `face_cluster_person_name` for each face_run.
+- ✅ `AlignmentPanel` gains a "Words by face cluster" section at the top with a CONFLATED badge on runs overlapping conflated pyannote turns. Conflation count headline summarises pyannote's over-merging rate.
+- ✅ 9 new unit tests cover: empty inputs, chunks with no overlapping detections, consecutive same-cluster merging, face cluster change → new run, conflation detection when one pyannote turn covers multiple face_runs, no conflation when face_runs match turns 1:1, no conflation from None-cluster runs (silence), pyannote_turn_ids reflects overlapping turns, deterministic tiebreak on cluster_id asc.
+
+**Phase 2 decision gate:** measure `conflated_turn_ids` count on a known-conflated source after the community-1 upgrade. If conflation drops to single-digit per source, skip the Phase 2 invasive build (sub-segment table + audio re-fetch). If conflation remains high, proceed with Phase 2.
 
 ### Phase 5 — Cross-modal compounding (3 days)
 

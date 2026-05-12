@@ -2205,6 +2205,8 @@ def get_identity_alignment(source_id: uuid.UUID, db: Session = Depends(get_db)):
         _add(t.get("audio_match_person_id"))
         _add(t.get("visual_match_person_id"))
         _add(t.get("speaker_person_id"))
+    for r in payload.get("face_transcript", []):
+        _add(r.get("face_cluster_person_id"))
 
     name_by_id: dict[str, str] = {}
     if person_ids:
@@ -2227,6 +2229,8 @@ def get_identity_alignment(source_id: uuid.UUID, db: Session = Depends(get_db)):
         t["audio_match_person_name"] = _name(t.get("audio_match_person_id"))
         t["visual_match_person_name"] = _name(t.get("visual_match_person_id"))
         t["speaker_person_name"] = _name(t.get("speaker_person_id"))
+    for r in payload.get("face_transcript", []):
+        r["face_cluster_person_name"] = _name(r.get("face_cluster_person_id"))
 
     return {
         "source_id": str(source_id),

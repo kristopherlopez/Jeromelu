@@ -9,6 +9,7 @@ import type {
   AlignmentDominantPair,
   AlignmentRow,
   AlignmentTimelineRow,
+  FaceTranscriptRun,
   IdentityAlignmentResponse,
 } from "@/lib/types";
 
@@ -163,6 +164,11 @@ export default function AlignmentPanel({ sourceId, onSeek }: Props) {
 
   return (
     <div className="flex h-full flex-col gap-6 overflow-y-auto custom-scrollbar pr-2">
+      <FaceTranscriptList
+        runs={data.face_transcript ?? []}
+        conflatedTurnIds={new Set(data.conflated_turn_ids ?? [])}
+        onSeek={onSeek}
+      />
       <TranscriptByAttribution
         timeline={data.timeline ?? []}
         onSeek={onSeek}
@@ -178,6 +184,203 @@ export default function AlignmentPanel({ sourceId, onSeek }: Props) {
         onSeek={onSeek}
       />
     </div>
+  );
+}
+
+interface FaceTranscriptListProps {
+  runs: FaceTranscriptRun[];
+  /** pyannote turn ids that pyannote merged across a face transition.
+   *  Used to render a CONFLATED badge on runs whose pyannote_turn_ids
+   *  intersect this set. */
+  conflatedTurnIds: Set<string>;
+  onSeek: (seconds: number) => void;
+}
+
+// Initial limit before "Show all" — face_runs are coarser than turns
+// (typically one per face appearance) so 80 covers most sources.
+const FACE_TRANSCRIPT_INITIAL_LIMIT = 80;
+
+function FaceTranscriptList({
+  runs,
+  conflatedTurnIds,
+  onSeek,
+}: FaceTranscriptListProps) {
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll
+    ? runs
+    : runs.slice(0, FACE_TRANSCRIPT_INITIAL_LIMIT);
+  const hiddenCount = runs.length - visible.length;
+  const conflationCount = conflatedTurnIds.size;
+
+  return (
+    <section className="flex flex-col gap-2">
+      <h3
+        className="text-[11px] font-semibold uppercase tracking-wider"
+        style={{ color: "var(--foreground-ghost)" }}
+      >
+        Words by face cluster · Phase 1
+      </h3>
+      <p className="text-[11px]" style={{ color: "var(--foreground-ghost)" }}>
+        Chunks grouped into runs by the on-screen face cluster, not by
+        pyannote boundaries. The "transcript as determined by face" —
+        each paragraph is consecutive speech where the same person was
+        visible. Runs marked CONFLATED sit inside a single pyannote
+        turn that spans multiple faces — pyannote's segmentation merged
+        across a real speaker change.
+      </p>
+      <div className="text-xs">
+        <strong>{runs.length}</strong>{" "}
+        <span style={{ color: "var(--foreground-ghost)" }}>
+          face-driven paragraphs ·{" "}
+        </span>
+        {conflationCount > 0 ? (
+          <span style={{ color: "#f87171" }}>
+            <strong>{conflationCount}</strong> conflated pyannote turn
+            {conflationCount === 1 ? "" : "s"}
+          </span>
+        ) : (
+          <span style={{ color: "var(--foreground-ghost)" }}>
+            no conflations detected
+          </span>
+        )}
+      </div>
+
+      {runs.length === 0 ? (
+        <div
+          className="rounded border px-3 py-2 text-xs"
+          style={{
+            borderColor: "var(--border)",
+            color: "var(--foreground-ghost)",
+          }}
+        >
+          No face transcript — source has no chunks, no detections, or
+          the API needs a restart to pick up the new endpoint shape.
+        </div>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {visible.map((run, idx) => (
+            <FaceTranscriptRowItem
+              key={`${run.start_ts}-${idx}`}
+              run={run}
+              isConflated={run.pyannote_turn_ids.some((tid) =>
+                conflatedTurnIds.has(tid),
+              )}
+              onSeek={onSeek}
+            />
+          ))}
+        </ul>
+      )}
+
+      {hiddenCount > 0 && !showAll && (
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          className="self-start rounded border px-2 py-1 text-[10px]"
+          style={{
+            borderColor: "var(--border)",
+            color: "var(--foreground-secondary)",
+          }}
+        >
+          Show all {runs.length} face paragraphs ({hiddenCount} hidden)
+        </button>
+      )}
+      {showAll && runs.length > FACE_TRANSCRIPT_INITIAL_LIMIT && (
+        <button
+          type="button"
+          onClick={() => setShowAll(false)}
+          className="self-start rounded border px-2 py-1 text-[10px]"
+          style={{
+            borderColor: "var(--border)",
+            color: "var(--foreground-secondary)",
+          }}
+        >
+          Collapse to first {FACE_TRANSCRIPT_INITIAL_LIMIT}
+        </button>
+      )}
+    </section>
+  );
+}
+
+interface FaceTranscriptRowItemProps {
+  run: FaceTranscriptRun;
+  isConflated: boolean;
+  onSeek: (seconds: number) => void;
+}
+
+function FaceTranscriptRowItem({
+  run,
+  isConflated,
+  onSeek,
+}: FaceTranscriptRowItemProps) {
+  const speakerName =
+    run.face_cluster_person_name ??
+    (run.face_cluster_id !== null
+      ? `Cluster ${run.face_cluster_id}`
+      : "(no face on screen)");
+
+  // Conflation is the actionable signal; tint the row red when any of
+  // the pyannote turns this paragraph overlaps is conflated, so the
+  // operator can scan for the speaker-change-pyannote-missed cases.
+  const borderColor = isConflated ? "#f87171" : "var(--border)";
+  const bgColor = isConflated
+    ? "color-mix(in srgb, #f87171 10%, transparent)"
+    : "var(--background-deep)";
+
+  return (
+    <li
+      className="flex flex-col gap-1 rounded border px-3 py-2 text-xs"
+      style={{ borderColor, backgroundColor: bgColor }}
+    >
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <button
+          type="button"
+          onClick={() => onSeek(run.start_ts)}
+          className="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-mono"
+          style={{
+            color: "var(--accent)",
+            backgroundColor: "var(--surface)",
+            cursor: "pointer",
+          }}
+          title={`Jump to ${fmtTs(run.start_ts)}`}
+        >
+          ▸ {fmtTs(run.start_ts)}–{fmtTs(run.end_ts)}
+        </button>
+        <strong>{speakerName}</strong>
+        <span
+          className="text-[10px]"
+          style={{ color: "var(--foreground-ghost)" }}
+        >
+          (face){" · "}{run.chunk_count} chunk
+          {run.chunk_count === 1 ? "" : "s"}
+          {" · "}
+          {run.pyannote_turn_ids.length === 1
+            ? "1 pyannote turn"
+            : `${run.pyannote_turn_ids.length} pyannote turns`}
+        </span>
+        {isConflated && (
+          <span
+            className="rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider"
+            style={{
+              border: "1px solid #f87171",
+              color: "#f87171",
+            }}
+            title="One or more pyannote turns this paragraph overlaps contains chunks attributed to multiple face clusters."
+          >
+            Conflated
+          </span>
+        )}
+      </div>
+      <div
+        className="leading-snug"
+        style={{ color: "var(--foreground-secondary)" }}
+      >
+        {run.text || (
+          <em style={{ color: "var(--foreground-ghost)" }}>
+            (no transcript text)
+          </em>
+        )}
+      </div>
+    </li>
   );
 }
 

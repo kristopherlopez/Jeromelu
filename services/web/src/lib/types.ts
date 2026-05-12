@@ -412,6 +412,23 @@ export interface AlignmentTimelineRow {
   preview_text: string;
 }
 
+/** Phase 1 face-driven transcript: chunks grouped into consecutive runs
+ *  of the same dominant on-screen face cluster. ``pyannote_turn_ids`` lists
+ *  the pyannote turn ids the run overlaps in time — combined with
+ *  ``conflated_turn_ids`` it shows which pyannote turns merged across a
+ *  face transition. */
+export interface FaceTranscriptRun {
+  face_cluster_id: number | null;
+  face_cluster_person_id: string | null;
+  face_cluster_person_name: string | null;
+  start_ts: number;
+  end_ts: number;
+  duration: number;
+  chunk_count: number;
+  text: string;
+  pyannote_turn_ids: string[];
+}
+
 export interface IdentityAlignmentResponse {
   source_id: string;
   face_clusters: AlignmentFaceCluster[];
@@ -420,4 +437,10 @@ export interface IdentityAlignmentResponse {
   dominant_pairings: AlignmentDominantPair[];
   disagreements: AlignmentDisagreement[];
   timeline: AlignmentTimelineRow[];
+  /** Chunks grouped by dominant on-screen face cluster — the
+   *  "transcript as determined by face". */
+  face_transcript: FaceTranscriptRun[];
+  /** pyannote turn ids that contain chunks attributed to more than
+   *  one face cluster — pyannote merged across a face transition. */
+  conflated_turn_ids: string[];
 }
