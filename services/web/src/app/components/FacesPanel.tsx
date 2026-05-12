@@ -330,11 +330,12 @@ function PositionSection({
   ) => void;
   allClusters: { clusterId: number; label: string }[];
 }) {
-  // Sort runs by frame_count desc so the top entries are the most
-  // screen-time-relevant — usually what the operator cares about for
-  // triage. Stable across renders via useMemo on identity.
+  // Sort runs chronologically (earliest first). With the cluster's
+  // identity already established by the header, the operator reads
+  // these rows to follow the timeline — "when does this person show
+  // up across the video" — not to find the longest spans.
   const sortedRuns = useMemo(
-    () => [...position.runs].sort((a, b) => b.frame_count - a.frame_count),
+    () => [...position.runs].sort((a, b) => a.start_ts - b.start_ts),
     [position.runs],
   );
   const [expanded, setExpanded] = useState(false);
