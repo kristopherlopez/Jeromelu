@@ -38,6 +38,7 @@ from ...deps import get_db
 from ...routers.admin import require_admin
 from .._s3_archive import archive_response
 from .models import SuperCoachPlayer
+from .notes_extractor import extract_notes_as_claims
 
 logger = logging.getLogger(__name__)
 
@@ -147,6 +148,12 @@ def run_supercoach_roster(
         )
         refresh_result = refresh_roster(db, sc_players_dicts, source=source)
         detail.update({"fetched": fetched, **refresh_result})
+
+        # Extract SC editorial notes[] as claims attributed to the synthetic
+        # SuperCoach Editorial advisor (per migration 061). Idempotent —
+        # re-runs only insert new notes.
+        notes_result = extract_notes_as_claims(db, sc_players=raw_players)
+        detail.update(notes_result)
     except SuperCoachFetchError as e:
         _record_failure(
             db, run_id=run_id, exc=e, detail=detail,
