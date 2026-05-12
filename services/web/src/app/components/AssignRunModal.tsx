@@ -43,6 +43,40 @@ function fmtTs(s: number): string {
   return `${m}:${String(sec).padStart(2, "0")}`;
 }
 
+const ERROR_TRUNCATE_AT = 300;
+
+function ErrorDisplay({ error }: { error: string }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!error) return null;
+  const long = error.length > ERROR_TRUNCATE_AT;
+  const visible = expanded || !long ? error : error.slice(0, ERROR_TRUNCATE_AT) + "…";
+  return (
+    <div className="rounded border border-red-500/40 px-3 py-2 text-xs">
+      <pre
+        className="whitespace-pre-wrap break-words font-mono text-[11px] text-red-400"
+        style={{ margin: 0 }}
+      >
+        {visible}
+      </pre>
+      {long && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1 text-[10px] uppercase tracking-wider"
+          style={{ color: "var(--foreground-secondary)" }}
+        >
+          {expanded
+            ? "Collapse"
+            : `Show full (${error.length.toLocaleString()} chars)`}
+        </button>
+      )}
+      <div className="mt-1 text-[10px]" style={{ color: "var(--foreground-ghost)" }}>
+        Full error also logged to dev-tools console.
+      </div>
+    </div>
+  );
+}
+
 export default function AssignRunModal({
   sourceId,
   clusterId,
@@ -85,6 +119,12 @@ export default function AssignRunModal({
         evt.detail !== null && typeof evt.detail === "object" && evt.detail !== undefined
           ? JSON.stringify(evt.detail)
           : String(evt.detail ?? "stream error");
+      // Always log the full detail so the dev tools console has it
+      // regardless of how the UI truncates the visible error.
+      console.error(
+        "[assign-cluster] stream error:",
+        { step: evt.step, status: evt.status, detail: evt.detail },
+      );
       setError(detail);
       // Mark the turn that was running as errored, if any.
       setTurnStatus((prev) => {
@@ -156,6 +196,10 @@ export default function AssignRunModal({
       );
       if (!resp.ok) {
         const text = await resp.text();
+        console.error(
+          "[assign-cluster] HTTP error:",
+          { status: resp.status, body: text },
+        );
         throw new Error(`API ${resp.status}: ${text}`);
       }
       if (!resp.body) throw new Error("Streaming not supported in this browser");
@@ -309,7 +353,7 @@ export default function AssignRunModal({
           </ul>
         )}
 
-        {error && <p className="text-xs text-red-400">{error}</p>}
+        {error && <ErrorDisplay error={error} />}
 
         <div className="mt-2 flex items-center justify-end gap-2">
           <button
