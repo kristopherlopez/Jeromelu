@@ -147,7 +147,7 @@ export default function FacesPanel({
   // host B's cluster because the angle made the embedding closer).
   const moveRun = useCallback(
     async (
-      sourceClusterId: number,
+      sourceClusterId: number | null,
       targetClusterId: number,
       startTs: number,
       endTs: number,
@@ -335,7 +335,8 @@ function PositionSection({
     patch: { excluded?: boolean; kind?: FaceClusterKind },
   ) => void;
   onMoveRun: (
-    sourceClusterId: number,
+    /** null = move out of the Outliers bucket (HDBSCAN noise) into a real cluster. */
+    sourceClusterId: number | null,
     targetClusterId: number,
     startTs: number,
     endTs: number,
@@ -489,7 +490,7 @@ function PositionSection({
             )}
             onMove={(target) =>
               onMoveRun(
-                position.cluster_id as number,
+                position.cluster_id ?? null,
                 target,
                 run.start_ts,
                 run.end_ts,
@@ -527,14 +528,16 @@ function RunRow({
   run: FaceRun;
   sourceId: string;
   onSeek: (s: number) => void;
-  /** null = Outliers bucket; Move action disabled there. */
+  /** null = Outliers bucket; Move is still allowed (target picker shows
+   *  every visible cluster) so the operator can rescue a salvageable
+   *  stretch out of noise. */
   currentClusterId: number | null;
   /** Available targets (all other clusters in this source). */
   otherClusters: { clusterId: number; label: string }[];
   onMove: (targetClusterId: number) => void;
 }) {
   const dur = Math.round(run.end_ts - run.start_ts);
-  const canMove = currentClusterId !== null && otherClusters.length > 0;
+  const canMove = otherClusters.length > 0;
   const [pickerOpen, setPickerOpen] = useState(false);
 
   return (
@@ -598,8 +601,8 @@ function RunRow({
           }}
           title={
             canMove
-              ? "Move this run's detections into a different cluster (re-cluster a mis-grouped stretch)"
-              : "Outliers / single-cluster source — nothing to move to"
+              ? "Move this run's detections into a different cluster (re-cluster a mis-grouped stretch, or promote out of Outliers)"
+              : "No other clusters to move to"
           }
         >
           {pickerOpen ? "Cancel" : "Move →"}

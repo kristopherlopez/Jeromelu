@@ -633,9 +633,14 @@ def recompute_face_clusters(source_id: uuid.UUID, db: Session = Depends(get_db))
 
 
 class MoveRunRequest(BaseModel):
-    source_cluster_id: int = Field(
+    source_cluster_id: int | None = Field(
         ...,
-        description="The cluster the run currently belongs to.",
+        description=(
+            "The cluster the run currently belongs to. `null` means the "
+            "Outliers bucket (HDBSCAN noise — detections with cluster_id "
+            "IS NULL), used when promoting a salvaged stretch out of "
+            "noise into a real cluster."
+        ),
     )
     target_cluster_id: int = Field(
         ...,
@@ -656,14 +661,16 @@ def move_run_between_clusters(
 
     Use case: HDBSCAN occasionally puts a short stretch of frames into
     the wrong cluster (a profile shot of host A grouped with host B
-    because the angle made them look similar). The operator spots it
-    in the runs view, picks the right target cluster, and one click
-    moves the run.
+    because the angle made them look similar), or drops them into noise
+    when the embedding doesn't cleanly join any cluster. The operator
+    spots either case in the runs view, picks the right target, and one
+    click moves the run.
 
-    Both clusters must already exist for this source — we never
-    invent a new cluster_id here. The detection_count on both
-    source_face_clusters rows is updated so the runs view reflects
-    the new sizes without a full re-analyse.
+    Target cluster must already exist; source can be ``null`` to move
+    from the Outliers bucket. ``source_face_clusters.detection_count``
+    is updated on both sides so the runs view reflects the new sizes
+    without a full re-analyse — the Outliers bucket has no row of its
+    own, so only the target's count is incremented in that case.
     """
     if body.end_ts <= body.start_ts:
         raise HTTPException(
@@ -675,43 +682,56 @@ def move_run_between_clusters(
             detail="source and target cluster are the same — nothing to move",
         )
 
-    src_meta = db.query(SourceFaceCluster).filter(
-        SourceFaceCluster.source_id == source_id,
-        SourceFaceCluster.cluster_id == body.source_cluster_id,
-    ).first()
+    # source_cluster_id=None → Outliers bucket. No source_face_clusters
+    # row exists for noise, so skip the lookup and the count-decrement.
+    src_meta: SourceFaceCluster | None = None
+    if body.source_cluster_id is not None:
+        src_meta = db.query(SourceFaceCluster).filter(
+            SourceFaceCluster.source_id == source_id,
+            SourceFaceCluster.cluster_id == body.source_cluster_id,
+        ).first()
+        if not src_meta:
+            raise HTTPException(
+                status_code=404,
+                detail=f"source cluster {body.source_cluster_id} not found for this source",
+            )
+
     tgt_meta = db.query(SourceFaceCluster).filter(
         SourceFaceCluster.source_id == source_id,
         SourceFaceCluster.cluster_id == body.target_cluster_id,
     ).first()
-    if not src_meta:
-        raise HTTPException(
-            status_code=404,
-            detail=f"source cluster {body.source_cluster_id} not found for this source",
-        )
     if not tgt_meta:
         raise HTTPException(
             status_code=404,
             detail=f"target cluster {body.target_cluster_id} not found for this source",
         )
 
+    # SQLAlchemy's `column == None` would warn; use `.is_(None)` for the
+    # Outliers (noise) bucket and direct equality otherwise.
+    src_cluster_predicate = (
+        SourceFaceDetection.cluster_id.is_(None)
+        if body.source_cluster_id is None
+        else SourceFaceDetection.cluster_id == body.source_cluster_id
+    )
     moved = db.execute(
         sa_update(SourceFaceDetection)
         .where(
             SourceFaceDetection.source_id == source_id,
-            SourceFaceDetection.cluster_id == body.source_cluster_id,
+            src_cluster_predicate,
             SourceFaceDetection.frame_ts >= body.start_ts,
             SourceFaceDetection.frame_ts <= body.end_ts,
         )
         .values(cluster_id=body.target_cluster_id)
     ).rowcount or 0
 
-    # Adjust the cached counts on both clusters so the next /face-runs
-    # call shows the right sizes. The full stats (mouth_open_std, etc)
-    # are stale until the next analyse — that's fine, they're advisory.
+    # Adjust the cached counts so the next /face-runs call shows the
+    # right sizes. The full stats (mouth_open_std, etc) are stale until
+    # the next analyse — that's fine, they're advisory.
     if moved:
-        src_meta.detection_count = max(0, (src_meta.detection_count or 0) - moved)
+        if src_meta is not None:
+            src_meta.detection_count = max(0, (src_meta.detection_count or 0) - moved)
+            src_meta.updated_at = datetime.now(timezone.utc)
         tgt_meta.detection_count = (tgt_meta.detection_count or 0) + moved
-        src_meta.updated_at = datetime.now(timezone.utc)
         tgt_meta.updated_at = datetime.now(timezone.utc)
     db.commit()
 
