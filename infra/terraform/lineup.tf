@@ -185,3 +185,104 @@ resource "aws_iam_role_policy" "sagemaker_lineup" {
   role   = aws_iam_role.sagemaker_lineup.id
   policy = data.aws_iam_policy_document.sagemaker_lineup_inline.json
 }
+
+# ---- Application Auto Scaling — scale variant to zero ----------------------
+#
+# The async endpoint (`jeromelu-lineup-async`, managed imperatively by
+# `services/gpu/deploy.py`) starts at InitialInstanceCount=1 and stays at 1
+# forever unless a scalable target with MinCapacity=0 is attached.
+# ml.g5.xlarge in us-east-1 is $1.408/hr — ~$1,014/mo running 24/7 for an
+# endpoint invoked 1-2 hrs/day. (Confirmed: May 2026 MTD spend was $218 in
+# 7 days against zero registered scalable targets.)
+#
+# AWS-recommended dual-policy pattern for async + scale-to-zero:
+#   - Target-tracking on `ApproximateBacklogSizePerInstance` drives steady-
+#     state count while instances >= 1.
+#   - Step-scaling triggered by `HasBacklogWithoutCapacity` CloudWatch alarm
+#     handles the 0 -> 1 cold start (target-tracking can't, because the
+#     backlog-per-instance metric divides by zero when no instance exists).
+#
+# Cold-start tradeoff: first request after idle takes 1-3 min to fetch the
+# image and load the model. ScaleInCooldown=600s keeps the variant warm for
+# 10 min after the queue drains so brief gaps within a session don't trigger
+# a recycle.
+
+resource "aws_appautoscaling_target" "lineup_async" {
+  provider = aws.us_east_1
+
+  service_namespace  = "sagemaker"
+  resource_id        = "endpoint/jeromelu-lineup-async/variant/AllTraffic"
+  scalable_dimension = "sagemaker:variant:DesiredInstanceCount"
+
+  min_capacity = 0
+  max_capacity = 2
+}
+
+resource "aws_appautoscaling_policy" "lineup_async_backlog" {
+  provider = aws.us_east_1
+
+  name               = "jeromelu-lineup-async-backlog"
+  service_namespace  = aws_appautoscaling_target.lineup_async.service_namespace
+  resource_id        = aws_appautoscaling_target.lineup_async.resource_id
+  scalable_dimension = aws_appautoscaling_target.lineup_async.scalable_dimension
+  policy_type        = "TargetTrackingScaling"
+
+  target_tracking_scaling_policy_configuration {
+    target_value       = 5.0
+    scale_in_cooldown  = 600
+    scale_out_cooldown = 60
+
+    customized_metric_specification {
+      metric_name = "ApproximateBacklogSizePerInstance"
+      namespace   = "AWS/SageMaker"
+      statistic   = "Average"
+
+      dimensions {
+        name  = "EndpointName"
+        value = "jeromelu-lineup-async"
+      }
+    }
+  }
+}
+
+resource "aws_appautoscaling_policy" "lineup_async_cold_start" {
+  provider = aws.us_east_1
+
+  name               = "jeromelu-lineup-async-cold-start"
+  service_namespace  = aws_appautoscaling_target.lineup_async.service_namespace
+  resource_id        = aws_appautoscaling_target.lineup_async.resource_id
+  scalable_dimension = aws_appautoscaling_target.lineup_async.scalable_dimension
+  policy_type        = "StepScaling"
+
+  step_scaling_policy_configuration {
+    adjustment_type         = "ChangeInCapacity"
+    cooldown                = 300
+    metric_aggregation_type = "Maximum"
+
+    step_adjustment {
+      metric_interval_lower_bound = 0
+      scaling_adjustment          = 1
+    }
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "lineup_async_backlog_no_capacity" {
+  provider = aws.us_east_1
+
+  alarm_name          = "jeromelu-lineup-async-has-backlog-without-capacity"
+  alarm_description   = "Scale lineup-async from 0 to 1 when an invoke arrives at an idle endpoint."
+  metric_name         = "HasBacklogWithoutCapacity"
+  namespace           = "AWS/SageMaker"
+  statistic           = "Maximum"
+  period              = 60
+  evaluation_periods  = 1
+  threshold           = 1
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    EndpointName = "jeromelu-lineup-async"
+  }
+
+  alarm_actions = [aws_appautoscaling_policy.lineup_async_cold_start.arn]
+}

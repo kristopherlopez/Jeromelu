@@ -18,7 +18,7 @@ coverage.
 | Lightsail instance + static IP + firewall | yes (PR2) | `jeromelu` instance + `jeromelu-ip`. SSH key pair stays manual. |
 | V0 orphan teardown | yes (PR3) | Out-of-band script — see [`cleanup-v0.sh`](cleanup-v0.sh) |
 | CI workflow (`.github/workflows/terraform.yml`) | yes (PR4) — live 2026-04-30 | Plan-on-PR, comment plan; apply stays manual until apply IAM is sorted |
-| Lineup GPU (Phase 5.5) | yes — `lineup.tf` | ECR `jeromelu/lineup-gpu` + S3 `jeromelu-sagemaker-async` (both `us-east-1`) + IAM role `JeromeluSagemakerLineup`. SageMaker model/config/endpoint stay imperative — see [`services/gpu/deploy.py`](../../services/gpu/deploy.py). |
+| Lineup GPU (Phase 5.5) | yes — `lineup.tf` | ECR `jeromelu/lineup-gpu` + S3 `jeromelu-sagemaker-async` (both `us-east-1`) + IAM role `JeromeluSagemakerLineup` + Application Auto Scaling target & policies (scale-to-zero on `jeromelu-lineup-async/AllTraffic`). SageMaker model/config/endpoint themselves stay imperative — see [`services/gpu/deploy.py`](../../services/gpu/deploy.py). |
 
 ## What is **not** managed by Terraform
 
