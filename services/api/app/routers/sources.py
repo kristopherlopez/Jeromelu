@@ -1403,7 +1403,12 @@ class BulkAssignRequest(BaseModel):
     segment_ids: list[uuid.UUID] = Field(
         ...,
         min_length=1,
-        max_length=200,
+        # Cluster-level assigns regularly hit hundreds of overlapping
+        # turns when one person dominates a long source (e.g. a 50-min
+        # podcast where the host speaks across 510 source_speakers
+        # rows). 2000 covers real-world ceiling with plenty of headroom;
+        # raise further only when we genuinely see clusters that big.
+        max_length=2000,
         description="source_speakers.segment_id values to reassign in this batch",
     )
     cluster_id: int | None = Field(
@@ -1609,7 +1614,16 @@ def bulk_assign_face_run(
             # The context tempdir holds the audio for the duration of
             # the bulk; each enroll_span_with_context only ffmpeg-crops
             # the turn's seconds and embeds the windows.
-            with enrollment_context(db, source_id) as voice_ctx:
+            #
+            # For larger batches, also pre-convert the full m4a to WAV
+            # so pyannote can crop natively per window instead of doing
+            # a per-span ffmpeg crop. ~30s one-time cost; pays for
+            # itself above ~10 spans. 510-span clusters drop from ~25
+            # minutes to ~5 minutes.
+            prefetch_wav = len(ordered) > 10
+            with enrollment_context(
+                db, source_id, prefetch_wav=prefetch_wav,
+            ) as voice_ctx:
                 for idx, sp in enumerate(ordered):
                     seg_id = str(sp.segment_id)
                     yield _ndjson({

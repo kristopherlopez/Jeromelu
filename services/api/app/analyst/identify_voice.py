@@ -165,10 +165,23 @@ class _EnrollmentContext:
     m4a_path: Path
     tmpdir: Path
     emb_inference: Any  # pyannote Inference; not typed to avoid the heavy import here
+    # Slice B PR 2.6 — when prefetch_wav=True the context converts the
+    # full m4a to a 16 kHz mono WAV up front. enroll_span_with_context
+    # then uses pyannote's native crop on the original timeline instead
+    # of doing a per-span ffmpeg crop. Drops per-span overhead from
+    # ~3s to ~0.5s. Pays a one-time ~30s conversion cost — worth it
+    # above ~5 spans, big win above ~50. None means "fall back to the
+    # per-span crop path" — the existing behaviour.
+    full_wav_path: Path | None = None
 
 
 @contextlib.contextmanager
-def enrollment_context(session: Session, source_id: UUID):
+def enrollment_context(
+    session: Session,
+    source_id: UUID,
+    *,
+    prefetch_wav: bool = False,
+):
     """Yield a shared enrollment context for repeated calls on the same
     source. Use as ``with enrollment_context(db, src_id) as ctx: ...``
     and pass ``ctx`` to :func:`enroll_span_with_context` per span.
@@ -212,6 +225,14 @@ def enrollment_context(session: Session, source_id: UUID):
         )
         _download_audio(source.audio_s3_key, m4a_path)
 
+        full_wav_path: Path | None = None
+        if prefetch_wav:
+            full_wav_path = tmpdir / "audio.full.wav"
+            logger.info(
+                "Pre-converting full audio to 16 kHz WAV for bulk enrollment",
+            )
+            _convert_to_wav(m4a_path, full_wav_path)
+
         logger.info("Loading embedding model %s", EMBEDDING_MODEL)
         emb_model = Model.from_pretrained(
             EMBEDDING_MODEL,
@@ -230,6 +251,7 @@ def enrollment_context(session: Session, source_id: UUID):
             m4a_path=m4a_path,
             tmpdir=tmpdir,
             emb_inference=emb_inference,
+            full_wav_path=full_wav_path,
         )
 
 
@@ -271,12 +293,23 @@ def enroll_span_with_context(
             f"created_by must be 'manual' or 'auto-confirmed', got {created_by!r}"
         )
 
-    span_wav = ctx.tmpdir / f"span_{start_ts:.3f}_{end_ts:.3f}.wav"
-    _crop_to_wav(ctx.m4a_path, span_wav, start_ts, end_ts)
-
-    # Sliding windows are computed against the cropped (zero-based) WAV,
-    # but the PersonVoiceprint rows record the original timeline.
-    windows = _sliding_windows(0.0, duration)
+    # Two paths:
+    #   1. Full WAV pre-converted (prefetch_wav=True in context setup).
+    #      Pyannote crops natively against the original timeline. No
+    #      per-span ffmpeg crop. ~0.5s per span vs ~3s.
+    #   2. m4a only. Crop to a per-span WAV, embed against zero-based
+    #      timeline, then offset back. Original behaviour — fine for
+    #      single-span use (the upfront WAV convert isn't worth it).
+    if ctx.full_wav_path is not None:
+        wav_path = ctx.full_wav_path
+        windows = _sliding_windows(start_ts, end_ts)
+        window_offset = 0.0
+    else:
+        span_wav = ctx.tmpdir / f"span_{start_ts:.3f}_{end_ts:.3f}.wav"
+        _crop_to_wav(ctx.m4a_path, span_wav, start_ts, end_ts)
+        wav_path = span_wav
+        windows = _sliding_windows(0.0, duration)
+        window_offset = start_ts
     logger.info("Embedding %d sliding windows over the span", len(windows))
 
     skipped = 0
@@ -284,7 +317,7 @@ def enroll_span_with_context(
     for w_start, w_end in windows:
         seg = Segment(w_start, w_end)
         try:
-            emb = ctx.emb_inference.crop(str(span_wav), seg)
+            emb = ctx.emb_inference.crop(str(wav_path), seg)
         except Exception as exc:
             logger.debug(
                 "Embedding failed for window %.2f-%.2f: %s", w_start, w_end, exc,
@@ -299,11 +332,14 @@ def enroll_span_with_context(
         if not np.all(np.isfinite(emb)):
             skipped += 1
             continue
+        # When using a per-span WAV, windows are zero-based and need
+        # `start_ts` added back. With the full WAV, windows are already
+        # in original-timeline coords (window_offset=0).
         rows.append(PersonVoiceprint(
             person_id=person_id,
             source_id=ctx.source_id,
-            start_ts=float(start_ts + w_start),
-            end_ts=float(start_ts + w_end),
+            start_ts=float(window_offset + w_start),
+            end_ts=float(window_offset + w_end),
             embedding=emb.tolist(),
             embedding_model=EMBEDDING_MODEL,
             created_by=created_by,
