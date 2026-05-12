@@ -24,6 +24,7 @@ from app.analyst.identify_voice import (
     enroll_span_with_context,
     enrollment_context,
 )
+from app.analyst.identity_alignment import fetch_alignment
 from app.analyst.voice_clusters import (
     VOICEPRINT_SAMPLE_LIMIT,
     compute_voice_clusters,
@@ -2153,3 +2154,66 @@ def bulk_assign_voice_cluster(
             })
 
     return StreamingResponse(stream(), media_type="application/x-ndjson")
+
+
+# ---------------------------------------------------------------------------
+# Identity alignment — face_cluster × voice_cluster overlap matrix.
+#
+# Face and voice are two independent clusterings of the same conversation.
+# This endpoint exposes their alignment: for every (face_cluster_id,
+# speaker_label) pair, how many face detections fall inside the speaker's
+# turns; greedy 1:1 best mapping; and a per-turn disagreement list where
+# the dominant on-screen face cluster's identity ≠ the turn's
+# speaker_person_id. See
+# docs/agents/system/speaker-identification.md § Identity alignment.
+# ---------------------------------------------------------------------------
+
+
+@router.get("/sources/{source_id}/identity-alignment")
+def get_identity_alignment(source_id: uuid.UUID, db: Session = Depends(get_db)):
+    """Cross-modal alignment between face clusters and voice clusters
+    for this source. Read-only — actions live on the per-modality tabs.
+
+    Resolves dominant person names for every face cluster, voice
+    cluster, and disagreement-list row in a single ``people`` query.
+    """
+    source = db.query(Source).filter(Source.source_id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+
+    payload = fetch_alignment(db, source_id)
+
+    person_ids: set[uuid.UUID] = set()
+    for c in payload["face_clusters"]:
+        if c.get("dominant_person_id"):
+            person_ids.add(uuid.UUID(c["dominant_person_id"]))
+    for v in payload["voice_clusters"]:
+        if v.get("dominant_person_id"):
+            person_ids.add(uuid.UUID(v["dominant_person_id"]))
+    for d in payload["disagreements"]:
+        person_ids.add(uuid.UUID(d["speaker_person_id"]))
+        person_ids.add(uuid.UUID(d["face_person_id"]))
+
+    name_by_id: dict[str, str] = {}
+    if person_ids:
+        for p in db.query(Person).filter(Person.person_id.in_(person_ids)).all():
+            name_by_id[str(p.person_id)] = p.canonical_name
+
+    for c in payload["face_clusters"]:
+        c["dominant_person_name"] = (
+            name_by_id.get(c["dominant_person_id"])
+            if c.get("dominant_person_id") else None
+        )
+    for v in payload["voice_clusters"]:
+        v["dominant_person_name"] = (
+            name_by_id.get(v["dominant_person_id"])
+            if v.get("dominant_person_id") else None
+        )
+    for d in payload["disagreements"]:
+        d["speaker_person_name"] = name_by_id.get(d["speaker_person_id"])
+        d["face_person_name"] = name_by_id.get(d["face_person_id"])
+
+    return {
+        "source_id": str(source_id),
+        **payload,
+    }

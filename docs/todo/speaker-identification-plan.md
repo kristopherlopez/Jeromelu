@@ -4,7 +4,7 @@ tags: [area/todo, status/in-progress]
 
 # Speaker Identification — Voice + Visual Fusion
 
-> **Status:** Phase 1 ✅ + Phase 2 ✅ + Phase 3 ✅ + Phase 4a ✅ + Phase 4-asd ✅ + Phase 4b-display ✅ + Phase 4b-display-v2 (ephemeral video + YouTube overlay) ✅ + Phase 4b-action (click-to-reassign) ✅ + Phase 5.5 (remote GPU) ✅ + **Voices tab (cluster-level voice assign) ✅** shipped. Voice + face fusion + face overlay live. Lineup runs on a SageMaker Async endpoint in `us-east-1` when `LINEUP_REMOTE=1`; full fresh-source pipeline drops from ~50 min CPU → **~3 min** wall time (pyannote 91 s, visual ID 75 s, Deepgram + DB writes ~30 s). Per-source video files are no longer persisted — overlay draws on the YouTube iframe; visual ID yt-dlps into a 24h-lifecycle staging key and deletes after. **Phase 5 (cross-modal compounding) remains.**
+> **Status:** Phase 1 ✅ + Phase 2 ✅ + Phase 3 ✅ + Phase 4a ✅ + Phase 4-asd ✅ + Phase 4b-display ✅ + Phase 4b-display-v2 (ephemeral video + YouTube overlay) ✅ + Phase 4b-action (click-to-reassign) ✅ + Phase 5.5 (remote GPU) ✅ + **Voices tab (cluster-level voice assign) ✅** + **Identity alignment (face × voice matrix, read-only) ✅** shipped. Voice + face fusion + face overlay live. Lineup runs on a SageMaker Async endpoint in `us-east-1` when `LINEUP_REMOTE=1`; full fresh-source pipeline drops from ~50 min CPU → **~3 min** wall time (pyannote 91 s, visual ID 75 s, Deepgram + DB writes ~30 s). Per-source video files are no longer persisted — overlay draws on the YouTube iframe; visual ID yt-dlps into a 24h-lifecycle staging key and deletes after. **Phase 5 (cross-modal compounding) remains.**
 
 **Phase:** Analyst quality / identification
 **Priority:** Unlocks per-speaker quote attribution, ledger weighting by host, host-specific consensus.
@@ -412,6 +412,17 @@ The voice-focused workflow the face-runs/assign endpoint explicitly deferred. Py
 - ✅ `tests/unit/api/analyst/test_voice_clusters.py` — 13 pure-function tests over `aggregate_clusters` covering grouping, ordering, dominant-person mode, match-method breakdown, sample selection, NULL-embedding handling, preview-text truncation.
 
 This converts the in-app voice enrolment story from "operator finds a clean monologue span and runs `make enroll-voice` from the CLI" to "operator clicks `Assign` on a pyannote cluster". `make enroll-voice` still exists for the bootstrap case where a specific span is wanted; the Voices tab is the cluster-level path for everything else.
+
+### Identity alignment — face × voice cluster matrix — **SHIPPED 2026-05-12**
+
+Read-only diagnostic over the two independent clusterings of the same conversation. Cross-modal cluster fusion is the bridge between per-turn `fuse_per_turn` and Phase 5 compounding — alignment at *identity* granularity is stronger evidence than agreement on a single frame.
+
+- ✅ `services/api/app/analyst/identity_alignment.py` — pure `compute_alignment(detections, speakers)` over `DetectionRow` / `TurnRow` projections + `fetch_alignment(session, source_id)` DB wrapper. Builds the (face_cluster_id, speaker_label) overlap matrix, derives per-modality shares + confidence, runs greedy 1:1 dominant pairings, and produces a per-turn disagreement worklist (capped at 50, sorted by duration desc).
+- ✅ `GET /api/sources/{source_id}/identity-alignment` — resolves Person names for every face cluster, voice cluster, and disagreement-list row in one Person query.
+- ✅ `services/web/src/app/components/AlignmentPanel.tsx` — three sections: dominant pairings list with consistency-coloured borders, overlap matrix capped at 8×8 with confidence-coloured cells, disagreement worklist with click-to-seek. New `Alignment` tab in `SourceReviewClient.tsx`, gated on `face_track_url`.
+- ✅ `tests/unit/api/analyst/test_identity_alignment.py` — 17 tests covering overlap counting, active-vs-passive split, share computation, NULL handling, greedy pairing 1:1 invariant, disagreement detection + sorting + cap.
+
+Today the tab is read-only. The next layer — one-shot dual assign and asymmetric-error backfill — is action on top of this same matrix.
 
 ### Phase 5 — Cross-modal compounding (3 days)
 

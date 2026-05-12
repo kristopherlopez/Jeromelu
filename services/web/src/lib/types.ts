@@ -301,3 +301,69 @@ export interface VoiceClustersResponse {
   source_id: string;
   speakers: VoiceCluster[];
 }
+
+// Identity alignment tab — cross-modal matrix between face clusters
+// (visual identity, from source_face_clusters / HDBSCAN over ArcFace
+// embeddings) and voice clusters (audio identity, pyannote SPEAKER_NN
+// labels). Read-only diagnostic; actions stay on the per-modality tabs.
+export interface AlignmentFaceCluster {
+  cluster_id: number;
+  detection_count: number;
+  dominant_person_id: string | null;
+  dominant_person_name: string | null;
+  dominant_share: number | null;
+}
+
+export interface AlignmentVoiceCluster {
+  speaker_label: string;
+  turn_count: number;
+  total_seconds: number;
+  dominant_person_id: string | null;
+  dominant_person_name: string | null;
+  dominant_share: number | null;
+}
+
+export interface AlignmentRow {
+  face_cluster_id: number;
+  speaker_label: string;
+  /** Face detections whose frame_ts falls inside any turn for this
+   *  speaker_label. At 1 fps detection-count ≈ seconds. */
+  overlap_count: number;
+  /** Subset of overlap_count where mouth-opening passed the ASD
+   *  threshold — i.e. the face was probably speaking, not just visible. */
+  active_overlap_count: number;
+  face_cluster_share: number;
+  voice_cluster_share: number;
+  /** min(face_cluster_share, voice_cluster_share) — the limiting
+   *  modality's share. */
+  confidence: number;
+}
+
+export interface AlignmentDominantPair {
+  face_cluster_id: number;
+  speaker_label: string;
+  confidence: number;
+  overlap_count: number;
+}
+
+export interface AlignmentDisagreement {
+  segment_id: string;
+  start_ts: number;
+  end_ts: number;
+  speaker_label: string | null;
+  speaker_person_id: string;
+  speaker_person_name: string | null;
+  face_cluster_id: number;
+  face_person_id: string;
+  face_person_name: string | null;
+  active_overlap_count: number;
+}
+
+export interface IdentityAlignmentResponse {
+  source_id: string;
+  face_clusters: AlignmentFaceCluster[];
+  voice_clusters: AlignmentVoiceCluster[];
+  alignment: AlignmentRow[];
+  dominant_pairings: AlignmentDominantPair[];
+  disagreements: AlignmentDisagreement[];
+}

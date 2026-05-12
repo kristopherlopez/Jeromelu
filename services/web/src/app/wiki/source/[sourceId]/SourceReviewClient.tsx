@@ -17,6 +17,7 @@ import TranscriptPanel from "@/app/components/TranscriptPanel";
 import EpisodeTimeline from "@/app/components/EpisodeTimeline";
 import FacesPanel from "@/app/components/FacesPanel";
 import VoicesPanel from "@/app/components/VoicesPanel";
+import AlignmentPanel from "@/app/components/AlignmentPanel";
 
 interface Props {
   data: SourceDetailResponse;
@@ -35,7 +36,7 @@ export default function SourceReviewClient({ data, allSources }: Props) {
   const [speakers, setSpeakers] = useState<Speaker[]>(data.speakers ?? []);
   const [currentTime, setCurrentTime] = useState(0);
   const [activeTab, setActiveTab] = useState<
-    "transcript" | "claims" | "faces" | "voices"
+    "transcript" | "claims" | "faces" | "voices" | "alignment"
   >("transcript");
   // Bumped after a successful face cluster assign so the overlay
   // remounts and re-fetches the regenerated face-track JSON. Combined
@@ -369,6 +370,22 @@ export default function SourceReviewClient({ data, allSources }: Props) {
             >
               Voices
             </button>
+            {/* Alignment tab — face × voice cluster overlap matrix +
+                disagreement worklist. Only meaningful when face_track_url
+                is set (face cluster side requires visual ID to have run);
+                voice side is implicit in any transcribed source. */}
+            {source.face_track_url && (
+              <button
+                onClick={() => setActiveTab("alignment")}
+                className="pb-2 text-[11px] font-semibold uppercase tracking-wider transition-colors"
+                style={{
+                  color: activeTab === "alignment" ? "var(--accent)" : "var(--foreground-muted)",
+                  borderBottom: activeTab === "alignment" ? "2px solid var(--accent)" : "2px solid transparent",
+                }}
+              >
+                Alignment
+              </button>
+            )}
           </div>
 
           {/* Tab content */}
@@ -419,6 +436,11 @@ export default function SourceReviewClient({ data, allSources }: Props) {
                   // were, but per-turn name resolution updates.
                   void refreshSpeakers();
                 }}
+              />
+            ) : activeTab === "alignment" ? (
+              <AlignmentPanel
+                sourceId={source.source_id}
+                onSeek={handleSeek}
               />
             ) : (
               <ClaimsList

@@ -688,6 +688,78 @@ The original `make enroll-voice` CLI still exists for the bootstrap workflow whe
 
 ---
 
+## Identity alignment (face × voice matrix)
+
+Face clusters and pyannote voice clusters are two independent clusterings of the same conversation. The Alignment tab on `/wiki/source/{source_id}` exposes their cross-modal overlap: for every `(face_cluster_id, speaker_label)` pair, how many face detections fall inside that voice cluster's turns, plus a per-turn disagreement worklist where the dominant on-screen face cluster's identity differs from the voice attribution.
+
+This is the bridge between today's per-turn `fuse_per_turn` (local, in `fusion.py`) and the planned [Phase 5 compounding](#backlog) (registry-side, automated). Per-turn fusion catches simultaneous voice+face agreement on individual rows. Cluster-level alignment catches the same signal at *identity* granularity — way stronger evidence, and the dominant pairings stay stable across noisy individual frames.
+
+### Endpoint
+
+- `GET /api/sources/{source_id}/identity-alignment` — read-only. Returns:
+
+```jsonc
+{
+  "face_clusters": [{cluster_id, detection_count,
+                     dominant_person_id, dominant_person_name, dominant_share}, ...],
+  "voice_clusters": [{speaker_label, turn_count, total_seconds,
+                      dominant_person_id, dominant_person_name, dominant_share}, ...],
+  "alignment": [{face_cluster_id, speaker_label,
+                 overlap_count, active_overlap_count,
+                 face_cluster_share, voice_cluster_share, confidence}, ...],
+  "dominant_pairings": [{face_cluster_id, speaker_label,
+                         confidence, overlap_count}, ...],
+  "disagreements": [{segment_id, start_ts, end_ts, speaker_label,
+                     speaker_person_id, speaker_person_name,
+                     face_cluster_id, face_person_id, face_person_name,
+                     active_overlap_count}, ...]
+}
+```
+
+### How overlap is computed
+
+1. **Detection-in-turn check.** Each `source_face_detections` row has a `frame_ts`. Each `source_speakers` row covers `[start_ts, end_ts]`. A detection lands in a turn when `start_ts <= frame_ts <= end_ts`. Turns don't overlap, so a detection lands in at most one — the walk breaks early once matched.
+
+2. **At 1 fps, detection count ≈ seconds.** That's the implicit unit conversion: `face_cluster_share = overlap_count / cluster.detection_count` and `voice_cluster_share = overlap_count / speaker_label.total_seconds` are both ratios in commensurable units. If `FRAME_SAMPLE_RATE` ever changes from 1 fps the shares need a multiplier — flagged in `identity_alignment.py`.
+
+3. **`active_overlap_count`** counts only detections whose `mouth_opening` clears `MIN_ACTIVE_MOUTH_OPENING=0.045` (mirror of the threshold in `visual_id.py`). The full overlap count includes listener / reaction-shot frames; the active subset is the precision-floor signal — the face was probably speaking, not just visible.
+
+4. **`confidence = min(face_cluster_share, voice_cluster_share)`** — the limiting modality's share. A pair confident on both axes is a real alignment; a high-face / low-voice pair means the face is on screen during most of the voice's airtime *and* most of the face cluster's appearance is during this voice — both have to be true.
+
+5. **Pairs with `overlap_count < MIN_OVERLAP_COUNT=5` are dropped.** One-frame appearances clutter the UI without contributing signal.
+
+### Dominant pairings
+
+Greedy walk over the alignment matrix sorted by confidence descending: take pairs whose `face_cluster_id` and `speaker_label` are both still unclaimed; skip otherwise. Each cluster on either side appears in at most one dominant pairing — the cleanest 1:1 mapping the data supports. Doesn't try to globally optimise (Hungarian would; not worth the complexity at podcast scale where N is single-digit per source).
+
+### Disagreements
+
+Per turn: find the face cluster that contributed the most detections to that turn's `[start_ts, end_ts]` window. If both the turn (`speaker_person_id`) and the cluster (`dominant_person_id`) have identities and they differ, the turn is a disagreement. Sorted by turn duration descending and capped at `DISAGREEMENT_LIMIT=50` — the top-N most airtime-significant cases is what the operator can actually action.
+
+This is the **operator worklist**. Each row is either:
+
+- A reaction shot the mouth-opening ASD let through (face was on screen during someone else's monologue and happened to clear the mouth-open density gate) — face cluster identity is correct but visual ID over-attributed.
+- A wrong voice attribution (voice cluster bulk-assigned to the wrong Person) — voice side needs fixing.
+- A genuine off-screen speaker — the speaking voice is correct, but the dominant on-screen face is somebody else (interviewer cutaway, B-roll, two-shot framing).
+
+The tab doesn't try to auto-resolve. The operator picks: open the turn in the Voices tab and reassign the cluster, or open the face overlay and click-correct the specific frame. Per-turn correction at this granularity is high-leverage *because* the disagreement is exactly where the modalities disagree — the rest of the source can be left alone.
+
+### Concrete wins
+
+1. **One-shot dual assign.** When `dominant_pairings` shows a high-confidence pair where one side has a name and the other doesn't, the UI can offer "Assign both to <Person>" in a single action. Today this is one click on each tab; the alignment view is the data behind making it one click total.
+
+2. **Disagreement review.** Concentrates operator attention on exactly the turns where face and voice disagree. Way higher signal-density than scrolling either tab top-to-bottom.
+
+3. **Asymmetric error correction.** A `match_method='face'` turn (visual-only fired, voice was NULL) whose face cluster's *aligned* voice cluster has a different dominant Person is almost certainly a reaction-shot false positive. A backfill job could drop those attributions automatically. Cluster-level fusion is more trustworthy than per-turn fusion because it pools evidence across an entire identity, not a single frame.
+
+### Limitations
+
+- **Read-only today.** Acting on a disagreement still requires opening the per-modality tab. The one-shot dual assign + auto-drop-asymmetric-errors actions are next on the backlog.
+- **Per-source.** Same-Person clusters across episodes aren't aligned here. Cross-source identity propagation is a separate problem and depends on the registry growing via the Faces/Voices tabs.
+- **Matrix capped at 8×8 in the UI** — bigger sources omit trailing clusters from the table. The endpoint returns everything; the UI is just opinionated about display density.
+
+---
+
 ## Backlog
 
 - **Real audio-sync ASD model.** The mouth-opening heuristic gets us from 55 % → 77 % visual precision but misses reaction-shot false positives (laughing during someone else's monologue still passes the density gate). A model that takes face crops + audio mel-spectrograms and predicts speaking probability (Light-ASD, TalkNet, LoCoNet) would close the remaining gap. None are pip-packaged — they'd need vendoring.
