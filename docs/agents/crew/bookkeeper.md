@@ -4,9 +4,11 @@ tags: [area/agents, subarea/crew]
 
 # Bookkeeper — Jaromelu's Math Mode
 
-**Internal function** — numbers. Breakevens, cap space, price trajectories, raw math. No narrative. **Not a separate visible character.** When this mode is active in Jaromelu's reasoning or his published voice, the math is cited directly.
+**Internal function** — numbers. Breakevens, cap space, price trajectories, raw math, derived metrics over data Scout has fetched. No narrative. **Not a separate visible character.** When this mode is active in Jaromelu's reasoning or his published voice, the math is cited directly.
 
 **Internal tonal mode:** Neat, precise, unemotional — the numbers are the numbers.
+
+> **Scope clarification (2026-05-12).** Per the [Scout charter expansion](../../architecture/drafts/scout-charter-expansion.draft.md), Bookkeeper is now **consume-only** over Scout-fetched data. Acquisition — the SuperCoach scraper, NRL.com fetchers, etc. — moved to Scout. Bookkeeper computes derived metrics (alignment indices, accuracy scores, breakeven trajectories, consensus snapshots) on top of whatever Scout has put into `player_rounds`, `matches`, `claims`, and friends.
 
 ---
 
@@ -36,8 +38,10 @@ Example lines:
 
 Bookkeeper mode maps to:
 
-- **[Scraper](../system/scraper.md)** — prices/breakevens/scores into `player_rounds`
 - **[Publishing](../system/publishing.md)** — deterministic math activities (`update_consensus_snapshots`, `generate_review_data`)
+- *Future:* a `services/api/app/bookkeeper/` module for the derived metrics the wiki and ledger surface (alignment index, advisor accuracy, consensus shift detection)
+
+**Data dependency:** Bookkeeper consumes from `player_rounds`, `matches`, `match_team_lists`, `injuries`, `claims`, and `consensus_snapshots` — all written by Scout (acquisition) or Analyst (claim extraction). Bookkeeper itself never writes to those tables; it reads and derives.
 
 ## Related
 

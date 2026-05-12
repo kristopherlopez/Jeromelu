@@ -4,24 +4,26 @@ tags: [area/agents, subarea/crew]
 
 # Scout — Jaromelu's Inventory Mode
 
-**Role:** Acquire and maintain the raw NRL media inventory across every supported platform. **Scout is the *Extract* in the system's ETL** — it pulls raw bytes from external sources and persists them as-is. **It does no Transformation** (no cleaning, parsing, diarisation, embedding, normalisation, or interpretation). Those are downstream agents.
+> **Charter expansion (2026-05-12).** Scout's scope is being formally expanded from *media inventory* to *all external data acquisition* per the [Scout charter expansion](../../architecture/drafts/scout-charter-expansion.draft.md) (decisions D1–D7 locked). The doc below reflects the **expanded charter**; some sections describe modules that are still in design (SuperCoach roster + stats, NRL.com fetchers for matches, team lists, injuries, rounds). Media-acquisition content is shipped today; data-acquisition content is in design.
 
-Scope is everything from *we don't know about this source* to *raw transcripts persisted in the database*. Stops at the raw layer.
+**Role:** Acquire and maintain Jeromelu's raw inventory across every external source of truth — NRL media (podcasts, video, blogs, web) and NRL data (SuperCoach API, NRL.com endpoints, league feeds). **Scout is the *Extract* in the system's ETL** — it pulls raw bytes from external sources and persists them as-is. **It does no Transformation** (no cleaning, parsing, diarisation, embedding, normalisation, or interpretation). Those are downstream agents.
+
+Scope is everything from *we don't know about this source* to *raw rows persisted in the database*. Stops at the raw layer.
 
 **Not a separate visible character.** When this mode is active, Jaromelu's voice (and the UI activity status) reflects it. Scout files inventory reports only — claims, contradictions, calls are all downstream.
 
 |                       |                                                                                                                                                              |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Type**              | Crew mode (internal reasoning)                                                                                                                               |
+| **Type**              | Crew mode (internal reasoning) + data-acquisition worker                                                                                                     |
 | **ETL role**          | **Extract only.** No Transform. (Cleaning, diarisation, parsing, embedding, normalisation are all downstream.)                                               |
-| **Scope**             | Discovery · post-approval enumeration · metadata refresh · raw transcript pull                                                                               |
-| **Status**            | **Shipped:** agentic discovery, recon API, post-approval enumeration, daily video-stats refresh. **In design:** deterministic discovery surface.            |
-| **Platform coverage** | YouTube only today. Schema (`scout_candidates.platform`, `sources.platform`) is platform-agnostic; podcasts (RSS), Twitter/X, blogs, and Reddit are backlog. |
-| **Code**              | `services/api/app/scout/` — discovery agent (`loop.py`, `prompt.py`, `tools.py`), enumeration / refresh (`refresh.py`), audio acquisition (`audio.py`). Transcription / diarisation is Analyst's surface — `services/api/app/analyst/transcribe.py`. Legacy: `services/worker-ingestion/` (Temporal, superseded).                                                                  |
-| **Trigger**           | Manual CLI: `python -m app.scout.cli`. Scheduled runs and live SSE stream are planned.                                                                       |
-| **Model**             | `claude-sonnet-4-6` via Claude Agent SDK (agentic surface only)                                                                                              |
-| **Audit**             | `agent_runs` + `agent_events` + S3 JSONL, `agent_id='scout'` ([pattern](../system/agent-audit.md))                                                           |
-| **Spec**              | [Source discovery](../system/source-discovery.md), [Ingestion](../system/ingestion.md)                                                                       |
+| **Scope**             | Media discovery + enumeration + raw transcript pull · SuperCoach roster + stats · NRL.com matches / team lists / injuries / rounds · future: podcasts, Twitter/X, blogs, Reddit |
+| **Status**            | **Media side shipped:** agentic discovery, recon API, post-approval enumeration, daily video-stats refresh. **Data side in design:** per the charter expansion, SuperCoach + NRL.com fetchers migrate from `scripts/data/fetchers/` and `services/worker-scraper/` into `services/api/app/scout/data/`.                                  |
+| **Platform coverage** | Media: YouTube only today; podcasts/RSS/Twitter/blogs/Reddit on backlog. Data: SuperCoach API + NRL.com endpoints land in the charter rollout.            |
+| **Code**              | `services/api/app/scout/` — media-discovery agent (`loop.py`, `prompt.py`, `tools.py`), enumeration / refresh (`refresh.py`), audio acquisition (`audio.py`). **Data acquisition** modules will land under `scout/data/` (`supercoach_roster.py`, `supercoach_stats.py`, `nrlcom_matches.py`, `nrlcom_teamlists.py`, `nrlcom_injuries.py`, `nrlcom_rounds.py`). Transcription / diarisation is Analyst's surface — `services/api/app/analyst/transcribe.py`. Legacy: `services/worker-ingestion/` and `services/worker-scraper/` (Temporal, both superseded). |
+| **Trigger**           | Media-discovery agent: manual CLI `python -m app.scout.cli`. Deterministic pipelines (media refresh + all data acquisition modules): `POST /api/admin/scout/<pipeline>` admin endpoints driven by external cron. |
+| **Model**             | `claude-sonnet-4-6` via Claude Agent SDK (agentic discovery surface only; data-acquisition modules are deterministic, no LLM)                                |
+| **Audit**             | `agent_runs` + `agent_events` + S3 JSONL, `agent_id='scout'` for everything; pipeline distinguished via `detail_json.pipeline` (`media-discovery`, `supercoach-stats`, `nrlcom-teamlists`, …) per D6. See [`agent-audit.md`](../system/agent-audit.md). |
+| **Spec**              | [Source discovery](../system/source-discovery.md), [Ingestion](../system/ingestion.md), [Scout charter expansion (draft)](../../architecture/drafts/scout-charter-expansion.draft.md)                                                    |
 
 ---
 
@@ -37,12 +39,14 @@ Scout       →  Analyst    →  Bookkeeper + Critic  →  Jaromelu
 
 | Stage | Crew mode | System agent | What it does | Status |
 |---|---|---|---|---|
-| **Acquire** | **Scout** *(this doc)* | [source-discovery](../system/source-discovery.md), [ingestion](../system/ingestion.md) | Discover sources, enumerate their content, refresh metadata, pull transcripts | Shipped (YouTube only) |
+| **Acquire** | **Scout** *(this doc)* | [source-discovery](../system/source-discovery.md), [ingestion](../system/ingestion.md), `scout/data/*` (in design per charter expansion) | Discover sources, enumerate content, refresh metadata, pull transcripts. **Also:** fetch SuperCoach roster + stats, NRL.com matches / team lists / injuries / rounds. | Media: shipped (YouTube). Data: in design — fetcher code exists in `scripts/data/fetchers/` and `services/worker-scraper/`, migrating to `scout/data/` per the charter expansion. |
 | Extract | [Analyst](analyst.md) | [extraction](../system/extraction.md) (today via [Transcript Pipeline skill](../skills/transcript-pipeline.md)) | Turn raw content into entities, quotes, claims; cross-reference for contradictions | Skill-based today; worker not built |
-| Decide | [Bookkeeper](bookkeeper.md) + [Critic](critic.md) | [decision](../system/decision.md), [scraper](../system/scraper.md) (SuperCoach + fixtures) | Acquire and apply numbers (breakevens, cap, fixtures), rank, challenge thin evidence | Scraper partial; decision worker not built |
+| Derive | [Bookkeeper](bookkeeper.md) + [Critic](critic.md) | [decision](../system/decision.md) | Apply math to Scout-fetched numbers (breakevens, cap, alignment indices, consensus snapshots), rank, challenge thin evidence. Acquisition itself is now Scout's per the charter expansion. | Decision worker not built; derived metrics partial |
 | Voice | [Jaromelu](jaromelu.md) | [publishing](../system/publishing.md) | Integrate everything, commit to a call, publish in the on-screen voice | Live |
 
 ### What Scout DOES cover
+
+**Media acquisition (shipped):**
 
 1. **Discovering new channels** across platforms — deterministic YouTube-native search (§3.1, in design) for the bulk case; agentic web hunt today (§3.2, shipped) for off-platform / long-tail. YouTube only today; podcasts / Twitter / blogs / Reddit on backlog.
 2. **Enumerating new sources from approved channels** — synchronous uploads-playlist walk on approval (§3.3, shipped) plus incremental daily enumeration of fresh uploads on tracked channels (§3.4, shipped).
@@ -51,6 +55,17 @@ Scout       →  Analyst    →  Bookkeeper + Critic  →  Jaromelu
 5. **Refreshing channel-level metadata** — sub count, total views, video count, name changes, active/inactive detection. *Planned* — currently `channel_metrics` is only written at approval time, not periodically refreshed.
 6. **Source health / liveness monitoring** — detecting stalled channels, 404 sources, transcript fetch failures, caption regenerations. *Backlog* — not built.
 7. **Multi-platform expansion** — instantiate the same shape (discovery → approval → enumerate → refresh → extract) for podcasts (RSS), Twitter/X, blogs/news, Reddit. *Backlog* — schema is platform-agnostic; code is YouTube-only.
+
+**Data acquisition (in design per the charter expansion):**
+
+Each pipeline lives as a module under `services/api/app/scout/data/`, fronted by a `POST /api/admin/scout/<pipeline>` admin endpoint driven by cron. All write under `agent_id='scout'` with `detail_json.pipeline=<name>`. Idempotency contract per D7 of the charter draft.
+
+8. **SuperCoach player roster** — refresh `people`, `people_attributes`, `people_roles` from SuperCoach API. *Phase 1.*
+9. **SuperCoach per-round stats** — pull stats per round into `player_rounds`. **Highest-leverage pipeline** for the wiki since it unblocks every player page's `## Current Form` and `## Price Analysis`. *Phase 2.*
+10. **NRL.com matches + draw** — populate `matches` from the NRL.com draw and match-centre endpoints. *Phase 3.*
+11. **NRL.com team lists** — populate `match_team_lists` from NRL.com team-list endpoints. *Phase 3.*
+12. **NRL.com casualty ward** — new pipeline, populates `injuries` from the public casualty-ward JSON. *Phase 4.*
+13. **NRL.com round metadata** — new pipeline, populates `rounds` from the draw endpoint. *Phase 4.*
 
 ### What Scout DOES NOT cover
 
@@ -64,22 +79,38 @@ Per the **Extract-only** rule, anything that interprets, structures, or enriches
 - **Annotations** (`source_annotations`) — sentiment, sub-topic tags, entity mentions, themes.
 - **Parsing content for meaning** — entity extraction, claim detection, quote pulls. That's [Analyst](analyst.md) ([extraction](../system/extraction.md)).
 - **Cross-source consensus or contradiction detection** — Scout reports "5 sources covered the trade"; Analyst reports "4 say sell, 1 says hold."
-- **Numeric NRL data** — SuperCoach scores/prices/breakevens, fixtures, match results. The crew split is *text inventory* (Scout) vs *numeric inventory* ([Bookkeeper](bookkeeper.md) via [scraper](../system/scraper.md)).
-- **Player roster registry / SCD-2 attribute tracking** — that's [player-roster](../system/player-roster.md), feeding the entity layer Analyst uses.
+- **Derived metrics** — alignment indices, advisor accuracy, consensus snapshots, breakeven trajectories. Those are derivations over Scout-fetched data — owned by [Bookkeeper](bookkeeper.md).
+
+*Previously out-of-scope but now in-scope under the [charter expansion](../../architecture/drafts/scout-charter-expansion.draft.md):* Numeric NRL data (SuperCoach scores/prices/breakevens, fixtures, match results, injuries, draw) and player roster registry. The acquisition of these moves to Scout; their derivation and math stay with Bookkeeper.
 
 ### Hand-off contract
 
-Scout's outputs are raw inventory rows only — Extract + Load, never Transform. The full chain Scout owns is `scout_candidates → channels → sources → source_documents → source_chunks`, plus the time-series metadata snapshots.
+Scout's outputs are raw inventory rows only — Extract + Load, never Transform. The full chain Scout owns spans **media** (`scout_candidates → channels → sources → audio`) and **data** (`people / people_attributes / player_rounds / matches / match_team_lists / injuries / rounds`).
 
-| Table | What Scout writes | What Scout does **not** write (filled in by Transform) |
+**Media writes:**
+
+| Table | What Scout writes | What Scout does **not** write |
 |---|---|---|
 | `scout_candidates` | Full row at discovery (kind, title, score, content_categories, score_reasons, run_id, `status='pending'`) | — |
 | `channels` | Full row at approval | — |
 | `sources` | Full row at enumeration (`source_type`, title, canonical_url, `approved_flag=true`, `ingestion_status='pending'`) | — |
-| `sources.audio_s3_key` + `ingestion_status='collected'` | Set on successful audio acquisition (§3.5) | `transcription_status`, `extraction_method` (Transform: Analyst transcription) |
+| `sources.audio_s3_key` + `ingestion_status='collected'` | Set on successful audio acquisition (§3.5) | `transcription_status`, `extraction_method` (Analyst) |
 | `channel_metrics` / `video_metrics` | Full row per snapshot | — |
 
-Scout writes **nothing** to `source_documents`, `source_speakers`, `source_chunks` (those are Analyst's transcription writes), `source_chapters` (semantic chapters), `source_annotations` (sentiment, mentions, themes), `quotes`, `claims`, `claim_chunks`, or any reasoning/output table. If a Scout-voiced UI line mentions parsed content (e.g. *"deep dive on Munster"*), that content was generated by a downstream agent and is being *surfaced through* Scout's voice mode — not produced by Scout itself.
+**Data writes (per the charter expansion):**
+
+| Table | What Scout writes | Module | Phase |
+|---|---|---|---|
+| `people` | Roster upsert from SuperCoach | `scout/data/supercoach_roster.py` | 1 |
+| `people_attributes` | Position, height, weight, contract from SuperCoach | `scout/data/supercoach_roster.py` | 1 |
+| `people_roles` | Primary role from SuperCoach (players today; advisors later via Analyst) | `scout/data/supercoach_roster.py` | 1 |
+| `player_rounds` | Per-round stats from SuperCoach | `scout/data/supercoach_stats.py` | 2 |
+| `matches` | Fixtures + results from NRL.com draw + match centre | `scout/data/nrlcom_matches.py` | 3 |
+| `match_team_lists` | Lineups from NRL.com team-list endpoint | `scout/data/nrlcom_teamlists.py` | 3 |
+| `injuries` | Casualty-ward state from NRL.com | `scout/data/nrlcom_injuries.py` | 4 (new pipeline) |
+| `rounds` | Round metadata from NRL.com draw | `scout/data/nrlcom_rounds.py` | 4 (new pipeline) |
+
+Scout writes **nothing** to `source_documents`, `source_speakers`, `source_chunks` (Analyst's transcription writes), `source_chapters`, `source_annotations`, `quotes`, `claims`, `claim_chunks`, `claim_associations`, `consensus_snapshots`, `predictions`, `decisions`, `wiki_pages`, or any reasoning/output table. If a Scout-voiced UI line mentions parsed content (e.g. *"deep dive on Munster"*), that content was generated by a downstream agent and is being *surfaced through* Scout's voice mode — not produced by Scout itself.
 
 ---
 

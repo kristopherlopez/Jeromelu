@@ -186,7 +186,7 @@ The Extract-only rule still applies — Scout fetches raw, Analyst transforms:
 - The fetcher scripts under `scripts/data/fetchers/` should migrate into `services/api/app/scout/` (or a new `services/api/app/scout/data/` subdirectory) to live alongside the existing media-inventory code.
 - Audit pattern (`agent_runs` with `agent_id='scout'`) extends to all acquisition pipelines, giving us one dashboard for "is data acquisition healthy?"
 
-This is a significant scope expansion and warrants its own draft proposal. **Tracked as a follow-up:** [Scout charter expansion (proposed)](../../architecture/drafts/scout-charter-expansion.draft.md) — *not yet written.*
+This scope expansion is formalised in [`scout-charter-expansion.draft.md`](../../architecture/drafts/scout-charter-expansion.draft.md), with decisions D1–D7 locked 2026-05-12. Phase 0 (the doc reconciliation across `scout.md`, `scraper.md`, `bookkeeper.md`, `crew/README.md`, `dynamics.md`) lands alongside this update; the migration phases follow.
 
 ---
 
@@ -245,7 +245,7 @@ If the Scout-charter expansion is approved, the following docs need updating as 
 | [`docs/agents/crew/bookkeeper.md`](../../agents/crew/bookkeeper.md) | Scope clarification: Bookkeeper is consume-only over the data Scout fetches. |
 | [`docs/agents/crew/README.md`](../../agents/crew/README.md) | Update the Bookkeeper one-liner to reflect consume-only scope. |
 | [`docs/agents/crew/dynamics.md`](../../agents/crew/dynamics.md) | Cadence table — Bookkeeper trigger becomes "Scout scrape complete" instead of "scraper sweep complete". |
-| New: `docs/architecture/drafts/scout-charter-expansion.draft.md` | The proposal doc that this doc currently implies but doesn't write. |
+| [`docs/architecture/drafts/scout-charter-expansion.draft.md`](../../architecture/drafts/scout-charter-expansion.draft.md) | ✅ Created 2026-05-12; decisions locked. Phase 0 reconciliation lands alongside this row. |
 | Eventually: `docs/agents/crew/archivist.md` "Hand-off contract" reads | The `claims`/`player_rounds`/`teamlists` rows the Archivist consumes will all be Scout-produced under the new model. Footnote the source. |
 
 ---

@@ -72,7 +72,7 @@ The cadence of internal reasoning maps to system events, not to on-screen beats:
 |---|---|---|
 | Scout | New transcript discovered / source added | "Jaromelu found new sources / new takes" — published as a Jaromelu update in the feed |
 | Analyst | Extraction worker output | Numbers / claims cited in Jaromelu's next Remark |
-| Bookkeeper | Scraper sweep complete | Numbers cited inline in Jaromelu's next Remark |
+| Bookkeeper | Scout scrape complete | Numbers cited inline in Jaromelu's next Remark |
 | Critic | Pre-publish gate on a draft Remark | Self-aware framing in the final voice ("almost talked myself out of it") |
 | Jaromelu | Decision worker commits | Remark card publishes |
 | **Archivist** *(out-of-band)* | New claims / stats / team lists / Remarks land | Wiki page rewrites, surfaced in `/wiki` and the activity Feed (revisions) |
