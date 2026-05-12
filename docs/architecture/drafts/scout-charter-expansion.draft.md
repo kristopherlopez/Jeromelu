@@ -41,7 +41,7 @@ A future Phase 5 could replace external cron with an in-process APScheduler if c
 
 ### D4. Disposition of `services/worker-scraper/`
 
-**Recommendation: migrate the activities into `services/api/app/scout/data/` as plain functions; retire the Temporal worker.** Per project memory, Temporal is not in production. The activities (`teamlists.py` and any siblings) become module-level functions called from admin endpoints under the unified Scout audit pattern. The `worker-scraper` directory stays in tree for a phase, with no new code, and is retired in Phase 4.
+**Recommendation: migrate the activities into per-pipeline folders under `services/api/app/scout/` per D9; retire the Temporal worker.** Per project memory, Temporal is not in production. The activities (`teamlists.py` and any siblings) become module-level functions inside the relevant pipeline folder (`scout/nrlcom_teamlists/fetcher.py`, etc.), called from admin endpoints under the unified Scout audit pattern. The `worker-scraper` directory stays in tree for a phase, with no new code, and is retired in Phase 4.
 
 ### D5. Skills disposition
 
@@ -73,7 +73,7 @@ Tied to D2 — single `agent_id='scout'`, pipeline discriminator in `detail_json
 
 **Why:** External sources (`nrl.com`, `supercoach.com.au`, `nrlsupercoachstats.com`, Zero Tackle) are out of our control. Silent degradation — e.g. a renamed field becoming null in every row — would propagate wrong/incomplete content downstream into the wiki. The user wants to be the one who decides the response: rewrite the parser, wait for the source to revert, accept the change, switch sources.
 
-**Concrete contract** (applies to every module under `services/api/app/scout/data/`):
+**Concrete contract** (applies to every pipeline folder under `services/api/app/scout/`):
 
 1. **Fixture in repo.** Each module ships with `tests/fixtures/scout/<pipeline>/canonical_response.json` — a known-good sample of the upstream response.
 2. **Strict Pydantic parsing.** Response models use `Config.extra = 'forbid'` so unknown fields raise rather than getting silently dropped.
@@ -82,6 +82,41 @@ Tied to D2 — single `agent_id='scout'`, pipeline discriminator in `detail_json
 5. **Drift surfaces to a human.** Either CI runs the live-mode drift tests on a schedule, or a separate cron pings the live endpoint and runs the parser. Failures go to the user, not into a silent log.
 
 This decision tightens the mitigation language that was previously in Risk #4 ("logs unknown fields rather than crashing") into a hard requirement.
+
+### D9. Code organisation — folder per pipeline
+
+**Decision (locked 2026-05-12):** Each Scout pipeline lives in its own folder under `services/api/app/scout/<pipeline_name>/`. The folder contains every concern that pipeline owns: fetcher logic, Pydantic models, admin endpoint, per-pipeline README.
+
+**Why:** Each pipeline has multiple concerns (fetch + parse + persist + endpoint + drift fixture + tests). Packing them into a single `.py` either bloats the file or scatters concerns across the tree. The test layout already uses folder-per-pipeline (`tests/fixtures/scout/<pipeline>/`, `tests/integration/scout/<pipeline>/`), so flat source files would create asymmetry. New module = `cp -r` an existing one and edit; the folder *is* the template.
+
+**Naming convention:**
+
+- Python paths (module folder, Python identifiers, test folder): **snake_case** — e.g. `supercoach_roster`.
+- URL paths and pipeline labels (`detail_json.pipeline`, admin endpoint URL, `make` target): **kebab-case** — e.g. `supercoach-roster`.
+- The two are 1:1 translations. Code that wants the pipeline label from the module name does `module.__name__.split('.')[-1].replace('_', '-')`.
+
+**Source layout per pipeline:**
+
+```
+services/api/app/scout/supercoach_roster/
+├── __init__.py          # public exports
+├── fetcher.py           # the fetch function (HTTP, parsing)
+├── models.py            # Pydantic strict models (Config.extra = 'forbid')
+├── routes.py            # admin endpoint (POST /api/admin/scout/supercoach-roster)
+└── README.md            # source, cadence, natural key, ownership
+```
+
+**Test layout mirrors source:**
+
+```
+tests/fixtures/scout/supercoach_roster/canonical_response.json
+tests/unit/api/scout/supercoach_roster/test_fetcher.py
+tests/unit/api/scout/supercoach_roster/test_models.py
+tests/integration/scout/supercoach_roster/test_response_shape.py
+tests/integration/scout/supercoach_roster/test_endpoint.py
+```
+
+**Out of scope for this charter:** Migrating the existing flat media-discovery files (`loop.py`, `refresh.py`, `audio.py`, `video.py`, `presenters.py`, `youtube_api.py`) into `scout/media/`. That refactor has no functional change; the new convention coexists with the legacy flat files until the media migration happens as separate work. The asymmetry is temporary and self-documenting — anything in a folder follows the new convention; anything flat at the top level is legacy media discovery on the migration roadmap.
 
 ---
 
@@ -94,12 +129,12 @@ This decision tightens the mitigation language that was previously in Risk #4 ("
 | Media discovery (YouTube) | YouTube Data API + web | `services/api/app/scout/loop.py`, `refresh.py` | ✅ shipped |
 | Audio acquisition | yt-dlp | `services/api/app/scout/audio.py` | ✅ shipped |
 | Video metadata refresh | YouTube Data API | `services/api/app/scout/refresh.py` | ✅ shipped |
-| **SuperCoach player roster** | SuperCoach API | move from `scripts/data/fetchers/fetch_supercoach_players.py` → `services/api/app/scout/data/supercoach_roster.py` | 🟡 fetcher exists, not endpoint-wrapped |
-| **SuperCoach per-round stats** | SuperCoach API | move from `scripts/data/fetchers/fetch_player_stats.py` + `worker-scraper` → `scout/data/supercoach_stats.py` | 🟡 fetcher exists, not endpoint-wrapped |
-| **NRL.com matches + draw** | nrl.com `/draw/data`, match-centre `/data` | move from `scripts/data/fetchers/fetch_match_stats.py` → `scout/data/nrlcom_matches.py` | 🟡 fetcher exists, not endpoint-wrapped |
-| **NRL.com team lists** | nrl.com `/teamlists/data` | move from `scripts/data/fetchers/fetch_teamlists.py` + `worker-scraper/teamlists.py` → `scout/data/nrlcom_teamlists.py` | 🟡 fetcher exists, not endpoint-wrapped |
-| **NRL.com casualty ward** | nrl.com `/casualty-ward/data` | new `scout/data/nrlcom_injuries.py` | ❌ not built |
-| **NRL.com round metadata** | nrl.com `/draw/data` (round-level) | new `scout/data/nrlcom_rounds.py` | ❌ not built |
+| **SuperCoach player roster** | SuperCoach API | move from `scripts/data/fetchers/fetch_supercoach_players.py` → `services/api/app/scout/supercoach_roster/` | 🟡 fetcher exists, not folder-organised, not audit-wrapped |
+| **SuperCoach per-round stats** | SuperCoach API | move from `scripts/data/fetchers/fetch_player_stats.py` + `worker-scraper` → `services/api/app/scout/supercoach_stats/` | 🟡 fetcher exists, not folder-organised, not audit-wrapped |
+| **NRL.com matches + draw** | nrl.com `/draw/data`, match-centre `/data` | move from `scripts/data/fetchers/fetch_match_stats.py` → `services/api/app/scout/nrlcom_matches/` | 🟡 fetcher exists, not folder-organised, not audit-wrapped |
+| **NRL.com team lists** | nrl.com `/teamlists/data` | move from `scripts/data/fetchers/fetch_teamlists.py` + `worker-scraper/teamlists.py` → `services/api/app/scout/nrlcom_teamlists/` | 🟡 fetcher exists, not folder-organised, not audit-wrapped |
+| **NRL.com casualty ward** | nrl.com `/casualty-ward/data` | new `services/api/app/scout/nrlcom_injuries/` | ❌ not built |
+| **NRL.com round metadata** | nrl.com `/draw/data` (round-level) | new `services/api/app/scout/nrlcom_rounds/` | ❌ not built |
 | Future: podcasts, Twitter/X, blogs, Reddit | RSS / API / web | backlog | ❌ scope only |
 
 ### What Scout still does NOT do (Extract-only rule, unchanged)
@@ -122,24 +157,22 @@ The Extract-only rule is the spine of the charter — Scout fetches raw, persist
 External world
        │
        ▼
-┌──────────────────────────────────────────────┐
-│ Scout (one agent identity, many modules)     │
-│                                              │
-│  Media:                                      │
-│    • discovery (loop.py + refresh.py)        │
-│    • audio acquisition (audio.py)            │
-│    • metadata refresh                        │
-│                                              │
-│  Identity:                                   │
-│    • supercoach_roster.py  (NEW)             │
-│                                              │
-│  Stats / fixtures:                           │
-│    • supercoach_stats.py    (NEW)            │
-│    • nrlcom_matches.py      (NEW)            │
-│    • nrlcom_teamlists.py    (NEW)            │
-│    • nrlcom_injuries.py     (NEW)            │
-│    • nrlcom_rounds.py       (NEW)            │
-└──────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│ Scout (one agent identity, many modules)         │
+│                                                  │
+│  Media (legacy flat files, scout/media/ later):  │
+│    • discovery (loop.py + refresh.py)            │
+│    • audio acquisition (audio.py)                │
+│    • metadata refresh                            │
+│                                                  │
+│  Data (folder per pipeline, per D9):             │
+│    • scout/supercoach_roster/    (NEW)           │
+│    • scout/supercoach_stats/     (NEW)           │
+│    • scout/nrlcom_matches/       (NEW)           │
+│    • scout/nrlcom_teamlists/     (NEW)           │
+│    • scout/nrlcom_injuries/      (NEW)           │
+│    • scout/nrlcom_rounds/        (NEW)           │
+└──────────────────────────────────────────────────┘
        │
        ▼
    Raw tables (sources, people, player_rounds, …)
@@ -180,8 +213,8 @@ This is the pattern Scout's media side already follows; the expansion just insta
 
 Pick the smallest pipeline: **SuperCoach player roster**. It already has a working fetcher script and a skill (to be retired).
 
-- Move `scripts/data/fetchers/fetch_supercoach_players.py` → `services/api/app/scout/data/supercoach_roster.py` as a callable function (no behavioural changes).
-- **Add the D8 drift fixture and test:** `tests/fixtures/scout/supercoach-roster/canonical_response.json` + `tests/integration/scout/supercoach-roster/test_response_shape.py` (Pydantic-strict, live-mode env-flagged). This is the pattern every subsequent pipeline copies — getting it right on Phase 1 means it's cheap to apply for Phases 2-4.
+- Move `scripts/data/fetchers/fetch_supercoach_players.py` → `services/api/app/scout/supercoach_roster/` (folder per D9) as a callable function (no behavioural changes).
+- **Add the D8 drift fixture and test:** `tests/fixtures/scout/supercoach_roster/canonical_response.json` + `tests/integration/scout/supercoach_roster/test_response_shape.py` (Pydantic-strict, live-mode env-flagged). This is the pattern every subsequent pipeline copies — getting it right on Phase 1 means it's cheap to apply for Phases 2-4.
 - Add `POST /api/admin/scout/supercoach-roster` endpoint that wraps the function in the agent audit pattern.
 - Add a `make scout-supercoach-roster` target for ad-hoc operator runs that hits the endpoint with admin auth.
 - Retire the `scrape-supercoach` Claude Code skill — operators use the endpoint or the `make` target.
@@ -192,13 +225,13 @@ Pick the smallest pipeline: **SuperCoach player roster**. It already has a worki
 
 Same pattern applied to `fetch_player_stats.py`. This is the **highest-leverage move on the entire roadmap** — it's what unblocks `player_rounds` from being empty and turns 600+ wiki stubs into pages with actual `## Current Form` and `## Price Analysis` content.
 
-- Move into `scout/data/supercoach_stats.py`.
+- Move into `services/api/app/scout/supercoach_stats/` (folder per D9).
 - Admin endpoint + cron (post-round cadence, plus on-demand for re-pulls).
 - The existing `services/worker-scraper/` Temporal worker can stop being touched after this; its activities are now sibling Scout modules.
 
 ### Phase 3 — NRL.com fetchers (matches + team lists)
 
-Migrate `fetch_match_stats.py` and `fetch_teamlists.py` into `scout/data/nrlcom_matches.py` and `scout/data/nrlcom_teamlists.py`. Same endpoint/cron pattern.
+Migrate `fetch_match_stats.py` and `fetch_teamlists.py` into `scout/nrlcom_matches/` and `scout/nrlcom_teamlists/` (folders per D9). Same endpoint/cron pattern.
 
 This unblocks team pages (`## Recent Results`, `## Key Players`) and round pages (`## Team Lists`, `## Results`).
 
@@ -216,7 +249,7 @@ This phase isn't blocked by anything earlier; could ship in parallel with Phase 
 
 ### Phase 6 (future) — Multi-platform expansion
 
-The roadmap items in [`scout.md` §4 "Multi-platform expansion"](../../agents/crew/scout.md) (podcasts, Twitter/X, blogs, Reddit) instantiate the same shape: each becomes a `scout/data/<platform>_<thing>.py` module with an admin endpoint. Out of scope for this draft; tracked for visibility.
+The roadmap items in [`scout.md` §4 "Multi-platform expansion"](../../agents/crew/scout.md) (podcasts, Twitter/X, blogs, Reddit) instantiate the same shape: each becomes a `scout/<platform>_<thing>/` folder with an admin endpoint. Out of scope for this draft; tracked for visibility.
 
 ---
 
@@ -248,8 +281,8 @@ Effectively **zero** for the deterministic pipelines (no LLM calls). The agent_a
 
 | Tier | What it covers |
 |---|---|
-| Unit (`tests/unit/api/scout/data/`) | Each module's response parser + upsert logic with a mocked HTTP client. Fast, deterministic. |
-| Integration (`tests/integration/scout/`) | Round-trip against a fixture HTTP server that serves canned SuperCoach / NRL.com responses. Validates the endpoint wrapper, audit row creation, idempotency on re-run. |
+| Unit (`tests/unit/api/scout/<pipeline>/`) | Each module's response parser + upsert logic with a mocked HTTP client. Fast, deterministic. Mirrors the source folder per D9. |
+| Integration (`tests/integration/scout/<pipeline>/`) | Round-trip against a fixture HTTP server that serves canned SuperCoach / NRL.com responses. Validates the endpoint wrapper, audit row creation, idempotency on re-run. |
 | **Drift detection** (`tests/integration/scout/<pipeline>/test_response_shape.py`) | Per D8: fixture-backed shape assertion + env-flagged live-mode variant that fetches the real endpoint. Fails on any unknown field, missing field, or type change. Live-mode runs on a schedule so upstream drift surfaces to the user, not into a silent log. |
 | Smoke (manual) | Operator runs each new endpoint once against the live source in staging; reviews the audit row and the upserted rows. |
 
@@ -259,7 +292,7 @@ No eval suite — these are deterministic fetchers. The eval suite belongs to th
 
 Each pipeline migration follows the same shape:
 
-1. Land the module in `scout/data/` with the endpoint, dry-run-tested.
+1. Land the pipeline folder under `scout/<pipeline_name>/` with the endpoint, dry-run-tested.
 2. Run live once via the endpoint, review the audit row + upserted rows by hand.
 3. Run live three more times manually, watch for unknown-field warnings.
 4. Enable cron; observe for a week.
@@ -282,7 +315,7 @@ The full list (matching [`data-feeds.md` §Documentation Updates](../../pages/wi
 | [`docs/agents/crew/dynamics.md`](../../agents/crew/dynamics.md) | Cadence: Bookkeeper trigger row updates from "scraper sweep complete" to "Scout scrape complete". |
 | [`docs/pages/wiki/data-feeds.md`](../../pages/wiki/data-feeds.md) | Replace "*proposed*" / "*tracked as a follow-up*" hedges with links to this draft and the implementing migrations as each phase ships. |
 | New: `docs/agents/system/scout-data-acquisition.md` | Companion doc to `scout.md`; operational details for each new pipeline (CLI, endpoint, cron cadence, debugging). Splits the doc weight so `scout.md` stays readable. |
-| New: `services/api/app/scout/data/README.md` | Module-layout README. |
+| New: `services/api/app/scout/README.md` | Top-level Scout README explaining the folder-per-pipeline convention (D9), how to add a new pipeline (cp -r template), and the legacy-flat-media-files exception. |
 
 ---
 

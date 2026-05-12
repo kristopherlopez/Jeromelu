@@ -4,7 +4,7 @@ tags: [area/agents, subarea/system, status/partial]
 
 # Scraper
 
-> **Reframe note (2026-05-12).** Per the [Scout charter expansion](../../architecture/drafts/scout-charter-expansion.draft.md), the scraper is a **Scout component, marked for retirement**. The Temporal-shaped `worker-scraper` is being unwound: its activities migrate into `services/api/app/scout/data/` as plain functions wrapped by admin endpoints, all writing under `agent_id='scout'` with a `detail_json.pipeline` discriminator. The "Fixture / Match / Injury sync (planned)" section below describes pipelines that are now part of Scout's expanded charter and will be built there, not as new Temporal activities. The Bookkeeper consumes the resulting `player_rounds` rows but no longer owns the acquisition.
+> **Reframe note (2026-05-12).** Per the [Scout charter expansion](../../architecture/drafts/scout-charter-expansion.draft.md), the scraper is a **Scout component, marked for retirement**. The Temporal-shaped `worker-scraper` is being unwound: its activities migrate into per-pipeline folders under `services/api/app/scout/<pipeline_name>/` (per D9), wrapped by admin endpoints, all writing under `agent_id='scout'` with a `detail_json.pipeline` discriminator. The "Fixture / Match / Injury sync (planned)" section below describes pipelines that are now part of Scout's expanded charter and will be built there, not as new Temporal activities. The Bookkeeper consumes the resulting `player_rounds` rows but no longer owns the acquisition.
 >
 > This doc remains as the historical reference for the Temporal worker until it's retired in Phase 4 of the charter rollout. New scraping work should look at [`scout.md`](../crew/scout.md) and the [charter expansion draft](../../architecture/drafts/scout-charter-expansion.draft.md), not here.
 
@@ -83,13 +83,13 @@ under the [charter expansion](../../architecture/drafts/scout-charter-expansion.
 identity with `detail_json.pipeline` discriminating. They're cron-driven
 admin endpoints, not Temporal activities.
 
-| Job | Scout module | Cadence | Source | Writes to |
+| Job | Scout module folder | Cadence | Source | Writes to |
 |---|---|---|---|---|
-| `sync_fixtures` | `scout/data/nrlcom_matches.py` | Daily 5am AEST | NRL.com draw API | `matches` (upsert on source + external id) |
-| `sync_team_lists` | `scout/data/nrlcom_teamlists.py` | Tue 1pm, Wed 6pm, Thu 6pm AEST | NRL.com match centre | `match_team_lists` (new `list_version` per pull) |
-| `sync_match_results` | `scout/data/nrlcom_matches.py` (shared module) | Hourly Fri evening → Mon noon AEST | NRL.com match centre | `matches.status/score`, late-change `match_team_lists` |
-| `sync_injuries` | `scout/data/nrlcom_injuries.py` | Daily 8am + Tue 5pm AEST | NRL.com casualty ward (primary), Zero Tackle (cross-ref) | `injuries` (append-on-change) |
-| `sync_supercoach` | `scout/data/supercoach_stats.py` | Mon / Wed / Thu | SuperCoach API | `player_rounds` (now also stamps `match_id`, `team_id`) |
+| `sync_fixtures` | `services/api/app/scout/nrlcom_matches/` | Daily 5am AEST | NRL.com draw API | `matches` (upsert on source + external id) |
+| `sync_team_lists` | `services/api/app/scout/nrlcom_teamlists/` | Tue 1pm, Wed 6pm, Thu 6pm AEST | NRL.com match centre | `match_team_lists` (new `list_version` per pull) |
+| `sync_match_results` | `services/api/app/scout/nrlcom_matches/` (shared with fixtures) | Hourly Fri evening → Mon noon AEST | NRL.com match centre | `matches.status/score`, late-change `match_team_lists` |
+| `sync_injuries` | `services/api/app/scout/nrlcom_injuries/` | Daily 8am + Tue 5pm AEST | NRL.com casualty ward (primary), Zero Tackle (cross-ref) | `injuries` (append-on-change) |
+| `sync_supercoach` | `services/api/app/scout/supercoach_stats/` | Mon / Wed / Thu | SuperCoach API | `player_rounds` (now also stamps `match_id`, `team_id`) |
 
 All five run under `agent_id='scout'` per D6 of the charter expansion;
 the `pipeline` field in `agent_runs.detail_json` is what distinguishes

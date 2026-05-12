@@ -157,16 +157,16 @@ Per [`docs/agents/crew/scout.md`](../../agents/crew/scout.md): **media inventory
 
 The proposal:
 
-| Acquisition pipeline | Source of truth | Current home | Proposed home |
+| Acquisition pipeline | Source of truth | Current home | Proposed home (per D9: folder per pipeline) |
 |---|---|---|---|
-| YouTube video discovery + audio | YouTube Data API + yt-dlp | `services/api/app/scout/` | **Scout** (no change) |
-| Podcast / RSS / blog / Twitter (future) | RSS feeds, web | Backlog | **Scout** (no change) |
-| SuperCoach player roster | SuperCoach API | `scripts/data/fetchers/fetch_supercoach_players.py` (cron-runnable via `scrape-supercoach` skill) | **Scout** (move) |
-| SuperCoach per-round stats | SuperCoach API | `scripts/data/fetchers/fetch_player_stats.py`, `services/worker-scraper/` | **Scout** (move) |
-| NRL.com fixtures + matches | nrl.com `/draw/data`, match-centre `/data` | `scripts/data/fetchers/fetch_match_stats.py` | **Scout** (move) |
-| NRL.com team lists | nrl.com `/teamlists/data` | `scripts/data/fetchers/fetch_teamlists.py`, `services/worker-scraper/app/activities/teamlists.py` | **Scout** (move) |
-| NRL.com casualty ward (injuries) | nrl.com `/casualty-ward/data` | *Not built* | **Scout** (new) |
-| NRL.com round metadata | nrl.com `/draw/data` | *Not built* | **Scout** (new) |
+| YouTube video discovery + audio | YouTube Data API + yt-dlp | `services/api/app/scout/` (flat files) | **Scout** (legacy flat files; eventual move to `scout/media/`) |
+| Podcast / RSS / blog / Twitter (future) | RSS feeds, web | Backlog | **Scout** — folder per pipeline |
+| SuperCoach player roster | SuperCoach API | `scripts/data/fetchers/fetch_supercoach_players.py` (cron-runnable via `scrape-supercoach` skill) | **`services/api/app/scout/supercoach_roster/`** |
+| SuperCoach per-round stats | SuperCoach API | `scripts/data/fetchers/fetch_player_stats.py`, `services/worker-scraper/` | **`services/api/app/scout/supercoach_stats/`** |
+| NRL.com fixtures + matches | nrl.com `/draw/data`, match-centre `/data` | `scripts/data/fetchers/fetch_match_stats.py` | **`services/api/app/scout/nrlcom_matches/`** |
+| NRL.com team lists | nrl.com `/teamlists/data` | `scripts/data/fetchers/fetch_teamlists.py`, `services/worker-scraper/app/activities/teamlists.py` | **`services/api/app/scout/nrlcom_teamlists/`** |
+| NRL.com casualty ward (injuries) | nrl.com `/casualty-ward/data` | *Not built* | **`services/api/app/scout/nrlcom_injuries/`** |
+| NRL.com round metadata | nrl.com `/draw/data` | *Not built* | **`services/api/app/scout/nrlcom_rounds/`** |
 
 ### What Scout still does NOT do (after the expansion)
 
@@ -183,7 +183,7 @@ The Extract-only rule still applies — Scout fetches raw, Analyst transforms:
 - [`scout.md`](../../agents/crew/scout.md) needs a scope rewrite: §"What Scout DOES NOT cover" currently lists "Numeric NRL data" and "Player roster registry" as out-of-scope; both move into scope.
 - [`scraper.md`](../../agents/system/scraper.md) becomes a *system component* under Scout (the `services/worker-scraper/` Temporal worker) rather than a Bookkeeper-owned subsystem. Bookkeeper consumes the data; Scout produces it.
 - The [Bookkeeper crew doc](../../agents/crew/bookkeeper.md) needs a corresponding scope clarification — it becomes a *consumer* and *math-runner*, not a fetcher.
-- The fetcher scripts under `scripts/data/fetchers/` should migrate into `services/api/app/scout/` (or a new `services/api/app/scout/data/` subdirectory) to live alongside the existing media-inventory code.
+- The fetcher scripts under `scripts/data/fetchers/` migrate into per-pipeline folders under `services/api/app/scout/<pipeline_name>/` (per D9 of the charter), each with its own fetcher, models, route, and README — alongside the legacy flat-file media-inventory code.
 - Audit pattern (`agent_runs` with `agent_id='scout'`) extends to all acquisition pipelines, giving us one dashboard for "is data acquisition healthy?"
 
 This scope expansion is formalised in [`scout-charter-expansion.draft.md`](../../architecture/drafts/scout-charter-expansion.draft.md), with decisions D1–D7 locked 2026-05-12. Phase 0 (the doc reconciliation across `scout.md`, `scraper.md`, `bookkeeper.md`, `crew/README.md`, `dynamics.md`) lands alongside this update; the migration phases follow.
@@ -225,7 +225,7 @@ The unblock order, ranked by leverage (most pages affected per unit of work):
 
 These need answers before Scout's charter expansion ships, and most influence the Archivist build downstream.
 
-1. **Where exactly does the scraper code live after the move?** `services/api/app/scout/data/` is the cleanest home structurally, but `services/worker-scraper/` already exists as its own service. Probably keep `worker-scraper` as the *runner* (cron / scheduler) and import shared logic from `scout/data/`.
+1. ~~**Where exactly does the scraper code live after the move?**~~ *Resolved (2026-05-12) by charter D9.* Each pipeline lives in its own folder under `services/api/app/scout/<pipeline_name>/`; `services/worker-scraper/` is retired in Phase 4 of the charter rollout, with no new code added.
 2. **Cron orchestration — who runs the L2 fetchers, and how often?** Today they're skill-runnable but not on a schedule. Options: (a) APScheduler in the API process, (b) the `scheduler` skill, (c) external cron on the prod box, (d) the `worker-scraper` service runs a schedule loop. Pick one and standardise.
 3. **Should fetchers populate via the same `agent_runs` audit pattern as Scout's media-discovery loops?** Yes if Scout's expanded charter is real — gives one dashboard. Means the deterministic fetcher runs need a `record_agent_started/ended` wrapper.
 4. **Does Bookkeeper become consume-only after this move?** Yes — Bookkeeper becomes a math/derivation layer over the data Scout fetches. Bookkeeper docs need updating.

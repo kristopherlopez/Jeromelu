@@ -79,13 +79,15 @@ The Scout media-discovery loop already uses this. Confirm the API.
 - **Read:** how `services/api/app/scout/loop.py` calls it — that's the canonical usage pattern.
 - **Verify:** confirm `detail_json` is a free-form JSONB the wrapper writes to (per D6, this is where `pipeline='supercoach-roster'` goes).
 
-### Step 4 — Add the audit wrapper to `fetch-and-refresh`
+### Step 4 — Create the `scout/supercoach_roster/` folder + audit wrapper
 
-The first behavioural change. Wraps the existing endpoint logic; no fetch-or-persist changes.
+The first behavioural change. Per D9, the new pipeline lives in its own folder. Wraps the existing endpoint logic; no fetch-or-persist changes.
 
-- **File:** `services/api/app/routers/players.py` (or its `fetch-and-refresh` handler)
-- **Change:** wrap the body in `record_agent_started(agent_id='scout', detail_json={'pipeline': 'supercoach-roster', 'mode': 'fetch-and-refresh'})` → call existing logic → `record_agent_ended(run_id, status='ok'|'error', detail_json={...counts...})`.
+- **New folder:** `services/api/app/scout/supercoach_roster/` with `__init__.py`, `routes.py`, `README.md`. (`fetcher.py` and `models.py` land in later steps as needed; thin wrapper is fine for now since the fetcher lives in `jeromelu_shared.players.supercoach`.)
+- **In `routes.py`:** define `POST /api/admin/scout/supercoach-roster`. Implementation wraps the existing `/api/admin/players/fetch-and-refresh` handler logic in `record_agent_started(agent_id='scout', detail_json={'pipeline': 'supercoach-roster', 'mode': 'fetch-and-refresh'})` → call existing logic → `record_agent_ended(run_id, status='ok'|'error', detail_json={...counts...})`.
 - **Counts to record in `detail_json` on completion:** `players_seen`, `players_inserted`, `players_updated_team`, `players_updated_position`, any other counts the SCD-2 logic produces.
+- **In `README.md`:** record source (supercoach.com.au players-cf endpoint), cadence (daily), natural key (`external_id` on `people`), owner (Scout).
+- **Wire the router** into the FastAPI app where other admin routers are mounted.
 - **Verify:** run the endpoint → confirm one new row in `agent_runs` with `agent_id='scout'`, `detail_json->>'pipeline' = 'supercoach-roster'`, `status='completed'`, non-null cost columns (likely $0.00).
 
 ### Step 5 — Add audit-row response to the endpoint
@@ -97,11 +99,11 @@ So the caller (cron, `make` target, operator) gets a `run_id` to track.
 
 ### Step 6 — Unit test the audit wrapper
 
-Without the LLM, without the live API.
+Without the LLM, without the live API. Test folder mirrors source folder per D9.
 
-- **File:** `tests/unit/api/scout/data/test_supercoach_roster_audit.py`
+- **File:** `tests/unit/api/scout/supercoach_roster/test_routes_audit.py`
 - **Shape:** mock `fetch_supercoach_roster` to return a small fixture; call the endpoint; assert one `agent_runs` row is written with the expected `agent_id`, `pipeline`, counts.
-- **Verify:** `pytest tests/unit/api/scout/data/test_supercoach_roster_audit.py` passes.
+- **Verify:** `pytest tests/unit/api/scout/supercoach_roster/` passes.
 
 ### Step 7 — Capture the canonical-response fixture (D8 step 1)
 
@@ -109,38 +111,40 @@ Snapshot what the upstream returns *right now*.
 
 - **Action:** run `python scripts/data/fetchers/fetch_supercoach_players.py` against the live endpoint. Capture the resulting JSON.
 - **Trim:** to a small representative sample (3–5 player rows from each team) for fixture stability and review-ability. The drift test cares about *shape* not row count.
-- **File:** `tests/fixtures/scout/supercoach-roster/canonical_response.json` — the trimmed sample, checked in.
+- **File:** `tests/fixtures/scout/supercoach_roster/canonical_response.json` — the trimmed sample, checked in. (Snake-case folder per D9 naming convention — Python identifier consistency.)
 - **Verify:** the fixture is valid JSON, ≥1 player per team in the sample.
 
 ### Step 8 — Add strict Pydantic models for the response (D8 step 2)
 
-- **File:** `packages/shared/jeromelu_shared/players/supercoach.py` (or a sibling `supercoach_models.py`)
+Models live inside the pipeline folder per D9, not in the shared package.
+
+- **File:** `services/api/app/scout/supercoach_roster/models.py`
 - **Change:** define `SuperCoachPlayer(BaseModel)` with explicit fields matching the fixture; `Config.extra = 'forbid'` so unknown fields raise.
-- **Change:** `fetch_supercoach_roster()` now returns `list[SuperCoachPlayer]` (or parses through the model internally). The downstream `refresh_roster()` adapts to the model shape.
-- **Verify:** `python -c "from jeromelu_shared.players.supercoach import fetch_supercoach_roster; fetch_supercoach_roster(season=2026)[0]"` returns a Pydantic instance.
+- **Change:** the pipeline's `fetcher.py` (also in the folder) wraps `jeromelu_shared.players.supercoach.fetch_supercoach_roster` and parses the result through the strict model before returning. The shared package stays unchanged — strict parsing is a Scout-layer concern; transcript-cleaning and other consumers of the shared package don't need it.
+- **Verify:** `python -c "from app.scout.supercoach_roster.fetcher import fetch; fetch(season=2026)[0]"` returns a Pydantic instance.
 
 ### Step 9 — Add the drift test (D8 step 3)
 
-- **File:** `tests/integration/scout/supercoach-roster/test_response_shape.py`
-- **Default mode (CI-safe):** loads `tests/fixtures/scout/supercoach-roster/canonical_response.json`, parses with the Pydantic model. Asserts no errors.
+- **File:** `tests/integration/scout/supercoach_roster/test_response_shape.py`
+- **Default mode (CI-safe):** loads `tests/fixtures/scout/supercoach_roster/canonical_response.json`, parses with the Pydantic model. Asserts no errors.
 - **Live mode (env-flagged):** when `SCOUT_DRIFT_LIVE=1`, hits the real endpoint and parses. Same assertion.
-- **Verify (fixture mode):** `pytest tests/integration/scout/supercoach-roster/` passes.
-- **Verify (live mode):** `SCOUT_DRIFT_LIVE=1 pytest tests/integration/scout/supercoach-roster/` passes against a healthy upstream.
+- **Verify (fixture mode):** `pytest tests/integration/scout/supercoach_roster/` passes.
+- **Verify (live mode):** `SCOUT_DRIFT_LIVE=1 pytest tests/integration/scout/supercoach_roster/` passes against a healthy upstream.
 
 ### Step 10 — Add intentionally-broken-fixture variant to prove the drift test fails on drift
 
 A negative test — without it, we don't know the drift detection actually triggers.
 
-- **File:** `tests/integration/scout/supercoach-roster/test_response_shape.py` adds a test that takes the canonical fixture, injects an unknown field, and asserts that parsing raises a Pydantic `ValidationError`.
+- **File:** `tests/integration/scout/supercoach_roster/test_response_shape.py` adds a test that takes the canonical fixture, injects an unknown field, and asserts that parsing raises a Pydantic `ValidationError`.
 - **Verify:** the negative test passes (parsing the broken fixture raises).
 
-### Step 11 — Alias the endpoint under `/api/admin/scout/supercoach-roster`
+### Step 11 — Mark the legacy `/api/admin/players/fetch-and-refresh` as deprecated alias
 
-Keeps the existing `/api/admin/players/fetch-and-refresh` path working for back-compat; new pipeline name is the canonical one.
+Step 4 already created the new `POST /api/admin/scout/supercoach-roster` route in `scout/supercoach_roster/routes.py`. The legacy path stays live for back-compat but is marked deprecated.
 
-- **File:** `services/api/app/routers/players.py` (or a new `scout/data/supercoach_roster.py` router that imports the existing handler)
-- **Change:** add `POST /api/admin/scout/supercoach-roster` route that calls the same handler. Document the old route as deprecated alias in code comment.
-- **Verify:** `curl -X POST $LOCAL_API/api/admin/scout/supercoach-roster -H "X-Admin-Key: $ADMIN_KEY"` returns the same shape as the old route.
+- **File:** `services/api/app/routers/players.py`
+- **Change:** add a code comment marking `/fetch-and-refresh` as a deprecated alias; optionally have it call into the new Scout route handler instead of duplicating logic.
+- **Verify:** both `curl -X POST $LOCAL_API/api/admin/scout/supercoach-roster -H "X-Admin-Key: $ADMIN_KEY"` and `curl -X POST $LOCAL_API/api/admin/players/fetch-and-refresh -H "X-Admin-Key: $ADMIN_KEY"` return the same shape and both produce `agent_runs` rows.
 
 ### Step 12 — Add `make scout-supercoach-roster` target
 
@@ -189,15 +193,16 @@ The shift from "operator runs `make fetch-players` then `make seed-players`" to 
 
 Phase 1 is **done** when all of these are true:
 
-1. `POST /api/admin/scout/supercoach-roster` exists, writes an `agent_runs` row, returns `run_id` + counts.
-2. `tests/fixtures/scout/supercoach-roster/canonical_response.json` is checked in.
-3. `pytest tests/unit/api/scout/data/test_supercoach_roster_audit.py tests/integration/scout/supercoach-roster/` is green in CI.
-4. `SCOUT_DRIFT_LIVE=1 pytest tests/integration/scout/supercoach-roster/` is green against the live upstream.
-5. The drift negative test (broken fixture) fails parsing as expected.
-6. `make scout-supercoach-roster` works from local and prod.
-7. `.claude/skills/scrape-supercoach/` is deleted.
-8. A daily cron is scheduled and has produced at least one `agent_runs` row.
-9. After 3 days of observation, `people`/`people_attributes` are healthy and no drift-test failures.
+1. `POST /api/admin/scout/supercoach-roster` exists (handled by `services/api/app/scout/supercoach_roster/routes.py`), writes an `agent_runs` row, returns `run_id` + counts.
+2. `services/api/app/scout/supercoach_roster/` folder exists with `__init__.py`, `routes.py`, `models.py`, `README.md` (and `fetcher.py` if non-trivial wrapping is needed).
+3. `tests/fixtures/scout/supercoach_roster/canonical_response.json` is checked in.
+4. `pytest tests/unit/api/scout/supercoach_roster/ tests/integration/scout/supercoach_roster/` is green in CI.
+5. `SCOUT_DRIFT_LIVE=1 pytest tests/integration/scout/supercoach_roster/` is green against the live upstream.
+6. The drift negative test (broken fixture) fails parsing as expected.
+7. `make scout-supercoach-roster` works from local and prod.
+8. `.claude/skills/scrape-supercoach/` is deleted.
+9. A daily cron is scheduled and has produced at least one `agent_runs` row.
+10. After 3 days of observation, `people`/`people_attributes` are healthy and no drift-test failures.
 
 ---
 
