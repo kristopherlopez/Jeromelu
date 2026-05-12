@@ -6,6 +6,8 @@ tags: [area/agents, subarea/crew]
 
 The crew describes Jaromelu's *internal* reasoning rhythm — the shape of the thinking that produces a call. Users never see this rhythm play out as separate characters. They see Jaromelu's final voice, which carries traces of the internal process (research findings, cross-references, self-doubt, math citations, historical pattern matches).
 
+The **Archivist** is an exception to that rhythm — it is a worker, not a tonal mode, and it runs out-of-band relative to the call chain. See [Out of band: the Archivist](#out-of-band-the-archivist) below.
+
 This doc maps the internal flow for engineering, prompt design, and copy purposes. It is **not** a UI specification.
 
 ---
@@ -69,10 +71,36 @@ The cadence of internal reasoning maps to system events, not to on-screen beats:
 | Internal step | System trigger | User-facing surface |
 |---|---|---|
 | Scout | New transcript discovered / source added | "Jaromelu found new sources / new takes" — published as a Jaromelu update in the feed |
-| Analyst | Extraction worker output | Wiki update authored by Jaromelu, citing the cross-reference |
+| Analyst | Extraction worker output | Numbers / claims cited in Jaromelu's next Remark |
 | Bookkeeper | Scraper sweep complete | Numbers cited inline in Jaromelu's next Remark |
 | Critic | Pre-publish gate on a draft Remark | Self-aware framing in the final voice ("almost talked myself out of it") |
 | Jaromelu | Decision worker commits | Remark card publishes |
+| **Archivist** *(out-of-band)* | New claims / stats / team lists / Remarks land | Wiki page rewrites, surfaced in `/wiki` and the activity Feed (revisions) |
+
+---
+
+## Out of band: the Archivist
+
+The five-step flow above is the **call chain** — the reasoning that produces a Remark. The Archivist is not in that chain. It runs continuously and asynchronously, downstream of every other crew member, and writes to a separate user-facing surface (the wiki).
+
+```
+Scout      →  Analyst    →  Bookkeeper  →  Critic     →  Jaromelu
+(acquire)     (extract)     (numbers)      (challenge)    (voice / Remark)
+                  ↓             ↓                            ↓
+                  ───────────► Archivist ◄────────────────────
+                          (composes wiki prose,
+                           curates relations,
+                           links continuity)
+```
+
+The Archivist consumes the structured outputs of every other crew member and composes them into a browsable knowledge artifact. It does not contribute to a single Remark; it maintains the wiki that frames *all* Remarks.
+
+Two consequences for the dynamics:
+
+1. **Different rhythm.** The call chain converges weekly on Thursday's Remark. The Archivist runs whenever new data lands — claims arrive, stats post-round, a Remark gets published. Its work is ambient and distributed across the week.
+2. **Different voice.** Where Jaromelu speaks in his confident on-screen voice, the Archivist writes in encyclopedic third-person. The same fact ("Cleary's breakeven is 42") can appear in both — voiced as bravado in a Remark, reported neutrally on Cleary's wiki page.
+
+Full role spec: [`archivist.md`](archivist.md). Runtime spec: [`../../pages/wiki/content-pipeline.md`](../../pages/wiki/content-pipeline.md).
 
 ---
 

@@ -6,15 +6,15 @@ tags: [area/pages, subarea/wiki]
 
 Status: **Design — not yet implemented**
 
-This doc covers how a **Managed Agent** updates wiki pages from the structured outputs of the source pipeline. For the source system itself (originals, cleaning, patterns, attribution) see [`docs/sources/`](../../sources/README.md).
+This doc covers how the **Archivist** updates wiki pages from the structured outputs of the source pipeline. The Archivist is a Claude Managed Agent; the role spec lives in [`docs/agents/crew/archivist.md`](../../agents/crew/archivist.md), this doc covers the runtime. For the source system itself (originals, cleaning, patterns, attribution) see [`docs/sources/`](../../sources/README.md).
 
 ---
 
 ## Context
 
-Sources → cleaning → claims + stats + team lists is the upstream pipeline. This doc starts where that ends: a Managed Agent reads the structured outputs via an MCP server, decides what has changed, and rewrites wiki page sections.
+Sources → cleaning → claims + stats + team lists is the upstream pipeline. This doc starts where that ends: the Archivist reads the structured outputs via an MCP server, decides what has changed, and rewrites wiki page sections.
 
-The agent doesn't process raw transcripts — it consumes already-extracted, verified outputs.
+The Archivist doesn't process raw transcripts — it consumes already-extracted, verified outputs.
 
 ```
    Source pipeline output            Wiki
@@ -23,21 +23,21 @@ The agent doesn't process raw transcripts — it consumes already-extracted, ver
 
    claims ────────────────┐
    player_rounds ─────────┤
-   teamlists ─────────────┼──→ [Managed Agent] ──→ wiki_pages
-   entities ──────────────┤         ↑                 │
-   KB entries (optional) ─┘     MCP Server       wiki_revisions
-                                (reads DB)            │
-                                                      ↓
-                                                 Activity Feed
+   teamlists ─────────────┼──→ [Archivist] ──→ wiki_pages
+   entities ──────────────┤         ↑               │
+   KB entries (optional) ─┘     MCP Server     wiki_revisions
+                                (reads DB)          │
+                                                    ↓
+                                               Activity Feed
 ```
 
 ---
 
 ## Wiki Update Architecture
 
-### Managed Agent
+### The Archivist
 
-A Claude Managed Agent handles all wiki page updates. The agent is defined once and triggered per update session.
+The Archivist — implemented as a Claude Managed Agent — handles all wiki page updates. It is defined once and triggered per update session. For the role spec (responsibilities, principles, page lifecycle, hand-off contract) see [`docs/agents/crew/archivist.md`](../../agents/crew/archivist.md).
 
 **Agent definition:**
 - **Model:** claude-sonnet-4-6 (cost-effective for structured rewrites)
@@ -76,7 +76,7 @@ The `update_wiki_page` operation atomically updates `wiki_pages.content` and ins
 | **Team lists published** | Team list fetcher writes new round data | Session created for team + round pages |
 | **Manual** | Operator triggers via API or skill | Session created for specified pages |
 
-> **Open question:** Should each trigger create one session per affected page, or one session that updates a batch of related pages? Batching is cheaper ($0.08/hr per session) and lets the agent cross-reference, but increases blast radius if something goes wrong.
+> **Open question:** Should each trigger create one session per affected page, or one session that updates a batch of related pages? Batching is cheaper ($0.08/hr per session) and lets the Archivist cross-reference, but increases blast radius if something goes wrong.
 
 ### Session Flow
 
@@ -84,16 +84,16 @@ When a session is triggered:
 
 1. **Scope** — the session receives a message specifying which pages to update and why (e.g. "New claims from SC Playbook Round 8 episode. Update player pages for: tom-trbojevic, nathan-cleary, ...").
 
-2. **Read current state** — the agent reads the current wiki page content via MCP, plus relevant claims, stats, and team list data.
+2. **Read current state** — the Archivist reads the current wiki page content via MCP, plus relevant claims, stats, and team list data.
 
-3. **Decide what changed** — the agent compares new data against existing page content. If nothing meaningful changed, it skips the page.
+3. **Decide what changed** — the Archivist compares new data against existing page content. If nothing meaningful changed, it skips the page (per the [skip threshold principle](../../agents/crew/archivist.md#knowledge-organisation-principles)).
 
-4. **Rewrite sections** — the agent rewrites only the affected sections (e.g. `## Expert Opinions`, `## Price Analysis`), preserving sections it didn't touch. It maintains `[[slug]]` wiki-links and follows the page's existing structure.
+4. **Rewrite sections** — the Archivist rewrites only the affected sections (e.g. `## Expert Opinions`, `## Price Analysis`), preserving sections it didn't touch. It maintains `[[slug]]` wiki-links and follows the page's existing structure.
 
-5. **Log revision** — for each page updated, the agent calls `update_wiki_page` which creates a `wiki_revisions` record with:
+5. **Log revision** — for each page updated, the Archivist calls `update_wiki_page` which creates a `wiki_revisions` record with:
    - `section_heading` — which section was changed
    - `summary` — human-readable description (e.g. "Updated Expert Opinions with SC Playbook Round 8 claims")
-   - `source_trigger` — what caused the update (e.g. `managed-agent/claims-upload`)
+   - `source_trigger` — what caused the update (e.g. `archivist/claims-upload`)
    - `source_id` — FK to the source that triggered it, if applicable
 
 6. **Report** — the session returns a summary of what was updated, skipped, and any issues.
@@ -102,26 +102,26 @@ When a session is triggered:
 
 ## Page Section Conventions
 
-Each page type has a defined section structure. The agent updates specific sections based on the upstream data source.
+Each page type has a defined section structure. The Archivist updates specific sections based on the upstream data source.
 
 ### Player Pages
 
 | Section | Updated by | Source data |
 |---------|-----------|-------------|
-| `## Overview` | Agent (infrequent) | Entity metadata, position, team |
-| `## Current Form` | Agent (post-round) | Recent PlayerRound stats, form trajectory |
-| `## Price Analysis` | Agent (post-round) | Price, breakeven, ownership trends |
-| `## Expert Opinions` | Agent (post-claims) | Recent claims from advisors, consensus direction |
-| `## Selection History` | Agent (weekly) | Team list appearances, jersey numbers |
+| `## Overview` | Archivist (infrequent) | Entity metadata, position, team |
+| `## Current Form` | Archivist (post-round) | Recent PlayerRound stats, form trajectory |
+| `## Price Analysis` | Archivist (post-round) | Price, breakeven, ownership trends |
+| `## Expert Opinions` | Archivist (post-claims) | Recent claims from advisors, consensus direction |
+| `## Selection History` | Archivist (weekly) | Team list appearances, jersey numbers |
 
 ### Team Pages
 
 | Section | Updated by | Source data |
 |---------|-----------|-------------|
-| `## Overview` | Agent (infrequent) | Team metadata |
-| `## Current Squad` | Agent (weekly) | Team list data |
-| `## Recent Results` | Agent (post-round) | Match stats |
-| `## Key Players` | Agent (post-round) | Top SC scorers, form players |
+| `## Overview` | Archivist (infrequent) | Team metadata |
+| `## Current Squad` | Archivist (weekly) | Team list data |
+| `## Recent Results` | Archivist (post-round) | Match stats |
+| `## Key Players` | Archivist (post-round) | Top SC scorers, form players |
 
 ### Channel Pages
 
@@ -131,33 +131,33 @@ through that channel.
 
 | Section | Updated by | Source data |
 |---------|-----------|-------------|
-| `## About` | Agent (infrequent) | `channels.description`, platform metadata |
-| `## Recent Sources` | Agent (per-source) | Last ~10 `sources` rows for this channel |
-| `## Coverage` | Agent (infrequent) | `channels.tags` |
-| `## Hosts` | Agent (when advisor pages land) | Linked advisor entities (deferred until Phase 2 speaker diarisation) |
-| `## Track Record` | Agent (post-round, Phase 3) | Channel-level prediction accuracy |
+| `## About` | Archivist (infrequent) | `channels.description`, platform metadata |
+| `## Recent Sources` | Archivist (per-source) | Last ~10 `sources` rows for this channel |
+| `## Coverage` | Archivist (infrequent) | `channels.tags` |
+| `## Hosts` | Archivist (when advisor pages land) | Linked advisor entities (deferred until Phase 2 speaker diarisation) |
+| `## Track Record` | Archivist (post-round, Phase 3) | Channel-level prediction accuracy |
 
 ### Advisor Pages (deferred)
 
 Advisor pages describe the **person/voice** (Tim Williams, Brien Seeney). The
 schema and route exist but no advisor pages are seeded yet — they appear as
-the agent identifies named voices with confidence (post speaker diarisation).
+the Archivist identifies named voices with confidence (post speaker diarisation).
 
 | Section | Updated by | Source data |
 |---------|-----------|-------------|
-| `## Overview` | Agent (infrequent) | Person bio, role history (`entity_roles`) |
-| `## Channels` | Agent (when host data exists) | Channels this person publishes through |
-| `## Recent Calls` | Agent (post-claims) | Latest claims where `quotes.speaker_entity_id` matches |
-| `## Track Record` | Agent (post-round, Phase 3) | Person-level accuracy across all their channels |
+| `## Overview` | Archivist (infrequent) | Person bio, role history (`entity_roles`) |
+| `## Channels` | Archivist (when host data exists) | Channels this person publishes through |
+| `## Recent Calls` | Archivist (post-claims) | Latest claims where `quotes.speaker_entity_id` matches |
+| `## Track Record` | Archivist (post-round, Phase 3) | Person-level accuracy across all their channels |
 
 ### Round Pages
 
 | Section | Updated by | Source data |
 |---------|-----------|-------------|
-| `## Overview` | Agent (pre-round) | Fixtures, dates, venues |
-| `## Team Lists` | Agent (weekly) | Team list data per match |
-| `## Key Talking Points` | Agent (post-claims) | Notable claims, consensus shifts |
-| `## Results` | Agent (post-round) | Match stats, scores, top performers |
+| `## Overview` | Archivist (pre-round) | Fixtures, dates, venues |
+| `## Team Lists` | Archivist (weekly) | Team list data per match |
+| `## Key Talking Points` | Archivist (post-claims) | Notable claims, consensus shifts |
+| `## Results` | Archivist (post-round) | Match stats, scores, top performers |
 
 ---
 
@@ -167,10 +167,10 @@ Every wiki update creates a `wiki_revisions` record. The `source_trigger` field 
 
 | source_trigger | Meaning |
 |----------------|---------|
-| `managed-agent/claims-upload` | New claims from a processed transcript |
-| `managed-agent/post-round-stats` | Player/match stats for a completed round |
-| `managed-agent/team-lists` | Weekly team list update |
-| `managed-agent/manual` | Operator-triggered update |
+| `archivist/claims-upload` | New claims from a processed transcript |
+| `archivist/post-round-stats` | Player/match stats for a completed round |
+| `archivist/team-lists` | Weekly team list update |
+| `archivist/manual` | Operator-triggered update |
 | `seed_wiki.py` | Initial seeding (historical) |
 
 Revisions power the activity feed (`GET /api/wiki/recent-changes`) and per-page revision history.
@@ -179,7 +179,7 @@ Revisions power the activity feed (`GET /api/wiki/recent-changes`) and per-page 
 
 ## Role Transitions
 
-When the agent encounters evidence that a person's role has changed (e.g. a
+When the Archivist encounters evidence that a person's role has changed (e.g. a
 player has retired and started commentating), it should update `entity_roles`
 rather than mutating the entity row:
 
@@ -200,9 +200,9 @@ Transition detection is slow-moving and operator-confirmed by default. See
 
 1. **Session granularity** — one session per page, per batch of related pages, or one big session per trigger event?
 2. **Automation level** — should post-round stats and team list updates trigger wiki sessions automatically, or remain operator-triggered?
-3. **KB entry role** — should the agent read KB entries as pre-digested context, or work directly from raw claims/stats? KB adds a synthesis layer but also an indirection.
-4. **Conflict handling** — if two sources give contradictory claims about the same player, how should the agent handle it in the wiki prose? Flag both? Weight by advisor accuracy?
-5. **Page creation** — should the agent create new wiki pages for entities that don't have one yet, or only update existing pages?
+3. **KB entry role** — should the Archivist read KB entries as pre-digested context, or work directly from raw claims/stats? KB adds a synthesis layer but also an indirection.
+4. **Conflict handling** — if two sources give contradictory claims about the same player, how should the Archivist handle it in the wiki prose? Flag both? Weight by advisor accuracy?
+5. ~~**Page creation**~~ — *Resolved (2026-05-12).* The Archivist creates stub pages proactively when prose links to an unstubbed entity. See [archivist.md → Page lifecycle](../../agents/crew/archivist.md#page-lifecycle).
 6. **MCP server location** — hosted alongside the API (as additional FastMCP routes), or as a separate service?
 
 ---

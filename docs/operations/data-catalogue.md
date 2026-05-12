@@ -1075,7 +1075,7 @@ Per-section edit log for wiki pages.
 | section_heading | text | yes | | Null = full page |
 | summary | text | no | | Agent-written change description |
 | content_snapshot | text | yes | | Optional snapshot of the section |
-| source_trigger | text | yes | | e.g. `managed-agent/claims-upload` |
+| source_trigger | text | yes | | e.g. `archivist/claims-upload` |
 | source_id | UUID | yes | | FK → sources (optional) |
 | metadata_json | jsonb | no | {} | |
 | created_at | timestamptz | no | now() | |
