@@ -354,6 +354,94 @@ endif
 	curl -s -X POST "$(API)/api/admin/scout/supercoach-stats?round=$(ROUND)$(if $(SEASON),&season=$(SEASON))" \
 		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
 
+# SuperCoach teams — cross-references SC team IDs into teams.metadata_json.
+# Usage: make scout-supercoach-teams ADMIN_KEY=xxx [SEASON=2026] [API=...]
+scout-supercoach-teams:
+	curl -s -X POST "$(API)/api/admin/scout/supercoach-teams$(if $(SEASON),?season=$(SEASON))" \
+		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
+
+# SuperCoach settings — snapshots SC game rules per season into sc_settings.
+# Usage: make scout-supercoach-settings ADMIN_KEY=xxx [SEASON=2026] [MODE=classic|draft]
+scout-supercoach-settings:
+	curl -s -X POST "$(API)/api/admin/scout/supercoach-settings?mode=$(or $(MODE),classic)$(if $(SEASON),&season=$(SEASON))" \
+		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
+
+# nrl.com draw — fixtures per (competition, season, round). Archives JSON to S3.
+# Usage: make scout-nrlcom-draw ADMIN_KEY=xxx SEASON=2026 [COMPETITION=111] [ROUND=N]
+scout-nrlcom-draw:
+ifndef SEASON
+	$(error SEASON= required)
+endif
+	curl -s -X POST "$(API)/api/admin/scout/nrlcom-draw?competition=$(or $(COMPETITION),111)&season=$(SEASON)$(if $(ROUND),&round=$(ROUND))" \
+		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
+
+# nrl.com match-centre — walks the round's fixtures, fetches each match's full JSON.
+# Usage: make scout-nrlcom-match-centre ADMIN_KEY=xxx SEASON=2026 ROUND=N [COMPETITION=111]
+scout-nrlcom-match-centre:
+ifndef SEASON
+	$(error SEASON= required)
+endif
+ifndef ROUND
+	$(error ROUND= required)
+endif
+	curl -s -X POST "$(API)/api/admin/scout/nrlcom-match-centre?competition=$(or $(COMPETITION),111)&season=$(SEASON)&round=$(ROUND)" \
+		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
+
+# nrl.com casualty ward — daily injury snapshot, timestamped key.
+# Usage: make scout-nrlcom-casualty-ward ADMIN_KEY=xxx [SEASON=2026] [COMPETITION=111]
+scout-nrlcom-casualty-ward:
+	curl -s -X POST "$(API)/api/admin/scout/nrlcom-casualty-ward?competition=$(or $(COMPETITION),111)$(if $(SEASON),&season=$(SEASON))" \
+		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
+
+# nrl.com ladder — team standings per round.
+# Usage: make scout-nrlcom-ladder ADMIN_KEY=xxx SEASON=2026 [COMPETITION=111] [ROUND=N]
+scout-nrlcom-ladder:
+ifndef SEASON
+	$(error SEASON= required)
+endif
+	curl -s -X POST "$(API)/api/admin/scout/nrlcom-ladder?competition=$(or $(COMPETITION),111)&season=$(SEASON)$(if $(ROUND),&round=$(ROUND))" \
+		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
+
+# nrl.com stats leaderboards — top-25 leaders per category, per season.
+# Usage: make scout-nrlcom-stats ADMIN_KEY=xxx SEASON=2026 [COMPETITION=111]
+scout-nrlcom-stats:
+ifndef SEASON
+	$(error SEASON= required)
+endif
+	curl -s -X POST "$(API)/api/admin/scout/nrlcom-stats?competition=$(or $(COMPETITION),111)&season=$(SEASON)" \
+		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
+
+# nrl.com players roster — per-team profile listing.
+# Usage: make scout-nrlcom-players-roster ADMIN_KEY=xxx TEAM=500011 [COMPETITION=111]
+scout-nrlcom-players-roster:
+ifndef TEAM
+	$(error TEAM= required (nrl.com team_id; e.g. Storm=500011))
+endif
+	curl -s -X POST "$(API)/api/admin/scout/nrlcom-players-roster?competition=$(or $(COMPETITION),111)&team=$(TEAM)" \
+		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
+
+# Generic backfill helper — runs the named pipeline across a year+round range.
+# Iterates seasons SEASON_FROM..SEASON_TO and (where applicable) rounds 1..30,
+# rate-limited at ~1 req/sec to be polite.
+# Usage: make scout-backfill SOURCE=nrlcom-draw SEASON_FROM=2000 [SEASON_TO=2026]
+#                            [ROUND_FROM=1] [ROUND_TO=30] [COMPETITION=111] ADMIN_KEY=xxx
+scout-backfill:
+ifndef SOURCE
+	$(error SOURCE= required (e.g. nrlcom-draw, nrlcom-match-centre, supercoach-stats))
+endif
+ifndef SEASON_FROM
+	$(error SEASON_FROM= required)
+endif
+	python scripts/data/scout_backfill.py \
+		--source $(SOURCE) \
+		--season-from $(SEASON_FROM) \
+		--season-to $(or $(SEASON_TO),$(SEASON_FROM)) \
+		--round-from $(or $(ROUND_FROM),0) \
+		--round-to $(or $(ROUND_TO),30) \
+		--competition $(or $(COMPETITION),111) \
+		--api $(API) \
+		--admin-key $(ADMIN_KEY)
+
 # nrl.com profile-page enrichment — walks every current player row,
 # fetches their nrl.com profile, parses the JSON-LD, and promotes dob /
 # image_url / birthplace_text / height_cm / weight_kg. Sequential, ~2-3
