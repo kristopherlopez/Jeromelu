@@ -1,7 +1,6 @@
 import { apiFetch } from "@/lib/api";
 import WikiIndexClient from "./WikiIndexClient";
 import type { WikiPagesResponse } from "./wiki-data";
-import type { SourceListResponse } from "@/lib/types";
 
 export const metadata = {
   title: "The Wiki | Jaromelu",
@@ -16,17 +15,12 @@ export default async function WikiPage({
 }) {
   const { type } = await searchParams;
 
-  const [pagesResult, sourcesResult] = await Promise.allSettled([
+  const pagesResult = await Promise.allSettled([
     apiFetch<WikiPagesResponse>("/api/wiki/pages?limit=2000"),
-    apiFetch<SourceListResponse>("/api/sources"),
   ]);
 
   const pages =
-    pagesResult.status === "fulfilled" ? pagesResult.value.items : [];
-  const sources =
-    sourcesResult.status === "fulfilled" ? sourcesResult.value.items : [];
+    pagesResult[0].status === "fulfilled" ? pagesResult[0].value.items : [];
 
-  return (
-    <WikiIndexClient pages={pages} sources={sources} initialType={type} />
-  );
+  return <WikiIndexClient pages={pages} initialType={type} />;
 }

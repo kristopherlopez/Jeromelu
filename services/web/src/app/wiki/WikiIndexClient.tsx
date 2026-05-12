@@ -17,7 +17,8 @@ import {
   Send,
 } from "lucide-react";
 import type { WikiPageSummary, WikiPageType } from "./wiki-data";
-import type { SourceListItem } from "@/lib/types";
+import type { SourceListItem, SourceListResponse } from "@/lib/types";
+import { apiFetch } from "@/lib/api";
 import VoicesView from "./VoicesView";
 import PlayersIndexView from "./PlayersIndexView";
 import SourcesView from "./SourcesView";
@@ -101,7 +102,6 @@ const v = {
 
 interface WikiIndexClientProps {
   pages: WikiPageSummary[];
-  sources?: SourceListItem[];
   initialType?: string;
 }
 
@@ -109,12 +109,30 @@ const VALID_TYPES: EntityKey[] = ["player", "team", "voices", "sources"];
 
 export default function WikiIndexClient({
   pages,
-  sources = [],
   initialType,
 }: WikiIndexClientProps) {
   const filterKey = (VALID_TYPES as string[]).includes(initialType ?? "")
     ? (initialType as EntityKey)
     : null;
+
+  // /api/sources is large (currently unbounded — tens of MB) so it's fetched
+  // client-side after hydration rather than blocking SSR. Counts and sample
+  // avatars render once it lands.
+  const [sources, setSources] = useState<SourceListItem[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch<SourceListResponse>("/api/sources")
+      .then((res) => {
+        if (!cancelled) setSources(res.items);
+      })
+      .catch(() => {
+        // Leave sources empty on failure — dashboard shows 0 count rather
+        // than blocking the page.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filtered = useMemo(() => {
     if (!filterKey) return pages;
