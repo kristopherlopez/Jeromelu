@@ -4,6 +4,8 @@ tags: [area/architecture]
 
 # Information Architecture
 
+> **Where this data comes from:** see [`data-lineage.md`](data-lineage.md) for the end-to-end source → S3 → DB → app lineage covering every entity below. That doc is the canonical "what feeds what" map.
+
 ## Core Objects
 The system revolves around structured entities:
 - Source

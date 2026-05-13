@@ -462,6 +462,8 @@ Additive — they layer on top of Tier 1 (already built: known-set injection + b
 
 ## 6. Related
 
+- [Data lineage](../../architecture/data-lineage.md) — end-to-end source → S3 → DB → app map for every Scout pipeline output
+- [Wiki data feeds](../../pages/wiki/data-feeds.md) — wiki-centric reverse view of which Scout pipelines feed which wiki sections
 - [Crew Dynamics](dynamics.md) — Scout mode's place in Jaromelu's internal reasoning flow
 - [Source discovery system spec](../system/source-discovery.md) — full architecture, schema, SQL recipes, CLI flags, audit-trail recipes
 - [Ingestion system spec](../system/ingestion.md) — `IntelSweepWorkflow` and transcript pull

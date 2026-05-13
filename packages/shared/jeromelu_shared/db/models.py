@@ -5,6 +5,7 @@ from datetime import date, datetime, timezone
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     Computed,
@@ -516,6 +517,7 @@ class Team(Base):
     )
     founded_year: Mapped[int | None] = mapped_column(Integer)
     logo_url: Mapped[str | None] = mapped_column(Text)
+    nrlcom_team_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)
     metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
@@ -565,6 +567,7 @@ class Person(Base):
     country: Mapped[str | None] = mapped_column(Text)
     image_url: Mapped[str | None] = mapped_column(Text)
     supercoach_id: Mapped[int | None] = mapped_column(Integer, unique=True)
+    nrlcom_player_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)
 
     metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
@@ -1122,6 +1125,8 @@ class PlayerRound(Base):
         UUID(as_uuid=True), ForeignKey("teams.team_id", ondelete="SET NULL")
     )
 
+    metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
     __table_args__ = (
@@ -1252,6 +1257,8 @@ class Match(Base):
     weather: Mapped[str | None] = mapped_column(Text)
     referee_name: Mapped[str | None] = mapped_column(Text)
     broadcast: Mapped[str | None] = mapped_column(Text)
+    attendance: Mapped[int | None] = mapped_column(Integer)
+    ground_conditions: Mapped[str | None] = mapped_column(Text)
     is_magic_round: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_rep_weekend: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)

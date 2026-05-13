@@ -7,6 +7,8 @@ tags: [area/pages, subarea/wiki]
 > Status: **Reference doc** (created 2026-05-12).
 >
 > Single-page view of every upstream data input the wiki depends on, the pipeline that owns each input, current population state, and which wiki sections each input unblocks. Doubles as a **charter document for Scout** — Scout's eventual scope is *all* data acquisition, not just media inventory. This doc maps that expanded territory.
+>
+> **See also:** [`docs/architecture/data-lineage.md`](../../architecture/data-lineage.md) — the architecture-level end-to-end lineage (source → S3 → DB → app), with the reverse-view "per DB table → what S3 archives feed it" table. This doc is wiki-centric; the lineage doc is the system-wide map.
 
 ---
 
