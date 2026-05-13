@@ -251,10 +251,19 @@ def _medoid(vectors: np.ndarray) -> np.ndarray:
 
 def _extract_turn_embeddings(
     inference,  # pyannote.audio.Inference
-    audio_path: Path,
+    audio_input: Any,
     turns: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """For each turn, compute sliding-window embeddings + medoid.
+
+    ``audio_input`` is whatever ``pyannote.audio.Inference.crop`` accepts
+    as its first argument: a file path (pyannote 3.x) or a dict
+    ``{"waveform": tensor, "sample_rate": int}`` (pyannote 3 + 4). The
+    container ships pyannote 4 without torchcodec, so file-path input
+    triggers a silent ``torchcodec.AudioDecoder`` import failure inside
+    ``crop`` that gets swallowed by the per-window ``except Exception``
+    below — producing empty embeddings on every turn. Always pass the
+    dict form so both versions of pyannote work.
 
     Returns a list parallel to ``turns`` with two extra keys per turn:
     ``embedding_medoid`` (list[float]) and ``embedding_windows``
@@ -278,7 +287,7 @@ def _extract_turn_embeddings(
         for w_start, w_end in windows:
             seg = Segment(w_start, w_end)
             try:
-                emb = inference.crop(str(audio_path), seg)
+                emb = inference.crop(audio_input, seg)
             except Exception as exc:
                 logger.debug(
                     "Embedding extraction failed for turn %d window %.2f-%.2f: %s",
@@ -426,7 +435,8 @@ def diarize(audio_s3_key: str, *, force: bool = False) -> DiarizeResult:
         _waveform_np = np.frombuffer(_raw, dtype=np.int16).astype(np.float32) / 32768.0
         _waveform_np = _waveform_np.reshape(-1, _n_channels).T
         _waveform = _torch.from_numpy(_waveform_np.copy())
-        _result = pipeline({"waveform": _waveform, "sample_rate": _sample_rate})
+        _audio_input = {"waveform": _waveform, "sample_rate": _sample_rate}
+        _result = pipeline(_audio_input)
         # Pyannote 4 returns ``DiarizeOutput`` (dataclass wrapping
         # speaker_diarization + exclusive_speaker_diarization + centroids);
         # pyannote 3 returns the ``Annotation`` directly. Unwrap if needed
@@ -447,7 +457,10 @@ def diarize(audio_s3_key: str, *, force: bool = False) -> DiarizeResult:
             len(turns),
             int(WINDOW_SECONDS / WINDOW_HOP_SECONDS) + 1,
         )
-        enriched_turns = _extract_turn_embeddings(emb_inference, wav_path, turns)
+        # Reuse the already-loaded waveform dict so ``inference.crop``
+        # doesn't try to file-read the WAV via torchcodec — see the
+        # docstring on ``_extract_turn_embeddings``.
+        enriched_turns = _extract_turn_embeddings(emb_inference, _audio_input, turns)
 
         distinct_speakers = len({t["speaker"] for t in enriched_turns})
         duration_seconds = max(
