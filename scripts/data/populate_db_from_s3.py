@@ -28,6 +28,7 @@ from jeromelu_shared.db.session import SessionLocal
 from .populate.phase_identity import backfill_identity
 from .populate.phase_matches import populate_matches
 from .populate.phase_rounds import populate_rounds
+from .populate.phase_attributes import populate_people_attributes
 from .populate.phase_aux import (
     populate_injuries,
     populate_stat_leaderboards,
@@ -46,7 +47,8 @@ logger = logging.getLogger(__name__)
 
 
 PHASES = ("identity", "people", "rounds", "matches", "team_lists", "stats",
-          "timeline", "standings", "leaderboards", "injuries", "reresolve")
+          "timeline", "standings", "leaderboards", "injuries", "reresolve",
+          "attributes")
 
 
 def main() -> int:
@@ -92,6 +94,8 @@ def main() -> int:
                 results[phase] = populate_people_history(db, competition=args.competition)
             elif phase == "reresolve":
                 results[phase] = reresolve_person_ids(db)
+            elif phase == "attributes":
+                results[phase] = populate_people_attributes(db)
             elif phase == "rounds":
                 results[phase] = populate_rounds(
                     db, seasons=args.seasons, competition=args.competition,
