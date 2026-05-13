@@ -100,9 +100,10 @@ def _get_pipeline():
             "Run `pip install -r services/api/requirements.txt`."
         ) from exc
     try:
+        from ._pyannote_compat import token_kwargs
         pipeline = Pipeline.from_pretrained(
             settings.pyannote_model,
-            use_auth_token=settings.huggingface_api_key,
+            **token_kwargs(settings.huggingface_api_key),
         )
     except Exception as exc:
         raise DiarizationError(
@@ -130,9 +131,10 @@ def _get_emb_inference():
     except ImportError as exc:
         raise DiarizationError(f"pyannote.audio missing: {exc}") from exc
     try:
+        from ._pyannote_compat import token_kwargs
         emb_model = Model.from_pretrained(
             EMBEDDING_MODEL,
-            use_auth_token=settings.huggingface_api_key,
+            **token_kwargs(settings.huggingface_api_key),
         )
     except Exception as exc:
         raise DiarizationError(
@@ -398,7 +400,38 @@ def diarize(audio_s3_key: str, *, force: bool = False) -> DiarizeResult:
         _convert_to_wav(m4a_path, wav_path)
 
         logger.info("Running diarization on %s", wav_path)
-        diarization = pipeline(str(wav_path))
+        # Pre-load audio to dict form. Pyannote 4 hard-requires torchcodec
+        # for file-path input (uses torchcodec.AudioDecoder internally),
+        # but torchcodec needs a shared-Python build that the AWS DLC
+        # base image doesn't ship — so we uninstalled torchcodec in the
+        # GPU container and load the WAV with Python's stdlib ``wave``
+        # module here. The dict form is also accepted by pyannote 3.x,
+        # so local dev still works unchanged. No new pip deps required:
+        # the WAV format is fixed (16 kHz mono PCM16) since
+        # ``_convert_to_wav`` writes it.
+        import wave as _wave
+        import torch as _torch
+        with _wave.open(str(wav_path), "rb") as _wf:
+            _sample_rate = _wf.getframerate()
+            _n_channels = _wf.getnchannels()
+            _n_frames = _wf.getnframes()
+            _sampwidth = _wf.getsampwidth()
+            _raw = _wf.readframes(_n_frames)
+        if _sampwidth != 2:
+            raise DiarizationError(
+                f"unexpected WAV sample width {_sampwidth}B; "
+                "ffmpeg should write 16-bit PCM"
+            )
+        # int16 → float32 in [-1, 1], shape (channels, frames)
+        _waveform_np = np.frombuffer(_raw, dtype=np.int16).astype(np.float32) / 32768.0
+        _waveform_np = _waveform_np.reshape(-1, _n_channels).T
+        _waveform = _torch.from_numpy(_waveform_np.copy())
+        _result = pipeline({"waveform": _waveform, "sample_rate": _sample_rate})
+        # Pyannote 4 returns ``DiarizeOutput`` (dataclass wrapping
+        # speaker_diarization + exclusive_speaker_diarization + centroids);
+        # pyannote 3 returns the ``Annotation`` directly. Unwrap if needed
+        # so the same call site supports both versions.
+        diarization = getattr(_result, "speaker_diarization", _result)
 
         turns: list[dict[str, Any]] = []
         for segment, _, speaker in diarization.itertracks(yield_label=True):

@@ -29,7 +29,11 @@ fi
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text --region "$REGION")
 IMAGE="$ACCOUNT.dkr.ecr.$REGION.amazonaws.com/$REPO:$TAG"
 SAGEMAKER_BASE_ACCOUNT="763104351884"
-BASE_IMAGE="$SAGEMAKER_BASE_ACCOUNT.dkr.ecr.$REGION.amazonaws.com/pytorch-inference:2.4.0-gpu-py311"
+# pytorch-inference 2.6.0-gpu-py312 — newest DLC available in the region.
+# pyannote 4 needs torch>=2.8; the Dockerfile force-upgrades torch on top of
+# this base in its own RUN layer so pip doesn't have to back-solve through
+# the DLC's pinned 2.6.
+BASE_IMAGE="$SAGEMAKER_BASE_ACCOUNT.dkr.ecr.$REGION.amazonaws.com/pytorch-inference:2.6.0-gpu-py312-cu124-ubuntu22.04-sagemaker-v1.80"
 
 echo "[build] target  = $IMAGE"
 echo "[build] base    = $BASE_IMAGE"

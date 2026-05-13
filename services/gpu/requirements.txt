@@ -1,14 +1,15 @@
 # Lineup GPU container — extra Python deps installed on top of the
-# AWS DLC pytorch-inference base image (which already provides
-# torch==2.4 + CUDA + the SageMaker inference toolkit).
+# AWS DLC pytorch-inference base image.
 #
-# Pins mirror services/api/requirements.txt where it matters:
-#   - pyannote.audio 3.4 needs huggingface_hub<1.0 (use_auth_token kwarg)
-#     and speechbrain<1.1 (k2_fsa lazy-import bug)
-#   - InsightFace `buffalo_l` runs on onnxruntime-gpu for CUDA inference
-pyannote.audio>=3.1,<4
-huggingface_hub<1.0
-speechbrain<1.1
+# pyannote.audio 4.x is required for pyannote/speaker-diarization-community-1.
+# Pyannote 4 pulls torch>=2.8, torchcodec, and pyannoteai-sdk transitively —
+# pip will upgrade the DLC's bundled torch (2.4) to satisfy the constraint.
+# On Linux this is fine; torchcodec ships FFmpeg shared libs and the runtime
+# stage already installs ffmpeg via apt for our subprocess uses.
+#
+# Local dev (services/api) stays on pyannote 3.x — the analyst code uses
+# the _pyannote_compat.token_kwargs() shim to handle the renamed auth kwarg.
+pyannote.audio>=4.0,<5
 insightface>=0.7,<0.8
 onnxruntime-gpu>=1.17,<2
 opencv-python-headless>=4.8,<5

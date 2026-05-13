@@ -1,0 +1,66 @@
+{
+    "ScalingPolicies": [
+        {
+            "PolicyARN": "arn:aws:autoscaling:us-east-1:111424988703:scalingPolicy:a6e82e08-bdd3-433e-99fc-7df57284f3d6:resource/sagemaker/endpoint/jeromelu-lineup-async/variant/AllTraffic:policyName/jeromelu-lineup-async-backlog",
+            "PolicyName": "jeromelu-lineup-async-backlog",
+            "ServiceNamespace": "sagemaker",
+            "ResourceId": "endpoint/jeromelu-lineup-async/variant/AllTraffic",
+            "ScalableDimension": "sagemaker:variant:DesiredInstanceCount",
+            "PolicyType": "TargetTrackingScaling",
+            "TargetTrackingScalingPolicyConfiguration": {
+                "TargetValue": 5.0,
+                "CustomizedMetricSpecification": {
+                    "MetricName": "ApproximateBacklogSizePerInstance",
+                    "Namespace": "AWS/SageMaker",
+                    "Dimensions": [
+                        {
+                            "Name": "EndpointName",
+                            "Value": "jeromelu-lineup-async"
+                        }
+                    ],
+                    "Statistic": "Average"
+                },
+                "ScaleOutCooldown": 60,
+                "ScaleInCooldown": 600,
+                "DisableScaleIn": false
+            },
+            "Alarms": [
+                {
+                    "AlarmName": "TargetTracking-endpoint/jeromelu-lineup-async/variant/AllTraffic-AlarmHigh-b2d6261e-2167-49a2-ac35-ba0f80b16af6",
+                    "AlarmARN": "arn:aws:cloudwatch:us-east-1:111424988703:alarm:TargetTracking-endpoint/jeromelu-lineup-async/variant/AllTraffic-AlarmHigh-b2d6261e-2167-49a2-ac35-ba0f80b16af6"
+                },
+                {
+                    "AlarmName": "TargetTracking-endpoint/jeromelu-lineup-async/variant/AllTraffic-AlarmLow-808574ce-539b-47aa-96f8-4afb355a8cef",
+                    "AlarmARN": "arn:aws:cloudwatch:us-east-1:111424988703:alarm:TargetTracking-endpoint/jeromelu-lineup-async/variant/AllTraffic-AlarmLow-808574ce-539b-47aa-96f8-4afb355a8cef"
+                }
+            ],
+            "CreationTime": "2026-05-12T20:31:27.566000+10:00"
+        },
+        {
+            "PolicyARN": "arn:aws:autoscaling:us-east-1:111424988703:scalingPolicy:a6e82e08-bdd3-433e-99fc-7df57284f3d6:resource/sagemaker/endpoint/jeromelu-lineup-async/variant/AllTraffic:policyName/jeromelu-lineup-async-cold-start",
+            "PolicyName": "jeromelu-lineup-async-cold-start",
+            "ServiceNamespace": "sagemaker",
+            "ResourceId": "endpoint/jeromelu-lineup-async/variant/AllTraffic",
+            "ScalableDimension": "sagemaker:variant:DesiredInstanceCount",
+            "PolicyType": "StepScaling",
+            "StepScalingPolicyConfiguration": {
+                "AdjustmentType": "ChangeInCapacity",
+                "StepAdjustments": [
+                    {
+                        "MetricIntervalLowerBound": 0.0,
+                        "ScalingAdjustment": 1
+                    }
+                ],
+                "Cooldown": 300,
+                "MetricAggregationType": "Maximum"
+            },
+            "Alarms": [
+                {
+                    "AlarmName": "jeromelu-lineup-async-has-backlog-without-capacity",
+                    "AlarmARN": "arn:aws:cloudwatch:us-east-1:111424988703:alarm:jeromelu-lineup-async-has-backlog-without-capacity"
+                }
+            ],
+            "CreationTime": "2026-05-12T20:31:27.295000+10:00"
+        }
+    ]
+}

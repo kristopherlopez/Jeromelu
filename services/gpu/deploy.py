@@ -35,16 +35,16 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 
-#: T4 (g4dn) is ~50% cheaper than A10G (g5) at $0.736/hr in us-east-1.
-#: Pyannote 3.1 + InsightFace `buffalo_l` both fit comfortably in T4's
-#: 16 GB VRAM. The original switch to g5 was a workaround for Sydney
-#: g4dn capacity — irrelevant now that the endpoint lives in us-east-1.
-#: T4 is ~30-50% slower per request than A10G, which doesn't matter
-#: because everything is already async.
+#: A10G (g5) — back on the menu because pyannote 4 (community-1) requires
+#: torch>=2.8, which PyTorch only ships against CUDA 12.6+. The g4dn.xlarge
+#: instance has NVIDIA driver 12.4 and can't run CUDA 12.6 torch wheels
+#: (RuntimeError: NVIDIA driver too old). g5 ships with a newer driver
+#: that handles cu126/cu128. Cost delta: ~$0.07 → ~$0.13 per source.
 #:
-#: If a new workload needs more VRAM (>16 GB) or much faster step time,
-#: bump back to ml.g5.xlarge and accept the ~2× hourly.
-INSTANCE_TYPE = "ml.g4dn.xlarge"
+#: If we ever roll back to pyannote 3.x with torch 2.6 (cu124), g4dn
+#: becomes viable again — flip this back and bump the image tag so the
+#: endpoint-config name changes and SageMaker rolls forward.
+INSTANCE_TYPE = "ml.g5.xlarge"
 
 
 def _account_id(region: str) -> str:

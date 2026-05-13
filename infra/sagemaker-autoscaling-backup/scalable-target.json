@@ -1,0 +1,19 @@
+{
+    "ScalableTargets": [
+        {
+            "ServiceNamespace": "sagemaker",
+            "ResourceId": "endpoint/jeromelu-lineup-async/variant/AllTraffic",
+            "ScalableDimension": "sagemaker:variant:DesiredInstanceCount",
+            "MinCapacity": 0,
+            "MaxCapacity": 2,
+            "RoleARN": "arn:aws:iam::111424988703:role/aws-service-role/sagemaker.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_SageMakerEndpoint",
+            "CreationTime": "2026-05-12T20:31:26.510000+10:00",
+            "SuspendedState": {
+                "DynamicScalingInSuspended": false,
+                "DynamicScalingOutSuspended": false,
+                "ScheduledScalingSuspended": false
+            },
+            "ScalableTargetARN": "arn:aws:application-autoscaling:us-east-1:111424988703:scalable-target/056ma6e82e08bdd3433e99fc7df57284f3d6"
+        }
+    ]
+}
