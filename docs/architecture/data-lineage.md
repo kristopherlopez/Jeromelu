@@ -207,20 +207,20 @@ For each DB table, which S3 archives populate it, and via which code path.
 
 | DB table | S3 archive(s) | Extractor | Status | Trust source per [D11](drafts/scout-charter-expansion.draft.md) |
 |---|---|---|---|---|
-| `people` | `scout/supercoach/classic/players-cf/*` (primary) + `scout/nrlcom/players-roster/*` (enrichment) + `scout/nrlsupercoachstats/stats/*` (historical union) | `scout/supercoach_roster/` (shipped) ⊕ future `extract_people_history` (for the 735 historical-only players) | ✅ shipped (current 550) / 🟡 history pending | SC for SC-eligible roster; nrl.com for biographical (DOB, image) |
+| `people` | `scout/supercoach/classic/players-cf/*` (primary) + `scout/nrlcom/match-centre/*` (coaches + nrlcom IDs) + `scout/nrlsupercoachstats/stats/*` (historical union, pending) | `scout/supercoach_roster/` + `scripts/data/populate/phase_identity.py` (nrlcom IDs + coaches) ⊕ future `extract_people_history` (for the 735 historical-only players) | ✅ shipped (593 = 572 SC + 21 coaches; 516 have nrlcom_player_id) / 🟡 history pending | SC for SC-eligible roster; nrl.com for biographical (DOB, image) + coaches |
 | `people_attributes` | SC roster + nrl.com profile enrichment | `scout/supercoach_roster/` (SCD-2 close/open on diff) | ✅ shipped | SC for team/position; nrl.com for height/weight/contract |
-| `people_roles` | SC roster (player), match-centre coaches (coach), Analyst diarisation (advisor) | `scout/supercoach_roster/` (player) | ✅ player roles shipped; coach + advisor pending | per role-class |
-| `teams` | Seeded once; `scout/supercoach/classic/teams/*` for SC ID enrichment; `scout/nrlcom/draw/*` filterTeams + match-centre for nrl.com ID | Seed + `scout/supercoach_teams/` (shipped) + future nrl.com ID extractor | ✅ partial (SC IDs done; nrl.com IDs pending) | Seed for identity; nrl.com IDs from match-centre |
+| `people_roles` | SC roster (player), match-centre coaches (coach), Analyst diarisation (advisor) | `scout/supercoach_roster/` (player); coach role is set via `people.metadata_json.role_class='coach'` from phase_identity (a proper `people_roles` row per coach tenure is a follow-up) | ✅ player roles shipped; ⚠️ coach roles tracked via metadata only; advisor pending | per role-class |
+| `teams` | Seeded once; `scout/supercoach/classic/teams/*` for SC ID enrichment; `scout/nrlcom/match-centre/*` for nrl.com ID | Seed + `scout/supercoach_teams/` + `scripts/data/populate/phase_identity.py` (nrl.com IDs) | ✅ shipped (17/19 NRL teams have nrlcom_team_id) | Seed for identity; nrl.com IDs from match-centre |
 | `venues` | Seeded; future enrichment from match-centre venue strings | Seed | ✅ seeded | Manual; nrl.com text is informational |
-| `matches` | `scout/nrlcom/match-centre/*` (primary) + `scout/nrlcom/draw/*` (round metadata, kickoff_at) | Future `extract_matches` | 🟡 pending | nrl.com canonical |
-| `match_team_lists` | `scout/nrlcom/match-centre/*` (positionGroups + players[]) | Future `extract_match_team_lists` | 🟡 pending | nrl.com canonical |
-| `player_match_stats` (migration 056) | `scout/nrlcom/match-centre/*` (stats.players.{homeTeam,awayTeam}[]) | Future `extract_player_match_stats` | 🟡 pending | nrl.com canonical |
-| `match_timeline` (migration 057) | `scout/nrlcom/match-centre/*` (timeline[]) | Future `extract_match_timeline` | 🟡 pending | nrl.com canonical |
-| `match_officials` (migration 058) | `scout/nrlcom/match-centre/*` (officials[]) | Future `extract_match_officials` | 🟡 pending | nrl.com canonical |
-| `team_standings` (migration 059) | `scout/nrlcom/ladder/*` | Future `extract_team_standings` | 🟡 pending | nrl.com canonical |
-| `stat_leaderboards` (migration 060) | `scout/nrlcom/stats/*` | Future `extract_stat_leaderboards` | 🟡 pending | nrl.com canonical |
-| `injuries` | `scout/nrlcom/casualty-ward/*` (daily diff) | Future `extract_injuries` | 🟡 pending | nrl.com canonical |
-| `rounds` | `scout/nrlcom/draw/*` (round-level metadata) | Future `extract_rounds` | 🟡 pending | nrl.com canonical |
+| `matches` | `scout/nrlcom/match-centre/*` (primary) + `scout/nrlcom/draw/*` (round metadata, kickoff_at) | `scripts/data/populate/phase_matches.py` | ✅ shipped (408 rows 2025-2026, historical backfill in progress) | nrl.com canonical |
+| `match_team_lists` | `scout/nrlcom/match-centre/*` (positionGroups + players[] + coaches[]) | `scripts/data/populate/phase_team_lists.py` | ✅ shipped (10,447 rows incl. 584 coaches) | nrl.com canonical |
+| `player_match_stats` (migration 056) | `scout/nrlcom/match-centre/*` (stats.players.{homeTeam,awayTeam}[]) | `scripts/data/populate/phase_stats.py` | ✅ shipped (10,384 rows × 59 fields) | nrl.com canonical |
+| `match_timeline` (migration 057) | `scout/nrlcom/match-centre/*` (timeline[]) | `scripts/data/populate/phase_timeline.py` | ✅ shipped (31,563 events, running scores) | nrl.com canonical |
+| `match_officials` (migration 058) | `scout/nrlcom/match-centre/*` (officials[]) | `scripts/data/populate/phase_timeline.py` (combined w/ timeline) | ✅ shipped (948 rows) | nrl.com canonical |
+| `team_standings` (migration 059) | `scout/nrlcom/ladder/*` | `scripts/data/populate/phase_aux.py` | ✅ shipped (481 rows historical ladders) | nrl.com canonical |
+| `stat_leaderboards` (migration 060) | `scout/nrlcom/stats/*` | `scripts/data/populate/phase_aux.py` | ✅ shipped (4,594 rows 2013-2025) | nrl.com canonical |
+| `injuries` | `scout/nrlcom/casualty-ward/*` (daily diff) | `scripts/data/populate/phase_aux.py` (state-machine over snapshots) | ✅ shipped (98 active) | nrl.com canonical |
+| `rounds` | `scout/nrlcom/draw/*` (round-level metadata) | `scripts/data/populate/phase_rounds.py` | ✅ shipped (756 rounds 1908-2026) | nrl.com canonical |
 | `player_rounds` | `scout/nrlsupercoachstats/stats/*` (primary — SC scoring breakdown) + `scout/supercoach/classic/players-cf/*.player_stats[]` (SC lookahead overlay) | `scout/supercoach_stats/` (shipped, primary path) + future SC overlay extractor | ✅ primary shipped; 🟡 SC overlay pending | nrlsupercoachstats for scoring breakdown (only source); SC for lookahead/projection |
 | `sc_settings` (migration 055) | `scout/supercoach/{mode}/settings/*` | Inline in `scout/supercoach_settings/` | ✅ shipped | SC (only source) |
 | `quotes` | `scout/supercoach/classic/players-cf/*` (notes[]) — and future Analyst transcript extraction | `scout/supercoach_roster/notes_extractor.py` (shipped) + future Analyst pipeline | ✅ SC notes shipped (846 rows) | Analyst per-source attribution; synthetic SC Editorial for notes |
