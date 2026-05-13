@@ -33,6 +33,7 @@ from .populate.phase_aux import (
     populate_stat_leaderboards,
     populate_team_standings,
 )
+from .populate.phase_people import populate_people_history, reresolve_person_ids
 from .populate.phase_stats import populate_player_match_stats
 from .populate.phase_team_lists import populate_team_lists
 from .populate.phase_timeline import populate_timeline_and_officials
@@ -44,8 +45,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-PHASES = ("identity", "rounds", "matches", "team_lists", "stats", "timeline",
-          "standings", "leaderboards", "injuries")
+PHASES = ("identity", "people", "rounds", "matches", "team_lists", "stats",
+          "timeline", "standings", "leaderboards", "injuries", "reresolve")
 
 
 def main() -> int:
@@ -87,6 +88,10 @@ def main() -> int:
                 results[phase] = backfill_identity(
                     db, seasons=args.seasons, competition=args.competition,
                 )
+            elif phase == "people":
+                results[phase] = populate_people_history(db, competition=args.competition)
+            elif phase == "reresolve":
+                results[phase] = reresolve_person_ids(db)
             elif phase == "rounds":
                 results[phase] = populate_rounds(
                     db, seasons=args.seasons, competition=args.competition,
