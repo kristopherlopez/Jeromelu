@@ -63,6 +63,19 @@ def _slugify(name: str) -> str:
     return s.strip("-")
 
 
+_STAR_RUN_RE = re.compile(r"\s*\*+\s*")
+
+
+def _clean_upstream_name(name: str) -> str:
+    """Strip stray `***` runs that nrl.com occasionally embeds in firstName /
+    lastName fields. Observed on a handful of profile ids (e.g. Jack Bird,
+    Karl Lawton). Collapses to a single space and trims edges.
+    """
+    if not name:
+        return ""
+    return _STAR_RUN_RE.sub(" ", name).strip()
+
+
 def _normalize_name(name: str) -> str:
     n = (name or "").lower().strip()
     n = re.sub(r"[^a-z0-9\s'-]+", " ", n)
@@ -155,8 +168,8 @@ def _harvest_candidates(
                 continue
             out.append({
                 "nrlcom_player_id": int(pid),
-                "first_name": (p.get("firstName") or "").strip(),
-                "last_name": (p.get("lastName") or "").strip(),
+                "first_name": _clean_upstream_name(p.get("firstName")),
+                "last_name": _clean_upstream_name(p.get("lastName")),
                 "team_nickname": nick,
                 "nrlcom_team_id": int(nrl_team_id) if nrl_team_id else None,
                 "role_class": "player",
@@ -169,8 +182,8 @@ def _harvest_candidates(
                 continue
             out.append({
                 "nrlcom_player_id": int(pid),
-                "first_name": (c.get("firstName") or "").strip(),
-                "last_name": (c.get("lastName") or "").strip(),
+                "first_name": _clean_upstream_name(c.get("firstName")),
+                "last_name": _clean_upstream_name(c.get("lastName")),
                 "team_nickname": nick,
                 "nrlcom_team_id": int(nrl_team_id) if nrl_team_id else None,
                 "role_class": "coach",
@@ -183,8 +196,8 @@ def _harvest_candidates(
             continue
         out.append({
             "nrlcom_player_id": int(pid),
-            "first_name": (o.get("firstName") or "").strip(),
-            "last_name": (o.get("lastName") or "").strip(),
+            "first_name": _clean_upstream_name(o.get("firstName")),
+            "last_name": _clean_upstream_name(o.get("lastName")),
             "team_nickname": "",
             "nrlcom_team_id": None,
             "role_class": "referee",

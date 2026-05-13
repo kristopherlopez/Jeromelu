@@ -106,8 +106,24 @@ def load_nrl_teams_by_abbrev(session: Session) -> dict[str, Team]:
 # Entity & role ensure helpers
 # ---------------------------------------------------------------------------
 
+_STAR_RUN_RE = re.compile(r"\s*\*+\s*")
+
+
+def _clean_sc_name_part(part: str | None) -> str:
+    """SC's players-cf occasionally embeds `***` runs in first_name /
+    last_name (observed on Jack Bird, Karl Lawton, Xavier Va'a, etc. —
+    likely an SC internal marker that leaked through). Strip the stars
+    and normalise whitespace.
+    """
+    if not part:
+        return ""
+    return _STAR_RUN_RE.sub(" ", part).strip()
+
+
 def _player_canonical_name(sc_player: dict[str, Any]) -> str:
-    return f"{sc_player.get('first_name', '').strip()} {sc_player.get('last_name', '').strip()}".strip()
+    fn = _clean_sc_name_part(sc_player.get("first_name"))
+    ln = _clean_sc_name_part(sc_player.get("last_name"))
+    return f"{fn} {ln}".strip()
 
 
 def _ensure_player_entity(session: Session, sc_player: dict[str, Any]) -> Person:
