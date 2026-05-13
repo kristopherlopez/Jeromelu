@@ -188,7 +188,7 @@ Lightsail box and the refresh runs unattended.
 
 <a name="nrlcom-enrichment"></a>
 **Enrichment, not enumeration.** Walks every player row that has a
-current `people_attributes` row, derives a profile URL
+current `player_attributes` row, derives a profile URL
 (`https://www.nrl.com/players/nrl-premiership/{team_short}/{slug}/`),
 fetches it, and parses the embedded `<script type="application/ld+json">`
 JSON-LD block. Promotes:
@@ -198,8 +198,8 @@ JSON-LD block. Promotes:
 | `birthDate` | `people.dob` | Set if currently null (lifetime constant) |
 | `image.url` | `people.image_url` | Always update (photos refresh seasonally) |
 | `birthPlace.address` | `people.metadata_json.birthplace_text` | Set if empty (raw text — no normalisation in v1) |
-| `height.value` (cm) | `people_attributes.height_cm` | In-place update on diff (re-measurements aren't SCD-2 transitions) |
-| `weight.value` (kg) | `people_attributes.weight_kg` | In-place update on diff |
+| `height.value` (cm) | `player_attributes.height_cm` | In-place update on diff (re-measurements aren't SCD-2 transitions) |
+| `weight.value` (kg) | `player_attributes.weight_kg` | In-place update on diff |
 
 Ignored in v1: `jobTitle` (captaincy is per-match — see
 `match_team_lists.is_captain`).

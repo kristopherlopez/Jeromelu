@@ -2,7 +2,7 @@
 
 Fetches the NRL player registry from supercoach.com.au's unauthenticated
 players-cf endpoint and applies the SCD-2 refresh in
-jeromelu_shared.players.roster. Writes people / people_attributes /
+jeromelu_shared.players.roster. Writes people / player_attributes /
 people_roles.
 
 Folder layout follows D9 of the Scout charter expansion: each pipeline

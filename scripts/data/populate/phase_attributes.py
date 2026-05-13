@@ -1,7 +1,7 @@
-"""Phase 1.6 — reconstruct people_attributes (team-tenure SCD-2) from
+"""Phase 1.6 — reconstruct player_attributes (team-tenure SCD-2) from
 match_team_lists.
 
-people_attributes is the canonical place to ask "who was on which team
+player_attributes is the canonical place to ask "who was on which team
 when?". The SC roster pipeline already writes here for current
 SC-eligible players. Historical players (the 2,094 we inserted via
 phase_people) have no tenure rows at all — this phase fills that gap
@@ -24,7 +24,7 @@ Idempotency (UPSERT, never DELETE — see migration 067):
     preserved so any downstream FKs remain valid.
   - Before upserting a person's tenures, we first flip ALL their
     existing nrlcom-sourced is_current=True rows to is_current=False
-    so the unique partial index `uq_people_attributes_current` doesn't
+    so the unique partial index `uq_player_attributes_current` doesn't
     fire when we re-mark a different tenure as current.
 
 Coaches (jersey_number IS NULL) are skipped — their tenures need a
@@ -94,14 +94,14 @@ def _iter_tenures(rows: Iterable[tuple[str, str, datetime, str | None]]) -> list
     return out
 
 
-def populate_people_attributes(db: Session) -> dict[str, Any]:
+def populate_player_attributes(db: Session) -> dict[str, Any]:
     """Walk every player's match_team_lists chronologically and project
-    tenure windows into people_attributes.
+    tenure windows into player_attributes.
     """
     # 1. Who has an SC-sourced is_current row? Don't compete with SC for
     #    is_current.
     sc_current_rows = db.execute(text("""
-        SELECT person_id FROM people_attributes
+        SELECT person_id FROM player_attributes
         WHERE is_current AND source = 'supercoach'
     """)).fetchall()
     sc_current = {str(r[0]) for r in sc_current_rows}
@@ -127,11 +127,11 @@ def populate_people_attributes(db: Session) -> dict[str, Any]:
     cutoff = today - timedelta(days=ACTIVE_RECENCY_DAYS)
 
     # Pre-clear is_current for this person's nrlcom-sourced rows so the
-    # unique partial index `uq_people_attributes_current` doesn't block
+    # unique partial index `uq_player_attributes_current` doesn't block
     # us when we re-mark a different tenure as current in this run.
     # This is an UPDATE, not a DELETE — the row stays, just gets closed.
     clear_current_sql = text("""
-        UPDATE people_attributes
+        UPDATE player_attributes
         SET is_current = FALSE,
             effective_to = COALESCE(effective_to, :today),
             updated_at = NOW()
@@ -143,7 +143,7 @@ def populate_people_attributes(db: Session) -> dict[str, Any]:
     # UPSERT on the natural tenure key. Preserves the row's id so any
     # downstream FK references stay intact across re-runs.
     upsert_sql = text("""
-        INSERT INTO people_attributes (
+        INSERT INTO player_attributes (
             person_id, team_id, primary_position,
             effective_from, effective_to, is_current,
             source, metadata_json
@@ -197,7 +197,7 @@ def populate_people_attributes(db: Session) -> dict[str, Any]:
             else:
                 # Closed the day before the next tenure's first match.
                 effective_to = tenures[i + 1].first_match - timedelta(days=1)
-                # Guard ck_people_attributes_period: effective_to >= effective_from
+                # Guard ck_player_attributes_period: effective_to >= effective_from
                 if effective_to < t.first_match:
                     effective_to = t.first_match
 

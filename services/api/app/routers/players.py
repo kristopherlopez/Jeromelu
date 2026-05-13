@@ -3,7 +3,7 @@
 Three endpoints, all behind the same ``X-Admin-Key`` admin auth:
 
 - ``POST /admin/players/seed`` — first-run idempotent seed from a SC
-  roster JSON body. Existing current ``people_attributes`` rows are left
+  roster JSON body. Existing current ``player_attributes`` rows are left
   alone.
 - ``POST /admin/players/refresh`` — diff a SC roster JSON body vs current
   rows; transition team / primary-position changes via SCD-2 (close
@@ -127,14 +127,14 @@ def refresh_players_nrlcom(
 ):
     """Enrich every current player row from nrl.com profile pages.
 
-    Walks ``people`` rows that have a current ``people_attributes`` row,
+    Walks ``people`` rows that have a current ``player_attributes`` row,
     fetches each one's nrl.com profile, parses the embedded JSON-LD, and
     promotes:
 
     - ``people.dob``           — set if currently null
     - ``people.image_url``     — always update
     - ``people.metadata_json.birthplace_text`` — set if currently empty
-    - ``people_attributes.height_cm / weight_kg`` — in-place update on diff
+    - ``player_attributes.height_cm / weight_kg`` — in-place update on diff
 
     404s are logged + flagged on ``people.metadata_json.nrlcom`` (with
     ``last_status: "404"`` and ``tried_url``) and returned in the

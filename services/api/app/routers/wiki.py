@@ -12,7 +12,7 @@ from jeromelu_shared.db import (
     Channel,
     Match,
     Person,
-    PersonAttributes,
+    PlayerAttributes,
     Round,
     Source,
     Team,
@@ -111,7 +111,7 @@ def _person_meta_for_pages(
 ) -> dict[uuid.UUID, dict[str, str | None]]:
     """Bulk-load current team + position for person-backed pages.
 
-    Joins ``WikiPage → people_attributes (is_current) → teams`` so the
+    Joins ``WikiPage → player_attributes (is_current) → teams`` so the
     Players index can render and filter by team/position without a stub
     metadata payload. One query regardless of count.
     """
@@ -124,12 +124,12 @@ def _person_meta_for_pages(
             Team.name,
             Team.short_name,
             Team.logo_url,
-            PersonAttributes.primary_position,
+            PlayerAttributes.primary_position,
         )
-        .join(PersonAttributes, PersonAttributes.person_id == WikiPage.person_id)
-        .outerjoin(Team, Team.team_id == PersonAttributes.team_id)
+        .join(PlayerAttributes, PlayerAttributes.person_id == WikiPage.person_id)
+        .outerjoin(Team, Team.team_id == PlayerAttributes.team_id)
         .filter(WikiPage.page_id.in_(person_page_ids))
-        .filter(PersonAttributes.is_current.is_(True))
+        .filter(PlayerAttributes.is_current.is_(True))
         .all()
     )
     return {

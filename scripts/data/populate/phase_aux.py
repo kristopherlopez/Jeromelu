@@ -327,7 +327,7 @@ def _build_people_name_lookup(db: Session) -> dict[tuple[str, str], str]:
     rows = db.execute(text("""
         SELECT p.person_id, p.canonical_name, p.aliases, t.short_name, t.slug
         FROM people p
-        LEFT JOIN people_attributes pa
+        LEFT JOIN player_attributes pa
             ON pa.person_id = p.person_id AND pa.effective_to IS NULL
         LEFT JOIN teams t ON t.team_id = pa.team_id
     """)).fetchall()

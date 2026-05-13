@@ -35,7 +35,7 @@ Every wiki page is composed from inputs in these four layers. Each layer feeds s
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│ LAYER 1: IDENTITY            people, people_attributes,             │
+│ LAYER 1: IDENTITY            people, player_attributes,             │
 │                              people_roles, teams, venues, channels  │
 │   → ## Overview              (name, position, team, height, role)   │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -72,7 +72,7 @@ For each page type, the table below shows which sections depend on which input l
 
 | Section | Inputs | Minimum to render meaningfully |
 |---------|--------|-------------------------------|
-| `## Overview` | L1: `people`, `people_attributes`, `people_roles` | 1 row in each (have today) |
+| `## Overview` | L1: `people`, `player_attributes`, `people_roles` | 1 row in each (have today) |
 | `## Current Form` | L2: `player_rounds` | ≥3 recent rounds with scores |
 | `## Price Analysis` | L2: `player_rounds` (price, breakeven over time) | ≥3 rounds for a trend |
 | `## Selection History` | L2: `match_team_lists` | ≥3 match lineups |
@@ -121,7 +121,7 @@ This is the inventory: every input table the wiki depends on, what populates it,
 | Layer | Table | Populated by | Current state | Code | Proposed Scout scope |
 |---|---|---|---|---|---|
 | **L1** | `people` | SuperCoach roster fetch | ✅ 557 rows | `scripts/data/fetchers/fetch_supercoach_players.py` | **Yes** — roster acquisition |
-| **L1** | `people_attributes` | SuperCoach roster fetch | ✅ 550 rows | Same as above | **Yes** — roster attributes |
+| **L1** | `player_attributes` | SuperCoach roster fetch | ✅ 550 rows | Same as above | **Yes** — roster attributes |
 | **L1** | `people_roles` | SuperCoach roster fetch + manual | ✅ 550 rows | Same as above | **Yes** — role assignment derives from roster |
 | **L1** | `teams` | Seed scripts | ✅ 58 rows | `scripts/data/seed_teams.py` | **Yes** — seed → ongoing refresh |
 | **L1** | `venues` | Seed scripts | ✅ 27 rows | `scripts/data/seed_venues.py` | **Yes** — seed → ongoing |

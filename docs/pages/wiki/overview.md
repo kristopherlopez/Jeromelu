@@ -176,7 +176,7 @@ Migrations:
 
 | Endpoint | Purpose |
 |----------|---------|
-| `GET /api/wiki/pages` | List pages. Filters: `page_type`, `status`, `q`. Cursor pagination. Returns `metadata_json` per page for team/position/price grouping. For channel-backed pages, also bulk-loads `logo_url`, `platform` and `channel_url` from the `channels` table. For player-backed pages, bulk-loads current `team`, `team_short` and `position` from `people_attributes` (`is_current = true`) into `metadata_json` so the Players index can render and filter by team without a per-row stub payload. One extra query per join, regardless of page count. |
+| `GET /api/wiki/pages` | List pages. Filters: `page_type`, `status`, `q`. Cursor pagination. Returns `metadata_json` per page for team/position/price grouping. For channel-backed pages, also bulk-loads `logo_url`, `platform` and `channel_url` from the `channels` table. For player-backed pages, bulk-loads current `team`, `team_short` and `position` from `player_attributes` (`is_current = true`) into `metadata_json` so the Players index can render and filter by team without a per-row stub payload. One extra query per join, regardless of page count. |
 | `GET /api/wiki/pages/{slug}` | Full page detail + revisions + `linked_pages` map |
 | `GET /api/wiki/pages/{slug}/revisions` | Full revision history |
 | `GET /api/wiki/recent-changes` | Recent revisions across all pages |

@@ -33,7 +33,7 @@ from sqlalchemy.orm import Session
 
 from jeromelu_shared.db.models import (
     Person,
-    PersonAttributes,
+    PlayerAttributes,
     PersonRole,
     Team,
     WikiPage,
@@ -285,9 +285,9 @@ def seed_roster(
             counts["wiki_pages_created"] += 1
 
         existing_attrs = session.execute(
-            select(PersonAttributes).where(
-                PersonAttributes.person_id == entity.person_id,
-                PersonAttributes.is_current.is_(True),
+            select(PlayerAttributes).where(
+                PlayerAttributes.person_id == entity.person_id,
+                PlayerAttributes.is_current.is_(True),
             )
         ).scalar_one_or_none()
         if existing_attrs is not None:
@@ -295,7 +295,7 @@ def seed_roster(
             continue
 
         session.add(
-            PersonAttributes(
+            PlayerAttributes(
                 person_id=entity.person_id,
                 team_id=team.team_id,
                 primary_position=primary,
@@ -350,15 +350,15 @@ def refresh_roster(
             counts["wiki_pages_created"] += 1
 
         current = session.execute(
-            select(PersonAttributes).where(
-                PersonAttributes.person_id == entity.person_id,
-                PersonAttributes.is_current.is_(True),
+            select(PlayerAttributes).where(
+                PlayerAttributes.person_id == entity.person_id,
+                PlayerAttributes.is_current.is_(True),
             )
         ).scalar_one_or_none()
 
         if current is None:
             session.add(
-                PersonAttributes(
+                PlayerAttributes(
                     person_id=entity.person_id,
                     team_id=team.team_id,
                     primary_position=primary,
@@ -395,7 +395,7 @@ def refresh_roster(
         current.is_current = False
 
         session.add(
-            PersonAttributes(
+            PlayerAttributes(
                 person_id=entity.person_id,
                 team_id=team.team_id,
                 primary_position=primary,

@@ -28,7 +28,7 @@ from jeromelu_shared.db.session import SessionLocal
 from .populate.phase_identity import backfill_identity
 from .populate.phase_matches import populate_matches
 from .populate.phase_rounds import populate_rounds
-from .populate.phase_attributes import populate_people_attributes
+from .populate.phase_attributes import populate_player_attributes
 from .populate.phase_aux import (
     populate_injuries,
     populate_stat_leaderboards,
@@ -95,7 +95,7 @@ def main() -> int:
             elif phase == "reresolve":
                 results[phase] = reresolve_person_ids(db)
             elif phase == "attributes":
-                results[phase] = populate_people_attributes(db)
+                results[phase] = populate_player_attributes(db)
             elif phase == "rounds":
                 results[phase] = populate_rounds(
                     db, seasons=args.seasons, competition=args.competition,

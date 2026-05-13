@@ -546,7 +546,7 @@ class Team(Base):
 
 # ─── Identity tables ────────────────────────────────────────────────────
 # After mig 038, the old Entity / EntityRole / PlayerAttributes tables and
-# their classes are gone. Person + PersonAttributes + PersonRole + Round
+# their classes are gone. Person + PlayerAttributes + PersonRole + Round
 # are the canonical identity layer.
 
 
@@ -578,12 +578,16 @@ class Person(Base):
     )
 
 
-class PersonAttributes(Base):
-    """SCD-2 of slow-changing per-person facts. Replaces ``PlayerAttributes``
-    (dropped in mig 037). Closed-and-reopened on change.
+class PlayerAttributes(Base):
+    """SCD-2 of slow-changing player facts (team, position, height,
+    weight, contract, salary). Only player-class people land here;
+    coach/referee/advisor tenures live in `people_roles`.
+
+    Renamed from `people_attributes` in migration 068 — the table only
+    ever carried player-shaped fields, so the new name is self-documenting.
     """
 
-    __tablename__ = "people_attributes"
+    __tablename__ = "player_attributes"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
     person_id: Mapped[uuid.UUID] = mapped_column(
@@ -609,12 +613,12 @@ class PersonAttributes(Base):
     __table_args__ = (
         CheckConstraint(
             "effective_to IS NULL OR effective_to >= effective_from",
-            name="ck_people_attributes_period",
+            name="ck_player_attributes_period",
         ),
-        Index("idx_people_attributes_person_current", "person_id", "is_current"),
-        Index("idx_people_attributes_team_current", "team_id", "is_current"),
+        Index("idx_player_attributes_person_current", "person_id", "is_current"),
+        Index("idx_player_attributes_team_current", "team_id", "is_current"),
         Index(
-            "uq_people_attributes_current",
+            "uq_player_attributes_current",
             "person_id",
             unique=True,
             postgresql_where="is_current",

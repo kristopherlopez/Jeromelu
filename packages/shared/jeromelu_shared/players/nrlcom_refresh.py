@@ -9,8 +9,8 @@ players. The 17 NRL clubs' top-grade rosters come from the SC seed
 - ``people.dob``                — set if currently null (lifetime constant)
 - ``people.image_url``          — always update (photos get refreshed)
 - ``people.metadata_json.birthplace_text`` — set if currently empty
-- ``people_attributes.height_cm``  — in-place update on diff (no SCD-2)
-- ``people_attributes.weight_kg``  — in-place update on diff (no SCD-2)
+- ``player_attributes.height_cm``  — in-place update on diff (no SCD-2)
+- ``player_attributes.weight_kg``  — in-place update on diff (no SCD-2)
 
 Everything else from the JSON-LD (captaincy, jobTitle, etc.) is ignored
 in v1 — see ``docs/agents/system/player-roster.md``.
@@ -39,7 +39,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
-from jeromelu_shared.db.models import Person, PersonAttributes, Team
+from jeromelu_shared.db.models import Person, PlayerAttributes, Team
 from jeromelu_shared.players.nrlcom import (
     USER_AGENT,
     NrlProfile,
@@ -83,10 +83,10 @@ def refresh_from_nrlcom(
     mismatches: list[dict[str, Any]] = []
 
     rows = session.execute(
-        select(Person, PersonAttributes, Team)
-        .join(PersonAttributes, PersonAttributes.person_id == Person.person_id)
-        .join(Team, Team.team_id == PersonAttributes.team_id)
-        .where(PersonAttributes.is_current)
+        select(Person, PlayerAttributes, Team)
+        .join(PlayerAttributes, PlayerAttributes.person_id == Person.person_id)
+        .join(Team, Team.team_id == PlayerAttributes.team_id)
+        .where(PlayerAttributes.is_current)
     ).all()
 
     if team_filter:
@@ -182,7 +182,7 @@ def _promote_lifetime(person: Person, profile: NrlProfile) -> bool:
     return changed
 
 
-def _promote_slow_changing(attrs: PersonAttributes, profile: NrlProfile) -> bool:
+def _promote_slow_changing(attrs: PlayerAttributes, profile: NrlProfile) -> bool:
     """In-place updates for height_cm / weight_kg.
 
     Per design decision (sketch #1): re-measurements are not SCD-2

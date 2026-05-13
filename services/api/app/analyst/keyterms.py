@@ -17,7 +17,7 @@ from typing import Iterable
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from jeromelu_shared.db import Person, PersonAttributes, PersonRole, Team
+from jeromelu_shared.db import Person, PlayerAttributes, PersonRole, Team
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +75,7 @@ def build_keyterms(session: Session) -> list[str]:
     Per-band caps prevent a long surname pool from crowding out teams or
     aliases. Hard-capped at ``KEYTERM_CAP`` entries.
     """
-    pa_alias = PersonAttributes
+    pa_alias = PlayerAttributes
     pr_alias = PersonRole
 
     player_stmt = (

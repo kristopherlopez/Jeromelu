@@ -61,7 +61,7 @@ Scout       →  Analyst    →  Bookkeeper + Critic  →  Jaromelu
 Each pipeline lives as a folder under `services/api/app/scout/<pipeline_name>/` per D9 — fetcher, Pydantic models, admin route, README all in the same folder. Fronted by a `POST /api/admin/scout/<pipeline>` admin endpoint driven by cron. **Each fetch writes the raw upstream response to S3 first** (D10); DB extraction is downstream (D13). Trust hierarchy `nrl.com > supercoach.com.au > nrlsupercoachstats.com` (D11). All write under `agent_id='scout'` with `detail_json.pipeline=<name>`. Idempotency per D7, drift tests per D8.
 
 **supercoach.com.au pipelines:**
-8. **`supercoach_roster`** — refresh `people` / `people_attributes` / `people_roles` from `players-cf`; also captures `notes[]` (editorial commentary → claims) and `player_stats[]` (per-round) inline. *Phase 1 — shipped.*
+8. **`supercoach_roster`** — refresh `people` / `player_attributes` / `people_roles` from `players-cf`; also captures `notes[]` (editorial commentary → claims) and `player_stats[]` (per-round) inline. *Phase 1 — shipped.*
 9. **`supercoach_teams`** — 17 SC teams; weekly. Cross-references `teams.metadata_json.supercoach`. *Phase 2.5.*
 10. **`supercoach_settings`** — SC game rules per season (lockouts, scoring config, captains/emergencies/dual-position rules). *Phase 2.5.*
 11. **`supercoach_draft_*`** — parallel of the above three for SC Draft mode. *Optional.*
@@ -95,7 +95,7 @@ Per the **Extract-only** rule, anything that interprets, structures, or enriches
 
 ### Hand-off contract
 
-Scout's outputs are raw inventory rows only — Extract + Load, never Transform. The full chain Scout owns spans **media** (`scout_candidates → channels → sources → audio`) and **data** (`people / people_attributes / player_rounds / matches / match_team_lists / injuries / rounds`).
+Scout's outputs are raw inventory rows only — Extract + Load, never Transform. The full chain Scout owns spans **media** (`scout_candidates → channels → sources → audio`) and **data** (`people / player_attributes / player_rounds / matches / match_team_lists / injuries / rounds`).
 
 **Media writes:**
 
@@ -114,7 +114,7 @@ Every pipeline writes to **S3 (raw response)** + **DB (extracted projection)** p
 | Table | What Scout writes | Module folder | Phase |
 |---|---|---|---|
 | `people` | Roster upsert from SC `players-cf` | `scout/supercoach_roster/` | 1 ✅ |
-| `people_attributes` | Position / team / contract (SCD-2); enriched by NRL.com profile data | `scout/supercoach_roster/` + `scout/nrlcom_players_roster/` | 1 ✅ / 4.5 |
+| `player_attributes` | Position / team / contract (SCD-2); enriched by NRL.com profile data | `scout/supercoach_roster/` + `scout/nrlcom_players_roster/` | 1 ✅ / 4.5 |
 | `people_roles` | Primary role tenure (SCD-2) | `scout/supercoach_roster/` | 1 ✅ |
 | `claims` + `quotes` (from SC `notes[]`) | SC editorial commentary on players | `scout/supercoach_roster/` (extractor) | 2.5 |
 | `teams.metadata_json.supercoach` | SC team IDs cross-reference | `scout/supercoach_teams/` | 2.5 |

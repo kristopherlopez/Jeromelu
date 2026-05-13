@@ -8,7 +8,7 @@ Personal reference for the Jaromelu data model. Source of truth: `packages/share
 
 The schema breaks into five layers:
 
-- **Identity** — typed per-kind tables for things claims/predictions/wiki reference: `people`, `people_attributes`, `people_roles`, `rounds`. Pre-mig-038 this was a single polymorphic `entities` table — now retired.
+- **Identity** — typed per-kind tables for things claims/predictions/wiki reference: `people`, `player_attributes`, `people_roles`, `rounds`. Pre-mig-038 this was a single polymorphic `entities` table — now retired.
 - **Structured world** — Real things and their facts: teams, venues, fixtures, rosters, injuries, per-round stats.
 - **Content & claims** — Pipeline from channel → source → document → overlays → quote → claim, plus time-series popularity sidecars.
 - **Reasoning & output** — What Jaromelu produces from the world plus the content: predictions, decisions, remarks, alignment scores, knowledge base, wiki. Cross-type subjects modelled as typed-FK association junctions (`claim_associations`, etc.).
@@ -21,7 +21,7 @@ The schema breaks into five layers:
 ```
 Layer 1 — IDENTITY ─────────────────────────────────────────────────────────────
    ┌──────────────┐        ┌────────────────────┐        ┌──────────────┐
-   │    people    │──────▶ │ people_attributes  │        │    rounds    │
+   │    people    │──────▶ │ player_attributes  │        │    rounds    │
    │  (humans —   │   │    │       (SCD-2)      │        │  (NRL fixt.  │
    │   players,   │   │    └────────────────────┘        │   round id)  │
    │   coaches,   │   │                                  └──────────────┘
@@ -104,7 +104,7 @@ Unified table for every human actor — players, coaches, advisors, commentators
 
 ---
 
-### people_attributes
+### player_attributes
 
 SCD-2 of slow-changing per-person facts (team affiliation, primary position, height/weight, contract). Replaces the old `player_attributes` table. Closed and reopened on change.
 
@@ -1158,7 +1158,7 @@ Ten standard event types defined in `jeromelu_shared.agent_audit`.
 
 ### player_team_history
 
-Dropped in migration 027. Replaced by `player_attributes` (mig 027) and subsequently by `people_attributes` (mig 038).
+Dropped in migration 027. Replaced by `player_attributes` (mig 027) and subsequently by `player_attributes` (mig 038).
 
 ### entities
 
@@ -1170,7 +1170,7 @@ Dropped in migration 038. Replaced by `people_roles` — same SCD-2 shape with `
 
 ### player_attributes
 
-Dropped in migration 038. Replaced by `people_attributes` — same SCD-2 shape with `person_id` FK to `people`. Generalised to any person role (not just players), though the dominant case is still players.
+Dropped in migration 038. Replaced by `player_attributes` — same SCD-2 shape with `person_id` FK to `people`. Generalised to any person role (not just players), though the dominant case is still players.
 
 ### source_annotations
 
@@ -1275,7 +1275,7 @@ Authoritative list: [`packages/db/migrations/`](../../packages/db/migrations/). 
 
 Recent landmarks worth knowing about:
 
-- **036** — typed identity tables (`people`, `people_attributes`, `people_roles`, `rounds`) + association junctions (`claim_associations`, `prediction_associations`, `decision_associations`) added; `claims` absorbed `source_annotations`; `matches` accommodates byes; column promotions on teams/venues/matches; `is_captain` on `match_team_lists`.
+- **036** — typed identity tables (`people`, `player_attributes`, `people_roles`, `rounds`) + association junctions (`claim_associations`, `prediction_associations`, `decision_associations`) added; `claims` absorbed `source_annotations`; `matches` accommodates byes; column promotions on teams/venues/matches; `is_captain` on `match_team_lists`.
 - **037** — dropped two stale postgres-default-named CHECK constraints that conflicted with their `ck_*` replacements.
 - **038** — dropped `entities`, `entity_roles`, `player_attributes`; dropped all polymorphic `*_entity_id` columns from output tables; tightened CHECK constraints on `wiki_pages` / `consensus_snapshots` / `knowledge_base` to enforce typed-FK exactly-one (or at-most-one for KB).
 

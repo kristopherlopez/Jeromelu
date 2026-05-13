@@ -35,7 +35,7 @@ fetch-players:
 	python scripts/data/fetchers/fetch_supercoach_players.py --season $(SEASON)
 	node scripts/data/generate_players_yaml.js
 
-# Seed people + people_attributes locally from a SC roster JSON dump.
+# Seed people + player_attributes locally from a SC roster JSON dump.
 # Reads scripts/data/scraped_players_api_raw.json (or the file passed as
 # the first arg). Requires teams to be seeded first. Run `make fetch-players`
 # beforehand if the JSON is stale.

@@ -128,7 +128,7 @@ def _build_existing_indices(db: Session) -> tuple[
             p.nrlcom_player_id,
             t.slug AS team_slug, t.short_name AS team_short
         FROM people p
-        LEFT JOIN people_attributes pa
+        LEFT JOIN player_attributes pa
             ON pa.person_id = p.person_id AND pa.effective_to IS NULL
         LEFT JOIN teams t ON t.team_id = pa.team_id
     """)).fetchall()

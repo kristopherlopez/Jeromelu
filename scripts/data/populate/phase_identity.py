@@ -79,7 +79,7 @@ def _build_people_lookup(db: Session) -> dict[tuple[str, str], str]:
             p.aliases,
             pa.team_id
         FROM people p
-        LEFT JOIN people_attributes pa
+        LEFT JOIN player_attributes pa
             ON pa.person_id = p.person_id
             AND pa.effective_to IS NULL
     """)).fetchall()

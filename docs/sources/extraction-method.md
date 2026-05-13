@@ -66,7 +66,7 @@ Idempotent on the audio object (`audio_object_exists` check skips re-download). 
 
 `services/api/app/analyst/keyterms.py` · `build_keyterms(session)` — Deepgram's `keyterm` parameter biases the ASR toward specific terms. We supply NRL surnames, team identifiers and aliases pulled from the canonical backend roster.
 
-Source of truth: `people` (canonical_name + aliases) joined with `people_roles` (role='player', effective_to IS NULL) and `people_attributes` (is_current=true) filtered to teams of grade `nrl` / `nrlw`. Also `teams` (short_name + aliases) for the same grades.
+Source of truth: `people` (canonical_name + aliases) joined with `people_roles` (role='player', effective_to IS NULL) and `player_attributes` (is_current=true) filtered to teams of grade `nrl` / `nrlw`. Also `teams` (short_name + aliases) for the same grades.
 
 `players.yaml` is **not** consulted — the database is canonical. The legacy `/clean-transcript` skill still uses it; that path is independent.
 
