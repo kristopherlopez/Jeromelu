@@ -57,7 +57,7 @@ The architecture series is numbered for reading order:
 - [Local Dev Connections](operations/local-dev-connections.md)
 - [AWS Setup Guide](operations/aws-setup-guide.md)
 - [IaC Overview](operations/iac-overview.md) · [Migration Plan](operations/iac-migration-plan.md) · [Runbook](operations/iac-runbook.md)
-- [Data Catalogue](operations/data-catalogue.md)
+- [Data Catalogue](operations/data-catalogue/README.md)
 
 ## Other Areas
 

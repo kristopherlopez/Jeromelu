@@ -365,7 +365,7 @@ represented yet.
 
 ## Related
 
-- [Data catalogue: player_attributes](../../operations/data-catalogue.md#player_attributes)
+- [Data catalogue: player_attributes](../../operations/data-catalogue/player_attributes.md)
 - [Entity roles SCD-2 pattern](../../concepts/entity-roles.md)
 - `packages/db/migrations/027_consolidate_player_scd.sql` — schema
 - `packages/db/migrations/026_teams.sql` — teams table this FKs into

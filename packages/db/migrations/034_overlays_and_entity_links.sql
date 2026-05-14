@@ -1,7 +1,7 @@
 -- 034: source overlays + match/venue entity links + entity_type cleanup
 --
 -- This migration is the schema-side of an alignment pass against
--- docs/operations/data-catalogue.md. Three changes bundled because they
+-- docs/operations/data-catalogue/. Three changes bundled because they
 -- form one coherent reshape: identity gets two more "noun" types (match,
 -- venue), the structured-world rows that back those nouns gain entity_id
 -- columns, and source_documents gain three overlay layers above

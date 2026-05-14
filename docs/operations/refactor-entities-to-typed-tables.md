@@ -617,7 +617,7 @@ Plus the ORM models and `db/__init__.py` exports.
 
 Once executed:
 
-- **`docs/operations/data-catalogue.md`** — biggest update. New §1 becomes "Identity" with `people` + `people_attributes` + `people_roles` + `rounds` instead of `entities` + `entity_roles`. §2/§3/§4 tables get FK updates. New "Associations" subsection per output table. Schema overview diagram redrawn.
+- **`docs/operations/data-catalogue/`** — biggest update. Identity layer now lives in per-table files: `people.md`, `player_attributes.md`, `people_roles.md`, `rounds.md` (replacing the old `entities` + `entity_roles`). Output tables get FK updates and `*_associations.md` junction files. Schema overview diagram in `README.md` redrawn.
 - **`docs/architecture/04-information-architecture.md`** — describes the entity model conceptually; needs rewrite around typed tables.
 - **`docs/agents/system/source-discovery.md`** — Scout's dedupe references entity_id; update to match.
 - **`docs/concepts/entity-roles.md`** — rename to `people-roles.md`; rewrite around `people` table.

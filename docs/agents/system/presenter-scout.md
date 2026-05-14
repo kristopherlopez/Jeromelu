@@ -69,7 +69,7 @@ channel_id ──► run_presenter_scout()
 | `scout_presenter_candidates` | Staging inbox. Agent writes here; status `pending` → `confirmed` / `rejected` on review. |
 | `source_presenters` | Confirmed `(channel_id, person_id, role)` association. Created on confirm. |
 
-Schema details: [data-catalogue § scout_presenter_candidates](../../operations/data-catalogue.md#scout_presenter_candidates). Migration: `052_source_presenters.sql`.
+Schema details: [data-catalogue: scout_presenter_candidates](../../operations/data-catalogue/scout_presenter_candidates.md). Migration: `052_source_presenters.sql`.
 
 ---
 

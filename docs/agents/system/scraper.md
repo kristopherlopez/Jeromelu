@@ -74,7 +74,7 @@ These are candidates for promotion into `worker-scraper` Temporal activities onc
 
 The schema-side groundwork landed in migrations 028–032 — `venues`,
 `matches`, `match_team_lists`, `injuries`, plus `match_id` / `team_id`
-FKs on `player_rounds`. See [data-catalogue](../../operations/data-catalogue.md)
+FKs on `player_rounds`. See [data-catalogue](../../operations/data-catalogue/README.md)
 for table shapes.
 
 Five sync jobs build on top. **These are now formalised as Scout modules
