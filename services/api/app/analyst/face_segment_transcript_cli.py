@@ -23,6 +23,7 @@ Stdout (default) gets a markdown-style transcript:
 from __future__ import annotations
 
 import argparse
+import bisect
 import json
 import logging
 import sys
@@ -98,10 +99,24 @@ def segment_by_face(
 ) -> list[dict]:
     """Produce face-driven transcript segments for ``source_id``.
 
-    Returns one segment per contiguous run of frames with the same
-    active-speaker cluster_id. Each segment carries the time range, the
-    speaker (cluster_id + optional attributed person), and the
-    concatenated text of every Deepgram chunk that overlaps the range.
+    Word-first algorithm — the right way to do this on multi-cam edited
+    content where frame-aligned segments leave gaps that drop words:
+
+      1. Load every face detection and bucket per ``frame_ts``.
+      2. Compute the active-speaker cluster at each frame_ts (cluster
+         with the highest ``mouth_opening`` that crosses the threshold;
+         ``None`` if no face is above the threshold at that moment).
+      3. Load every Deepgram word from the doc's transcript JSON.
+      4. For each word, look up the active speaker at the word's start
+         time (latest frame_ts <= word.start). Every word gets a
+         speaker assignment (or ``None`` for "no face speaking").
+      5. Group consecutive same-speaker words into segments —
+         word-aligned start/end, no gaps.
+      6. Smooth same-speaker segments across multi-cam camera cuts up
+         to ``smooth_gap_seconds`` (a brief other-speaker run between
+         two same-speaker runs collapses into one).
+      7. Drop sub-``min_segment_seconds`` segments from the output (no
+         re-attribution; just hide them).
     """
     doc = (
         session.query(SourceDocument)
@@ -125,51 +140,76 @@ def segment_by_face(
     if not rows:
         return []
 
-    # 2) Bucket by frame_ts — at multi-cam sources there are usually
-    #    multiple detections per frame (one per face on screen).
+    # 2) Bucket by frame_ts. Multi-cam sources have multiple detections
+    #    per frame (one per face on screen).
     by_frame: dict[float, list[tuple[int | None, float]]] = defaultdict(list)
     for r in rows:
         mo = float(r.mouth_opening) if r.mouth_opening is not None else 0.0
         by_frame[float(r.frame_ts)].append((r.cluster_id, mo))
 
     # 3) Per-frame active speaker: cluster with highest mouth_opening,
-    #    provided it crosses the threshold. Otherwise NULL (silence /
-    #    everyone closed-mouth).
-    per_frame_speaker: list[tuple[float, int | None]] = []
-    for ts in sorted(by_frame.keys()):
-        ranked = sorted(by_frame[ts], key=lambda t: -t[1])
-        top_cid, top_mo = ranked[0]
-        speaker = top_cid if (top_cid is not None and top_mo >= mouth_threshold) else None
-        per_frame_speaker.append((ts, speaker))
+    #    provided it crosses the threshold. Otherwise NULL.
+    sorted_frame_ts = sorted(by_frame.keys())
+    per_frame_speaker: list[int | None] = []
+    for ts in sorted_frame_ts:
+        top_cid, top_mo = max(by_frame[ts], key=lambda t: t[1])
+        per_frame_speaker.append(
+            top_cid if (top_cid is not None and top_mo >= mouth_threshold) else None
+        )
 
-    # 4) Group consecutive same-speaker frames into raw segments.
+    # 4) Word-level transcript load.
+    if doc.s3_key:
+        try:
+            dg = json.loads(download_raw(doc.s3_key))
+            words = _deepgram_words_from_json(dg)
+        except Exception:
+            words = []
+    else:
+        words = []
+
+    if not words:
+        return []
+
+    # 5) Word-first speaker lookup. For each word, the active speaker
+    #    is whoever was speaking at the most recent face frame
+    #    at-or-before word.start.
+    def speaker_at(t: float) -> int | None:
+        idx = bisect.bisect_right(sorted_frame_ts, t) - 1
+        if idx < 0:
+            # Word starts before any face frame was recorded — no signal
+            # to attribute. Common for ~first few words if visual ID
+            # warmed up after audio started.
+            return None
+        return per_frame_speaker[idx]
+
+    word_speakers: list[tuple[float, float, str, int | None]] = []
+    for w_start, w_end, w_text in words:
+        word_speakers.append((w_start, w_end, w_text, speaker_at(w_start)))
+
+    # 6) Group consecutive same-speaker words into segments.
     raw_segments: list[dict] = []
-    cur_speaker: int | None = -2  # sentinel so first frame always opens
-    cur_start: float = 0.0
-    cur_last: float = 0.0
-    for ts, speaker in per_frame_speaker:
-        if speaker != cur_speaker:
-            if raw_segments or cur_speaker != -2:
-                raw_segments.append({
-                    "start": cur_start,
-                    "end": cur_last,
-                    "speaker_cluster_id": cur_speaker,
-                })
-            cur_speaker = speaker
-            cur_start = ts
-        cur_last = ts
-    raw_segments.append({
-        "start": cur_start,
-        "end": cur_last,
-        "speaker_cluster_id": cur_speaker,
-    })
+    cur: dict | None = None
+    for w_start, w_end, w_text, speaker in word_speakers:
+        if cur is not None and cur["speaker_cluster_id"] == speaker:
+            cur["end"] = w_end
+            cur["text"] = (cur["text"] + " " + w_text).strip() if w_text else cur["text"]
+        else:
+            if cur is not None:
+                raw_segments.append(cur)
+            cur = {
+                "start": w_start,
+                "end": w_end,
+                "speaker_cluster_id": speaker,
+                "text": w_text,
+            }
+    if cur is not None:
+        raw_segments.append(cur)
 
-    # 5) Smooth across short camera cuts: merge same-speaker segments
-    #    separated by a gap of at most ``smooth_gap_seconds``. Multi-cam
-    #    edits flip between co-hosts every 2-3s during a single
-    #    monologue — without smoothing, that monologue becomes a dozen
-    #    short flips. We only merge across other speakers, not silence
-    #    (silence is genuine information — someone took a breath).
+    # 7) Smooth same-speaker runs separated by brief other-speaker cuts.
+    #    Multi-cam editing flips between co-hosts every 2-3s during a
+    #    single monologue — without smoothing, that monologue becomes a
+    #    dozen short flips. Same logic as the old frame-aligned path,
+    #    now over the word-aligned segments.
     smoothed: list[dict] = []
     for seg in raw_segments:
         if (
@@ -179,30 +219,36 @@ def segment_by_face(
             and seg["start"] - smoothed[-1]["end"] <= smooth_gap_seconds
         ):
             smoothed[-1]["end"] = seg["end"]
+            smoothed[-1]["text"] = (smoothed[-1]["text"] + " " + seg["text"]).strip()
+        elif (
+            seg["speaker_cluster_id"] is not None
+            and len(smoothed) >= 2
+            and smoothed[-1]["speaker_cluster_id"] is not None
+            and smoothed[-1]["speaker_cluster_id"] != seg["speaker_cluster_id"]
+            and smoothed[-2]["speaker_cluster_id"] == seg["speaker_cluster_id"]
+            and (smoothed[-1]["end"] - smoothed[-1]["start"]) <= smooth_gap_seconds
+            and seg["start"] - smoothed[-2]["end"] <= smooth_gap_seconds * 2
+        ):
+            # [A] [B short] [A] → collapse the B cut into the A around it.
+            # Keep the interrupted-cluster's text in place (it was its
+            # words); just extend the prior A and append this A's words.
+            kept = smoothed[-1]
+            smoothed.pop()
+            smoothed[-1]["end"] = seg["end"]
+            smoothed[-1]["text"] = (
+                smoothed[-1]["text"] + " " + kept["text"] + " " + seg["text"]
+            ).strip()
         else:
-            # Also walk backwards to absorb a same-speaker run that was
-            # interrupted by a brief other-speaker cut. E.g. [A 5s] [B 1s] [A 4s]
-            # becomes [A 10s] because the B cut was a multi-cam flash.
-            if (
-                seg["speaker_cluster_id"] is not None
-                and len(smoothed) >= 2
-                and smoothed[-1]["speaker_cluster_id"] is not None
-                and smoothed[-1]["speaker_cluster_id"] != seg["speaker_cluster_id"]
-                and smoothed[-2]["speaker_cluster_id"] == seg["speaker_cluster_id"]
-                and (smoothed[-1]["end"] - smoothed[-1]["start"]) <= smooth_gap_seconds
-                and seg["start"] - smoothed[-2]["end"] <= smooth_gap_seconds * 2
-            ):
-                # Drop the brief interruption, extend the prior same-speaker.
-                smoothed.pop()
-                smoothed[-1]["end"] = seg["end"]
-            else:
-                smoothed.append(seg)
+            smoothed.append(seg)
 
-    # 6) Drop tiny segments from the output (just filter; don't
-    #    re-attribute them to anyone — that risks lying about who spoke).
-    merged = [s for s in smoothed if (s["end"] - s["start"]) >= min_segment_seconds or s["speaker_cluster_id"] is None]
+    # 8) Drop tiny segments from the output. Don't re-attribute them
+    #    to anyone — that risks lying about who spoke.
+    merged = [
+        s for s in smoothed
+        if (s["end"] - s["start"]) >= min_segment_seconds or s["speaker_cluster_id"] is None
+    ]
 
-    # 6) Resolve cluster_id → person_name via SourceFaceCluster + Person.
+    # 9) Resolve cluster_id → person_name via SourceFaceCluster + Person.
     cluster_meta = {
         c.cluster_id: c
         for c in session.query(SourceFaceCluster)
@@ -217,23 +263,7 @@ def segment_by_face(
         for p in session.query(Person).filter(Person.person_id.in_(person_ids)).all()
     } if person_ids else {}
 
-    # 7) Word-level transcript matching. Sentence-level utterances are
-    #    too coarse: a single utterance often spans multiple face
-    #    segments after a camera cut, and chunk.start_ts can fall
-    #    outside the segment that actually holds the spoken words.
-    #    Load the Deepgram JSON once and bucket each word into the
-    #    segment whose time range contains its start.
-    if doc.s3_key:
-        try:
-            dg = json.loads(download_raw(doc.s3_key))
-            words = _deepgram_words_from_json(dg)
-        except Exception:
-            words = []
-    else:
-        words = []
-
     for seg in merged:
-        seg["text"] = ""
         cid = seg["speaker_cluster_id"]
         if cid is None:
             seg["speaker_label"] = "—"
@@ -243,19 +273,6 @@ def segment_by_face(
             pid = cmeta.attributed_person_id if cmeta else None
             seg["speaker_label"] = f"FACE_{cid}"
             seg["person_name"] = person_name_by_id.get(pid) if pid else None
-
-    # Two-pointer walk: words and segments are both sorted by start.
-    # Each word lands in the first segment whose [start, end) contains
-    # its start timestamp.
-    seg_idx = 0
-    for w_start, _w_end, w_text in words:
-        while seg_idx < len(merged) and merged[seg_idx]["end"] <= w_start:
-            seg_idx += 1
-        if seg_idx >= len(merged):
-            break
-        if merged[seg_idx]["start"] <= w_start < merged[seg_idx]["end"]:
-            sep = " " if merged[seg_idx]["text"] else ""
-            merged[seg_idx]["text"] = merged[seg_idx]["text"] + sep + w_text
 
     return merged
 
