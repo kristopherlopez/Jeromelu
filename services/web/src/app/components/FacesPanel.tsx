@@ -121,6 +121,11 @@ export default function FacesPanel({
   // cluster. Runs get a Move action instead (re-cluster a stretch).
   const [assigning, setAssigning] = useState<ClusterSelection | null>(null);
   const [showExcluded, setShowExcluded] = useState(false);
+  // "cluster" (default): per-cluster sections, runs sorted within the
+  // section. "chronological": flatten every run across every cluster
+  // into one timeline sorted by start_ts. Both views share the same
+  // underlying data — only the grouping flips.
+  const [viewMode, setViewMode] = useState<"cluster" | "chronological">("cluster");
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -229,50 +234,95 @@ export default function FacesPanel({
   }
 
   const hiddenCount = data.excluded_count ?? 0;
+  const visiblePositions = data.positions.filter(
+    (p) => showExcluded || !p.excluded,
+  );
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto custom-scrollbar pr-2">
-      {(hiddenCount > 0 || showExcluded) && (
-        <div
-          className="flex items-center justify-between rounded border px-3 py-1.5 text-xs"
-          style={{
-            borderColor: "var(--border)",
-            backgroundColor: "var(--background-deep)",
-            color: "var(--foreground-secondary)",
-          }}
-        >
-          <span>
-            {showExcluded
-              ? `Showing excluded clusters too`
-              : `${hiddenCount} cluster${hiddenCount === 1 ? "" : "s"} hidden as portraits / noise`}
+      {/* Controls row — view-mode toggle + exclude-visibility toggle.
+          Shown unconditionally so the operator can flip between
+          "By cluster" and "Chronological" at any time. */}
+      <div
+        className="flex flex-wrap items-center justify-between gap-2 rounded border px-3 py-1.5 text-xs"
+        style={{
+          borderColor: "var(--border)",
+          backgroundColor: "var(--background-deep)",
+          color: "var(--foreground-secondary)",
+        }}
+      >
+        <div className="flex items-center gap-1">
+          <span className="mr-1 text-[10px] uppercase tracking-wider" style={{ color: "var(--foreground-ghost)" }}>
+            View
           </span>
           <button
             type="button"
-            onClick={() => setShowExcluded((v) => !v)}
-            className="rounded border px-2 py-0.5 text-[10px] uppercase tracking-wider"
-            style={{ borderColor: "var(--border)" }}
+            onClick={() => setViewMode("cluster")}
+            className="rounded border px-2 py-0.5 text-[10px] uppercase tracking-wider transition-colors"
+            style={{
+              borderColor: viewMode === "cluster" ? "var(--accent)" : "var(--border)",
+              color: viewMode === "cluster" ? "var(--accent)" : "var(--foreground-secondary)",
+            }}
           >
-            {showExcluded ? "Hide excluded" : "Show excluded"}
+            By cluster
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("chronological")}
+            className="rounded border px-2 py-0.5 text-[10px] uppercase tracking-wider transition-colors"
+            style={{
+              borderColor: viewMode === "chronological" ? "var(--accent)" : "var(--border)",
+              color: viewMode === "chronological" ? "var(--accent)" : "var(--foreground-secondary)",
+            }}
+          >
+            Chronological
           </button>
         </div>
-      )}
-      {data.positions.map((pos) => (
-        <PositionSection
-          key={pos.position_id}
-          position={pos}
+        {(hiddenCount > 0 || showExcluded) && (
+          <div className="flex items-center gap-2">
+            <span>
+              {showExcluded
+                ? "Showing excluded clusters too"
+                : `${hiddenCount} cluster${hiddenCount === 1 ? "" : "s"} hidden as portraits / noise`}
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowExcluded((v) => !v)}
+              className="rounded border px-2 py-0.5 text-[10px] uppercase tracking-wider"
+              style={{ borderColor: "var(--border)" }}
+            >
+              {showExcluded ? "Hide excluded" : "Show excluded"}
+            </button>
+          </div>
+        )}
+      </div>
+      {viewMode === "chronological" ? (
+        <ChronologicalRunsList
+          positions={visiblePositions}
           sourceId={sourceId}
           onSeek={onSeek}
-          onAssign={() => setAssigning(clusterSelectionFrom(pos))}
-          onOverride={overrideCluster}
           onMoveRun={moveRun}
-          allClusters={data.positions
-            .filter((p) => p.cluster_id !== null && p.cluster_id !== undefined)
-            .map((p) => ({
-              clusterId: p.cluster_id as number,
-              label: p.label,
-            }))}
+          onAssign={(pos) => setAssigning(clusterSelectionFrom(pos))}
         />
-      ))}
+      ) : (
+        visiblePositions.map((pos) => (
+          <PositionSection
+            key={pos.position_id}
+            position={pos}
+            sourceId={sourceId}
+            onSeek={onSeek}
+            onAssign={() => setAssigning(clusterSelectionFrom(pos))}
+            onOverride={overrideCluster}
+            onMoveRun={moveRun}
+            allClusters={data.positions
+              .filter((p) => p.cluster_id !== null && p.cluster_id !== undefined)
+              .map((p) => ({
+                clusterId: p.cluster_id as number,
+                label: p.label,
+              }))}
+          />
+        ))
+      )}
       {assigning && (
         <AssignRunModal
           sourceId={sourceId}
@@ -674,5 +724,148 @@ function FaceThumb({
         className="h-full w-full object-cover"
       />
     </div>
+  );
+}
+
+// Stable per-cluster colour, so each cluster's runs read the same hue
+// across the timeline. Matches the palette used in FaceTranscriptPanel
+// so the operator can correlate face-cluster colour across tabs.
+const CLUSTER_PALETTE = [
+  "#60a5fa", "#fbbf24", "#4ade80", "#c084fc",
+  "#f87171", "#22d3ee", "#fb923c", "#a3e635",
+  "#f472b6", "#94a3b8", "#facc15", "#34d399",
+];
+function colorForCluster(cid: number | null | undefined): string {
+  if (cid === null || cid === undefined) return "var(--foreground-ghost)";
+  return CLUSTER_PALETTE[cid % CLUSTER_PALETTE.length];
+}
+
+function ChronologicalRunsList({
+  positions,
+  sourceId,
+  onSeek,
+  onMoveRun,
+  onAssign,
+}: {
+  positions: FacePosition[];
+  sourceId: string;
+  onSeek: (seconds: number) => void;
+  onMoveRun: (
+    sourceClusterId: number | null,
+    targetClusterId: number,
+    startTs: number,
+    endTs: number,
+  ) => void;
+  onAssign: (pos: FacePosition) => void;
+}) {
+  // Flatten every cluster's runs into one timeline, tagged with the
+  // position metadata so each row can still expose the per-cluster
+  // label + assign action.
+  const allRuns = useMemo(() => {
+    const out: { run: FaceRun; pos: FacePosition }[] = [];
+    for (const pos of positions) {
+      for (const r of pos.runs) {
+        out.push({ run: r, pos });
+      }
+    }
+    out.sort((a, b) => a.run.start_ts - b.run.start_ts);
+    return out;
+  }, [positions]);
+
+  // Same Move-target list as the per-cluster sections expose, computed
+  // once and reused for every row.
+  const allClusters = useMemo(
+    () =>
+      positions
+        .filter((p) => p.cluster_id !== null && p.cluster_id !== undefined)
+        .map((p) => ({
+          clusterId: p.cluster_id as number,
+          label: p.label,
+        })),
+    [positions],
+  );
+
+  if (allRuns.length === 0) {
+    return (
+      <div className="text-xs" style={{ color: "var(--foreground-ghost)" }}>
+        No runs in the visible clusters.
+      </div>
+    );
+  }
+
+  return (
+    <section
+      className="rounded border p-3"
+      style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
+    >
+      <header className="mb-2 flex items-baseline justify-between gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wider">
+          Chronological — {allRuns.length} runs across {positions.length}{" "}
+          {positions.length === 1 ? "cluster" : "clusters"}
+        </h3>
+      </header>
+      <ul className="flex flex-col gap-2">
+        {allRuns.map(({ run, pos }, idx) => {
+          const color = colorForCluster(pos.cluster_id);
+          return (
+            <li
+              key={`${pos.position_id}-${idx}-${run.start_ts}`}
+              className="flex flex-col gap-1 rounded border px-2 py-1.5"
+              style={{
+                borderColor: "var(--border)",
+                backgroundColor: "var(--background-deep)",
+              }}
+            >
+              {/* Cluster chip + assign affordance — same identity info
+                  the cluster-view header carries, repeated per row so
+                  the operator can act without scrolling back to a
+                  cluster section. */}
+              <div className="flex items-center justify-between gap-2 text-[11px]">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="inline-block h-2 w-2 rounded-full"
+                    style={{ backgroundColor: color }}
+                  />
+                  <span className="font-semibold uppercase tracking-wider">
+                    {pos.label}
+                  </span>
+                  {pos.dominant_person_name && (
+                    <span style={{ color: "var(--accent)" }}>
+                      → {pos.dominant_person_name}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onAssign(pos)}
+                  className="rounded border px-2 py-0.5 text-[10px] uppercase tracking-wider"
+                  style={{ borderColor: "var(--border)" }}
+                  title={`Assign all detections in ${pos.label} to a Person`}
+                >
+                  {pos.dominant_person_name ? "Reassign cluster" : "Assign cluster"}
+                </button>
+              </div>
+              <RunRow
+                run={run}
+                sourceId={sourceId}
+                onSeek={onSeek}
+                currentClusterId={pos.cluster_id ?? null}
+                otherClusters={allClusters.filter(
+                  (c) => c.clusterId !== pos.cluster_id,
+                )}
+                onMove={(target) =>
+                  onMoveRun(
+                    pos.cluster_id ?? null,
+                    target,
+                    run.start_ts,
+                    run.end_ts,
+                  )
+                }
+              />
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
