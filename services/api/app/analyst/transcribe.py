@@ -338,6 +338,17 @@ def transcribe(
                         logger.warning(
                             "Visual ID failed: %s — proceeding voice-only", exc,
                         )
+                    except Exception as exc:
+                        # Anything else from visual_identify (RemoteInferenceError
+                        # timeouts on cold-started SageMaker endpoints, S3
+                        # transient errors, container OOMs) must not roll back
+                        # the whole pyannote + Deepgram + DB-writes transaction.
+                        # Fall back to voice-only attribution; visual ID can be
+                        # re-run separately once the endpoint is warm.
+                        logger.warning(
+                            "Visual ID raised %s: %s — proceeding voice-only",
+                            type(exc).__name__, exc,
+                        )
         except VideoStagingError as exc:
             logger.warning(
                 "Video staging failed: %s — proceeding voice-only", exc,

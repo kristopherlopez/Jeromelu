@@ -444,3 +444,28 @@ export interface IdentityAlignmentResponse {
    *  one face cluster — pyannote merged across a face transition. */
   conflated_turn_ids: string[];
 }
+
+/** Face-driven transcript segment. One row per contiguous run of frames
+ *  where the same face cluster is the active speaker (mouth opening above
+ *  threshold), smoothed across multi-cam camera cuts, with Deepgram words
+ *  whose start falls inside the segment window attached as text. */
+export interface FaceTranscriptSegment {
+  start: number;
+  end: number;
+  duration: number;
+  face_cluster_id: number | null;
+  speaker_label: string;
+  person_name: string | null;
+  text: string;
+}
+
+export interface FaceTranscriptResponse {
+  source_id: string;
+  params_used: {
+    mouth_threshold: number;
+    smooth_gap: number;
+    min_segment: number;
+    include_silence: boolean;
+  };
+  segments: FaceTranscriptSegment[];
+}

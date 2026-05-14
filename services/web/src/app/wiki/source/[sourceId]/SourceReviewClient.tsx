@@ -18,6 +18,7 @@ import EpisodeTimeline from "@/app/components/EpisodeTimeline";
 import FacesPanel from "@/app/components/FacesPanel";
 import VoicesPanel from "@/app/components/VoicesPanel";
 import AlignmentPanel from "@/app/components/AlignmentPanel";
+import FaceTranscriptPanel from "@/app/components/FaceTranscriptPanel";
 
 interface Props {
   data: SourceDetailResponse;
@@ -36,7 +37,7 @@ export default function SourceReviewClient({ data, allSources }: Props) {
   const [speakers, setSpeakers] = useState<Speaker[]>(data.speakers ?? []);
   const [currentTime, setCurrentTime] = useState(0);
   const [activeTab, setActiveTab] = useState<
-    "transcript" | "claims" | "faces" | "voices" | "alignment"
+    "transcript" | "claims" | "faces" | "voices" | "alignment" | "face_transcript"
   >("transcript");
   // Bumped after a successful face cluster assign so the overlay
   // remounts and re-fetches the regenerated face-track JSON. Combined
@@ -386,6 +387,22 @@ export default function SourceReviewClient({ data, allSources }: Props) {
                 Alignment
               </button>
             )}
+            {/* Face-driven transcript — exploratory view that bypasses
+                pyannote and segments purely by which face cluster has
+                mouth open. Same precondition as Alignment: needs face
+                detections (i.e. visual ID to have run). */}
+            {source.face_track_url && (
+              <button
+                onClick={() => setActiveTab("face_transcript")}
+                className="pb-2 text-[11px] font-semibold uppercase tracking-wider transition-colors"
+                style={{
+                  color: activeTab === "face_transcript" ? "var(--accent)" : "var(--foreground-muted)",
+                  borderBottom: activeTab === "face_transcript" ? "2px solid var(--accent)" : "2px solid transparent",
+                }}
+              >
+                Face transcript
+              </button>
+            )}
           </div>
 
           {/* Tab content */}
@@ -439,6 +456,11 @@ export default function SourceReviewClient({ data, allSources }: Props) {
               />
             ) : activeTab === "alignment" ? (
               <AlignmentPanel
+                sourceId={source.source_id}
+                onSeek={handleSeek}
+              />
+            ) : activeTab === "face_transcript" ? (
+              <FaceTranscriptPanel
                 sourceId={source.source_id}
                 onSeek={handleSeek}
               />

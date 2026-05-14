@@ -25,6 +25,12 @@ from app.analyst.identify_voice import (
     enrollment_context,
 )
 from app.analyst.identity_alignment import fetch_alignment
+from app.analyst.face_segment_transcript_cli import (
+    DEFAULT_MIN_SEGMENT_SECONDS as FACE_TX_DEFAULT_MIN_SEGMENT,
+    DEFAULT_MOUTH_THRESHOLD as FACE_TX_DEFAULT_MOUTH,
+    DEFAULT_SMOOTH_GAP_SECONDS as FACE_TX_DEFAULT_SMOOTH,
+    segment_by_face,
+)
 from app.analyst.voice_cluster_hdbscan import VoiceClusterParams
 from app.analyst.voice_cluster_runner import recluster_source_voice
 from app.analyst.voice_clusters import (
@@ -2238,6 +2244,88 @@ def recluster_voice_clusters(
             "min_samples": params.min_samples,
             "noise_threshold": params.noise_threshold,
         },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Face-driven transcript — segment by face presence + mouth opening (ASD),
+# bypassing pyannote. Each segment carries the active-speaker cluster
+# (and attributed person if any) plus the Deepgram words whose start
+# falls inside the segment window. Exploratory surface — answers "what
+# does the transcript look like if face is the source of truth?".
+# ---------------------------------------------------------------------------
+
+
+@router.get("/sources/{source_id}/face-transcript")
+def get_face_transcript(
+    source_id: uuid.UUID,
+    mouth_threshold: float | None = None,
+    smooth_gap: float | None = None,
+    min_segment: float | None = None,
+    include_silence: bool = False,
+    db: Session = Depends(get_db),
+):
+    """Return a face-driven chronological transcript for the source.
+
+    Walks ``source_face_detections`` frame-by-frame, picks the active
+    speaker per frame using the existing mouth-opening ASD signal,
+    merges same-speaker windows across multi-cam camera cuts up to
+    ``smooth_gap``, drops sub-``min_segment`` flickers, and attaches
+    Deepgram word-level text to each segment.
+
+    Bypasses ``source_speakers`` / pyannote entirely — the answer here
+    is "who is on screen with mouth open at this moment". Useful as a
+    diagnostic counterpart to the pyannote Voices view; the two should
+    converge on single-cam recordings and disagree systematically on
+    multi-cam edited content (camera flips while audio continues).
+    """
+    source = db.query(Source).filter(Source.source_id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+
+    segments = segment_by_face(
+        db, source_id,
+        mouth_threshold=(
+            mouth_threshold if mouth_threshold is not None else FACE_TX_DEFAULT_MOUTH
+        ),
+        smooth_gap_seconds=(
+            smooth_gap if smooth_gap is not None else FACE_TX_DEFAULT_SMOOTH
+        ),
+        min_segment_seconds=(
+            min_segment if min_segment is not None else FACE_TX_DEFAULT_MIN_SEGMENT
+        ),
+    )
+
+    if not include_silence:
+        segments = [s for s in segments if s["speaker_cluster_id"] is not None]
+
+    payload = [
+        {
+            "start": s["start"],
+            "end": s["end"],
+            "duration": s["end"] - s["start"],
+            "face_cluster_id": s["speaker_cluster_id"],
+            "speaker_label": s["speaker_label"],
+            "person_name": s["person_name"],
+            "text": s["text"],
+        }
+        for s in segments
+    ]
+    return {
+        "source_id": str(source_id),
+        "params_used": {
+            "mouth_threshold": (
+                mouth_threshold if mouth_threshold is not None else FACE_TX_DEFAULT_MOUTH
+            ),
+            "smooth_gap": (
+                smooth_gap if smooth_gap is not None else FACE_TX_DEFAULT_SMOOTH
+            ),
+            "min_segment": (
+                min_segment if min_segment is not None else FACE_TX_DEFAULT_MIN_SEGMENT
+            ),
+            "include_silence": include_silence,
+        },
+        "segments": payload,
     }
 
 
