@@ -688,6 +688,28 @@ The original `make enroll-voice` CLI still exists for the bootstrap workflow whe
 - **No `Move` action at the turn level.** Pyannote's turn boundaries are accepted as-is; if a turn is misattributed within a cluster (e.g. the host laughs during a guest's monologue and pyannote merges them), the existing per-turn reassign click on the face overlay handles it. The Voices tab operates at cluster granularity only.
 - **Voice cluster assigns don't regenerate the face-track JSON.** The cached JSON only carries face/visual identity; speaker-label-driven attribution shows up via `source_speakers.speaker_person_id`, which the overlay reads directly from the lifted speakers list.
 
+### Re-clustering with HDBSCAN (`cluster_label`)
+
+Pyannote's per-source clustering is one input to the Voices tab, not the source of truth. Empirically pyannote conflates two co-commentators with similar pitch and pacing into a single `SPEAKER_NN`. To handle that without losing pyannote's original assignment, `source_speakers` carries a second free-text column `cluster_label` that any post-pyannote clustering pass can write to. The Voices tab and AssignVoice flow both group/match by `coalesce(cluster_label, speaker_label)` — so once HDBSCAN runs, its labels take precedence; rows it didn't reach (no embedding, or HDBSCAN-noise) fall back to pyannote's `SPEAKER_NN` so the source stays fully navigable.
+
+`POST /api/sources/{id}/voice-clusters/recluster` (and `make voice-cluster SOURCE_ID=...`) runs the in-process HDBSCAN pass over per-turn wespeaker medoids. It mirrors the face-cluster code: L2-normalise → HDBSCAN with cosine-equivalent Euclidean → relabel by descending cluster size → centroid-cosine post-filter to eject loose points to noise. Output labels use an `H` prefix (`H00`, `H01`, …) so they never collide with pyannote's `SPEAKER_NN` namespace.
+
+Three knobs are exposed in the API and the VoicesPanel header:
+
+| Knob | Default | Effect |
+|---|---|---|
+| `min_cluster_size` | 5 | Lower → finds smaller clusters (e.g. a guest commentator with only a handful of turns). Real wespeaker medoid sets are ~hundreds of turns max, so this is much lower than the face-cluster default of 20. |
+| `min_samples` | 2 | Lower → permissive density. Voice embeddings are softer than ArcFace (more intra-speaker variation from phonetic content / mic / emotion). |
+| `noise_threshold` | 0.25 | Cosine floor for inclusion: turns whose cosine to their own cluster's centroid falls below this are ejected to noise (NULL `cluster_label`). |
+
+The pass is pure SQL + CPU — no SageMaker, no GPU. Re-running with new params is cheap (well under a second on a 50-min source) and idempotent: every turn in the document is reset to `cluster_label=NULL` before the new labels are written, so stale H-labels from a previous run never leak through. Pyannote's `speaker_label` column is never touched.
+
+### Limitations of the HDBSCAN pass
+
+- **Same per-source scope.** HDBSCAN runs over one source's medoids at a time. Cross-source person discovery is a separate clustering job (HDBSCAN over per-cluster medoids spanning all unassigned clusters in the corpus) — useful as a periodic batch to surface new presenters, not implemented yet.
+- **Sensitive to params.** Voice embeddings cluster less crisply than face. The same source can produce 3 or 5 clusters depending on `min_cluster_size` and `noise_threshold`. The tuning sliders in VoicesPanel exist for exactly this reason — there's no universal default.
+- **Doesn't touch turn boundaries.** HDBSCAN reassigns turns to clusters; it doesn't change which span of audio is one turn. If pyannote merged two consecutive speakers into one long turn, that turn stays as-is regardless of how it gets re-clustered. The face-driven re-segmentation path (in backlog) is the complement that splits turns.
+
 ---
 
 ## Identity alignment (face × voice matrix)

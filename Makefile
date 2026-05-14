@@ -1,4 +1,4 @@
-.PHONY: up down db-shell migrate migrate-status seed-teams seed-venues fetch-players seed-players api web logs clean collect-audio collect-video transcribe extract-transcript diarize diarize-compare enroll-voice enroll-face scout-presenters lineup-build lineup-deploy lineup-status lineup-delete test test-eval prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all prod-refresh-videos prod-refresh-channel-stats prod-channel-coverage prod-seed-teams prod-seed-players prod-refresh-players prod-fetch-and-refresh-players prod-refresh-players-nrlcom deploy-prod prod-shell prod-logs
+.PHONY: up down db-shell migrate migrate-status seed-teams seed-venues fetch-players seed-players api web logs clean collect-audio collect-video transcribe extract-transcript diarize diarize-compare voice-cluster enroll-voice enroll-face scout-presenters lineup-build lineup-deploy lineup-status lineup-delete test test-eval prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all prod-refresh-videos prod-refresh-channel-stats prod-channel-coverage prod-seed-teams prod-seed-players prod-refresh-players prod-fetch-and-refresh-players prod-refresh-players-nrlcom deploy-prod prod-shell prod-logs
 
 # Start local infrastructure
 up:
@@ -91,6 +91,17 @@ diarize:
 diarize-compare:
 	@test -n "$(SOURCE_ID)" || (echo "SOURCE_ID is required: make diarize-compare SOURCE_ID=<uuid>" && exit 2)
 	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.analyst.diarize_compare $(SOURCE_ID) $(if $(INTERVAL),--interval $(INTERVAL)) $(if $(SHOW_ALL),--show-all-rows)
+
+# Re-cluster voice turns with HDBSCAN. Reads per-turn medoids from the DB
+# and writes new labels to source_speakers.cluster_label. The Voices tab
+# and AssignVoice flow pick them up via coalesce(cluster_label, speaker_label).
+# Usage: make voice-cluster SOURCE_ID=<uuid> [MIN_CLUSTER_SIZE=5] [MIN_SAMPLES=2] [NOISE=0.25]
+voice-cluster:
+	@test -n "$(SOURCE_ID)" || (echo "SOURCE_ID is required: make voice-cluster SOURCE_ID=<uuid>" && exit 2)
+	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.analyst.voice_cluster_cli $(SOURCE_ID) \
+	  $(if $(MIN_CLUSTER_SIZE),--min-cluster-size $(MIN_CLUSTER_SIZE)) \
+	  $(if $(MIN_SAMPLES),--min-samples $(MIN_SAMPLES)) \
+	  $(if $(NOISE),--noise-threshold $(NOISE))
 
 # Phase 3 voice enrollment — extract sliding-window embeddings from a
 # known span of source audio and write one PersonVoiceprint row per

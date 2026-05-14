@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { apiFetch } from "@/lib/api";
+import { apiFetch, apiPost } from "@/lib/api";
 import type {
   VoiceCluster,
   VoiceClusterTurn,
@@ -70,6 +70,20 @@ function methodColor(method: string | null): string {
   }
 }
 
+interface ReclusterResponse {
+  source_id: string;
+  n_turns_total: number;
+  n_turns_with_embedding: number;
+  n_clusters: number;
+  n_noise: number;
+  cluster_sizes: number[];
+  params_used: {
+    min_cluster_size: number;
+    min_samples: number;
+    noise_threshold: number;
+  };
+}
+
 export default function VoicesPanel({
   sourceId,
   onSeek,
@@ -79,6 +93,16 @@ export default function VoicesPanel({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [assigning, setAssigning] = useState<VoiceCluster | null>(null);
+
+  // HDBSCAN re-cluster controls. Defaults mirror VoiceClusterParams on
+  // the API side — kept loose enough for typical commentary podcasts but
+  // tunable per-source from this header without redeploying.
+  const [minClusterSize, setMinClusterSize] = useState(5);
+  const [minSamples, setMinSamples] = useState(2);
+  const [noiseThreshold, setNoiseThreshold] = useState(0.25);
+  const [reclustering, setReclustering] = useState(false);
+  const [reclusterStatus, setReclusterStatus] =
+    useState<ReclusterResponse | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -99,6 +123,28 @@ export default function VoicesPanel({
     refresh();
   }, [refresh]);
 
+  const handleRecluster = useCallback(async () => {
+    setReclustering(true);
+    setError(null);
+    try {
+      const r = await apiPost<ReclusterResponse, {
+        min_cluster_size: number;
+        min_samples: number;
+        noise_threshold: number;
+      }>(`/api/sources/${sourceId}/voice-clusters/recluster`, {
+        min_cluster_size: minClusterSize,
+        min_samples: minSamples,
+        noise_threshold: noiseThreshold,
+      });
+      setReclusterStatus(r);
+      await refresh();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setReclustering(false);
+    }
+  }, [sourceId, minClusterSize, minSamples, noiseThreshold, refresh]);
+
   if (loading) {
     return (
       <div className="text-xs" style={{ color: "var(--foreground-ghost)" }}>
@@ -113,17 +159,113 @@ export default function VoicesPanel({
       </div>
     );
   }
+  const reclusterControls = (
+    <section
+      className="flex flex-col gap-2 rounded border px-3 py-2"
+      style={{
+        borderColor: "var(--border)",
+        backgroundColor: "var(--background-deep)",
+      }}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <h3
+          className="text-[11px] font-semibold uppercase tracking-wider"
+          style={{ color: "var(--foreground-secondary)" }}
+        >
+          HDBSCAN re-cluster
+        </h3>
+        <button
+          type="button"
+          onClick={handleRecluster}
+          disabled={reclustering}
+          className="rounded border px-2 py-0.5 text-[11px]"
+          style={{
+            borderColor: "var(--border)",
+            opacity: reclustering ? 0.5 : 1,
+            cursor: reclustering ? "wait" : "pointer",
+          }}
+        >
+          {reclustering ? "Re-clustering…" : "Re-cluster"}
+        </button>
+      </div>
+      <div className="flex flex-wrap items-center gap-3 text-[11px]">
+        <label className="flex items-center gap-1">
+          <span style={{ color: "var(--foreground-ghost)" }}>min cluster</span>
+          <input
+            type="number"
+            min={2}
+            max={50}
+            value={minClusterSize}
+            onChange={(e) =>
+              setMinClusterSize(Math.max(2, Number(e.target.value) || 2))
+            }
+            disabled={reclustering}
+            className="w-12 rounded border px-1 py-0.5 text-right"
+            style={{ borderColor: "var(--border)" }}
+          />
+        </label>
+        <label className="flex items-center gap-1">
+          <span style={{ color: "var(--foreground-ghost)" }}>min samples</span>
+          <input
+            type="number"
+            min={1}
+            max={20}
+            value={minSamples}
+            onChange={(e) =>
+              setMinSamples(Math.max(1, Number(e.target.value) || 1))
+            }
+            disabled={reclustering}
+            className="w-12 rounded border px-1 py-0.5 text-right"
+            style={{ borderColor: "var(--border)" }}
+          />
+        </label>
+        <label className="flex items-center gap-1">
+          <span style={{ color: "var(--foreground-ghost)" }}>
+            noise floor (cos)
+          </span>
+          <input
+            type="number"
+            min={0}
+            max={1}
+            step={0.05}
+            value={noiseThreshold}
+            onChange={(e) =>
+              setNoiseThreshold(
+                Math.max(0, Math.min(1, Number(e.target.value) || 0)),
+              )
+            }
+            disabled={reclustering}
+            className="w-14 rounded border px-1 py-0.5 text-right"
+            style={{ borderColor: "var(--border)" }}
+          />
+        </label>
+        {reclusterStatus && (
+          <span style={{ color: "var(--foreground-ghost)" }}>
+            Last run: {reclusterStatus.n_clusters} clusters · sizes [
+            {reclusterStatus.cluster_sizes.join(", ")}] · {reclusterStatus.n_noise}{" "}
+            noise turns (of {reclusterStatus.n_turns_with_embedding} with
+            embedding)
+          </span>
+        )}
+      </div>
+    </section>
+  );
+
   if (!data || data.speakers.length === 0) {
     return (
-      <div className="text-xs" style={{ color: "var(--foreground-ghost)" }}>
-        No voice clusters for this source — pyannote hasn't run, or all turns
-        lack a speaker_label.
+      <div className="flex h-full flex-col gap-4 overflow-y-auto custom-scrollbar pr-2">
+        {reclusterControls}
+        <div className="text-xs" style={{ color: "var(--foreground-ghost)" }}>
+          No voice clusters for this source — pyannote hasn't run, or all
+          turns lack a speaker_label.
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto custom-scrollbar pr-2">
+      {reclusterControls}
       {data.speakers.map((sp) => (
         <VoiceClusterSection
           key={sp.speaker_label}

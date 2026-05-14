@@ -210,6 +210,7 @@ class SourceSpeaker(Base):
         UUID(as_uuid=True), ForeignKey("people.person_id", ondelete="SET NULL")
     )
     speaker_label: Mapped[str | None] = mapped_column(Text)
+    cluster_label: Mapped[str | None] = mapped_column(Text)
     start_ts: Mapped[float] = mapped_column(Float, nullable=False)
     end_ts: Mapped[float] = mapped_column(Float, nullable=False)
     confidence: Mapped[float | None] = mapped_column(Float)

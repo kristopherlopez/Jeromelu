@@ -19,6 +19,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from jeromelu_shared.db import SourceChunk, SourceDocument, SourceSpeaker
@@ -163,10 +164,20 @@ def compute_voice_clusters(session: Session, source_id: UUID) -> dict:
     # Don't load ``embedding`` — it's a 256-dim pgvector we only need
     # to know is non-null. The boolean projection saves the pgvector
     # deserialisation cost across hundreds of rows.
+    #
+    # Group by ``coalesce(cluster_label, speaker_label)`` so any custom
+    # clustering pass (HDBSCAN over wespeaker medoids, manual edits,
+    # face-driven re-segmentation) takes precedence over pyannote's raw
+    # SPEAKER_NN. NULL ``cluster_label`` falls through to ``speaker_label``
+    # so a partially-clustered source (HDBSCAN-noise turns) stays
+    # navigable under its original pyannote grouping.
+    effective_label = func.coalesce(
+        SourceSpeaker.cluster_label, SourceSpeaker.speaker_label,
+    ).label("speaker_label")
     raw_rows = (
         session.query(
             SourceSpeaker.segment_id,
-            SourceSpeaker.speaker_label,
+            effective_label,
             SourceSpeaker.start_ts,
             SourceSpeaker.end_ts,
             SourceSpeaker.speaker_person_id,
@@ -174,7 +185,11 @@ def compute_voice_clusters(session: Session, source_id: UUID) -> dict:
             (SourceSpeaker.embedding.isnot(None)).label("has_embedding"),
         )
         .filter(SourceSpeaker.document_id == doc.document_id)
-        .filter(SourceSpeaker.speaker_label.isnot(None))
+        .filter(
+            func.coalesce(
+                SourceSpeaker.cluster_label, SourceSpeaker.speaker_label,
+            ).isnot(None),
+        )
         .order_by(SourceSpeaker.start_ts)
         .all()
     )

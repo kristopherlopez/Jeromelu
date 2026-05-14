@@ -19,6 +19,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from jeromelu_shared.db import (
@@ -723,12 +724,19 @@ def fetch_alignment(session: Session, source_id: UUID) -> dict:
         for r in det_rows
     ]
 
+    # Group by ``coalesce(cluster_label, speaker_label)`` so any custom
+    # clustering pass (HDBSCAN, manual edits, face-driven re-segmentation)
+    # takes precedence over pyannote's raw SPEAKER_NN — matches the
+    # Voices tab and AssignVoice flow.
+    effective_label = func.coalesce(
+        SourceSpeaker.cluster_label, SourceSpeaker.speaker_label,
+    ).label("speaker_label")
     speaker_rows = (
         session.query(
             SourceSpeaker.segment_id,
             SourceSpeaker.start_ts,
             SourceSpeaker.end_ts,
-            SourceSpeaker.speaker_label,
+            effective_label,
             SourceSpeaker.speaker_person_id,
             SourceSpeaker.match_method,
             SourceSpeaker.audio_match_person_id,

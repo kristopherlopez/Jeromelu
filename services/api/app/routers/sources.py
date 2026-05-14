@@ -25,6 +25,8 @@ from app.analyst.identify_voice import (
     enrollment_context,
 )
 from app.analyst.identity_alignment import fetch_alignment
+from app.analyst.voice_cluster_hdbscan import VoiceClusterParams
+from app.analyst.voice_cluster_runner import recluster_source_voice
 from app.analyst.voice_clusters import (
     VOICEPRINT_SAMPLE_LIMIT,
     compute_voice_clusters,
@@ -1990,11 +1992,18 @@ def bulk_assign_voice_cluster(
 
     # Pre-check: cluster must have at least one turn. Validate before the
     # stream starts so malformed input surfaces as 4xx, not mid-stream.
+    # Match by ``coalesce(cluster_label, speaker_label)`` so the same
+    # endpoint accepts HDBSCAN-emitted labels (``H00``, ``H01``, …) and
+    # pyannote raw labels (``SPEAKER_NN``) without the frontend having
+    # to know which one it's looking at.
+    effective_label = func.coalesce(
+        SourceSpeaker.cluster_label, SourceSpeaker.speaker_label,
+    )
     cluster_turn_count = (
         db.query(func.count(SourceSpeaker.segment_id))
         .filter(
             SourceSpeaker.document_id == doc.document_id,
-            SourceSpeaker.speaker_label == speaker_label,
+            effective_label == speaker_label,
         )
         .scalar() or 0
     )
@@ -2042,7 +2051,7 @@ def bulk_assign_voice_cluster(
         db.query(SourceSpeaker)
         .filter(
             SourceSpeaker.document_id == doc.document_id,
-            SourceSpeaker.speaker_label == speaker_label,
+            effective_label == speaker_label,
             SourceSpeaker.embedding.isnot(None),
             SourceSpeaker.embedding_model.isnot(None),
         )
@@ -2109,7 +2118,7 @@ def bulk_assign_voice_cluster(
                 sa_update(SourceSpeaker)
                 .where(
                     SourceSpeaker.document_id == doc.document_id,
-                    SourceSpeaker.speaker_label == speaker_label,
+                    effective_label == speaker_label,
                 )
                 .values(
                     speaker_person_id=target_person_id,
@@ -2154,6 +2163,82 @@ def bulk_assign_voice_cluster(
             })
 
     return StreamingResponse(stream(), media_type="application/x-ndjson")
+
+
+class VoiceReclusterRequest(BaseModel):
+    """Tunable knobs for the HDBSCAN re-clustering pass.
+
+    All optional — defaults mirror :class:`VoiceClusterParams` and are
+    sensible for typical 30-60 min commentary podcasts. The UI exposes
+    these as sliders so the operator can tighten / loosen the clustering
+    per-source without redeploying.
+    """
+    min_cluster_size: int | None = Field(
+        default=None, ge=2, le=200,
+        description="HDBSCAN min_cluster_size. Lower → finds smaller clusters.",
+    )
+    min_samples: int | None = Field(
+        default=None, ge=1, le=50,
+        description="HDBSCAN min_samples. Lower → more permissive density.",
+    )
+    noise_threshold: float | None = Field(
+        default=None, ge=0.0, le=1.0,
+        description=(
+            "Cosine similarity floor (0..1). Higher → tighter clusters, "
+            "more turns labelled noise."
+        ),
+    )
+
+
+@router.post("/sources/{source_id}/voice-clusters/recluster")
+def recluster_voice_clusters(
+    source_id: uuid.UUID,
+    body: VoiceReclusterRequest,
+    db: Session = Depends(get_db),
+):
+    """Re-run HDBSCAN over per-turn wespeaker medoids and overwrite the
+    ``cluster_label`` column for every turn in this source.
+
+    Pyannote's ``speaker_label`` stays untouched as a fallback signal.
+    The Voices tab and AssignVoice flow group/match by
+    ``coalesce(cluster_label, speaker_label)`` so the new labels take
+    precedence immediately, and re-running with different params is
+    safe — every turn in the document is reset to ``cluster_label=NULL``
+    before the new labels are written, so stale H-labels from previous
+    runs don't leak through.
+
+    Pure SQL + in-process HDBSCAN — no SageMaker, no GPU. The clustering
+    step is O(N²) but N is ~hundreds of turns per source, so it runs in
+    well under a second.
+    """
+    source = db.query(Source).filter(Source.source_id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+
+    defaults = VoiceClusterParams()
+    params = VoiceClusterParams(
+        min_cluster_size=body.min_cluster_size or defaults.min_cluster_size,
+        min_samples=body.min_samples or defaults.min_samples,
+        noise_threshold=(
+            body.noise_threshold
+            if body.noise_threshold is not None
+            else defaults.noise_threshold
+        ),
+    )
+    result = recluster_source_voice(db, source_id, params=params)
+    return {
+        "source_id": str(result.source_id),
+        "n_turns_total": result.n_turns_total,
+        "n_turns_with_embedding": result.n_turns_with_embedding,
+        "n_clusters": result.n_clusters,
+        "n_noise": result.n_noise,
+        "cluster_sizes": result.cluster_sizes,
+        "params_used": {
+            "min_cluster_size": params.min_cluster_size,
+            "min_samples": params.min_samples,
+            "noise_threshold": params.noise_threshold,
+        },
+    }
 
 
 # ---------------------------------------------------------------------------
