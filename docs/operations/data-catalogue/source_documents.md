@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # source_documents
 
-[← Data Catalogue](README.md) · Layer 3 — Content & claims
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/source_documents.md) · Layer 3 — Content & claims
 
 Full transcript or text content for a source. One source can have multiple documents.
 

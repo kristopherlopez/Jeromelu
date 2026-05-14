@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # matches
 
-[← Data Catalogue](README.md) · Layer 2 — Structured world
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/matches.md) · Layer 2 — Structured world
 
 Fixture / result spine — one row per game across all grades (NRL, NRLW,
 NSW Cup, QLD Cup, junior pathway). Real-world side of the model;
@@ -29,6 +29,8 @@ NSW Cup, QLD Cup, junior pathway). Real-world side of the model;
 | weather | text | yes | | |
 | referee_name | text | yes | | |
 | broadcast | text | yes | | |
+| attendance | int | yes | | NULL when nrl.com reports 0 (sentinel for unknown) (mig 063) |
+| ground_conditions | text | yes | | e.g. `Fine`, `Wet` (mig 063) |
 | is_magic_round | bool | no | false | |
 | is_rep_weekend | bool | no | false | |
 | metadata_json | jsonb | no | {} | Ladder context, broadcast quirks, score corrections |

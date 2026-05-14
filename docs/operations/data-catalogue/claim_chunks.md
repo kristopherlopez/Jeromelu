@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # claim_chunks
 
-[← Data Catalogue](README.md) · Layer 3 — Content & claims
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/claim_chunks.md) · Layer 3 — Content & claims
 
 Junction table linking claims to the source chunks they were extracted from (N:M).
 

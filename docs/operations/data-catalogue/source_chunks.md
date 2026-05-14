@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # source_chunks
 
-[← Data Catalogue](README.md) · Layer 3 — Content & claims
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/source_chunks.md) · Layer 3 — Content & claims
 
 Individual transcript segments (1:1 with deduped auto-caption segments). Each row is a single 5-6 word segment preserving the original YouTube caption boundaries and timestamps.
 

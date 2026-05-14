@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # player_rounds
 
-[← Data Catalogue](README.md) · Layer 2 — Structured world
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/player_rounds.md) · Layer 2 — Structured world
 
 Per-player SuperCoach performance overlay — one row per player per round per season. Joins to the fixture spine via `match_id` (FK→matches) and `team_id` (FK→teams). External `player_id` keys back to the SC API.
 

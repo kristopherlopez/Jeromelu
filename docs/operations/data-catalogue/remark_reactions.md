@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue, status/planned]
 
 # remark_reactions — planned (not yet built)
 
-[← Data Catalogue](README.md) · Layer 4 — Reasoning & output
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/remark_reactions.md) · Layer 4 — Reasoning & output
 
 > **Status:** described below as planned design — depends on [remarks](remarks.md).
 

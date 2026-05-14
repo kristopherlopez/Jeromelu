@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # source_presenters
 
-[← Data Catalogue](README.md) · Layer 3 — Content & claims
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/source_presenters.md) · Layer 3 — Content & claims
 
 Confirmed `(channel_id, person_id, role)` association. Anchored at channel level — presenters are a property of the show, not the episode. Created by `POST /api/admin/presenters/candidates/{id}/confirm`. See migration 052.
 

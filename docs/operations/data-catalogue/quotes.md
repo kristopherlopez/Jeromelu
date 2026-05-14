@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # quotes
 
-[← Data Catalogue](README.md) · Layer 3 — Content & claims
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/quotes.md) · Layer 3 — Content & claims
 
 Direct quotes extracted from source documents, attributed to a speaker.
 

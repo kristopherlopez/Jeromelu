@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # plans
 
-[← Data Catalogue](README.md) · Layer 4 — Reasoning & output
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/plans.md) · Layer 4 — Reasoning & output
 
 Strategy documents per round.
 

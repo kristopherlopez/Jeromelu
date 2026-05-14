@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # events
 
-[← Data Catalogue](README.md) · Layer 4 — Reasoning & output
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/events.md) · Layer 4 — Reasoning & output
 
 Immutable audit trail of system activity. Entries are hashed for tamper detection.
 

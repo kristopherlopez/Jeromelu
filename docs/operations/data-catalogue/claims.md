@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # claims
 
-[← Data Catalogue](README.md) · Layer 3 — Content & claims
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/claims.md) · Layer 3 — Content & claims
 
 The single extraction table — every assertion or annotation pulled from a transcript span. Mig 036 absorbed the old `source_annotations` table by expanding `claim_type` to include annotation-flavoured kinds. Subjects are not stored on the claim row itself; they're rows in [claim_associations](claim_associations.md) with `role='subject'`.
 

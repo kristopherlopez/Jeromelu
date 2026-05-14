@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue, status/planned]
 
 # alignment_scores — planned (not yet built)
 
-[← Data Catalogue](README.md) · Layer 4 — Reasoning & output
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/alignment_scores.md) · Layer 4 — Reasoning & output
 
 > **Status:** described below as planned design — not yet present in `models.py` or migrations. Will be built when the Ledger surface lights up. Subject will use typed-nullable FKs + CHECK exactly-one (same Option-B pattern as [claim_associations](claim_associations.md)) — likely just `person_id` since alignment is per-human.
 

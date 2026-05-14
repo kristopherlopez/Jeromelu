@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # source_speakers
 
-[← Data Catalogue](README.md) · Layer 3 — Content & claims
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/source_speakers.md) · Layer 3 — Content & claims
 
 Diarised speaker turns over a document. Coarse-grained span layer above [source_chunks](source_chunks.md); chunks fall within a speaker turn by timestamp containment. Populated by the diarisation pass (Deepgram or equivalent) after document ingest.
 

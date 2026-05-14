@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # claim_associations
 
-[← Data Catalogue](README.md) · Layer 3 — Content & claims
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/claim_associations.md) · Layer 3 — Content & claims
 
 Polymorphic many-to-many between claims and typed entities. A claim can name multiple typed subjects with different roles (e.g. a player as the subject + a team as context). The CHECK constraint enforces exactly one typed FK is set per row.
 

@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # channel_metrics
 
-[← Data Catalogue](README.md) · Layer 3 — Content & claims
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/channel_metrics.md) · Layer 3 — Content & claims
 
 Time-series popularity per channel. Multi-platform via the JSONB `metrics` column — YouTube uses `{subscribers, videos, views, country, channel_published_at}`; other platforms (podcast, twitter) carry their own shape. Identity stays clean in [channels](channels.md); popularity (which changes over time and varies per platform) lives here.
 

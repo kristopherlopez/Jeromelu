@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue, status/planned]
 
 # remarks — planned (not yet built)
 
-[← Data Catalogue](README.md) · Layer 4 — Reasoning & output
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/remarks.md) · Layer 4 — Reasoning & output
 
 > **Status:** described below as planned design — not yet present in `models.py` or migrations. Will be revisited as the front-end build clarifies whether this stays a distinct table from [predictions](predictions.md) / [decisions](decisions.md). See [docs/concepts/02-remarks.md](../../concepts/02-remarks.md) for the design intent. Subjects will use a `remark_associations` junction following the same Option-B shape as [claim_associations](claim_associations.md).
 

@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # teams
 
-[← Data Catalogue](README.md) · Layer 2 — Structured world
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/teams.md) · Layer 2 — Structured world
 
 Canonical roster of every team across all grades feeding into NRL — NRL,
 NRLW, NSW Cup, QLD Cup (Hostplus Cup), and the junior pathway grades

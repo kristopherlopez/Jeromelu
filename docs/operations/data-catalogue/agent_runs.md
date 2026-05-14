@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # agent_runs
 
-[← Data Catalogue](README.md) · Layer 5 — Agent audit
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/agent_runs.md) · Layer 5 — Agent audit
 
 Run-level summary. One row per run, keyed by `run_id`. Inserted with `status='running'` at the top of a run and updated in place at run end with totals, summary, and cost rollup. Joined to [agent_events](agent_events.md) (the per-event trail) via `run_id`. See [docs/agents/system/agent-audit.md](../../agents/system/agent-audit.md) for the full audit pattern.
 

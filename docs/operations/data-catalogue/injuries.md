@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # injuries
 
-[← Data Catalogue](README.md) · Layer 2 — Structured world
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/injuries.md) · Layer 2 — Structured world
 
 Append-on-change timeline of player injury / suspension state. Each daily
 casualty-ward sweep writes a new row only when a player's status has

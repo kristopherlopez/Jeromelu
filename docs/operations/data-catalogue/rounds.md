@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # rounds
 
-[← Data Catalogue](README.md) · Layer 1 — Identity
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/rounds.md) · Layer 1 — Identity
 
 Round identity for the NRL/NRLW competition cycles. Referenced by claim/prediction/decision associations when an opinion is round-level rather than player- or match-level.
 

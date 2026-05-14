@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # decisions
 
-[← Data Catalogue](README.md) · Layer 4 — Reasoning & output
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/decisions.md) · Layer 4 — Reasoning & output
 
 Action decisions made in the system (trades, captain picks, etc.). Subject(s) and contextual entities live on [decision_associations](decision_associations.md).
 

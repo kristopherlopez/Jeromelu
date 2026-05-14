@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # scout_presenter_candidates
 
-[← Data Catalogue](README.md) · Layer 3 — Content & claims
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/scout_presenter_candidates.md) · Layer 3 — Content & claims
 
 Presenter Scout's staging inbox. Distinct from [scout_candidates](scout_candidates.md) (which discovers *channels* and *videos*) — this one discovers *people who present* a known channel. The Presenter Scout agent files findings here; humans confirm/reject in the admin "Presenters" tab. Confirmation creates (or links to) a [people](people.md) row and writes a [source_presenters](source_presenters.md) association. See migration 052 and [docs/agents/system/presenter-scout.md](../../agents/system/presenter-scout.md).
 

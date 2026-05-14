@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # agent_events
 
-[← Data Catalogue](README.md) · Layer 5 — Agent audit
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/agent_events.md) · Layer 5 — Agent audit
 
 Per-event audit trail. One row per event in an agent run; dense `sequence` per run for ordered replay. Joined to [agent_runs](agent_runs.md) via `run_id`.
 

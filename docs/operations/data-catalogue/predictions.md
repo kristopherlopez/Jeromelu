@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # predictions
 
-[← Data Catalogue](README.md) · Layer 4 — Reasoning & output
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/predictions.md) · Layer 4 — Reasoning & output
 
 Forecasts about future events, linked to evidence claims. Subject(s) live on [prediction_associations](prediction_associations.md).
 

@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # people
 
-[← Data Catalogue](README.md) · Layer 1 — Identity
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/people.md) · Layer 1 — Identity
 
 Unified table for every human actor — players, coaches, advisors, commentators, journalists, referees. Lifetime-stable facts get typed columns; long-tail goes in `metadata_json`.
 

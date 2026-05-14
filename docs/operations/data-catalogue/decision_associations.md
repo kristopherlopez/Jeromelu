@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # decision_associations
 
-[← Data Catalogue](README.md) · Layer 4 — Reasoning & output
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/decision_associations.md) · Layer 4 — Reasoning & output
 
 Polymorphic many-to-many between decisions and typed entities. Trade decisions typically have `role='player_in'` and `role='player_out'` rows pointing at people; captain decisions have one `role='subject'` person; etc.
 

@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # people_roles
 
-[← Data Catalogue](README.md) · Layer 1 — Identity
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/people_roles.md) · Layer 1 — Identity
 
 SCD-2 of role tenure per person. **Multi-valued at a single point in time** — a person can hold multiple roles concurrently (Adam Reynolds = active player + occasional commentator) or transition (Andrew Johns: player → commentator). Replaces `entity_roles`.
 

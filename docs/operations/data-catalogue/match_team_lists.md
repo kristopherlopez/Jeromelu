@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # match_team_lists
 
-[← Data Catalogue](README.md) · Layer 2 — Structured world
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/match_team_lists.md) · Layer 2 — Structured world
 
 Versioned named-17 announcements per match per team. Each new public lineup
 (Tuesday list, Thursday list, late changes) appends a row with an

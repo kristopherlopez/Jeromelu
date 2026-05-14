@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # venues
 
-[← Data Catalogue](README.md) · Layer 2 — Structured world
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/venues.md) · Layer 2 — Structured world
 
 Stadium reference table. Slow-changing — roughly 25–30 NRL/NRLW grounds plus
 the occasional one-off (Magic Round host city, country trial venues).

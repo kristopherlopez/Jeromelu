@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # outcomes
 
-[← Data Catalogue](README.md) · Layer 4 — Reasoning & output
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/outcomes.md) · Layer 4 — Reasoning & output
 
 Scored results for predictions and decisions after events occur.
 

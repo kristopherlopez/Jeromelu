@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # knowledge_base
 
-[← Data Catalogue](README.md) · Layer 4 — Reasoning & output
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/knowledge_base.md) · Layer 4 — Reasoning & output
 
 Distilled, structured knowledge chunks embedded for RAG retrieval. Also stores Analysis articles.
 

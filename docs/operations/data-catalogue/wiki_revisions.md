@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # wiki_revisions
 
-[← Data Catalogue](README.md) · Layer 4 — Reasoning & output
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/wiki_revisions.md) · Layer 4 — Reasoning & output
 
 Per-section edit log for wiki pages.
 

@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # channels
 
-[← Data Catalogue](README.md) · Layer 3 — Content & claims
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/channels.md) · Layer 3 — Content & claims
 
 Registry of content sources (YouTube channels, podcast feeds, websites).
 

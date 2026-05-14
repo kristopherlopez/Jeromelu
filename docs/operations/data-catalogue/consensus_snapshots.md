@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # consensus_snapshots
 
-[← Data Catalogue](README.md) · Layer 4 — Reasoning & output
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/consensus_snapshots.md) · Layer 4 — Reasoning & output
 
 Aggregated claim sentiment for a typed subject at a point in time. Exactly one of `person_id` / `team_id` / `match_id` / `venue_id` / `round_id` is set per row.
 

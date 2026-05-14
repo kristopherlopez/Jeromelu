@@ -6,7 +6,14 @@ tags: [area/architecture, area/operations]
 
 > Created 2026-05-13. End-to-end view of where every piece of data in Jeromelu comes from, where it lands in S3, and how it eventually lands in the DB.
 >
-> This doc is the **map**. Other docs are the territory:
+> **Per-table column-level lineage moved to [`docs/operations/data-lineage/`](../operations/data-lineage/README.md)** (2026-05-15). Each catalogue table now has its own file mapping every column to a source-profile JSON path + extractor. This document keeps the **conceptual** view: the L1→L2→L3 model, identity-resolution narrative, era coverage map, and downstream-surface map.
+>
+> The trinity:
+> - [`docs/operations/data-sources/`](../operations/data-sources/README.md) — what's in S3 (upstream JSON profiles)
+> - [`docs/operations/data-catalogue/`](../operations/data-catalogue/README.md) — what's in DB (column-level schema)
+> - [`docs/operations/data-lineage/`](../operations/data-lineage/README.md) — the per-table mapping between them
+>
+> Other related docs:
 > - [`docs/pages/wiki/data-feeds.md`](../pages/wiki/data-feeds.md) — wiki-centric "what feeds the wiki" view
 > - [`docs/agents/crew/scout.md`](../agents/crew/scout.md) — Scout's pipeline inventory
 > - [`docs/architecture/drafts/scout-charter-expansion.draft.md`](drafts/scout-charter-expansion.draft.md) — the charter governing all this
@@ -52,6 +59,8 @@ Every piece of structured NRL data in Jeromelu transits three layers:
 ---
 
 ## Per-domain lineage
+
+> **Note (2026-05-15):** the tables below are a frozen snapshot. Authoritative per-table lineage now lives at [`docs/operations/data-lineage/<table>.md`](../operations/data-lineage/README.md). Don't edit these tables in place — open the per-table file instead.
 
 For each domain concept, we trace: **external source → Scout pipeline → S3 path → extractor → DB table(s)**.
 
@@ -301,14 +310,15 @@ The app reads from the DB. **The DB is fully re-derivable from S3 archives** —
 
 ## Maintenance
 
-This doc has two failure modes (same as `data-feeds.md`):
-1. Pipelines change without updating this doc → readers get the wrong picture.
-2. The DB schema evolves and this doc lags behind.
+Authoritative per-table lineage now lives in [`docs/operations/data-lineage/`](../operations/data-lineage/README.md). The per-domain tables in this document are a frozen snapshot from 2026-05-13 — **don't update them in place**. Update the per-table file in the new folder instead.
 
-Mitigations:
-- Every new Scout pipeline ships with a row in the **per-domain lineage** table above.
-- Every new migration that adds an extractor target lands a row in the **reverse view** table.
-- Field-name churn is captured by D8 drift fixtures — when an upstream changes shape, the drift test catches it before silently mis-mapping.
+When schema or pipelines change:
+1. Update the per-table file in `docs/operations/data-lineage/<table>.md`
+2. Update [`docs/operations/data-catalogue/<table>.md`](../operations/data-catalogue/README.md) if a column was added/removed
+3. Regenerate the affected [`docs/operations/data-sources/<source>/<pipeline>.md`](../operations/data-sources/README.md) profile if upstream JSON shape changed
+4. Field-name churn is captured by D8 drift fixtures — drift tests catch upstream shape changes before they silently mis-map
+
+This document only changes when the **conceptual** model changes (L1/L2/L3 boundaries, identity-resolution approach, downstream surface map).
 
 ---
 

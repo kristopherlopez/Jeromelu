@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # video_metrics
 
-[← Data Catalogue](README.md) · Layer 3 — Content & claims
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/video_metrics.md) · Layer 3 — Content & claims
 
 Time-series popularity per video (a [sources](sources.md) row). Same shape as [channel_metrics](channel_metrics.md) — see migration 023 for the design rationale. YouTube payload: `{views, likes, comments, duration_seconds}`. Sampled at video discovery time and daily thereafter via the admin refresh endpoint.
 

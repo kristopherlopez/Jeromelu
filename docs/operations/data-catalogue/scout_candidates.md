@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # scout_candidates
 
-[← Data Catalogue](README.md) · Layer 3 — Content & claims
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/scout_candidates.md) · Layer 3 — Content & claims
 
 Scout's candidate inbox. Scout (the source-discovery agent) writes here as it hunts the web for new NRL channels and videos worth onboarding. Humans approve / reject via the admin review queue; approval promotes a row into the canonical [channels](channels.md) (kind=channel) or [sources](sources.md) (kind=video) tables.
 

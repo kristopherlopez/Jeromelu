@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # player_attributes
 
-[← Data Catalogue](README.md) · Layer 1 — Identity
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/player_attributes.md) · Layer 1 — Identity
 
 SCD-2 of slow-changing per-person facts (team affiliation, primary position, height/weight, contract). Replaces the old `player_attributes` table. Closed and reopened on change.
 

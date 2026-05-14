@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # prediction_associations
 
-[← Data Catalogue](README.md) · Layer 4 — Reasoning & output
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/prediction_associations.md) · Layer 4 — Reasoning & output
 
 Polymorphic many-to-many between predictions and typed entities. Same shape as [claim_associations](claim_associations.md) — one row with `role='subject'` per prediction is the dominant case.
 

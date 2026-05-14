@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # wiki_pages
 
-[← Data Catalogue](README.md) · Layer 4 — Reasoning & output
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/wiki_pages.md) · Layer 4 — Reasoning & output
 
 Prose per-entity (or per-channel) knowledge pages, written and maintained by a managed agent.
 

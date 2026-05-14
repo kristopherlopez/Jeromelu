@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # sources
 
-[← Data Catalogue](README.md) · Layer 3 — Content & claims
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/sources.md) · Layer 3 — Content & claims
 
 Individual content items (a specific video, episode, article).
 

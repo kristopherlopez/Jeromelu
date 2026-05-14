@@ -4,7 +4,7 @@ tags: [area/operations, data-catalogue]
 
 # source_chapters
 
-[← Data Catalogue](README.md) · Layer 3 — Content & claims
+[← Data Catalogue](README.md) · [Lineage](../data-lineage/source_chapters.md) · Layer 3 — Content & claims
 
 Semantic chapters detected over a document. Used by the analyse-transcript pipeline to scope claim extraction and to attribute claims back to a chapter for UI navigation.
 
