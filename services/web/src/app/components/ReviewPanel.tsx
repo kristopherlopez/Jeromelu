@@ -29,6 +29,20 @@ function fmtTs(s: number): string {
   return `${m}:${String(sec).padStart(2, "0")}`;
 }
 
+/** Tenth-second precision — used in the voice-turn list where many
+ *  pyannote turns are sub-second (467 of 911 on the test source) and
+ *  ``fmtTs`` floor-renders them to identical-looking timestamps. */
+function fmtTsPrecise(s: number): string {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const secStr = sec.toFixed(1).padStart(4, "0"); // "00.0".."59.9"
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, "0")}:${secStr}`;
+  }
+  return `${m}:${secStr}`;
+}
+
 function fmtDuration(seconds: number): string {
   if (seconds < 1) return `${seconds.toFixed(1)}s`;
   if (seconds < 60) return `${Math.round(seconds)}s`;
@@ -550,6 +564,12 @@ function VoiceTurnList({
                 style={{
                   borderColor: "var(--border)",
                   backgroundColor: isActive ? "var(--accent-faint, rgba(96,165,250,0.15))" : "transparent",
+                  // No-embedding turns can't contribute voiceprints, so
+                  // they're de-emphasised: faded text and no Reassign
+                  // button (the action would only update the label,
+                  // not grow the registry, and most are sub-300ms
+                  // micro-turns from speaker-transition flicker).
+                  opacity: t.has_embedding ? 1 : 0.55,
                 }}
               >
                 {/* Header row clickable for seek; Reassign sits to the
@@ -588,14 +608,16 @@ function VoiceTurnList({
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-1.5 text-[11px]">
-                  <span className="font-mono" style={{ color: "var(--foreground-ghost)" }}>
-                    {fmtTs(t.start_ts)} – {fmtTs(t.end_ts)}
-                  </span>
-                  <span style={{ color: "var(--foreground-ghost)" }}>
-                    · {fmtDuration(t.duration)}
-                  </span>
-                </div>
+                  <div className="flex items-center gap-1.5 text-[11px]">
+                    <span className="font-mono" style={{ color: "var(--foreground-ghost)" }}>
+                      {fmtTsPrecise(t.start_ts)} – {fmtTsPrecise(t.end_ts)}
+                    </span>
+                    <span style={{ color: "var(--foreground-ghost)" }}>
+                      · {t.duration < 1
+                        ? `${(t.duration * 1000).toFixed(0)}ms`
+                        : fmtDuration(t.duration)}
+                    </span>
+                  </div>
                   <div className="text-[11px]">
                     {t.person_name ? (
                       <strong>{t.person_name}</strong>
@@ -606,32 +628,37 @@ function VoiceTurnList({
                     )}
                   </div>
                 </button>
-                <div className="mt-1 flex items-center justify-end gap-2">
-                  {reassigningId === t.segment_id ? (
-                    <ReassignTurnPopover
-                      sourceId={sourceId}
-                      turn={t}
-                      onCancel={() => setReassigningId(null)}
-                      onDone={(_resp) => {
-                        setReassigningId(null);
-                        onTurnReassigned();
-                      }}
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setReassigningId(t.segment_id)}
-                      className="rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-wider"
-                      style={{
-                        borderColor: "var(--border)",
-                        color: "var(--foreground-secondary)",
-                      }}
-                      title="Reassign this turn to a person (also writes a voiceprint exemplar)"
-                    >
-                      Reassign
-                    </button>
-                  )}
-                </div>
+                {/* Reassign row — only shown for turns with an
+                    embedding. Without one, the action can only update
+                    the label, which isn't worth the click. */}
+                {t.has_embedding && (
+                  <div className="mt-1 flex items-center justify-end gap-2">
+                    {reassigningId === t.segment_id ? (
+                      <ReassignTurnPopover
+                        sourceId={sourceId}
+                        turn={t}
+                        onCancel={() => setReassigningId(null)}
+                        onDone={(_resp) => {
+                          setReassigningId(null);
+                          onTurnReassigned();
+                        }}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setReassigningId(t.segment_id)}
+                        className="rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-wider"
+                        style={{
+                          borderColor: "var(--border)",
+                          color: "var(--foreground-secondary)",
+                        }}
+                        title="Reassign this turn to a person (also writes a voiceprint exemplar)"
+                      >
+                        Reassign
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </li>
           );
