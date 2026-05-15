@@ -169,6 +169,41 @@ export default function ReviewPanel({
   const activeTurn = activeTurnIdx >= 0 ? turns[activeTurnIdx] : null;
   const activeWord = activeWordIdx >= 0 ? words[activeWordIdx] : null;
 
+  // For each word, compute which voice turn (by index) contains its
+  // start timestamp. -1 means no turn contains the word — typically
+  // gaps between turns or words before/after the last turn.
+  //
+  // Two-pointer walk: both lists are sorted by time, so this is O(N+M).
+  // Used by WordTranscript to render a turn-number superscript on the
+  // first word that crosses into each new turn.
+  const wordToTurnIdx = useMemo(() => {
+    const out: number[] = new Array(words.length).fill(-1);
+    if (turns.length === 0 || words.length === 0) return out;
+    let ti = 0;
+    for (let wi = 0; wi < words.length; wi++) {
+      const ws = words[wi].start;
+      while (ti < turns.length && turns[ti].end_ts <= ws) ti++;
+      if (ti < turns.length && turns[ti].start_ts <= ws) {
+        out[wi] = ti;
+      }
+    }
+    return out;
+  }, [words, turns]);
+
+  // Set of word indices that are the first word in their voice turn.
+  // These render a superscript turn number so the operator can see at
+  // a glance where pyannote / HDBSCAN drew each turn boundary.
+  const firstWordOfTurn = useMemo(() => {
+    const out = new Set<number>();
+    let prev = -2;
+    for (let i = 0; i < wordToTurnIdx.length; i++) {
+      const cur = wordToTurnIdx[i];
+      if (cur !== prev && cur !== -1) out.add(i);
+      prev = cur;
+    }
+    return out;
+  }, [wordToTurnIdx]);
+
   // Auto-scroll both lists so the active row stays in view as playback
   // advances. Refs are keyed by index so we can find the right element
   // without searching the DOM. Smooth scroll feels janky during fast
@@ -227,6 +262,8 @@ export default function ReviewPanel({
           activeIdx={activeWordIdx}
           onSeek={onSeek}
           wordRefs={wordRefs}
+          wordToTurnIdx={wordToTurnIdx}
+          firstWordOfTurn={firstWordOfTurn}
         />
       </div>
     </div>
@@ -484,6 +521,12 @@ function VoiceTurnList({
                 }}
               >
                 <div className="flex items-center gap-1.5 text-[11px]">
+                  <span
+                    className="font-mono font-semibold"
+                    style={{ color: "var(--foreground-ghost)", minWidth: "2.5em" }}
+                  >
+                    #{idx + 1}
+                  </span>
                   <span style={{ color: methodColor(t.match_method) }}>●</span>
                   {t.cluster_label && (
                     <span
@@ -504,8 +547,13 @@ function VoiceTurnList({
                       {t.speaker_label}
                     </span>
                   )}
+                </div>
+                <div className="flex items-center gap-1.5 text-[11px]">
+                  <span className="font-mono" style={{ color: "var(--foreground-ghost)" }}>
+                    {fmtTs(t.start_ts)} – {fmtTs(t.end_ts)}
+                  </span>
                   <span style={{ color: "var(--foreground-ghost)" }}>
-                    {fmtTs(t.start_ts)} · {fmtDuration(t.duration)}
+                    · {fmtDuration(t.duration)}
                   </span>
                 </div>
                 <div className="text-[11px]">
@@ -531,6 +579,12 @@ interface WordTranscriptProps {
   activeIdx: number;
   onSeek: (seconds: number) => void;
   wordRefs: React.MutableRefObject<Map<number, HTMLSpanElement>>;
+  /** Word-index → voice-turn-index (or -1). Drives superscript display. */
+  wordToTurnIdx: number[];
+  /** Word indices that are the first word in their voice turn. Get a
+   *  small superscript number so the operator can see at a glance where
+   *  each voice turn starts. */
+  firstWordOfTurn: Set<number>;
 }
 
 function WordTranscript({
@@ -538,6 +592,8 @@ function WordTranscript({
   activeIdx,
   onSeek,
   wordRefs,
+  wordToTurnIdx,
+  firstWordOfTurn,
 }: WordTranscriptProps) {
   return (
     <section
@@ -568,6 +624,9 @@ function WordTranscript({
             w.active_speaker?.cluster_attributed_person_name ??
             w.active_speaker?.per_detection_matched_person_name ??
             null;
+          const turnNum = firstWordOfTurn.has(idx)
+            ? wordToTurnIdx[idx] + 1
+            : null;
           return (
             <span
               key={idx}
@@ -589,6 +648,19 @@ function WordTranscript({
                   : `no active face · ${fmtTs(w.start)}`
               }
             >
+              {turnNum !== null && (
+                <sup
+                  className="font-semibold"
+                  style={{
+                    color: "var(--accent)",
+                    fontSize: "0.65em",
+                    marginRight: 1,
+                  }}
+                  title={`Voice turn #${turnNum} starts here`}
+                >
+                  {turnNum}
+                </sup>
+              )}
               {w.word}{" "}
             </span>
           );
