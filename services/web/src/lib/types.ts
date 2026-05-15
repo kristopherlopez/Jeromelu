@@ -512,6 +512,11 @@ export interface ReviewVisibleFace {
   per_detection_matched_person_id: string | null;
   per_detection_matched_person_name: string | null;
   is_active_speaker: boolean;
+  /** True when the operator has marked this cluster excluded (kind
+   *  noise/portrait or manual exclude). Excluded clusters still appear
+   *  in the pill so the operator can see what's on screen, but they're
+   *  ineligible to win the active-speaker pick. */
+  is_excluded: boolean;
 }
 
 export interface ReviewWord {

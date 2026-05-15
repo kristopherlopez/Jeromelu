@@ -2401,21 +2401,30 @@ def get_word_attribution(source_id: uuid.UUID, db: Session = Depends(get_db)):
             "per_detection_matched_person_name": names.get(matched_pid) if matched_pid else None,
         }
 
+    excluded_cluster_ids = {
+        cid for cid, c in cluster_meta.items() if c.excluded
+    }
+
     def lookup_faces(word_start: float) -> tuple[list[dict], dict | None]:
         """Return (visible_faces, active_speaker).
 
         ``visible_faces`` is every face detected in the active frame,
-        even those whose mouth_opening is below threshold — the overlay
-        draws all of them, so Review must report all of them. Each
-        carries a ``is_active_speaker`` flag.
+        even those whose mouth_opening is below threshold and even
+        those in excluded clusters — the overlay draws all of them,
+        so Review must report all of them. Each carries a
+        ``is_active_speaker`` flag and a ``is_excluded`` flag.
 
-        ``active_speaker`` is the face with the highest mouth_opening
-        that crosses the ASD threshold, or ``None`` if no face on
-        screen has mouth open enough.
+        ``active_speaker`` is the **non-excluded** face with the
+        highest mouth_opening that crosses the ASD threshold. Excluded
+        clusters are deliberately ignored here: the operator already
+        decided those rows are noise/portraits/duplicates, so a 5%
+        mouth-opening flicker on c1 shouldn't override the legitimate
+        speaker on c0. Excluded faces still appear in
+        ``visible_faces`` for visibility — they just can't win the
+        speaker pick.
 
         Both are ``None`` / ``[]`` only when no face frame exists
-        at-or-before ``word_start`` (genuinely no detection — typically
-        only at the very start of the source).
+        at-or-before ``word_start``.
         """
         idx = bisect.bisect_right(sorted_frame_ts, word_start) - 1
         if idx < 0:
@@ -2424,21 +2433,29 @@ def get_word_attribution(source_id: uuid.UUID, db: Session = Depends(get_db)):
         candidates = by_frame[ts]
         if not candidates:
             return [], None
-        # Excluded clusters are NOT filtered — Review wants to show
-        # what's actually on screen, including detections the operator
-        # has marked excluded, so any mis-classification is visible.
         ranked = sorted(candidates, key=lambda c: -c[1])
-        top_cid, top_mo, top_matched = ranked[0]
+
+        # Active speaker pick is restricted to non-excluded clusters.
         active = None
-        if top_mo >= threshold and top_cid is not None:
+        for cid, mo, matched_pid in ranked:
+            if cid is None or cid in excluded_cluster_ids:
+                continue
+            if mo < threshold:
+                # Further candidates are sorted lower, so once we hit
+                # the first non-excluded one that's below threshold,
+                # no later non-excluded one will cross it either.
+                break
             active = {
-                **_resolve_face(top_cid, top_matched),
-                "mouth_opening": float(top_mo),
+                **_resolve_face(cid, matched_pid),
+                "mouth_opening": float(mo),
             }
+            break
+
         visible = []
         for cid, mo, matched_pid in ranked:
             entry = _resolve_face(cid, matched_pid)
             entry["mouth_opening"] = float(mo)
+            entry["is_excluded"] = (cid in excluded_cluster_ids) if cid is not None else False
             entry["is_active_speaker"] = (
                 active is not None
                 and cid == active["face_cluster_id"]

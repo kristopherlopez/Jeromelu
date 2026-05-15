@@ -264,19 +264,15 @@ function PlayheadStatusPill({
                   key={`${f.face_cluster_id ?? "none"}-${idx}`}
                   className="flex items-center gap-1.5 text-[11px]"
                   style={{
-                    opacity: f.is_active_speaker ? 1 : 0.7,
+                    opacity: f.is_excluded ? 0.45 : f.is_active_speaker ? 1 : 0.7,
+                    textDecoration: f.is_excluded ? "line-through" : "none",
                   }}
                 >
                   <span
                     className="inline-block h-2 w-2 rounded-full"
                     style={{ backgroundColor: colorForCluster(f.face_cluster_id) }}
                   />
-                  <span
-                    className="font-semibold"
-                    style={{
-                      textDecoration: f.is_active_speaker ? "none" : "none",
-                    }}
-                  >
+                  <span className="font-semibold">
                     FACE_{f.face_cluster_id ?? "?"}
                   </span>
                   {name && (
@@ -304,10 +300,24 @@ function PlayheadStatusPill({
                       style={{
                         backgroundColor: "var(--accent)",
                         color: "var(--background)",
+                        textDecoration: "none",
                       }}
                       title="Mouth opening above ASD threshold — this face is speaking"
                     >
                       speaking
+                    </span>
+                  )}
+                  {f.is_excluded && (
+                    <span
+                      className="rounded border px-1 text-[9px] font-semibold uppercase"
+                      style={{
+                        borderColor: "var(--foreground-ghost)",
+                        color: "var(--foreground-ghost)",
+                        textDecoration: "none",
+                      }}
+                      title="Cluster marked excluded (noise/portrait/duplicate) — ineligible to be the active speaker"
+                    >
+                      excluded
                     </span>
                   )}
                 </li>
