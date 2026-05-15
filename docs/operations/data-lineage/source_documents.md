@@ -16,7 +16,10 @@ tags: [area/operations, data-lineage]
 
 ## Writers
 
-- `fetch-transcripts` skill (`scripts/transcripts/...`) — downloads YouTube auto-captions to `data/transcripts/raw/`, then writes the raw text into `source_documents.raw_text` and stores S3 key in `s3_key`
+- `services/api/app/analyst/transcribe.py` — primary creator of `SourceDocument` rows during the transcription pipeline (per [[feedback_transcribe_isolation]] heavy ML deps stay isolated)
+- `services/worker-ingestion/app/backfill.py` — bulk-ingestion path; INSERTs documents for backfilled sources
+- `scripts/transcripts/extraction/writer.py` — writes from the skill pipeline (clean → process → upload)
+- `fetch-transcripts` skill (`scripts/transcripts/...`) — downloads YouTube auto-captions to `data/transcripts/raw/`, then writes raw text into `source_documents.raw_text` and stores S3 key in `s3_key`
 - `clean-transcript` skill — populates `cleaned_text` after running cleaning passes
 - `upload-transcript` skill — finalises `transcript_available=true`, sets `chunk_count` after [source_chunks](source_chunks.md) are written
 

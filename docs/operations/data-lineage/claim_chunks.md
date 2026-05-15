@@ -14,7 +14,7 @@ tags: [area/operations, data-lineage]
 
 ## Writer
 
-`upload-transcript` skill — for each [claims](claims.md) row, writes one `claim_chunks` row per [source_chunks](source_chunks.md) chunk that the claim was extracted from.
+`scripts/transcripts/extraction/writer.py` — driven by the `upload-transcript` skill. For each [claims](claims.md) row, writes one `claim_chunks` row per [source_chunks](source_chunks.md) chunk that the claim was extracted from. SC notes path uses the same writer via `services/api/app/scout/supercoach_roster/notes_extractor.py`.
 
 ## Field mapping
 

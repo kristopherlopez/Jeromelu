@@ -14,7 +14,7 @@ tags: [area/operations, data-lineage]
 
 ## Writer
 
-`POST /api/admin/presenters/candidates/{id}/confirm` — admin endpoint that:
+`services/api/app/routers/presenters.py` — handles `POST /api/admin/presenters/candidates/{id}/confirm`:
 1. Either creates a new [people](people.md) row OR links to an existing `person_id` (from the candidate's `existing_person_id` hint or a manual override on confirm)
 2. INSERTs a `source_presenters` row with `(channel_id, person_id, role)`
 3. Sets the upstream candidate's `status='confirmed'` and `confirmed_person_id`

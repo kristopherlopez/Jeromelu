@@ -15,8 +15,10 @@ tags: [area/operations, data-lineage]
 ## Writers
 
 - `scripts/transcripts/extraction/chunker.py` — splits `source_documents.cleaned_text` into 5-6 word segments preserving original YouTube caption boundaries and timestamps
+- `scripts/transcripts/extraction/writer.py` — INSERTs chunks (and downstream claims/quotes) when the skill pipeline persists
+- `services/api/app/analyst/transcribe.py` — also writes chunks during the transcription pipeline
 - `clean-transcript` skill — calls the chunker after cleaning
-- `upload-transcript` skill — INSERTs the resulting chunks
+- `upload-transcript` skill — drives the persistence step
 
 ## Field mapping
 

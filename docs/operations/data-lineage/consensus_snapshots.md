@@ -14,7 +14,9 @@ tags: [area/operations, data-lineage]
 
 ## Writer
 
-Aggregator job (planned/scheduled) that computes per-subject claim sentiment buckets at a point in time. Reads from `claims` + `claim_associations`, GROUP BY (subject typed FK, time bucket).
+`services/worker-publishing/app/activities/update_consensus.py` — Temporal activity (`@activity.defn update_consensus_snapshots`) that aggregates per-subject claim sentiment. Reads from [claims](claims.md) + [claim_associations](claim_associations.md), GROUPs by `claim_associations.person_id` (typed FK Phase 2). Buckets `claim_type` into `BUY_TYPES = {buy, captain, breakout}`, `SELL_TYPES = {sell, avoid}`, `HOLD_TYPES = {hold}`.
+
+> **Deployment note:** Per [[project_temporal_not_in_prod]], the worker-publishing Temporal activities are coded but the worker isn't deployed in prod (Lightsail micro_3_2 runs api/web/postgres/caddy only). When this surface lights up, either deploy the worker or rewrite as a simpler scheduled job.
 
 ## Field mapping
 

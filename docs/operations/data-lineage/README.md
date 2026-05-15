@@ -24,13 +24,16 @@ For the conceptual L1 (external) → L2 (S3) → L3 (DB) overview and identity-r
 
 ### Layer 2 — Structured world
 
-- [teams](teams.md) · [venues](venues.md) · [matches](matches.md) · [match_team_lists](match_team_lists.md) · [injuries](injuries.md) · [player_rounds](player_rounds.md)
+- [teams](teams.md) · [venues](venues.md) · [matches](matches.md) · [match_team_lists](match_team_lists.md) · [match_officials](match_officials.md) · [match_timeline](match_timeline.md)
+- [player_match_stats](player_match_stats.md) · [team_standings](team_standings.md) · [stat_leaderboards](stat_leaderboards.md)
+- [injuries](injuries.md) · [player_rounds](player_rounds.md) · [sc_settings](sc_settings.md)
 
 ### Layer 3 — Content & claims
 
 - [scout_candidates](scout_candidates.md) · [scout_presenter_candidates](scout_presenter_candidates.md) · [source_presenters](source_presenters.md)
 - [channels](channels.md) · [channel_metrics](channel_metrics.md) · [sources](sources.md) · [video_metrics](video_metrics.md)
 - [source_documents](source_documents.md) · [source_chunks](source_chunks.md) · [source_speakers](source_speakers.md) · [source_chapters](source_chapters.md)
+- [source_face_detections](source_face_detections.md) · [source_face_clusters](source_face_clusters.md) · [person_voiceprints](person_voiceprints.md) · [person_face_embeddings](person_face_embeddings.md)
 - [quotes](quotes.md) · [claims](claims.md) · [claim_chunks](claim_chunks.md) · [claim_associations](claim_associations.md)
 
 ### Layer 4 — Reasoning & output
@@ -63,23 +66,6 @@ Marker conventions:
 - `constant` source means hardcoded in the writer
 - `S3 key` source means parsed from the archive's path, not its payload
 - `not extracted` means schema-allowed but no current writer populates it
-
----
-
-## Tables not in catalogue (TODO)
-
-10 tables exist in `models.py` or migrations but have no [data-catalogue](../data-catalogue/README.md) entry yet. They also have no lineage file. Surface for the user to decide whether to model:
-
-- `person_voiceprints` (mig 048)
-- `person_face_embeddings` (mig 049)
-- `source_face_detections` (mig 053)
-- `source_face_clusters` (mig 054)
-- `sc_settings` (mig 055)
-- `player_match_stats` (mig 056) — has shipped extractor in `phase_stats.py`
-- `match_timeline` (mig 057) — has shipped extractor in `phase_timeline.py`
-- `match_officials` (mig 058) — combined writer in `phase_timeline.py`
-- `team_standings` (mig 059) — has shipped extractor in `phase_aux.py`
-- `stat_leaderboards` (mig 060) — has shipped extractor in `phase_aux.py`
 
 ---
 

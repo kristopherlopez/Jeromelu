@@ -27,8 +27,8 @@ tags: [area/operations, data-lineage]
 | `segment_id` | derived | UUID, DB-side default |
 | `document_id` | scope | FK → source_documents (CASCADE) |
 | `speaker_person_id` | voice/face matcher | FK → people (SET NULL); NULL for unattributed turns |
-| `speaker_label` | diariser | Raw label (`Speaker 1`, `Speaker 2`) when person not yet resolved |
-| `cluster_label` | cluster labeller (mig 069) | HDBSCAN cluster id / manual label / face-driven label |
+| `speaker_label` | pyannote | Raw `SPEAKER_00`, `SPEAKER_01` from pyannote's segmentation + clustering pass |
+| `cluster_label` | post-pyannote clusterer (mig 069) | HDBSCAN over per-turn wespeaker medoids, face-driven re-segmentation, or manual edits. Voices tab and Alignment endpoints read by `coalesce(cluster_label, speaker_label)` — re-running the diariser repopulates `speaker_label` only and leaves `cluster_label` intact |
 | `start_ts`, `end_ts` | diariser | Seconds |
 | `confidence` | diariser | 0-1 |
 | `created_at` | derived | DB default `now()` |

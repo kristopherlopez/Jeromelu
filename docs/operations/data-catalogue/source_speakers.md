@@ -13,7 +13,8 @@ Diarised speaker turns over a document. Coarse-grained span layer above [source_
 | segment_id | UUID | PK | uuid4 | |
 | document_id | UUID | no | | FK → source_documents (CASCADE) |
 | speaker_person_id | UUID | yes | | FK → people (SET NULL); NULL for unattributed turns |
-| speaker_label | text | yes | | Raw diariser label (`Speaker 1`) when person not yet resolved |
+| speaker_label | text | yes | | Raw pyannote label (`SPEAKER_00`, `SPEAKER_01`) — pyannote's segmentation + clustering output |
+| cluster_label | text | yes | | Post-pyannote clustering label (HDBSCAN over per-turn wespeaker medoids, face-driven re-segmentation, or manual edits) (mig 069). Voices tab and Alignment endpoints read by `coalesce(cluster_label, speaker_label)` |
 | start_ts | float | no | | Seconds |
 | end_ts | float | no | | Seconds |
 | confidence | float | yes | | Diarisation confidence 0-1 |

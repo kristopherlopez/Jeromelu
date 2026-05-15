@@ -15,9 +15,11 @@ tags: [area/operations, data-lineage]
 
 ## Writers
 
-- `scripts/insights/generate_round_tips.py` — round-tips article generator
+- `services/worker-publishing/app/activities/generate_kb.py` — Temporal activity that produces `article_*` kinds via `packages/shared/jeromelu_shared/insights.py` (`ARTICLE_TYPES` registry: tips, totw, trades, captains, stocks, consensus). Per [[project_temporal_not_in_prod]] the worker isn't deployed today.
+- `packages/shared/jeromelu_shared/insights.py` — shared article-generation logic; LLM-driven content + embedding via `chat_text` and `get_embeddings`
+- `scripts/insights/generate_round_tips.py` — round-tips article generator (CLI path)
 - `scripts/insights/seed_mock_articles.py` — local-dev seed
-- The Analysis pipeline (`docs/pages/analysis/overview.md`) — produces `article_tips`, `article_totw`, `article_trades`, `article_captains`, `article_stocks`, `article_consensus` kinds
+- The Analysis pipeline (`docs/pages/analysis/overview.md`) — surfaces the `article_*` kinds
 - Ask-Me / RAG pipeline (`docs/pages/ask-me/overview.md`) — produces `player_summary`, `round_brief`, `source_digest` chunks for retrieval
 
 ## Field mapping

@@ -97,8 +97,14 @@ Real-world rows holding facts. Cross-type references from claims/predictions/etc
 - [venues](venues.md) — stadium reference table
 - [matches](matches.md) — fixture / result spine (one row per game across all grades)
 - [match_team_lists](match_team_lists.md) — versioned named-17 announcements per match per team
+- [match_officials](match_officials.md) — referees, touch judges, bunker per match
+- [match_timeline](match_timeline.md) — typed play-by-play events per match (~100-120 events)
+- [player_match_stats](player_match_stats.md) — per-player per-match ~58-field stat line
+- [team_standings](team_standings.md) — per-round team-table positions + 22 per-team metrics
+- [stat_leaderboards](stat_leaderboards.md) — pre-computed top-25 leaderboards per stat
 - [injuries](injuries.md) — append-on-change timeline of player injury / suspension state
 - [player_rounds](player_rounds.md) — per-player SuperCoach performance overlay (~60 columns)
+- [sc_settings](sc_settings.md) — per-season SuperCoach game rules snapshot
 
 ### 3. Content & claims
 
@@ -115,6 +121,10 @@ Pipeline from channel → source → document → overlays → quote → claim, 
 - [source_chunks](source_chunks.md) — atomic caption-level segments (1:1 with deduped auto-caption segments)
 - [source_speakers](source_speakers.md) — diarised speaker turns over a document
 - [source_chapters](source_chapters.md) — semantic chapters detected over a document
+- [source_face_detections](source_face_detections.md) — per-frame face detections with embeddings (visual ID)
+- [source_face_clusters](source_face_clusters.md) — per-cluster metadata layer above face detections (operator labels)
+- [person_voiceprints](person_voiceprints.md) — voice fingerprint registry for speaker ID
+- [person_face_embeddings](person_face_embeddings.md) — face fingerprint registry for visual ID
 - [quotes](quotes.md) — direct quotes extracted from source documents, attributed to a speaker
 - [claims](claims.md) — every assertion or annotation pulled from a transcript span
 - [claim_chunks](claim_chunks.md) — N:M junction linking claims to the source chunks they were extracted from

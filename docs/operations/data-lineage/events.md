@@ -14,12 +14,14 @@ tags: [area/operations, data-lineage]
 
 ## Writers
 
-Any system component that produces user-visible activity:
-- Scout pipelines emit `display_mode='watching'` / `'thinking'` events as they discover content
-- Reasoning agents emit `display_mode='signal'` / `'prediction'` / `'action'` events
-- Wiki edits emit `display_mode='review'` events
-- System lifecycle emits `display_mode='sys'` events
-- Q&A surface emits `display_mode='question'` / `'answer'` events
+- `services/worker-publishing/app/activities/generate_events.py` — Temporal activity that emits feed events. Per [[project_temporal_not_in_prod]] the worker isn't deployed today.
+- `services/api/app/routers/feed.py` — API surface for the activity feed; reads + can emit events directly
+- Plus opportunistic emitters across the system:
+  - Scout pipelines emit `display_mode='watching'` / `'thinking'` events as they discover content
+  - Reasoning agents emit `display_mode='signal'` / `'prediction'` / `'action'` events
+  - Wiki edits emit `display_mode='review'` events
+  - System lifecycle emits `display_mode='sys'` events
+  - Q&A surface emits `display_mode='question'` / `'answer'` events
 
 ## Field mapping
 
