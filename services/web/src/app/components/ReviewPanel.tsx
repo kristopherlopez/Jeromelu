@@ -37,17 +37,42 @@ function fmtDuration(seconds: number): string {
   return `${m}m${s ? ` ${s}s` : ""}`;
 }
 
-// Stable per-cluster colour palette, same one used in FacesPanel /
-// FaceTranscriptPanel so the same hue identifies the same cluster
-// across tabs.
-const CLUSTER_PALETTE = [
+// Stable colour palette shared between cluster and person colouring.
+// Same one used in FacesPanel / FaceTranscriptPanel so the same hue
+// identifies the same identity across tabs.
+const IDENTITY_PALETTE = [
   "#60a5fa", "#fbbf24", "#4ade80", "#c084fc",
   "#f87171", "#22d3ee", "#fb923c", "#a3e635",
   "#f472b6", "#94a3b8", "#facc15", "#34d399",
 ];
+
 function colorForCluster(cid: number | null | undefined): string {
   if (cid === null || cid === undefined) return "var(--foreground-ghost)";
-  return CLUSTER_PALETTE[cid % CLUSTER_PALETTE.length];
+  return IDENTITY_PALETTE[cid % IDENTITY_PALETTE.length];
+}
+
+function colorForPerson(personId: string | null | undefined): string {
+  if (!personId) return "var(--foreground-ghost)";
+  // Deterministic hash: first 8 hex chars of the UUID → palette index.
+  // Same person_id → same hue across every word/face/pill on the page
+  // AND across two clusters that happen to be the same person.
+  const hash = parseInt(personId.replace(/-/g, "").slice(0, 8), 16) || 0;
+  return IDENTITY_PALETTE[hash % IDENTITY_PALETTE.length];
+}
+
+/** Person-first colouring. When an attribution exists (manual or kNN),
+ *  colour by the person — so two clusters belonging to the same person
+ *  (different camera angles, embedding drift) read as the same hue.
+ *  Falls back to the cluster colour when unassigned, and to ghost grey
+ *  when no cluster either. */
+function colorForFace(
+  cid: number | null | undefined,
+  clusterPersonId: string | null | undefined,
+  detectionPersonId: string | null | undefined,
+): string {
+  if (clusterPersonId) return colorForPerson(clusterPersonId);
+  if (detectionPersonId) return colorForPerson(detectionPersonId);
+  return colorForCluster(cid);
 }
 
 function methodColor(method: string | null): string {
@@ -270,7 +295,13 @@ function PlayheadStatusPill({
                 >
                   <span
                     className="inline-block h-2 w-2 rounded-full"
-                    style={{ backgroundColor: colorForCluster(f.face_cluster_id) }}
+                    style={{
+                      backgroundColor: colorForFace(
+                        f.face_cluster_id,
+                        f.cluster_attributed_person_id,
+                        f.per_detection_matched_person_id,
+                      ),
+                    }}
                   />
                   <span className="font-semibold">
                     FACE_{f.face_cluster_id ?? "?"}
@@ -523,7 +554,20 @@ function WordTranscript({
         {words.map((w, idx) => {
           const isActive = idx === activeIdx;
           const cid = w.active_speaker?.face_cluster_id ?? null;
-          const color = colorForCluster(cid);
+          // Person-first colouring: if the active speaker maps to a
+          // person (via cluster attribution or per-detection kNN),
+          // colour the word by the person — so two camera-angle
+          // clusters that map to the same human read as one colour.
+          // Falls back to the cluster colour when no attribution.
+          const color = colorForFace(
+            cid,
+            w.active_speaker?.cluster_attributed_person_id ?? null,
+            w.active_speaker?.per_detection_matched_person_id ?? null,
+          );
+          const personLabel =
+            w.active_speaker?.cluster_attributed_person_name ??
+            w.active_speaker?.per_detection_matched_person_name ??
+            null;
           return (
             <span
               key={idx}
@@ -541,7 +585,7 @@ function WordTranscript({
               }}
               title={
                 w.active_speaker
-                  ? `FACE_${cid}${w.active_speaker.cluster_attributed_person_name ? ` → ${w.active_speaker.cluster_attributed_person_name}` : ""} · ${fmtTs(w.start)}`
+                  ? `FACE_${cid}${personLabel ? ` → ${personLabel}` : ""} · ${fmtTs(w.start)}`
                   : `no active face · ${fmtTs(w.start)}`
               }
             >
