@@ -500,11 +500,26 @@ export interface ReviewActiveSpeaker {
   per_detection_matched_person_name: string | null;
 }
 
+/** Every face detected at the playhead's face frame, even those with
+ *  closed-enough mouths. The overlay draws all of them — Review must
+ *  too, so the operator can see "X is on screen but not speaking right
+ *  now" vs "no face was detected at this moment". */
+export interface ReviewVisibleFace {
+  face_cluster_id: number | null;
+  mouth_opening: number;
+  cluster_attributed_person_id: string | null;
+  cluster_attributed_person_name: string | null;
+  per_detection_matched_person_id: string | null;
+  per_detection_matched_person_name: string | null;
+  is_active_speaker: boolean;
+}
+
 export interface ReviewWord {
   start: number;
   end: number;
   word: string;
   confidence: number;
+  visible_faces: ReviewVisibleFace[];
   active_speaker: ReviewActiveSpeaker | null;
 }
 

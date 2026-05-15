@@ -219,11 +219,8 @@ function PlayheadStatusPill({
   activeTurn,
   activeWord,
 }: PlayheadStatusPillProps) {
-  const faceCid = activeWord?.active_speaker?.face_cluster_id ?? null;
-  // Face cluster's manual attribution wins over the per-detection kNN
-  // match. The pill surfaces both so disagreement is visible.
-  const faceClusterPerson = activeWord?.active_speaker?.cluster_attributed_person_name ?? null;
-  const facePerDetPerson = activeWord?.active_speaker?.per_detection_matched_person_name ?? null;
+  const visible = activeWord?.visible_faces ?? [];
+  const hasActive = activeWord?.active_speaker != null;
 
   return (
     <section
@@ -233,45 +230,90 @@ function PlayheadStatusPill({
         backgroundColor: "var(--background-deep)",
       }}
     >
-      {/* FACE column */}
+      {/* FACE column — every detection at the playhead frame.
+          Speaking faces marked with an ●; non-speaking faces still
+          shown so the operator can tell "X is on screen but quiet"
+          from "no face detected at this moment". */}
       <div className="flex flex-col gap-0.5">
-        <h4 className="text-[10px] font-semibold uppercase tracking-wider"
-            style={{ color: "var(--foreground-ghost)" }}>
-          Face at {fmtTs(currentTime)}
+        <h4
+          className="text-[10px] font-semibold uppercase tracking-wider"
+          style={{ color: "var(--foreground-ghost)" }}
+        >
+          Faces at {fmtTs(currentTime)}
+          {visible.length > 0 && (
+            <span style={{ color: "var(--foreground-ghost)" }}>
+              {" "}· {visible.length} on screen
+              {hasActive ? "" : " · none speaking"}
+            </span>
+          )}
         </h4>
-        {activeWord?.active_speaker ? (
-          <>
-            <div className="flex items-center gap-1.5 text-xs">
-              <span
-                className="inline-block h-2 w-2 rounded-full"
-                style={{ backgroundColor: colorForCluster(faceCid) }}
-              />
-              <span className="font-semibold">FACE_{faceCid}</span>
-              <span style={{ color: "var(--foreground-ghost)" }}>
-                · mouth {(activeWord.active_speaker.mouth_opening * 100).toFixed(1)}%
-              </span>
-            </div>
-            <div className="text-[11px]">
-              {faceClusterPerson ? (
-                <span style={{ color: "var(--accent)" }}>
-                  cluster → <strong>{faceClusterPerson}</strong>
-                </span>
-              ) : facePerDetPerson ? (
-                <span style={{ color: "var(--foreground-secondary)" }}>
-                  kNN → {facePerDetPerson}
-                  <span style={{ color: "var(--foreground-ghost)" }}>
-                    {" "}(cluster unassigned)
-                  </span>
-                </span>
-              ) : (
-                <span style={{ color: "var(--foreground-ghost)" }}>unassigned</span>
-              )}
-            </div>
-          </>
-        ) : (
+        {visible.length === 0 ? (
           <div className="text-[11px]" style={{ color: "var(--foreground-ghost)" }}>
-            no face speaking
+            no face detected
           </div>
+        ) : (
+          <ul className="flex flex-col gap-0.5">
+            {visible.map((f, idx) => {
+              const name =
+                f.cluster_attributed_person_name ??
+                f.per_detection_matched_person_name ??
+                null;
+              const isCluster = f.cluster_attributed_person_name != null;
+              return (
+                <li
+                  key={`${f.face_cluster_id ?? "none"}-${idx}`}
+                  className="flex items-center gap-1.5 text-[11px]"
+                  style={{
+                    opacity: f.is_active_speaker ? 1 : 0.7,
+                  }}
+                >
+                  <span
+                    className="inline-block h-2 w-2 rounded-full"
+                    style={{ backgroundColor: colorForCluster(f.face_cluster_id) }}
+                  />
+                  <span
+                    className="font-semibold"
+                    style={{
+                      textDecoration: f.is_active_speaker ? "none" : "none",
+                    }}
+                  >
+                    FACE_{f.face_cluster_id ?? "?"}
+                  </span>
+                  {name && (
+                    <span
+                      style={{
+                        color: isCluster
+                          ? "var(--accent)"
+                          : "var(--foreground-secondary)",
+                      }}
+                    >
+                      {isCluster ? "→" : "kNN→"} <strong>{name}</strong>
+                    </span>
+                  )}
+                  {!name && (
+                    <span style={{ color: "var(--foreground-ghost)" }}>
+                      unassigned
+                    </span>
+                  )}
+                  <span style={{ color: "var(--foreground-ghost)" }}>
+                    · mouth {(f.mouth_opening * 100).toFixed(1)}%
+                  </span>
+                  {f.is_active_speaker && (
+                    <span
+                      className="rounded px-1 text-[9px] font-semibold uppercase"
+                      style={{
+                        backgroundColor: "var(--accent)",
+                        color: "var(--background)",
+                      }}
+                      title="Mouth opening above ASD threshold — this face is speaking"
+                    >
+                      speaking
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         )}
       </div>
 

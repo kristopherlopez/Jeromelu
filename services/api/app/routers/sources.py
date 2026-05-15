@@ -2390,33 +2390,62 @@ def get_word_attribution(source_id: uuid.UUID, db: Session = Depends(get_db)):
     # the face-transcript and visual_id paths.
     threshold = 0.045
 
-    def lookup_active(word_start: float) -> dict | None:
-        idx = bisect.bisect_right(sorted_frame_ts, word_start) - 1
-        if idx < 0:
-            return None
-        ts = sorted_frame_ts[idx]
-        # Among faces visible at that frame, pick the one with highest
-        # mouth_opening above threshold. Excluded clusters are NOT
-        # filtered here — Review wants to show what's actually on
-        # screen so the operator can see if an excluded cluster was
-        # mistakenly the loudest mouth.
-        candidates = by_frame[ts]
-        if not candidates:
-            return None
-        top = max(candidates, key=lambda c: c[1])
-        if top[1] < threshold:
-            return None
-        cid, mo, matched_pid = top
+    def _resolve_face(cid: int | None, matched_pid: uuid.UUID | None) -> dict:
         cmeta = cluster_meta.get(cid) if cid is not None else None
         attr_pid = cmeta.attributed_person_id if cmeta else None
         return {
             "face_cluster_id": cid,
-            "mouth_opening": float(mo),
             "cluster_attributed_person_id": str(attr_pid) if attr_pid else None,
             "cluster_attributed_person_name": names.get(attr_pid) if attr_pid else None,
             "per_detection_matched_person_id": str(matched_pid) if matched_pid else None,
             "per_detection_matched_person_name": names.get(matched_pid) if matched_pid else None,
         }
+
+    def lookup_faces(word_start: float) -> tuple[list[dict], dict | None]:
+        """Return (visible_faces, active_speaker).
+
+        ``visible_faces`` is every face detected in the active frame,
+        even those whose mouth_opening is below threshold — the overlay
+        draws all of them, so Review must report all of them. Each
+        carries a ``is_active_speaker`` flag.
+
+        ``active_speaker`` is the face with the highest mouth_opening
+        that crosses the ASD threshold, or ``None`` if no face on
+        screen has mouth open enough.
+
+        Both are ``None`` / ``[]`` only when no face frame exists
+        at-or-before ``word_start`` (genuinely no detection — typically
+        only at the very start of the source).
+        """
+        idx = bisect.bisect_right(sorted_frame_ts, word_start) - 1
+        if idx < 0:
+            return [], None
+        ts = sorted_frame_ts[idx]
+        candidates = by_frame[ts]
+        if not candidates:
+            return [], None
+        # Excluded clusters are NOT filtered — Review wants to show
+        # what's actually on screen, including detections the operator
+        # has marked excluded, so any mis-classification is visible.
+        ranked = sorted(candidates, key=lambda c: -c[1])
+        top_cid, top_mo, top_matched = ranked[0]
+        active = None
+        if top_mo >= threshold and top_cid is not None:
+            active = {
+                **_resolve_face(top_cid, top_matched),
+                "mouth_opening": float(top_mo),
+            }
+        visible = []
+        for cid, mo, matched_pid in ranked:
+            entry = _resolve_face(cid, matched_pid)
+            entry["mouth_opening"] = float(mo)
+            entry["is_active_speaker"] = (
+                active is not None
+                and cid == active["face_cluster_id"]
+                and mo == active["mouth_opening"]
+            )
+            visible.append(entry)
+        return visible, active
 
     alts = (dg.get("results") or {}).get("channels") or []
     raw_words: list[dict] = []
@@ -2431,12 +2460,13 @@ def get_word_attribution(source_id: uuid.UUID, db: Session = Depends(get_db)):
             we = float(w["end"])
         except (KeyError, TypeError, ValueError):
             continue
-        active = lookup_active(ws)
+        visible, active = lookup_faces(ws)
         out_words.append({
             "start": ws,
             "end": we,
             "word": str(w.get("punctuated_word") or w.get("word") or ""),
             "confidence": float(w.get("confidence") or 0.0),
+            "visible_faces": visible,
             "active_speaker": active,
         })
 
