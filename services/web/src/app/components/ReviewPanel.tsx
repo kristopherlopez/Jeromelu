@@ -65,27 +65,36 @@ function colorForCluster(cid: number | null | undefined): string {
   return IDENTITY_PALETTE[cid % IDENTITY_PALETTE.length];
 }
 
-function colorForPerson(personId: string | null | undefined): string {
+/** Per-source person → palette-index lookup. Built once from the
+ *  loaded turns + word data, indexed in order of appearance. Up to 12
+ *  distinct persons within one source get 12 distinct hues; the 13th+
+ *  cycle and collide (acceptable given typical podcast headcount). */
+type PersonColorMap = Map<string, number>;
+
+function colorForPersonViaMap(
+  personId: string | null | undefined,
+  map: PersonColorMap,
+): string {
   if (!personId) return "var(--foreground-ghost)";
-  // Deterministic hash: first 8 hex chars of the UUID → palette index.
-  // Same person_id → same hue across every word/face/pill on the page
-  // AND across two clusters that happen to be the same person.
-  const hash = parseInt(personId.replace(/-/g, "").slice(0, 8), 16) || 0;
-  return IDENTITY_PALETTE[hash % IDENTITY_PALETTE.length];
+  const idx = map.get(personId);
+  if (idx === undefined) return "var(--foreground-ghost)";
+  return IDENTITY_PALETTE[idx % IDENTITY_PALETTE.length];
 }
 
 /** Person-first colouring. When an attribution exists (manual or kNN),
  *  colour by the person — so two clusters belonging to the same person
  *  (different camera angles, embedding drift) read as the same hue.
  *  Falls back to the cluster colour when unassigned, and to ghost grey
- *  when no cluster either. */
+ *  when no cluster either. Within a single source, distinct persons
+ *  always get distinct colours (up to 12). */
 function colorForFace(
   cid: number | null | undefined,
   clusterPersonId: string | null | undefined,
   detectionPersonId: string | null | undefined,
+  personColorMap: PersonColorMap,
 ): string {
-  if (clusterPersonId) return colorForPerson(clusterPersonId);
-  if (detectionPersonId) return colorForPerson(detectionPersonId);
+  if (clusterPersonId) return colorForPersonViaMap(clusterPersonId, personColorMap);
+  if (detectionPersonId) return colorForPersonViaMap(detectionPersonId, personColorMap);
   return colorForCluster(cid);
 }
 
@@ -183,6 +192,40 @@ export default function ReviewPanel({
   const activeTurn = activeTurnIdx >= 0 ? turns[activeTurnIdx] : null;
   const activeWord = activeWordIdx >= 0 ? words[activeWordIdx] : null;
 
+  // Per-source person→palette-index map. Indexed in order of
+  // appearance across turns + active-speaker rows so distinct persons
+  // get distinct hues within one source. Also collect display names
+  // for the legend.
+  const { personColorMap, personLegend } = useMemo(() => {
+    const map: PersonColorMap = new Map();
+    const nameById: Map<string, string> = new Map();
+    const consider = (id: string | null, name: string | null) => {
+      if (!id) return;
+      if (!map.has(id)) map.set(id, map.size);
+      if (name && !nameById.has(id)) nameById.set(id, name);
+    };
+    for (const t of turns) consider(t.person_id, t.person_name);
+    for (const w of words) {
+      consider(
+        w.active_speaker?.cluster_attributed_person_id ?? null,
+        w.active_speaker?.cluster_attributed_person_name ?? null,
+      );
+      consider(
+        w.active_speaker?.per_detection_matched_person_id ?? null,
+        w.active_speaker?.per_detection_matched_person_name ?? null,
+      );
+    }
+    const legend: { person_id: string; name: string; color: string }[] = [];
+    for (const [pid, idx] of map.entries()) {
+      legend.push({
+        person_id: pid,
+        name: nameById.get(pid) ?? pid.slice(0, 8),
+        color: IDENTITY_PALETTE[idx % IDENTITY_PALETTE.length],
+      });
+    }
+    return { personColorMap: map, personLegend: legend };
+  }, [turns, words]);
+
   // For each word, compute which voice turn (by index) contains its
   // start timestamp. -1 means no turn contains the word — typically
   // gaps between turns or words before/after the last turn.
@@ -254,11 +297,19 @@ export default function ReviewPanel({
 
   return (
     <div className="flex h-full flex-col gap-3 overflow-hidden">
+      {/* 0. PERSON LEGEND — which colour means which person in this
+          source. Indices assigned in order of appearance so distinct
+          persons reliably get distinct hues (up to 12). */}
+      {personLegend.length > 0 && (
+        <PersonLegend legend={personLegend} />
+      )}
+
       {/* 1. STATUS PILL — face + voice + word at playhead */}
       <PlayheadStatusPill
         currentTime={currentTime}
         activeTurn={activeTurn}
         activeWord={activeWord}
+        personColorMap={personColorMap}
       />
 
       {/* 2 + 3. Two-column scroll: voice turn list on the left,
@@ -282,6 +333,7 @@ export default function ReviewPanel({
           wordRefs={wordRefs}
           wordToTurnIdx={wordToTurnIdx}
           firstWordOfTurn={firstWordOfTurn}
+          personColorMap={personColorMap}
         />
       </div>
     </div>
@@ -292,12 +344,14 @@ interface PlayheadStatusPillProps {
   currentTime: number;
   activeTurn: ReviewVoiceTurn | null;
   activeWord: ReviewWord | null;
+  personColorMap: PersonColorMap;
 }
 
 function PlayheadStatusPill({
   currentTime,
   activeTurn,
   activeWord,
+  personColorMap,
 }: PlayheadStatusPillProps) {
   const visible = activeWord?.visible_faces ?? [];
   const hasActive = activeWord?.active_speaker != null;
@@ -355,6 +409,7 @@ function PlayheadStatusPill({
                         f.face_cluster_id,
                         f.cluster_attributed_person_id,
                         f.per_detection_matched_person_id,
+                        personColorMap,
                       ),
                     }}
                   />
@@ -679,6 +734,7 @@ interface WordTranscriptProps {
    *  small superscript number so the operator can see at a glance where
    *  each voice turn starts. */
   firstWordOfTurn: Set<number>;
+  personColorMap: PersonColorMap;
 }
 
 function WordTranscript({
@@ -688,6 +744,7 @@ function WordTranscript({
   wordRefs,
   wordToTurnIdx,
   firstWordOfTurn,
+  personColorMap,
 }: WordTranscriptProps) {
   return (
     <section
@@ -713,6 +770,7 @@ function WordTranscript({
             cid,
             w.active_speaker?.cluster_attributed_person_id ?? null,
             w.active_speaker?.per_detection_matched_person_id ?? null,
+            personColorMap,
           );
           const personLabel =
             w.active_speaker?.cluster_attributed_person_name ??
@@ -760,6 +818,42 @@ function WordTranscript({
           );
         })}
       </div>
+    </section>
+  );
+}
+
+interface PersonLegendProps {
+  legend: { person_id: string; name: string; color: string }[];
+}
+
+function PersonLegend({ legend }: PersonLegendProps) {
+  return (
+    <section
+      className="flex flex-wrap items-center gap-2 rounded border px-3 py-1.5 text-[11px]"
+      style={{
+        borderColor: "var(--border)",
+        backgroundColor: "var(--background-deep)",
+      }}
+    >
+      <span
+        className="text-[10px] font-semibold uppercase tracking-wider"
+        style={{ color: "var(--foreground-ghost)" }}
+      >
+        Persons in this source
+      </span>
+      {legend.map((p) => (
+        <span
+          key={p.person_id}
+          className="inline-flex items-center gap-1 rounded px-1.5 py-0.5"
+          style={{ backgroundColor: "var(--background)" }}
+        >
+          <span
+            className="inline-block h-2 w-2 rounded-full"
+            style={{ backgroundColor: p.color }}
+          />
+          <strong>{p.name}</strong>
+        </span>
+      ))}
     </section>
   );
 }
