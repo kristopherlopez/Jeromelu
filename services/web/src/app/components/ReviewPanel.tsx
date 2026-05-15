@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { apiFetch } from "@/lib/api";
+import { apiFetch, apiPost } from "@/lib/api";
 import type {
   ReviewVoiceTimelineResponse,
   ReviewVoiceTurn,
@@ -252,10 +252,14 @@ export default function ReviewPanel({
           active row as playback advances. */}
       <div className="grid flex-1 min-h-0 grid-cols-2 gap-3">
         <VoiceTurnList
+          sourceId={sourceId}
           turns={turns}
           activeIdx={activeTurnIdx}
           onSeek={onSeek}
           turnRefs={turnRefs}
+          onTurnReassigned={() => {
+            void fetchAll();
+          }}
         />
         <WordTranscript
           words={words}
@@ -477,18 +481,48 @@ function PlayheadStatusPill({
 }
 
 interface VoiceTurnListProps {
+  sourceId: string;
   turns: ReviewVoiceTurn[];
   activeIdx: number;
   onSeek: (seconds: number) => void;
   turnRefs: React.MutableRefObject<Map<number, HTMLLIElement>>;
+  /** Called after a successful voice-reassign so the panel re-fetches
+   *  voice-timeline + word-attribution and the row's label / colour
+   *  update without a hard refresh. */
+  onTurnReassigned: () => void;
+}
+
+interface PersonSearchHit {
+  person_id: string;
+  canonical_name: string;
+}
+
+interface PersonSearchResponse {
+  items: PersonSearchHit[];
+}
+
+interface VoiceReassignResponse {
+  person_id: string;
+  person_name: string;
+  person_created: boolean;
+  segment_id: string;
+  speaker_label: string | null;
+  cluster_label: string | null;
+  voiceprint_written: boolean;
 }
 
 function VoiceTurnList({
+  sourceId,
   turns,
   activeIdx,
   onSeek,
   turnRefs,
+  onTurnReassigned,
 }: VoiceTurnListProps) {
+  // segment_id of the turn whose Reassign popover is currently open.
+  // Null when no popover is open. Only one open at a time so we don't
+  // have to manage close-on-outside-click across many popovers.
+  const [reassigningId, setReassigningId] = useState<string | null>(null);
   return (
     <section
       className="flex min-h-0 flex-col rounded border"
@@ -511,15 +545,21 @@ function VoiceTurnList({
                 else turnRefs.current.delete(idx);
               }}
             >
-              <button
-                type="button"
-                onClick={() => onSeek(t.start_ts)}
-                className="flex w-full flex-col items-start gap-0.5 border-b px-3 py-1.5 text-left transition-colors"
+              <div
+                className="flex w-full flex-col gap-0.5 border-b px-3 py-1.5 text-left transition-colors"
                 style={{
                   borderColor: "var(--border)",
                   backgroundColor: isActive ? "var(--accent-faint, rgba(96,165,250,0.15))" : "transparent",
                 }}
               >
+                {/* Header row clickable for seek; Reassign sits to the
+                    right and stops propagation so clicking it doesn't
+                    also jump the player. */}
+                <button
+                  type="button"
+                  onClick={() => onSeek(t.start_ts)}
+                  className="flex w-full flex-col items-start gap-0.5 text-left"
+                >
                 <div className="flex items-center gap-1.5 text-[11px]">
                   <span
                     className="font-mono font-semibold"
@@ -556,16 +596,43 @@ function VoiceTurnList({
                     · {fmtDuration(t.duration)}
                   </span>
                 </div>
-                <div className="text-[11px]">
-                  {t.person_name ? (
-                    <strong>{t.person_name}</strong>
+                  <div className="text-[11px]">
+                    {t.person_name ? (
+                      <strong>{t.person_name}</strong>
+                    ) : (
+                      <span style={{ color: "var(--foreground-ghost)" }}>
+                        unattributed{!t.has_embedding && " · no embedding"}
+                      </span>
+                    )}
+                  </div>
+                </button>
+                <div className="mt-1 flex items-center justify-end gap-2">
+                  {reassigningId === t.segment_id ? (
+                    <ReassignTurnPopover
+                      sourceId={sourceId}
+                      turn={t}
+                      onCancel={() => setReassigningId(null)}
+                      onDone={(_resp) => {
+                        setReassigningId(null);
+                        onTurnReassigned();
+                      }}
+                    />
                   ) : (
-                    <span style={{ color: "var(--foreground-ghost)" }}>
-                      unattributed{!t.has_embedding && " · no embedding"}
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setReassigningId(t.segment_id)}
+                      className="rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-wider"
+                      style={{
+                        borderColor: "var(--border)",
+                        color: "var(--foreground-secondary)",
+                      }}
+                      title="Reassign this turn to a person (also writes a voiceprint exemplar)"
+                    >
+                      Reassign
+                    </button>
                   )}
                 </div>
-              </button>
+              </div>
             </li>
           );
         })}
@@ -667,5 +734,132 @@ function WordTranscript({
         })}
       </div>
     </section>
+  );
+}
+
+interface ReassignTurnPopoverProps {
+  sourceId: string;
+  turn: ReviewVoiceTurn;
+  onCancel: () => void;
+  onDone: (resp: VoiceReassignResponse) => void;
+}
+
+function ReassignTurnPopover({
+  sourceId,
+  turn,
+  onCancel,
+  onDone,
+}: ReassignTurnPopoverProps) {
+  const [query, setQuery] = useState("");
+  const [hits, setHits] = useState<PersonSearchHit[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Debounced people-search. Keep light — the registry is small, the
+  // backend caps at 30, no point being clever.
+  useEffect(() => {
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const r = await apiFetch<PersonSearchResponse>(
+          `/api/people/search?q=${encodeURIComponent(query)}&limit=20`,
+        );
+        if (!cancelled) setHits(r.items);
+      } catch {
+        // Best-effort — the new-person path still works if search fails.
+      }
+    }, 150);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [query]);
+
+  const submit = async (
+    payload:
+      | { person_id: string }
+      | { new_person_name: string },
+  ) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await apiPost<VoiceReassignResponse, typeof payload>(
+        `/api/sources/${sourceId}/speakers/${turn.segment_id}/voice-reassign`,
+        payload,
+      );
+      onDone(r);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const trimmed = query.trim();
+  const exactMatch = hits.find(
+    (h) => h.canonical_name.toLowerCase() === trimmed.toLowerCase(),
+  );
+
+  return (
+    <div
+      className="flex w-full flex-col gap-1.5 rounded border px-2 py-1.5"
+      style={{ borderColor: "var(--accent)", backgroundColor: "var(--background)" }}
+    >
+      <div className="flex items-center justify-between gap-2 text-[10px] uppercase tracking-wider"
+           style={{ color: "var(--foreground-secondary)" }}>
+        <span>Reassign turn #{turn.segment_id.slice(0, 6)}</span>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={busy}
+          className="text-[10px]"
+          style={{ color: "var(--foreground-ghost)" }}
+        >
+          cancel
+        </button>
+      </div>
+      <input
+        type="text"
+        value={query}
+        autoFocus
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search for a person…"
+        disabled={busy}
+        className="rounded border px-2 py-1 text-[11px]"
+        style={{ borderColor: "var(--border)" }}
+      />
+      {hits.length > 0 && (
+        <ul className="flex max-h-32 flex-col gap-px overflow-y-auto custom-scrollbar">
+          {hits.map((h) => (
+            <li key={h.person_id}>
+              <button
+                type="button"
+                onClick={() => submit({ person_id: h.person_id })}
+                disabled={busy}
+                className="w-full rounded px-2 py-0.5 text-left text-[11px] hover:bg-[var(--background-deep)]"
+              >
+                {h.canonical_name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {trimmed && !exactMatch && (
+        <button
+          type="button"
+          onClick={() => submit({ new_person_name: trimmed })}
+          disabled={busy}
+          className="rounded border px-2 py-1 text-[11px]"
+          style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
+        >
+          {busy ? "Saving…" : `Create + assign "${trimmed}"`}
+        </button>
+      )}
+      {error && (
+        <div className="text-[11px]" style={{ color: "#f87171" }}>
+          {error}
+        </div>
+      )}
+    </div>
   );
 }

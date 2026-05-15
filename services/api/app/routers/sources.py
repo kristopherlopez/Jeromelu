@@ -2173,6 +2173,139 @@ def bulk_assign_voice_cluster(
     return StreamingResponse(stream(), media_type="application/x-ndjson")
 
 
+class VoiceTurnReassignRequest(BaseModel):
+    """Reassign a single voice turn to a Person + grow the voiceprint
+    registry by one labeled exemplar. Voice-only counterpart to the
+    full ``/reassign`` endpoint that also enrols a face crop. No video
+    worker, no S3 audio download — the turn's medoid embedding is
+    already on the row.
+    """
+    person_id: uuid.UUID | None = Field(
+        default=None,
+        description="Existing Person to attribute this turn to.",
+    )
+    new_person_name: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description=(
+            "Canonical name of a Person to create (or reuse, "
+            "case-insensitive). Mutually exclusive with person_id."
+        ),
+    )
+
+
+@router.post("/sources/{source_id}/speakers/{segment_id}/voice-reassign")
+def voice_reassign_turn(
+    source_id: uuid.UUID,
+    segment_id: uuid.UUID,
+    body: VoiceTurnReassignRequest,
+    db: Session = Depends(get_db),
+):
+    """Per-turn voice label fix — improves both the per-turn attribution
+    AND the voiceprint registry's labels in one SQL transaction.
+
+    Updates ``source_speakers``:
+      * ``speaker_person_id`` → target Person
+      * ``match_method`` → 'manual'
+      * ``match_confidence`` → 1.0
+
+    Writes one ``person_voiceprints`` row from the turn's medoid
+    (when ``embedding`` is non-null). The turn already has an
+    embedding from the diarisation pass — no recompute, no audio
+    fetch. If the turn lacks an embedding (sub-MIN_TURN_DURATION
+    spans), only the attribution is updated; the voiceprint is
+    skipped with ``voiceprint_written: false``.
+
+    Used by the Review tab to fix outlier turns where the cluster
+    is right overall but this single turn was mis-assigned. Each
+    correction grows the registry by one correctly-labeled exemplar,
+    which is exactly the bootstrap loop voice ID needs to sharpen.
+    """
+    if (body.person_id is None) == (body.new_person_name is None):
+        raise HTTPException(
+            status_code=400,
+            detail="Provide exactly one of person_id or new_person_name",
+        )
+
+    source = db.query(Source).filter(Source.source_id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+
+    turn = (
+        db.query(SourceSpeaker)
+        .filter(SourceSpeaker.segment_id == segment_id)
+        .first()
+    )
+    if not turn:
+        raise HTTPException(status_code=404, detail="Turn not found")
+    # Confirm the segment belongs to this source — defends against
+    # cross-source URL tampering.
+    doc = (
+        db.query(SourceDocument)
+        .filter(SourceDocument.document_id == turn.document_id)
+        .first()
+    )
+    if not doc or doc.source_id != source_id:
+        raise HTTPException(
+            status_code=404, detail="Turn does not belong to this source",
+        )
+
+    # Resolve / create Person. Commit the new person before the turn
+    # update so a later UNIQUE collision can't leave a half-created
+    # row (same pattern as ``bulk_assign_voice_cluster``).
+    person_created = False
+    if body.person_id is not None:
+        person = db.query(Person).filter(Person.person_id == body.person_id).first()
+        if not person:
+            raise HTTPException(status_code=404, detail="Person not found")
+    else:
+        new_name = (body.new_person_name or "").strip()
+        if not new_name:
+            raise HTTPException(status_code=400, detail="new_person_name is empty")
+        person = (
+            db.query(Person)
+            .filter(func.lower(Person.canonical_name) == new_name.lower())
+            .first()
+        )
+        if not person:
+            person = Person(canonical_name=new_name)
+            db.add(person)
+            db.commit()
+            person_created = True
+
+    # Voiceprint from the turn's medoid. Skip when the row carries no
+    # embedding (sub-300ms turns have NULL after diarisation).
+    voiceprint_written = False
+    if turn.embedding is not None and turn.embedding_model is not None:
+        vp = PersonVoiceprint(
+            person_id=person.person_id,
+            source_id=source_id,
+            start_ts=float(turn.start_ts),
+            end_ts=float(turn.end_ts),
+            embedding=list(turn.embedding),
+            embedding_model=turn.embedding_model,
+            created_by="manual",
+        )
+        db.add(vp)
+        voiceprint_written = True
+
+    turn.speaker_person_id = person.person_id
+    turn.match_method = "manual"
+    turn.match_confidence = 1.0
+    db.commit()
+
+    return {
+        "person_id": str(person.person_id),
+        "person_name": person.canonical_name,
+        "person_created": person_created,
+        "segment_id": str(turn.segment_id),
+        "speaker_label": turn.speaker_label,
+        "cluster_label": turn.cluster_label,
+        "voiceprint_written": voiceprint_written,
+    }
+
+
 class VoiceReclusterRequest(BaseModel):
     """Tunable knobs for the HDBSCAN re-clustering pass.
 
