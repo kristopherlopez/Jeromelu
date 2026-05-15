@@ -19,6 +19,7 @@ import FacesPanel from "@/app/components/FacesPanel";
 import VoicesPanel from "@/app/components/VoicesPanel";
 import AlignmentPanel from "@/app/components/AlignmentPanel";
 import FaceTranscriptPanel from "@/app/components/FaceTranscriptPanel";
+import ReviewPanel from "@/app/components/ReviewPanel";
 
 interface Props {
   data: SourceDetailResponse;
@@ -37,7 +38,7 @@ export default function SourceReviewClient({ data, allSources }: Props) {
   const [speakers, setSpeakers] = useState<Speaker[]>(data.speakers ?? []);
   const [currentTime, setCurrentTime] = useState(0);
   const [activeTab, setActiveTab] = useState<
-    "transcript" | "claims" | "faces" | "voices" | "alignment" | "face_transcript"
+    "transcript" | "claims" | "faces" | "review" | "voices" | "alignment" | "face_transcript"
   >("transcript");
   // Bumped after a successful face cluster assign so the overlay
   // remounts and re-fetches the regenerated face-track JSON. Combined
@@ -358,6 +359,23 @@ export default function SourceReviewClient({ data, allSources }: Props) {
                 Faces
               </button>
             )}
+            {/* Review tab — playback-aligned working surface. Same
+                precondition as Alignment (needs face detections + a
+                transcript) so we only show it when face_track_url
+                exists. Sits between Faces (assignment work) and
+                Voices (diagnostic) in the workflow. */}
+            {source.face_track_url && (
+              <button
+                onClick={() => setActiveTab("review")}
+                className="pb-2 text-[11px] font-semibold uppercase tracking-wider transition-colors"
+                style={{
+                  color: activeTab === "review" ? "var(--accent)" : "var(--foreground-muted)",
+                  borderBottom: activeTab === "review" ? "2px solid var(--accent)" : "2px solid transparent",
+                }}
+              >
+                Review
+              </button>
+            )}
             {/* Voices tab — visible whenever the source has a transcript.
                 Pyannote diarisation runs as part of transcription, so any
                 transcribed source has voice clusters to attribute. */}
@@ -453,6 +471,12 @@ export default function SourceReviewClient({ data, allSources }: Props) {
                   // were, but per-turn name resolution updates.
                   void refreshSpeakers();
                 }}
+              />
+            ) : activeTab === "review" ? (
+              <ReviewPanel
+                sourceId={source.source_id}
+                currentTime={currentTime}
+                onSeek={handleSeek}
               />
             ) : activeTab === "alignment" ? (
               <AlignmentPanel

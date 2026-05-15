@@ -712,6 +712,34 @@ The pass is pure SQL + CPU — no SageMaker, no GPU. Re-running with new params 
 
 ---
 
+## Review tab — playback-aligned working surface
+
+Once face cluster → person assignment is done (via the Faces tab), the **Review tab** is where the operator scrubs through the video and inspects the alignment between face and voice in real time. The other tabs (Voices, Alignment, Face transcript) are read-only / diagnostic — Review is where the *next* round of attribution work happens, and where voice enrollment will eventually be triggered (Phase 2).
+
+Layout — three sections, all driven by the YouTube player's `currentTime`:
+
+1. **Playhead status pill** — three columns updating live:
+   - **Face at playhead.** The face cluster currently with mouth open above `MIN_ACTIVE_MOUTH_OPENING` (0.045), the cluster's manual attribution (if any), and the per-detection kNN match (if any). When the cluster attribution and the kNN match disagree, both show — that's the high-leverage diagnostic moment.
+   - **Voice at playhead.** Pyannote's `speaker_label` AND HDBSCAN's `cluster_label` side-by-side. The dot is the source-of-attribution colour (voice / face / voice+face / manual / none). Person attribution if any. Both labels shown so it's obvious when HDBSCAN reorganised pyannote's clusters.
+   - **Word at playhead.** Active Deepgram word with confidence and time range.
+
+2. **Voice turn list (left column).** Every `source_speakers` row, sorted by start_ts. Both labels shown (HDBSCAN + pyannote), match method dot, attributed person. Click to seek. Auto-scrolls so the active turn stays in view as playback advances.
+
+3. **Word-level transcript (right column).** Every Deepgram word, coloured by the active face cluster at the word's start timestamp. The current word is highlighted. Click any word to seek to that moment. Hover for the face cluster and time. Auto-scrolls in lockstep with the turn list.
+
+Two API endpoints back it:
+
+- `GET /api/sources/{id}/voice-timeline` — one row per `source_speakers` turn, both labels exposed.
+- `GET /api/sources/{id}/word-attribution` — Deepgram words with per-word active-speaker lookup using the same `speaker_at` logic the face-transcript surface uses. Heavy (~11k rows on a 50-min source) but cached in front-end memory once loaded.
+
+### How this fits the workflow
+
+Before Review existed, the operator's loop was: open Faces → assign clusters → switch to Voices → guess which voice cluster matches which face cluster → switch to the YouTube tab → scrub manually → repeat. Review collapses those switches into one tab the operator can stay in while watching.
+
+### Phase 2 — enrollment from window
+
+The current Review surface is read-only. The natural next step (deferred to its own commit) is an **"Enroll this voice window for X"** action on the status pill: when the operator confirms the face matches the active voice turn, one click captures the turn's audio span, computes a wespeaker embedding, and writes a `person_voiceprints` row tagged with the face cluster's attributed person. Closes the loop from "watch → enroll → voice attribution sharpens for future sources".
+
 ## Identity alignment (face × voice matrix)
 
 Face clusters and pyannote voice clusters are two independent clusterings of the same conversation. The Alignment tab on `/wiki/source/{source_id}` exposes their cross-modal overlap: for every `(face_cluster_id, speaker_label)` pair, how many face detections fall inside that voice cluster's turns, plus a per-turn disagreement worklist where the dominant on-screen face cluster's identity differs from the voice attribution.

@@ -469,3 +469,48 @@ export interface FaceTranscriptResponse {
   };
   segments: FaceTranscriptSegment[];
 }
+
+/** One voice turn for the Review tab — both pyannote (speaker_label)
+ *  and HDBSCAN (cluster_label) labels exposed so the UI can show them
+ *  side-by-side. */
+export interface ReviewVoiceTurn {
+  segment_id: string;
+  start_ts: number;
+  end_ts: number;
+  duration: number;
+  speaker_label: string | null;
+  cluster_label: string | null;
+  person_id: string | null;
+  person_name: string | null;
+  match_method: string | null;
+  has_embedding: boolean;
+}
+
+export interface ReviewVoiceTimelineResponse {
+  source_id: string;
+  turns: ReviewVoiceTurn[];
+}
+
+export interface ReviewActiveSpeaker {
+  face_cluster_id: number | null;
+  mouth_opening: number;
+  cluster_attributed_person_id: string | null;
+  cluster_attributed_person_name: string | null;
+  per_detection_matched_person_id: string | null;
+  per_detection_matched_person_name: string | null;
+}
+
+export interface ReviewWord {
+  start: number;
+  end: number;
+  word: string;
+  confidence: number;
+  active_speaker: ReviewActiveSpeaker | null;
+}
+
+export interface ReviewWordAttributionResponse {
+  source_id: string;
+  mouth_threshold: number;
+  word_count: number;
+  words: ReviewWord[];
+}

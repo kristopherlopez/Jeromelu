@@ -1,7 +1,9 @@
+import bisect
 import json
 import logging
 import tempfile
 import uuid
+from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
@@ -2244,6 +2246,205 @@ def recluster_voice_clusters(
             "min_samples": params.min_samples,
             "noise_threshold": params.noise_threshold,
         },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Review tab — playback-aligned working surface that fuses face, voice
+# and word data so the operator can scrub the video and see the
+# attribution at the playhead in one place. Two read-only endpoints
+# back it; enrollment-from-window is a Phase 2 follow-up.
+# ---------------------------------------------------------------------------
+
+
+@router.get("/sources/{source_id}/voice-timeline")
+def get_voice_timeline(source_id: uuid.UUID, db: Session = Depends(get_db)):
+    """Per-turn voice timeline for the Review tab.
+
+    One row per ``source_speakers`` entry with both labels exposed
+    side-by-side (``speaker_label`` = pyannote raw, ``cluster_label``
+    = HDBSCAN override) so the Review status pill can show both and
+    you can see where they diverge. Sorted by start_ts.
+    """
+    source = db.query(Source).filter(Source.source_id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    doc = (
+        db.query(SourceDocument)
+        .filter(SourceDocument.source_id == source_id)
+        .first()
+    )
+    if not doc:
+        return {"source_id": str(source_id), "turns": []}
+
+    rows = (
+        db.query(
+            SourceSpeaker.segment_id,
+            SourceSpeaker.start_ts,
+            SourceSpeaker.end_ts,
+            SourceSpeaker.speaker_label,
+            SourceSpeaker.cluster_label,
+            SourceSpeaker.speaker_person_id,
+            SourceSpeaker.match_method,
+            (SourceSpeaker.embedding.isnot(None)).label("has_embedding"),
+        )
+        .filter(SourceSpeaker.document_id == doc.document_id)
+        .order_by(SourceSpeaker.start_ts)
+        .all()
+    )
+
+    person_ids = {r.speaker_person_id for r in rows if r.speaker_person_id}
+    names: dict[uuid.UUID, str] = {}
+    if person_ids:
+        for p in db.query(Person).filter(Person.person_id.in_(person_ids)).all():
+            names[p.person_id] = p.canonical_name
+
+    turns = [
+        {
+            "segment_id": str(r.segment_id),
+            "start_ts": float(r.start_ts),
+            "end_ts": float(r.end_ts),
+            "duration": float(r.end_ts - r.start_ts),
+            "speaker_label": r.speaker_label,
+            "cluster_label": r.cluster_label,
+            "person_id": str(r.speaker_person_id) if r.speaker_person_id else None,
+            "person_name": names.get(r.speaker_person_id) if r.speaker_person_id else None,
+            "match_method": r.match_method,
+            "has_embedding": bool(r.has_embedding),
+        }
+        for r in rows
+    ]
+    return {"source_id": str(source_id), "turns": turns}
+
+
+@router.get("/sources/{source_id}/word-attribution")
+def get_word_attribution(source_id: uuid.UUID, db: Session = Depends(get_db)):
+    """Deepgram words with per-word face-cluster attribution.
+
+    For each Deepgram word, looks up the active face cluster at the
+    word's start timestamp using the same mouth-opening ASD signal
+    the face-transcript surface uses. Returns the word's text, time
+    range, confidence, and the face cluster + attributed person that
+    was on screen with mouth open at that moment. ``face_cluster_id``
+    is null when no face was above the mouth-opening threshold at
+    that instant (camera cutaway, reaction shot, off-screen speech).
+
+    Heavy endpoint by row count (~11k words for a 50-min source) but
+    the JSON is well under 5 MB, served gzipped, and front-end keeps
+    it in memory for the duration of the Review session.
+    """
+    source = db.query(Source).filter(Source.source_id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    doc = (
+        db.query(SourceDocument)
+        .filter(SourceDocument.source_id == source_id)
+        .first()
+    )
+    if not doc or not doc.s3_key:
+        return {"source_id": str(source_id), "words": []}
+
+    try:
+        dg = json.loads(download_raw(doc.s3_key))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Failed to load Deepgram JSON from S3: {exc}",
+        )
+
+    # Face frames sorted by ts, plus per-frame active speaker (cluster
+    # with highest mouth_opening above threshold).
+    det_rows = (
+        db.query(
+            SourceFaceDetection.frame_ts,
+            SourceFaceDetection.cluster_id,
+            SourceFaceDetection.mouth_opening,
+            SourceFaceDetection.matched_person_id,
+        )
+        .filter(SourceFaceDetection.source_id == source_id)
+        .order_by(SourceFaceDetection.frame_ts)
+        .all()
+    )
+    by_frame: dict[float, list[tuple[int | None, float, uuid.UUID | None]]] = defaultdict(list)
+    for r in det_rows:
+        mo = float(r.mouth_opening) if r.mouth_opening is not None else 0.0
+        by_frame[float(r.frame_ts)].append((r.cluster_id, mo, r.matched_person_id))
+    sorted_frame_ts = sorted(by_frame.keys())
+
+    cluster_meta = {
+        c.cluster_id: c
+        for c in db.query(SourceFaceCluster).filter(SourceFaceCluster.source_id == source_id).all()
+    }
+    person_ids: set[uuid.UUID] = {
+        c.attributed_person_id for c in cluster_meta.values() if c.attributed_person_id
+    }
+    for r in det_rows:
+        if r.matched_person_id:
+            person_ids.add(r.matched_person_id)
+    names: dict[uuid.UUID, str] = {}
+    if person_ids:
+        for p in db.query(Person).filter(Person.person_id.in_(person_ids)).all():
+            names[p.person_id] = p.canonical_name
+
+    # Use the live ASD threshold so this view stays consistent with
+    # the face-transcript and visual_id paths.
+    threshold = 0.045
+
+    def lookup_active(word_start: float) -> dict | None:
+        idx = bisect.bisect_right(sorted_frame_ts, word_start) - 1
+        if idx < 0:
+            return None
+        ts = sorted_frame_ts[idx]
+        # Among faces visible at that frame, pick the one with highest
+        # mouth_opening above threshold. Excluded clusters are NOT
+        # filtered here — Review wants to show what's actually on
+        # screen so the operator can see if an excluded cluster was
+        # mistakenly the loudest mouth.
+        candidates = by_frame[ts]
+        if not candidates:
+            return None
+        top = max(candidates, key=lambda c: c[1])
+        if top[1] < threshold:
+            return None
+        cid, mo, matched_pid = top
+        cmeta = cluster_meta.get(cid) if cid is not None else None
+        attr_pid = cmeta.attributed_person_id if cmeta else None
+        return {
+            "face_cluster_id": cid,
+            "mouth_opening": float(mo),
+            "cluster_attributed_person_id": str(attr_pid) if attr_pid else None,
+            "cluster_attributed_person_name": names.get(attr_pid) if attr_pid else None,
+            "per_detection_matched_person_id": str(matched_pid) if matched_pid else None,
+            "per_detection_matched_person_name": names.get(matched_pid) if matched_pid else None,
+        }
+
+    alts = (dg.get("results") or {}).get("channels") or []
+    raw_words: list[dict] = []
+    if alts:
+        first_alt = (alts[0].get("alternatives") or [{}])[0]
+        raw_words = first_alt.get("words") or []
+
+    out_words: list[dict] = []
+    for w in raw_words:
+        try:
+            ws = float(w["start"])
+            we = float(w["end"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        active = lookup_active(ws)
+        out_words.append({
+            "start": ws,
+            "end": we,
+            "word": str(w.get("punctuated_word") or w.get("word") or ""),
+            "confidence": float(w.get("confidence") or 0.0),
+            "active_speaker": active,
+        })
+
+    return {
+        "source_id": str(source_id),
+        "mouth_threshold": threshold,
+        "word_count": len(out_words),
+        "words": out_words,
     }
 
 
