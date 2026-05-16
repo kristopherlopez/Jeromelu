@@ -1,0 +1,36 @@
+name: One-off prod backfill team wiki pages
+
+# TEMPORARY workflow added to run scripts/data/backfill_wiki_team_pages.py
+# against the prod DB. Idempotent — creates a stub wiki_pages row for every
+# Team that doesn't yet have one. Removed once the gap is filled.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backfill:
+    runs-on: [self-hosted, jeromelu-prod]
+    steps:
+      - name: Pull master
+        working-directory: /opt/jeromelu
+        run: git pull --ff-only
+
+      - name: Run backfill
+        working-directory: /opt/jeromelu
+        run: |
+          set -euo pipefail
+          set -a
+          source /opt/jeromelu/.env
+          set +a
+
+          docker run --rm \
+            --network docker_default \
+            -e DATABASE_URL="postgresql+psycopg://jeromelu_admin:${POSTGRES_PASSWORD}@postgres:5432/jeromelu" \
+            -e PYTHONUNBUFFERED=1 \
+            -v /opt/jeromelu/scripts:/app/scripts:ro \
+            -w /app \
+            111424988703.dkr.ecr.ap-southeast-2.amazonaws.com/jeromelu/api:latest \
+            python scripts/data/backfill_wiki_team_pages.py
