@@ -36,7 +36,16 @@ Thumbs.db
 
 # Docker
 docker/data/
-data/
+# Anchor to repo root — `data/` (unanchored) accidentally swallowed
+# scripts/data/* source code. Keep the repo-root data/ folder ignored
+# (working data, scraped dumps, transcript caches) without affecting
+# nested data/ directories elsewhere in the tree.
+/data/
+
+# Generated scrape output that does belong under scripts/data/ but
+# shouldn't be tracked (large JSON dumps + Python bytecode).
+scripts/data/scraped_*.json
+scripts/data/__pycache__/
 
 # Local runtime logs (uvicorn etc.)
 .run/
