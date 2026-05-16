@@ -50,9 +50,13 @@ def get_db_url() -> str:
 
 
 def _normalise_driver(url: str) -> str:
-    # SQLAlchemy needs a driver token; psycopg2 is the legacy default and
-    # works for `postgresql://` shorthand too.
-    return re.sub(r"^postgresql\+[a-z]+://", "postgresql://", url)
+    # The rest of the codebase uses psycopg v3 (services/api/requirements.txt
+    # ships psycopg[binary]==3.2.*), not the legacy psycopg2. Normalise any
+    # incoming driver token to `+psycopg` so this script runs both locally
+    # and inside the api container.
+    if url.startswith("postgresql+psycopg://"):
+        return url
+    return re.sub(r"^postgresql(\+[a-z]+)?://", "postgresql+psycopg://", url)
 
 
 def _summary_for(team: Team) -> str | None:
