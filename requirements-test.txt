@@ -21,3 +21,6 @@ pydantic-settings==2.7.*
 boto3==1.36.*
 httpx
 pytest>=8.0
+# Pure-Python HDBSCAN used by app.analyst.voice_cluster_hdbscan and
+# face_clusters. Not GPU; needed at unit-test collection time.
+scikit-learn>=1.5

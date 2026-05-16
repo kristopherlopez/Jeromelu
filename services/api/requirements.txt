@@ -32,6 +32,11 @@ torch==2.4.*
 torchaudio==2.4.*
 huggingface_hub<1.0
 speechbrain<1.1
+# scikit-learn: HDBSCAN over wespeaker turn medoids (voice_cluster_hdbscan)
+# and over ArcFace face embeddings (face_clusters). Currently pulled in
+# transitively via pyannote, but the analyst modules import it directly,
+# so declare it explicitly so CI / lean installs don't break.
+scikit-learn>=1.5
 # Phase 4 visual identification deps (insightface, onnxruntime, opencv) live
 # in services/gpu — the API dispatches via `visual_identify_remote` (SageMaker
 # async) when LINEUP_REMOTE=1 (default in docker-compose.prod.yml).
