@@ -1,0 +1,95 @@
+name: One-off prod populate-db-from-s3
+
+# TEMPORARY workflow added to run scripts/data/populate_db_from_s3.py against
+# the prod DB on the Lightsail self-hosted runner. Gated to workflow_dispatch
+# only. Reads scout/* archives from real AWS S3, UPSERTs into prod Postgres.
+# Will be removed once the backfill is done.
+#
+# Spawns a one-shot container off the jeromelu/api:latest image so the
+# already-running api container stays untouched. The shared package and all
+# Python deps are baked into that image already.
+
+on:
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: "Phase to run (FK order). Start with identity, then people, rounds, matches, team_lists, stats, timeline, standings, leaderboards, injuries. 'attributes' / 'reresolve' are tidy-ups. 'all' runs everything in order — risky on 1GB Lightsail."
+        type: choice
+        required: true
+        options:
+          - identity
+          - people
+          - attributes
+          - rounds
+          - matches
+          - team_lists
+          - stats
+          - timeline
+          - standings
+          - leaderboards
+          - injuries
+          - reresolve
+          - all
+      seasons:
+        description: "Seasons (space-separated). Used by season-scoped phases. Default 2024 2025 2026."
+        type: string
+        default: "2024 2025 2026"
+      competition:
+        description: "Competition id. NRL=111, NRLW=161."
+        type: string
+        default: "111"
+      dry_run:
+        description: "Dry run (compute counts then rollback)."
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  populate:
+    runs-on: [self-hosted, jeromelu-prod]
+    steps:
+      - name: Pull master
+        working-directory: /opt/jeromelu
+        run: git pull --ff-only
+
+      - name: Run populate phase
+        working-directory: /opt/jeromelu
+        env:
+          PHASE: ${{ inputs.phase }}
+          SEASONS: ${{ inputs.seasons }}
+          COMPETITION: ${{ inputs.competition }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          set -a
+          source /opt/jeromelu/.env
+          set +a
+
+          ARGS=(--phase "$PHASE" --competition "$COMPETITION")
+          if [ -n "${SEASONS:-}" ]; then
+            # shellcheck disable=SC2206
+            ARGS+=(--seasons $SEASONS)
+          fi
+          if [ "$DRY_RUN" = "true" ]; then
+            ARGS+=(--dry-run)
+          fi
+
+          echo "── running: python -m scripts.data.populate_db_from_s3 ${ARGS[*]}"
+
+          docker run --rm \
+            --network docker_default \
+            -e DATABASE_URL="postgresql+psycopg://jeromelu_admin:${POSTGRES_PASSWORD}@postgres:5432/jeromelu" \
+            -e S3_ENDPOINT="" \
+            -e AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
+            -e AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
+            -e AWS_DEFAULT_REGION=ap-southeast-2 \
+            -e S3_RAW_BUCKET=jeromelu-raw-transcripts \
+            -e S3_CLEAN_BUCKET=jeromelu-clean-documents \
+            -e S3_ASSETS_BUCKET=jeromelu-public-assets \
+            -e PYTHONUNBUFFERED=1 \
+            -v /opt/jeromelu/scripts:/app/scripts:ro \
+            -w /app \
+            111424988703.dkr.ecr.ap-southeast-2.amazonaws.com/jeromelu/api:latest \
+            python -m scripts.data.populate_db_from_s3 "${ARGS[@]}"
