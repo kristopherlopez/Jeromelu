@@ -399,3 +399,5 @@ Logs:
 - scout-refresh → `/var/log/jeromelu/scout-refresh.log`
 
 `scout-refresh.sh` sources `/opt/jeromelu/.env` for `ADMIN_KEY`, calls the matching admin endpoint, and exits non-zero on non-2xx so cron failures are observable. Box is in UTC — schedules target AEST clock times, so jobs drift +1 hour during AEDT.
+
+The `videos` wrapper uses `curl --max-time 3600` because the underlying endpoint commits all ~118k `video_metrics` rows in a single transaction at the end of the `videos.list` loop. Typical runtime is 13–20 min; slow YouTube-API nights have pushed it to ~45 min. A tighter ceiling (the original 900s) produced nightly false-positive `curl_rc=28` log lines even when the server-side work succeeded.

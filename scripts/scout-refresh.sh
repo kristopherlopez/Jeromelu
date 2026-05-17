@@ -45,8 +45,13 @@ LOG_FILE="${LOG_DIR}/scout-refresh.log"
 mkdir -p "$LOG_DIR"
 
 TS="$(date -u +%FT%TZ)"
+# --max-time 3600: the videos job typically runs 13–20 min server-side (~2400
+# videos.list batches × ~0.3s + identity-sync UPDATEs, all committed in one
+# transaction at the end), but slow YouTube-API nights have pushed it to ~45
+# min. The previous 900s ceiling triggered curl_rc=28 nightly even when the
+# server-side work succeeded. 1 hour is well under the 24h cron interval.
 RESPONSE="$(curl -sS -w '\n__http_status__=%{http_code}' \
-    --max-time 900 \
+    --max-time 3600 \
     --resolve "${API_HOST}:443:127.0.0.1" \
     -X POST "$API_URL" \
     -H "X-Admin-Key: ${ADMIN_KEY}" 2>&1)"
