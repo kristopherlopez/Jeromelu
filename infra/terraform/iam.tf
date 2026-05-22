@@ -179,6 +179,22 @@ data "aws_iam_policy_document" "instance" {
       "arn:aws:ssm:${var.aws_region}:${var.aws_account_id}:parameter/jeromelu/*",
     ]
   }
+
+  # Daily cron-health digest (scripts/cron_report.py, scheduled via
+  # /etc/cron.d/jeromelu) ships an email via SES from the box. Same
+  # SES identities as the GHA cost report.
+  statement {
+    sid    = "SESSendCronReport"
+    effect = "Allow"
+    actions = [
+      "ses:SendEmail",
+      "ses:SendRawEmail",
+    ]
+    resources = [
+      aws_ses_domain_identity.jeromelu.arn,
+      aws_ses_email_identity.kris.arn,
+    ]
+  }
 }
 
 resource "aws_iam_user_policy" "instance" {

@@ -35,3 +35,9 @@ MAILTO=""
 # backups/postgres/. Retention via S3 lifecycle (30d). The wrapper writes its
 # own status line to stdout; cron redirects that into the log file.
 30 16 * * *     ubuntu  /opt/jeromelu/scripts/pg-backup.sh >> /var/log/jeromelu/pg-backup.log 2>&1
+
+# Daily cron-health digest — 00:30 UTC = 10:30 AEST / 11:30 AEDT.
+# Runs *after* all the above so it can report on the trailing 24h. Emails
+# a per-job status table (run? exit clean? what did it write?) via SES.
+# Sister to .github/workflows/cost-report.yml — different signal, same shape.
+30 0 * * *      ubuntu  /opt/jeromelu/scripts/cron-report.sh >> /var/log/jeromelu/cron-report.log 2>&1

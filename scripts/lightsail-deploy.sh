@@ -41,6 +41,17 @@ for svc in api web video-worker; do
 	docker image prune -f
 done
 
+# Bootstrap the cron ops venv if missing. Only dep is boto3 (used by
+# scripts/cron_report.py for SES + S3). Kept separate from any service
+# venv so a service image rebuild can't pull deps out from under cron.
+# Idempotent — no-op when the venv already exists.
+if [[ ! -x /opt/jeromelu/.venv-ops/bin/python ]]; then
+	echo ">>> bootstrapping .venv-ops"
+	python3 -m venv /opt/jeromelu/.venv-ops
+	/opt/jeromelu/.venv-ops/bin/pip install --quiet --upgrade pip
+	/opt/jeromelu/.venv-ops/bin/pip install --quiet 'boto3>=1.34'
+fi
+
 # Sync the checked-in cron schedule into /etc/cron.d/. The `ubuntu` deploy
 # user has NOPASSWD:ALL via cloud-init's /etc/sudoers.d/90-cloud-init-users,
 # so this just works. -n forces non-interactive sudo — if the sudoers
