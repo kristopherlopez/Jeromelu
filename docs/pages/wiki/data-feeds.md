@@ -240,7 +240,7 @@ The Extract-only rule still applies — Scout fetches raw, Analyst transforms:
 
 - [`scout.md`](../../agents/crew/scout/README.md) needs a scope rewrite: §"What Scout DOES NOT cover" currently lists "Numeric NRL data" and "Player roster registry" as out-of-scope; both move into scope.
 - [`scraper.md`](../../agents/system/scraper.md) becomes a *system component* under Scout (the `services/worker-scraper/` Temporal worker) rather than a Bookkeeper-owned subsystem. Bookkeeper consumes the data; Scout produces it.
-- The [Bookkeeper crew doc](../../agents/crew/bookkeeper.md) needs a corresponding scope clarification — it becomes a *consumer* and *math-runner*, not a fetcher.
+- The [Bookkeeper crew doc](../../agents/crew/bookkeeper/README.md) needs a corresponding scope clarification — it becomes a *consumer* and *math-runner*, not a fetcher.
 - The fetcher scripts under `scripts/data/fetchers/` migrate into per-pipeline folders under `services/api/app/scout/<pipeline_name>/` (per D9 of the charter), each with its own fetcher, models, route, and README — alongside the legacy flat-file media-inventory code.
 - Audit pattern (`agent_runs` with `agent_id='scout'`) extends to all acquisition pipelines, giving us one dashboard for "is data acquisition healthy?"
 
@@ -300,7 +300,7 @@ If the Scout-charter expansion is approved, the following docs need updating as 
 |-----|--------|
 | [`docs/agents/crew/scout/README.md`](../../agents/crew/scout/README.md) | §"What Scout DOES cover" gains all L2 acquisition pipelines. §"What Scout DOES NOT cover" loses "Numeric NRL data" and "Player roster registry". §"Pipeline position" diagram updated. |
 | [`docs/agents/system/scraper.md`](../../agents/system/scraper.md) | Reframed as a Scout component (the `worker-scraper` service), not a Bookkeeper subsystem. Cross-link to Scout. |
-| [`docs/agents/crew/bookkeeper.md`](../../agents/crew/bookkeeper.md) | Scope clarification: Bookkeeper is consume-only over the data Scout fetches. |
+| [`docs/agents/crew/bookkeeper/README.md`](../../agents/crew/bookkeeper/README.md) | Scope clarification: Bookkeeper is consume-only over the data Scout fetches. |
 | [`docs/agents/crew/README.md`](../../agents/crew/README.md) | Update the Bookkeeper one-liner to reflect consume-only scope. |
 | [`docs/agents/crew/dynamics.md`](../../agents/crew/dynamics.md) | Cadence table — Bookkeeper trigger becomes "Scout scrape complete" instead of "scraper sweep complete". |
 | [`docs/agents/crew/scout/charter.md`](../../agents/crew/scout/charter.md) | ✅ Created 2026-05-12; decisions locked. Phase 0 reconciliation lands alongside this row. |
@@ -312,7 +312,7 @@ If the Scout-charter expansion is approved, the following docs need updating as 
 
 - [Wiki overview](overview.md) — page types and routes
 - [Wiki content pipeline](content-pipeline.md) — Archivist runtime that consumes these feeds
-- [Archivist (role spec)](../../agents/crew/archivist.md) — primary downstream consumer
+- [Archivist (role spec)](../../agents/crew/archivist/README.md) — primary downstream consumer
 - [Scout (current scope)](../../agents/crew/scout/README.md) — to be reframed per the charter expansion above
 - [Scraper system](../../agents/system/scraper.md) — currently Bookkeeper-owned; moves under Scout
 - [Source pipeline](../../sources/README.md) — Scout → Analyst → wiki end-to-end stages

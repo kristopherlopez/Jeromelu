@@ -9,7 +9,7 @@ tags: [area/agents, subarea/system, status/not-built]
 | **Worker** | `services/worker-extraction/` (skeleton only) |
 | **Task Queue** | `extraction` |
 | **Status** | Not yet built |
-| **Crew counterpart** | [Analyst](../crew/analyst.md) |
+| **Crew counterpart** | [Analyst](../crew/analyst/README.md) |
 
 ## Purpose (intended)
 

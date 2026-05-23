@@ -7,7 +7,7 @@ status: draft
 
 > Draft. Last reviewed: 2026-05-12.
 >
-> First-pass implementation plan for the Archivist crew worker — the wiki-maintaining Claude Managed Agent. Engages with the open implementation questions in [`content-pipeline.md`](../../pages/wiki/content-pipeline.md) and the relations dependency in [`wiki-entity-connections.draft.md`](wiki-entity-connections.draft.md). Role is canonicalised in [`docs/agents/crew/archivist.md`](../../agents/crew/archivist.md); this doc does not re-litigate it.
+> First-pass implementation plan for the Archivist crew worker — the wiki-maintaining Claude Managed Agent. Engages with the open implementation questions in [`content-pipeline.md`](../../pages/wiki/content-pipeline.md) and the relations dependency in [`wiki-entity-connections.draft.md`](wiki-entity-connections.draft.md). Role is canonicalised in [`docs/agents/crew/archivist/README.md`](../../agents/crew/archivist/README.md); this doc does not re-litigate it.
 
 ---
 

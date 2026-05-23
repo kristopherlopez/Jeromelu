@@ -99,7 +99,7 @@ Two consequences for the dynamics:
 1. **Different rhythm.** The call chain converges weekly on Thursday's Remark. The Archivist runs whenever new data lands — claims arrive, stats post-round, a Remark gets published. Its work is ambient and distributed across the week.
 2. **Different voice.** Where Jaromelu speaks in his confident on-screen voice, the Archivist writes in encyclopedic third-person. The same fact ("Cleary's breakeven is 42") can appear in both — voiced as bravado in a Remark, reported neutrally on Cleary's wiki page.
 
-Full role spec: [`archivist.md`](archivist.md). Runtime spec: [`../../pages/wiki/content-pipeline.md`](../../pages/wiki/content-pipeline.md).
+Full role spec: [`archivist.md`](archivist/README.md). Runtime spec: [`../../pages/wiki/content-pipeline.md`](../../pages/wiki/content-pipeline.md).
 
 ---
 

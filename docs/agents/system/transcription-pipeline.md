@@ -79,7 +79,7 @@ Stages run **sequentially** in the order shown. Each block lists the technologie
 |---|---|
 | **Modules** | `services/api/app/analyst/transcribe.py` (orchestrator), `services/api/app/analyst/diarize.py` (pyannote stage). Speaker-identification modules — `identify_voice.py`, `visual_id.py`, `fusion.py` — are run inline by the orchestrator; see [speaker-identification.md](speaker-identification.md). |
 | **Driver** | `python -m app.analyst.transcribe_cli <source_id>` · `make transcribe SOURCE_ID=<uuid>` |
-| **Crew counterpart** | [Analyst](../crew/analyst.md) — Analyst's first surface, sitting in front of cleaning / claim extraction. |
+| **Crew counterpart** | [Analyst](../crew/analyst/README.md) — Analyst's first surface, sitting in front of cleaning / claim extraction. |
 | **ETL role** | **Transform.** Reads Scout's audio (and video, when speaker ID is in scope); produces the structured transcript artefacts every later stage depends on. |
 | **Cost** | Deepgram ~$0.30 per 90-min video (nova-3 batch, words only). Pyannote 3.1 + InsightFace combined: ~50 min CPU per 45-min source locally; ~3 min wall time on the SageMaker Async GPU endpoint when `LINEUP_REMOTE=1`. End-to-end **~$0.43/source** with remote GPU enabled. |
 | **Status** | Diarization + ASR + merge + voice ID + visual ID + fusion all live. Single-source CLI shipped. Recurring drain job not yet built. |
@@ -102,7 +102,7 @@ For one source where `audio_s3_key IS NOT NULL`:
    - Build keyterm vocabulary from the canonical roster (`people` + `teams`). See [extraction-method § keyterm](../../sources/extraction-method.md#keyterm-vocabulary).
    - Presign the audio S3 URL (regional virtual-host endpoint, 15-min validity).
    - POST to Deepgram's prerecorded API with `model=nova-3`, `language=en-AU`, `diarize=false`, `punctuate=true`, `smart_format=true`, `utterances=true`, `paragraphs=true`, `keyterm=<vocabulary>`.
-   - **Why `diarize=false`?** Deepgram can do diarization, but pyannote owns that stage. Pyannote 3.1 also exposes the per-window voice embeddings ([wespeaker](#appendix-how-pyannote-31-does-diarization)) that Speaker Identification later matches against; Deepgram's diarizer doesn't expose embeddings, so using it would force a separate embedder run. The two were A/B'd at Phase 1 — see [analyst.md § Lineup status](../crew/analyst.md#lineup-status) for the 83.6 % agreement result that drove the choice.
+   - **Why `diarize=false`?** Deepgram can do diarization, but pyannote owns that stage. Pyannote 3.1 also exposes the per-window voice embeddings ([wespeaker](#appendix-how-pyannote-31-does-diarization)) that Speaker Identification later matches against; Deepgram's diarizer doesn't expose embeddings, so using it would force a separate embedder run. The two were A/B'd at Phase 1 — see [analyst.md § Lineup status](../crew/analyst/README.md#lineup-status) for the 83.6 % agreement result that drove the choice.
    - Persist Deepgram JSON → `s3://jeromelu-raw-transcripts/.../{video_id}.deepgram.json`. Replayable.
 3. **Merge + DB write** (single transaction):
    - `source_documents` — joined utterance text, checksum, language, chunk_count, S3 pointer.
@@ -217,7 +217,7 @@ Output is RTTM-style turn segmentation — a list of `(start, end, speaker_label
 
 ## Related
 
-- [Analyst (crew)](../crew/analyst.md)
+- [Analyst (crew)](../crew/analyst/README.md)
 - [Audio ingestion (Scout)](ingestion.md) — predecessor stage
 - [Speaker Identification](speaker-identification.md) — successor stage; voice + face + fusion. Populates `speaker_person_id` from the per-turn embeddings this pipeline produces.
 - [Sources § extraction method](../../sources/extraction-method.md) — keyterm strategy, error handling, per-stage cost model

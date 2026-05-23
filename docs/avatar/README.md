@@ -26,7 +26,7 @@ Powered by:
 
 | Layer | Doc | Concern |
 |-------|-----|---------|
-| **Character** | [`agents/crew/jaromelu.md`](../agents/crew/jaromelu.md) | Who Jaromelu is — persona, voice, behavioural rules |
+| **Character** | [`agents/crew/jaromelu/README.md`](../agents/crew/jaromelu/README.md) | Who Jaromelu is — persona, voice, behavioural rules |
 | **Presence design** | [`concepts/05-crew-presence.md`](../concepts/05-crew-presence.md) | Visual identity, avatar sizes, full animation library spec (all crew, not just Jaromelu) |
 | **Implementation** | This folder | How the avatar actually behaves on the live site |
 

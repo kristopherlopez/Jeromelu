@@ -630,6 +630,6 @@ If the goal is fastest path to "human-in-the-loop is just an audit, not a labell
 ## Related
 
 - [Transcription (Analyst's first Transform)](../agents/system/transcription-pipeline.md) — predecessor surface this plan extends.
-- [Analyst (crew)](../agents/crew/analyst.md)
+- [Analyst (crew)](../agents/crew/analyst/README.md)
 - [Ingestion (Scout)](../agents/system/ingestion.md) — gains the video acquisition step.
 - [Migration 044](../../packages/db/migrations/044_audio_first_extract.sql), [045](../../packages/db/migrations/045_split_ingestion_transcription.sql), [046](../../packages/db/migrations/046_chunk_paragraph_break.sql) — current schema.

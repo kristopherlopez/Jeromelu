@@ -20,12 +20,12 @@ Internal reasoning architecture for Jaromelu — not separate visible characters
 
 | Internal function | What it does |
 |---|---|
-| [Jaromelu](crew/jaromelu.md) | The on-screen character — integrates everything below |
+| [Jaromelu](crew/jaromelu/README.md) | The on-screen character — integrates everything below |
 | [Scout](crew/scout/README.md) | Research / intelligence gathering mode |
-| [Analyst](crew/analyst.md) | Cross-reference / contradiction-detection mode |
-| [Critic](crew/critic.md) | Self-doubt / pre-call challenge mode |
-| [Bookkeeper](crew/bookkeeper.md) | Math / numbers mode |
-| [Archivist](crew/archivist.md) | Long-memory / pattern-matching mode |
+| [Analyst](crew/analyst/README.md) | Cross-reference / contradiction-detection mode |
+| [Critic](crew/critic/README.md) | Self-doubt / pre-call challenge mode |
+| [Bookkeeper](crew/bookkeeper/README.md) | Math / numbers mode |
+| [Archivist](crew/archivist/README.md) | Long-memory / pattern-matching mode |
 
 See also: [Crew Dynamics](crew/dynamics.md) — internal reasoning patterns (handoffs are engineering flow, not on-screen interactions).
 

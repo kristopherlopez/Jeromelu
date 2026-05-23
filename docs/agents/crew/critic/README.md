@@ -41,8 +41,8 @@ When Critic mode resolves into the published voice:
 
 ## System-side Counterpart
 
-Not yet implemented as a separate worker. Envisioned as a rule-based "challenge" layer inside the [decision agent](../system/decision.md) — surfaces objections before the final voice synthesis publishes a Remark.
+Not yet implemented as a separate worker. Envisioned as a rule-based "challenge" layer inside the [decision agent](../../system/decision.md) — surfaces objections before the final voice synthesis publishes a Remark.
 
 ## Related
 
-- [Crew Dynamics](dynamics.md) — Critic mode's place in Jaromelu's internal reasoning flow
+- [Crew Dynamics](../dynamics.md) — Critic mode's place in Jaromelu's internal reasoning flow

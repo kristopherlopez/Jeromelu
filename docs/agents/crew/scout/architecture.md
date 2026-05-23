@@ -23,9 +23,9 @@ Scout       →  Analyst    →  Bookkeeper + Critic  →  Jaromelu
 | Stage | Crew mode | System agent | What it does | Status |
 |---|---|---|---|---|
 | **Acquire** | **Scout** *(this doc)* | [source-discovery](../../system/source-discovery.md), [ingestion](../../system/ingestion.md), `scout/<pipeline>/*` folders (in design per D9) | Discover sources, enumerate content, refresh metadata, pull transcripts. **Also:** fetch SuperCoach roster + stats, NRL.com matches / team lists / injuries / rounds. | Media: shipped (YouTube). Data: in design — fetcher code exists in `scripts/data/fetchers/` and `services/worker-scraper/`, migrating into per-pipeline folders under `services/api/app/scout/` per the charter expansion. |
-| Extract | [Analyst](../analyst.md) | [extraction](../../system/extraction.md) (today via [Transcript Pipeline skill](../../skills/transcript-pipeline.md)) | Turn raw content into entities, quotes, claims; cross-reference for contradictions | Skill-based today; worker not built |
-| Derive | [Bookkeeper](../bookkeeper.md) + [Critic](../critic.md) | [decision](../../system/decision.md) | Apply math to Scout-fetched numbers (breakevens, cap, alignment indices, consensus snapshots), rank, challenge thin evidence. Acquisition itself is now Scout's per the charter expansion. | Decision worker not built; derived metrics partial |
-| Voice | [Jaromelu](../jaromelu.md) | [publishing](../../system/publishing.md) | Integrate everything, commit to a call, publish in the on-screen voice | Live |
+| Extract | [Analyst](../analyst/README.md) | [extraction](../../system/extraction.md) (today via [Transcript Pipeline skill](../../skills/transcript-pipeline.md)) | Turn raw content into entities, quotes, claims; cross-reference for contradictions | Skill-based today; worker not built |
+| Derive | [Bookkeeper](../bookkeeper/README.md) + [Critic](../critic/README.md) | [decision](../../system/decision.md) | Apply math to Scout-fetched numbers (breakevens, cap, alignment indices, consensus snapshots), rank, challenge thin evidence. Acquisition itself is now Scout's per the charter expansion. | Decision worker not built; derived metrics partial |
+| Voice | [Jaromelu](../jaromelu/README.md) | [publishing](../../system/publishing.md) | Integrate everything, commit to a call, publish in the on-screen voice | Live |
 
 ---
 
@@ -277,7 +277,7 @@ Keeps every tracked YouTube channel's video list and per-video popularity number
 
 ### 3.5 Audio acquisition `[deterministic, shipped]`
 
-Scout's last Extract step. Pulls audio from approved-but-pending YouTube sources and lands it in S3. **Extract only** — does not interpret the audio. Transcription / diarisation belongs to [Analyst](../analyst.md) (see [analyst/transcription](../../system/transcription-pipeline.md)).
+Scout's last Extract step. Pulls audio from approved-but-pending YouTube sources and lands it in S3. **Extract only** — does not interpret the audio. Transcription / diarisation belongs to [Analyst](../analyst/README.md) (see [analyst/transcription](../../system/transcription-pipeline.md)).
 
 **Trigger** — Manual CLI: `python -m app.scout.audio_cli <source_id>` or `make collect-audio SOURCE_ID=<uuid>`. The recurring drain job (APScheduler / cron over `ingestion_status='pending'`) is on the backlog.
 

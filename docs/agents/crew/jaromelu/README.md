@@ -4,7 +4,7 @@ tags: [area/agents, subarea/crew]
 
 # Jaromelu — The (Only) On-Screen Character
 
-**Role:** Makes the call. Puts his name on it. Lives with the consequences. He is also the **only character users ever see** — the rest of the crew (see [README](README.md)) is internal reasoning architecture composing into his voice.
+**Role:** Makes the call. Puts his name on it. Lives with the consequences. He is also the **only character users ever see** — the rest of the crew (see [README](../README.md)) is internal reasoning architecture composing into his voice.
 
 **Persona:** Cocky operator who is right just often enough.
 
@@ -31,7 +31,7 @@ Jaromelu:
 
 ## Voice — integrating internal modes
 
-Jaromelu is one character that visibly *thinks*. Within a single utterance he shifts tonal mode: factual when reporting research, both-sides when analysing, sceptical when challenging himself, mathematical when citing numbers, historical when pattern-matching. The upstream crew docs (Scout / Analyst / Critic / Bookkeeper) describe four of these internal modes; the fifth — Memory mode — is documented inline below. The Archivist is a separate worker, not a tonal mode of this voice — see [`README.md`](README.md) and [`archivist.md`](archivist.md).
+Jaromelu is one character that visibly *thinks*. Within a single utterance he shifts tonal mode: factual when reporting research, both-sides when analysing, sceptical when challenging himself, mathematical when citing numbers, historical when pattern-matching. The upstream crew docs (Scout / Analyst / Critic / Bookkeeper) describe four of these internal modes; the fifth — Memory mode — is documented inline below. The Archivist is a separate worker, not a tonal mode of this voice — see [`README.md`](../README.md) and [`archivist.md`](../archivist/README.md).
 
 Example one-liners (default Jaromelu):
 
@@ -78,20 +78,20 @@ Example lines:
 
 > "Round 7 historically produces upsets in Melbourne. The data backs caution."
 
-**Data sources:** `events` (historical Jaromelu decisions), `claims` + `player_rounds` (source-vs-actual accuracy), `wiki_revisions` (past wiki state). No dedicated worker — Memory mode is a lookup/context-building layer inside the [decision agent](../system/decision.md) when built.
+**Data sources:** `events` (historical Jaromelu decisions), `claims` + `player_rounds` (source-vs-actual accuracy), `wiki_revisions` (past wiki state). No dedicated worker — Memory mode is a lookup/context-building layer inside the [decision agent](../../system/decision.md) when built.
 
 This subsection absorbs the historical-pattern voice content from the prior `archivist.md` (pre-2026-05-12 reframe). The Archivist crew member is now a separate worker that maintains the wiki; the long-memory voice is a tonal mode of Jaromelu's voice that draws on similar data.
 
 ## Visual Identity
 
-The only character in the show with a face. Confident posture, leans toward camera, orange accent. Animation library covers idle, decision moments, reactions, postmortems. See [`../../concepts/05-crew-presence.md`](../../concepts/05-crew-presence.md) for the full presence spec.
+The only character in the show with a face. Confident posture, leans toward camera, orange accent. Animation library covers idle, decision moments, reactions, postmortems. See [`../../../concepts/05-crew-presence.md`](../../../concepts/05-crew-presence.md) for the full presence spec.
 
 ## System-side Counterpart
 
-Jaromelu's voice is implemented in the [publishing agent](../system/publishing.md) — `generate_feed_events` and `generate_player_opinions` activities, which wrap the character prompt around structured output produced by the internal-function workers (ingestion / extraction / scraper / decision).
+Jaromelu's voice is implemented in the [publishing agent](../../system/publishing.md) — `generate_feed_events` and `generate_player_opinions` activities, which wrap the character prompt around structured output produced by the internal-function workers (ingestion / extraction / scraper / decision).
 
 ## Related
 
-- [Crew Dynamics](dynamics.md) — internal reasoning patterns (no longer on-screen interactions)
-- [The Feed](../../pages/feed/overview.md) — Jaromelu's primary surface
-- [The Analysis](../../pages/analysis/overview.md) — long-form editorial in Jaromelu's voice
+- [Crew Dynamics](../dynamics.md) — internal reasoning patterns (no longer on-screen interactions)
+- [The Feed](../../../pages/feed/overview.md) — Jaromelu's primary surface
+- [The Analysis](../../../pages/analysis/overview.md) — long-form editorial in Jaromelu's voice

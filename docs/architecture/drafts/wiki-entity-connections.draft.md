@@ -323,7 +323,7 @@ implementing changeset (per CLAUDE.md documentation discipline):
 | [`docs/pages/wiki/content-pipeline.md`](../../pages/wiki/content-pipeline.md) | Add `upsert_wiki_relation` / `close_wiki_relation` to the MCP operations table; describe the Archivist responsibility for relation extraction. |
 | [`docs/concepts/entity-roles.md`](../../concepts/entity-roles.md) | Add a section noting `wiki_relations` as the third SCD-2 table and the consolidation decision in Open Question 2. |
 | [`docs/architecture/01-information-architecture.md`](../01-information-architecture.md) | Add `wiki_relations` to the data-model overview. |
-| [`docs/agents/crew/analyst.md`](../../agents/crew/analyst.md) (and `archivist.md` if it exists) | Add the relation-derivation / relation-extraction responsibilities. |
+| [`docs/agents/crew/analyst/README.md`](../../agents/crew/analyst/README.md) (and `archivist.md` if it exists) | Add the relation-derivation / relation-extraction responsibilities. |
 | New: `packages/db/migrations/0NN_wiki_relations.sql` | The migration itself. |
 | New: `scripts/data/seed_wiki_relations.py` | Backfill from `entity_roles`, `player_attributes`, and any seeded host data. |
 

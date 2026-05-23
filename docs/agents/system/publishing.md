@@ -8,7 +8,7 @@ tags: [area/agents, subarea/system, status/live]
 |---|---|
 | **Worker** | `services/worker-publishing/app/main.py` |
 | **Task Queue** | `publishing` |
-| **Crew counterparts** | [Jaromelu](../crew/jaromelu.md) (voice), [Analyst](../crew/analyst.md) (consensus detection) |
+| **Crew counterparts** | [Jaromelu](../crew/jaromelu/README.md) (voice), [Analyst](../crew/analyst/README.md) (consensus detection) |
 
 This worker owns two workflows and a set of LLM activities. It's the bridge between structured claims and user-facing content — Jaromelu's voice lives here.
 

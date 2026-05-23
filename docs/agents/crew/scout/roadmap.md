@@ -29,7 +29,7 @@ The expanded charter ([charter.md](charter.md)) stages the migration of all exte
 - Land the charter after review.
 - Update Scout's crew docs: §"What Scout DOES cover" gains the new modules; §"What Scout DOES NOT cover" loses "Numeric NRL data" and "Player roster registry"; pipeline-position diagram updated.
 - Reframe [`scraper.md`](../../system/scraper.md) as a Scout component (specifically: the `worker-scraper` Temporal worker, marked for retirement) rather than a Bookkeeper subsystem.
-- Update [`bookkeeper.md`](../bookkeeper.md): consume-only over Scout-fetched data; Bookkeeper no longer acquires anything.
+- Update [`bookkeeper.md`](../bookkeeper/README.md): consume-only over Scout-fetched data; Bookkeeper no longer acquires anything.
 - Update [`dynamics.md`](../dynamics.md) Cadence row: Bookkeeper trigger becomes "Scout scrape complete" instead of "scraper sweep complete".
 - Update [crew `README.md`](../README.md) Bookkeeper one-liner.
 

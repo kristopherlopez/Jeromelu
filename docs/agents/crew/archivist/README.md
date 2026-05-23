@@ -6,16 +6,16 @@ tags: [area/agents, subarea/crew]
 
 **Role:** Owns the wiki. Composes prose, maintains cross-page integrity, curates entity-to-entity relations, and links new Remarks back to the history they extend. **The only crew member whose output is a persistent, browsable artifact rather than a transient feed entry or a single call.**
 
-> **Reframe note (2026-05-12).** This doc supersedes a prior framing of Archivist as a tonal mode of Jaromelu's voice (long-memory pattern-matching). That framing has been folded back into Jaromelu's voice repertoire — see [`jaromelu.md`](jaromelu.md) "Voice — integrating internal modes" → *Archivist mode*. The Archivist as a **standalone wiki-maintaining crew member** is the framing this doc canonicalises, per the decision in [wiki-entity-connections.draft.md](../../architecture/drafts/wiki-entity-connections.draft.md).
+> **Reframe note (2026-05-12).** This doc supersedes a prior framing of Archivist as a tonal mode of Jaromelu's voice (long-memory pattern-matching). That framing has been folded back into Jaromelu's voice repertoire — see [`jaromelu.md`](../jaromelu/README.md) "Voice — integrating internal modes" → *Archivist mode*. The Archivist as a **standalone wiki-maintaining crew member** is the framing this doc canonicalises, per the decision in [wiki-entity-connections.draft.md](../../../architecture/drafts/wiki-entity-connections.draft.md).
 
 |                       |                                                                                                |
 | --------------------- | ---------------------------------------------------------------------------------------------- |
 | **Type**              | Crew worker (operates async, persists artifacts)                                               |
 | **Pipeline role**     | Compose. Reads downstream of Scout (sources), Analyst (claims), Bookkeeper (stats); writes the wiki. |
-| **Scope**             | `wiki_pages` content + `wiki_revisions` + curated `wiki_relations` (see [draft](../../architecture/drafts/wiki-entity-connections.draft.md)) |
-| **Status**            | **In design.** The runtime "Managed Agent" is specced in [content-pipeline.md](../../pages/wiki/content-pipeline.md); naming + responsibilities canonicalised here. |
+| **Scope**             | `wiki_pages` content + `wiki_revisions` + curated `wiki_relations` (see [draft](../../../architecture/drafts/wiki-entity-connections.draft.md)) |
+| **Status**            | **In design.** The runtime "Managed Agent" is specced in [content-pipeline.md](../../../pages/wiki/content-pipeline.md); naming + responsibilities canonicalised here. |
 | **Trigger**           | Session-per-event: new claims uploaded · post-round stats arrive · team lists published · operator-triggered |
-| **Spec**              | [Wiki content pipeline](../../pages/wiki/content-pipeline.md) (runtime, MCP ops) · [Wiki overview](../../pages/wiki/overview.md) (schema, API) · [Entity connections (draft)](../../architecture/drafts/wiki-entity-connections.draft.md) (relations work) |
+| **Spec**              | [Wiki content pipeline](../../../pages/wiki/content-pipeline.md) (runtime, MCP ops) · [Wiki overview](../../../pages/wiki/overview.md) (schema, API) · [Entity connections (draft)](../../../architecture/drafts/wiki-entity-connections.draft.md) (relations work) |
 
 ---
 
@@ -51,7 +51,7 @@ The core job. For each session brief:
 - Maintains `[[slug]]` wiki-links to other entity pages.
 - Writes a `wiki_revisions` row per page with a human-readable summary.
 
-The runtime details — session brief format, MCP tools, revision logging — are in [content-pipeline.md](../../pages/wiki/content-pipeline.md).
+The runtime details — session brief format, MCP tools, revision logging — are in [content-pipeline.md](../../../pages/wiki/content-pipeline.md).
 
 ### 2. Cross-page integrity
 
@@ -61,7 +61,7 @@ The Archivist owns the **transactional view** of these multi-page updates — ei
 
 ### 3. Relation extraction and curation
 
-Per the [entity-connections draft](../../architecture/drafts/wiki-entity-connections.draft.md):
+Per the [entity-connections draft](../../../architecture/drafts/wiki-entity-connections.draft.md):
 
 - When the prose the Archivist writes mentions a relation ("Mam now teams with Hughes in the halves"), it calls `upsert_wiki_relation(mam, hughes, teammate_of, effective_from=...)`.
 - When the Analyst's derived pass writes a new `agrees_with`/`contradicts`/`covers` row, the Archivist's next pass on the affected channel/advisor page surfaces it in prose and in the **Connections** sidebar.
@@ -77,7 +77,7 @@ When Jaromelu publishes a new Remark, or the Bookkeeper resolves an old one, the
 - Updates the relevant entity page sections with the new call ("Jaromelu is now selling Cleary; flipped from his Round 6 buy — see [[round-2026-6]]").
 - Surfaces the linkage in the page's revision summary so it shows up in the Feed.
 
-This is the mechanism behind *"Archivist linked this Remark to Jaromelu's earlier call from Round 3"* in [The Show](../../vision/02-the-show.md).
+This is the mechanism behind *"Archivist linked this Remark to Jaromelu's earlier call from Round 3"* in [The Show](../../../vision/02-the-show.md).
 
 ---
 
@@ -89,9 +89,9 @@ Sharper boundaries than additional responsibilities. The Archivist:
 - **Does not compute math.** The Bookkeeper owns scores, breakevens, alignment indices; the Archivist surfaces the numbers in prose.
 - **Does not extract claims or quotes.** The source pipeline (Analyst's territory) does that; the Archivist consumes already-verified claims.
 - **Does not fetch or transcribe sources.** Scout's job.
-- **Does not adjudicate truth when sources disagree.** It presents the contradiction (e.g. via the `Trust List` and `Verdict` callout boxes from [page-design.md](../../pages/wiki/page-design.md)); calling who's right is Jaromelu's job, expressed in a Remark.
+- **Does not adjudicate truth when sources disagree.** It presents the contradiction (e.g. via the `Trust List` and `Verdict` callout boxes from [page-design.md](../../../pages/wiki/page-design.md)); calling who's right is Jaromelu's job, expressed in a Remark.
 - **Does not create new entity rows.** Entities are created upstream (by the source pipeline, scraper, or operator). The Archivist creates *wiki pages for entities that already exist* — see Page Lifecycle below.
-- **Does not invent new page sections without operator approval.** The section vocabulary per page type is fixed in [content-pipeline.md](../../pages/wiki/content-pipeline.md); the Archivist writes within that scaffold.
+- **Does not invent new page sections without operator approval.** The section vocabulary per page type is fixed in [content-pipeline.md](../../../pages/wiki/content-pipeline.md); the Archivist writes within that scaffold.
 - **Does not editorialise.** Wiki prose is encyclopedic in voice. Personality lives in Remarks (Jaromelu) and in the editorial typography of the page. See [Voice](#voice) below.
 
 ---
@@ -102,7 +102,7 @@ The principles below are how the Archivist keeps the wiki coherent as it scales 
 
 ### 1. One entity, one page
 
-Already enforced by `wiki_pages.entity_id` (or `channel_id`) being unique per row, per [`ck_wiki_page_subject`](../../pages/wiki/overview.md). The Archivist preserves this invariant — it never creates a duplicate page for the same subject and never splits one entity across multiple pages.
+Already enforced by `wiki_pages.entity_id` (or `channel_id`) being unique per row, per [`ck_wiki_page_subject`](../../../pages/wiki/overview.md). The Archivist preserves this invariant — it never creates a duplicate page for the same subject and never splits one entity across multiple pages.
 
 ### 2. Provenance for every claim in prose
 
@@ -126,7 +126,7 @@ Every entity mention in prose should be a `[[slug]]` link. If the target page do
 
 ### 6. Relations are first-class, not implicit
 
-A statement like "Mam plays for the Broncos" creates a `wiki_relations` row, not just a sentence in prose. This is what powers the index graph and the per-entity Connections sidebar (see [entity-connections draft](../../architecture/drafts/wiki-entity-connections.draft.md)). Prose alone is unqueryable; relations make the connection structure of the wiki interrogable.
+A statement like "Mam plays for the Broncos" creates a `wiki_relations` row, not just a sentence in prose. This is what powers the index graph and the per-entity Connections sidebar (see [entity-connections draft](../../../architecture/drafts/wiki-entity-connections.draft.md)). Prose alone is unqueryable; relations make the connection structure of the wiki interrogable.
 
 ### 7. Skip threshold — quiet by default
 
@@ -142,7 +142,7 @@ The Archivist's prose is third-person, neutral, and reportorial. Opinions are re
 
 ## Page lifecycle
 
-Per the schema in [overview.md](../../pages/wiki/overview.md), `wiki_pages.status` is `stub → draft → published`. The Archivist's role at each transition:
+Per the schema in [overview.md](../../../pages/wiki/overview.md), `wiki_pages.status` is `stub → draft → published`. The Archivist's role at each transition:
 
 | Status | Created by | Promoted to next when | Archivist behaviour |
 |--------|-----------|------------------------|---------------------|
@@ -150,7 +150,7 @@ Per the schema in [overview.md](../../pages/wiki/overview.md), `wiki_pages.statu
 | `draft` | Archivist promotes from `stub` when threshold met | Operator-confirmed promotion (no automatic threshold yet) | Writes full sectional content per the page-type scaffold. Most pages live here in the early phase of the wiki. |
 | `published` | Operator | n/a — terminal | Continues to update sections per principle 7. Revision history becomes the long-tail audit trail. |
 
-**Constraints on Archivist page creation** (per [Option A](../../architecture/drafts/wiki-entity-connections.draft.md) decision):
+**Constraints on Archivist page creation** (per [Option A](../../../architecture/drafts/wiki-entity-connections.draft.md) decision):
 
 1. The entity must already exist in `entities` (or `channels` for channel pages). The Archivist never creates the underlying entity row.
 2. New pages start at `status='stub'` with minimal scaffold. Promotion to `draft` and `published` follows the table above.
@@ -163,7 +163,7 @@ Skip-threshold and stub-promotion thresholds are explicitly **tunable** — expe
 
 ## Hand-off contract
 
-What the Archivist reads and writes. The MCP toolset that exposes these operations is specced in [content-pipeline.md §MCP Server Operations](../../pages/wiki/content-pipeline.md).
+What the Archivist reads and writes. The MCP toolset that exposes these operations is specced in [content-pipeline.md §MCP Server Operations](../../../pages/wiki/content-pipeline.md).
 
 **Reads:**
 
@@ -197,7 +197,7 @@ The Archivist never writes to `entities`, `claims`, `quotes`, `player_rounds`, `
 
 Deferred (per scope of this draft). The Archivist writes in encyclopedic third-person; opinionated voice belongs to Remarks.
 
-The prior framing of "Archivist mode" as a tonal mode of Jaromelu's voice (historical pattern-matching surfacing as *"last time three sources agreed on a sell..."*) has been absorbed into [`jaromelu.md` → Memory mode](jaromelu.md#memory-mode). The Archivist crew member is now strictly the wiki maintainer; the long-memory voice is a tonal mode of Jaromelu, not of this worker.
+The prior framing of "Archivist mode" as a tonal mode of Jaromelu's voice (historical pattern-matching surfacing as *"last time three sources agreed on a sell..."*) has been absorbed into [`jaromelu.md` → Memory mode](../jaromelu/README.md#memory-mode). The Archivist crew member is now strictly the wiki maintainer; the long-memory voice is a tonal mode of Jaromelu, not of this worker.
 
 ---
 
@@ -215,10 +215,10 @@ These will be revisited as the Archivist runtime is built.
 
 ## Related
 
-- [Wiki content pipeline](../../pages/wiki/content-pipeline.md) — runtime spec: managed agent, MCP toolset, session flow, page section conventions
-- [Wiki overview](../../pages/wiki/overview.md) — schema, API, page types
-- [Wiki page design](../../pages/wiki/page-design.md) — typography, components, callout vocabulary the Archivist writes against
-- [Entity connections (draft)](../../architecture/drafts/wiki-entity-connections.draft.md) — `wiki_relations` table the Archivist curates
-- [Crew Dynamics](dynamics.md) — where the Archivist sits in the internal reasoning flow
-- [Jaromelu](jaromelu.md) — voice / tonal modes (where the prior Archivist tonal-mode content gets reabsorbed)
-- [The Show](../../vision/02-the-show.md) — customer-facing framing of the crew
+- [Wiki content pipeline](../../../pages/wiki/content-pipeline.md) — runtime spec: managed agent, MCP toolset, session flow, page section conventions
+- [Wiki overview](../../../pages/wiki/overview.md) — schema, API, page types
+- [Wiki page design](../../../pages/wiki/page-design.md) — typography, components, callout vocabulary the Archivist writes against
+- [Entity connections (draft)](../../../architecture/drafts/wiki-entity-connections.draft.md) — `wiki_relations` table the Archivist curates
+- [Crew Dynamics](../dynamics.md) — where the Archivist sits in the internal reasoning flow
+- [Jaromelu](../jaromelu/README.md) — voice / tonal modes (where the prior Archivist tonal-mode content gets reabsorbed)
+- [The Show](../../../vision/02-the-show.md) — customer-facing framing of the crew

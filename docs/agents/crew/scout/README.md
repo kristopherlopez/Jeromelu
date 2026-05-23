@@ -64,15 +64,15 @@ Each pipeline lives as a folder under `services/api/app/scout/<pipeline_name>/` 
 
 Per the **Extract-only** rule, anything that interprets, structures, or enriches the raw bytes is downstream:
 
-- **Transcript cleaning** — fixing mangled player names, garbled words, auto-caption errors. Scout writes `raw_text`; the cleaning pass writes `cleaned_text` / `clean_text`. Owned by the [transcript pipeline](../../skills/transcript-pipeline.md) / [Analyst](../analyst.md).
-- **Diarisation + transcription** — turning Scout's audio into `source_documents`, `source_speakers` (turn-level), and `source_chunks` (per-utterance) is owned by [Analyst](../analyst.md). Scout stops at the m4a in S3.
+- **Transcript cleaning** — fixing mangled player names, garbled words, auto-caption errors. Scout writes `raw_text`; the cleaning pass writes `cleaned_text` / `clean_text`. Owned by the [transcript pipeline](../../skills/transcript-pipeline.md) / [Analyst](../analyst/README.md).
+- **Diarisation + transcription** — turning Scout's audio into `source_documents`, `source_speakers` (turn-level), and `source_chunks` (per-utterance) is owned by [Analyst](../analyst/README.md). Scout stops at the m4a in S3.
 - **Speaker → Person resolution** — mapping a `source_speakers.speaker_label` like `speaker_0` to a known `Person`. Downstream of Analyst's transcription pass — voice-fingerprint clustering across episodes plus LLM-assisted attribution from contextual cues.
 - **Embedding** — `source_chunks.embedding`, `knowledge_base.embedding`. Owned by the indexer.
 - **Semantic chapters** (`source_chapters`) — produced by the analyse-transcript pipeline to scope claim extraction.
 - **Annotations** (`source_annotations`) — sentiment, sub-topic tags, entity mentions, themes.
-- **Parsing content for meaning** — entity extraction, claim detection, quote pulls. That's [Analyst](../analyst.md) ([extraction](../../system/extraction.md)).
+- **Parsing content for meaning** — entity extraction, claim detection, quote pulls. That's [Analyst](../analyst/README.md) ([extraction](../../system/extraction.md)).
 - **Cross-source consensus or contradiction detection** — Scout reports "5 sources covered the trade"; Analyst reports "4 say sell, 1 says hold."
-- **Derived metrics** — alignment indices, advisor accuracy, consensus snapshots, breakeven trajectories. Those are derivations over Scout-fetched data — owned by [Bookkeeper](../bookkeeper.md).
+- **Derived metrics** — alignment indices, advisor accuracy, consensus snapshots, breakeven trajectories. Those are derivations over Scout-fetched data — owned by [Bookkeeper](../bookkeeper/README.md).
 
 *Previously out-of-scope but now in-scope under the [charter expansion](charter.md):* Numeric NRL data (SuperCoach scores/prices/breakevens, fixtures, match results, injuries, draw) and player roster registry. The acquisition of these moves to Scout; their derivation and math stay with Bookkeeper.
 
@@ -88,7 +88,7 @@ In Scout mode, Jaromelu's voice:
 - reports inventory without editorialising — counts of new sources, new uploads, dedupe results
 - surfaces volume and novelty at the **source / artefact** level ("4 new episodes", "1 new channel surfaced")
 - flags discovery edge-cases ("nothing new since last sweep", "noisy sweep — most results were already-known")
-- never parses content, infers themes, detects contradictions, or makes calls — those are [Analyst](../analyst.md), [Critic](../critic.md), and [Jaromelu](../jaromelu.md)'s jobs
+- never parses content, infers themes, detects contradictions, or makes calls — those are [Analyst](../analyst/README.md), [Critic](../critic/README.md), and [Jaromelu](../jaromelu/README.md)'s jobs
 - defers any "what was said" claim to downstream agents, even when surfaced through Scout's voice
 
 ### Sample lines
@@ -107,9 +107,9 @@ These surface as Jaromelu-authored cards with internal mode = Scout. They report
 
 **Out-of-mode lines** (these *look* like Scout but are downstream agents speaking through the same voice frame):
 
-> ~~"4 new episodes overnight. 2 mention Cleary, 1 has a deep dive on Munster."~~ — *parsed content; this is [Analyst](../analyst.md).*
+> ~~"4 new episodes overnight. 2 mention Cleary, 1 has a deep dive on Munster."~~ — *parsed content; this is [Analyst](../analyst/README.md).*
 
-> ~~"3 sources are talking about the same trade. That's unusual."~~ — *consensus detection; this is [Analyst](../analyst.md).*
+> ~~"3 sources are talking about the same trade. That's unusual."~~ — *consensus detection; this is [Analyst](../analyst/README.md).*
 
 ---
 

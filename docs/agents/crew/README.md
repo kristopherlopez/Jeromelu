@@ -12,11 +12,11 @@ The **Archivist** is the exception: it is a worker that produces a persistent, b
 
 | Crew member | Kind | What it does | What the user sees |
 |---|---|---|---|
-| [Jaromelu](jaromelu.md) | On-screen character | Integrates everything below; makes the call | His voice on every Feed entry, Remark, and reply |
-| [Scout](scout.md) | Reasoning mode + system worker | Research and intelligence gathering | "I've been digging through the pods this week..." (in Jaromelu's voice) |
-| [Analyst](analyst.md) | Reasoning mode + system worker | Cross-referencing, contradiction detection | "Three sources agree, one's the outlier..." (in Jaromelu's voice) |
-| [Critic](critic.md) | Reasoning mode | Pre-call skeptical challenge | "I almost talked myself out of it because..." (in Jaromelu's voice) |
-| [Bookkeeper](bookkeeper.md) | Reasoning mode + derivation layer | Math, breakevens, derived metrics over Scout-fetched data | "Breakeven's 42 — needs 55+ to pay off..." (in Jaromelu's voice) |
-| [Archivist](archivist.md) | Worker (separate output) | Wiki composition, cross-page integrity, relation curation | The wiki itself — entity pages in encyclopedic voice |
+| [Jaromelu](jaromelu/README.md) | On-screen character | Integrates everything below; makes the call | His voice on every Feed entry, Remark, and reply |
+| [Scout](scout/README.md) | Reasoning mode + system worker | Research and intelligence gathering | "I've been digging through the pods this week..." (in Jaromelu's voice) |
+| [Analyst](analyst/README.md) | Reasoning mode + system worker | Cross-referencing, contradiction detection | "Three sources agree, one's the outlier..." (in Jaromelu's voice) |
+| [Critic](critic/README.md) | Reasoning mode | Pre-call skeptical challenge | "I almost talked myself out of it because..." (in Jaromelu's voice) |
+| [Bookkeeper](bookkeeper/README.md) | Reasoning mode + derivation layer | Math, breakevens, derived metrics over Scout-fetched data | "Breakeven's 42 — needs 55+ to pay off..." (in Jaromelu's voice) |
+| [Archivist](archivist/README.md) | Worker (separate output) | Wiki composition, cross-page integrity, relation curation | The wiki itself — entity pages in encyclopedic voice |
 
 See [dynamics.md](dynamics.md) for how the internal-mode crew composes into Jaromelu's voice, and how the Archivist sits out-of-band relative to that flow. On-screen presence — i.e. characters with faces and personality — is Jaromelu-only; see [`../../concepts/05-crew-presence.md`](../../concepts/05-crew-presence.md).

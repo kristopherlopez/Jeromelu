@@ -148,5 +148,5 @@ The canonical implementation is `services/web/src/app/components/JeromeluPresenc
 
 ## Related
 
-- [`../agents/crew/jaromelu.md`](../agents/crew/jaromelu.md) — voice, behavioural rules, persona
+- [`../agents/crew/jaromelu/README.md`](../agents/crew/jaromelu/README.md) — voice, behavioural rules, persona
 - [`../agents/crew/dynamics.md`](../agents/crew/dynamics.md) — internal reasoning patterns

@@ -92,7 +92,7 @@ Discovery, collection, and indexing are automated. Cleaning through upload is cu
 | **Access** | Attributed to `nrlsupercoachstats.com` |
 | **Wiki impact** | Player pages (Stats, Price Analysis), Round pages (Scoring Summary) |
 
-Stats feed the [Bookkeeper](../agents/crew/bookkeeper.md) domain.
+Stats feed the [Bookkeeper](../agents/crew/bookkeeper/README.md) domain.
 
 ---
 

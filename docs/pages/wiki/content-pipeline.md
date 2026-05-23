@@ -6,7 +6,7 @@ tags: [area/pages, subarea/wiki]
 
 Status: **Design — not yet implemented**
 
-This doc covers how the **Archivist** updates wiki pages from the structured outputs of the source pipeline. The Archivist is a Claude Managed Agent; the role spec lives in [`docs/agents/crew/archivist.md`](../../agents/crew/archivist.md), this doc covers the runtime. For the source system itself (originals, cleaning, patterns, attribution) see [`docs/sources/`](../../sources/README.md).
+This doc covers how the **Archivist** updates wiki pages from the structured outputs of the source pipeline. The Archivist is a Claude Managed Agent; the role spec lives in [`docs/agents/crew/archivist/README.md`](../../agents/crew/archivist/README.md), this doc covers the runtime. For the source system itself (originals, cleaning, patterns, attribution) see [`docs/sources/`](../../sources/README.md).
 
 ---
 
@@ -37,7 +37,7 @@ The Archivist doesn't process raw transcripts — it consumes already-extracted,
 
 ### The Archivist
 
-The Archivist — implemented as a Claude Managed Agent — handles all wiki page updates. It is defined once and triggered per update session. For the role spec (responsibilities, principles, page lifecycle, hand-off contract) see [`docs/agents/crew/archivist.md`](../../agents/crew/archivist.md).
+The Archivist — implemented as a Claude Managed Agent — handles all wiki page updates. It is defined once and triggered per update session. For the role spec (responsibilities, principles, page lifecycle, hand-off contract) see [`docs/agents/crew/archivist/README.md`](../../agents/crew/archivist/README.md).
 
 **Agent definition:**
 - **Model:** claude-sonnet-4-6 (cost-effective for structured rewrites)
@@ -86,7 +86,7 @@ When a session is triggered:
 
 2. **Read current state** — the Archivist reads the current wiki page content via MCP, plus relevant claims, stats, and team list data.
 
-3. **Decide what changed** — the Archivist compares new data against existing page content. If nothing meaningful changed, it skips the page (per the [skip threshold principle](../../agents/crew/archivist.md#knowledge-organisation-principles)).
+3. **Decide what changed** — the Archivist compares new data against existing page content. If nothing meaningful changed, it skips the page (per the [skip threshold principle](../../agents/crew/archivist/README.md#knowledge-organisation-principles)).
 
 4. **Rewrite sections** — the Archivist rewrites only the affected sections (e.g. `## Expert Opinions`, `## Price Analysis`), preserving sections it didn't touch. It maintains `[[slug]]` wiki-links and follows the page's existing structure.
 
@@ -202,7 +202,7 @@ Transition detection is slow-moving and operator-confirmed by default. See
 2. **Automation level** — should post-round stats and team list updates trigger wiki sessions automatically, or remain operator-triggered?
 3. **KB entry role** — should the Archivist read KB entries as pre-digested context, or work directly from raw claims/stats? KB adds a synthesis layer but also an indirection.
 4. **Conflict handling** — if two sources give contradictory claims about the same player, how should the Archivist handle it in the wiki prose? Flag both? Weight by advisor accuracy?
-5. ~~**Page creation**~~ — *Resolved (2026-05-12).* The Archivist creates stub pages proactively when prose links to an unstubbed entity. See [archivist.md → Page lifecycle](../../agents/crew/archivist.md#page-lifecycle).
+5. ~~**Page creation**~~ — *Resolved (2026-05-12).* The Archivist creates stub pages proactively when prose links to an unstubbed entity. See [archivist.md → Page lifecycle](../../agents/crew/archivist/README.md#page-lifecycle).
 6. **MCP server location** — hosted alongside the API (as additional FastMCP routes), or as a separate service?
 
 ---

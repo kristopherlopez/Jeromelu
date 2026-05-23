@@ -9,7 +9,7 @@ tags: [area/agents, subarea/system, status/not-built]
 | **Worker** | `services/worker-decision/` (skeleton only) |
 | **Task Queue** | `decision` |
 | **Status** | Not yet built |
-| **Crew counterparts** | [Jaromelu](../crew/jaromelu.md) (the call), [Critic](../crew/critic.md) (challenge layer), [Archivist](../crew/archivist.md) (historical context) |
+| **Crew counterparts** | [Jaromelu](../crew/jaromelu/README.md) (the call), [Critic](../crew/critic/README.md) (challenge layer), [Archivist](../crew/archivist/README.md) (historical context) |
 
 ## Purpose (intended)
 

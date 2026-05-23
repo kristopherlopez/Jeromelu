@@ -133,7 +133,7 @@ Takes everything Scout drags in and works out where the takes agree, where they 
 - *"The room just turned on the Panthers' spine — Analyst caught the shift before it was obvious."*
 - *"KingOfSC rates Cleary this week. NRLBrothers is fading him. They can't both be right."*
 
-Detail: [agents/crew/analyst.md](../agents/crew/analyst.md).
+Detail: [agents/crew/analyst/README.md](../agents/crew/analyst/README.md).
 
 ### Critic — the mate who won't let it slide
 
@@ -172,7 +172,7 @@ Reviews the crew's work, makes the call, puts his name on it publicly. The voice
 - *"The call is in: the Storm cover the Eels on Thursday. Here's why."*
 - *"Jaromelu disagrees with consensus. Going contrarian on Munster."*
 
-Detail: [agents/crew/jaromelu.md](../agents/crew/jaromelu.md).
+Detail: [agents/crew/jaromelu/README.md](../agents/crew/jaromelu/README.md).
 
 ---
 
