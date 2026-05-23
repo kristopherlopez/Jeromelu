@@ -96,23 +96,12 @@ Runs on every PR (and master push) that touches `infra/terraform/**` or the work
 
 ## `cost-report.yml` — daily spend + inventory email
 
-Runs at 22:00 UTC (08:00 AEST). Generates an HTML+plaintext email with:
+Documented in [`docs/ops/reports.md`](./reports.md). One-time SES setup notes:
 
-- Month-to-date AWS spend total, by-service breakdown, and a linear month-end projection.
-- Prior month's total (for quick comparison).
-- Running resources: Lightsail bundle + state, SageMaker endpoint instance type + desired/current count + autoscaling min/max, and S3 bucket list.
+- `aws_ses_email_identity.kris` triggers AWS to send a verification email to `kristopher.lopez@gmail.com` on first apply. **Click the link in that inbox once.** Until you do, the workflow fails on `SendEmail` with `Email address is not verified`.
+- The domain identity (`jeromelu.ai`) auto-verifies once Route53 propagates the DKIM CNAMEs (~5-15 min). `aws_ses_domain_identity_verification` blocks `terraform apply` until SES confirms — so if apply finishes, DKIM is good.
 
-Uses the existing `jeromelu-cicd` GitHub Actions secrets — the IAM policy is extended in `infra/terraform/iam.tf` with `ce:GetCostAndUsage`, a handful of describe-* perms, and scoped `ses:SendEmail`. SES sender + recipient identities live in `infra/terraform/ses.tf`.
-
-### One-time setup after the first `terraform apply`
-
-`aws_ses_email_identity.kris` triggers AWS to send a verification email to `kristopher.lopez@gmail.com`. **Click the link in that inbox once.** Until you do, the workflow fails on `SendEmail` with `Email address is not verified`. After clicking, the identity stays verified indefinitely.
-
-The domain identity (`jeromelu.ai`) auto-verifies once Route53 propagates the DKIM CNAMEs (~5-15 min). Terraform's `aws_ses_domain_identity_verification` blocks `apply` until SES confirms — so if `terraform apply` finishes, DKIM is good.
-
-### Testing without waiting for cron
-
-Trigger the workflow manually: **Actions → Daily cost report → Run workflow**. Or `gh workflow run cost-report.yml`.
+Re-run manually: `gh workflow run cost-report.yml`.
 
 ---
 
@@ -122,10 +111,13 @@ GitHub Actions only handles `cost-report.yml`. Everything else recurring runs as
 
 | When (UTC / AEST) | Job | What it does |
 |---|---|---|
+| `30 16 * * *` / 02:30 | `pg-backup.sh` | Streams `pg_dump` to `s3://jeromelu-public-assets/backups/postgres/`. 14-day S3 lifecycle retention. |
 | `0 23 * * *` / 09:00 | `scout-refresh.sh channel-stats` | POSTs to `/api/admin/scout/refresh-channel-stats`. Snapshots subscriber/video/view counts into `channel_metrics`. ~3 YouTube quota units. |
 | `15 23 * * *` / 09:15 | `scout-refresh.sh videos` | POSTs to `/api/admin/scout/refresh-videos`. Enumerates new videos per channel + snapshots `video_metrics`. ~750 quota units. Staggered 15 min after channel-stats to avoid DB-connection contention. |
-| `30 16 * * *` / 02:30 | `pg-backup.sh` | Streams `pg_dump` to `s3://jeromelu-public-assets/backups/postgres/`. 14-day S3 lifecycle retention. |
-| `30 0 * * *` / 10:30 | `cron-report.sh` → `cron_report.py` | Sends the daily cron-health digest email (see below). Runs *after* all other jobs so it can report on the trailing 24h. |
+| `30 0 * * *` / 10:30 | `cron-report.sh` | Cron-health digest email — see [`reports.md`](./reports.md). |
+| `35 0 * * *` / 10:35 | `error-report.sh` | App-error digest email — see [`reports.md`](./reports.md). |
+| `0 22 * * 1` / Tue 08:00 | `content-report.sh` | Weekly content digest — see [`reports.md`](./reports.md). |
+| `30 22 * * 1` / Tue 08:30 | `disk-report.sh` | Weekly capacity report — see [`reports.md`](./reports.md). |
 
 All jobs run as the `ubuntu` user — the deploy user, member of the `docker` group, owner of `/opt/jeromelu` and `~/.aws/credentials`. AEST clock times are nominal — during AEDT each job fires an hour later in local time. Box stays in UTC.
 
@@ -135,67 +127,11 @@ Per-job log files under `/var/log/jeromelu/`:
 |---|---|
 | `scout-refresh.log` | both scout-refresh runs; one line per run with timestamp + HTTP status + response body |
 | `pg-backup.log` | pg-backup runs; one line per successful run |
-| `cron-report.log` | cron-report runs; full text version of each digest sent |
+| `cron-report.log` · `error-report.log` · `content-report.log` · `disk-report.log` | full text version of each digest sent |
 
----
+### Python deps for the report scripts
 
-## `cron-report.sh` — daily cron-health digest email
-
-Sister to the GHA cost report. Where `cost-report.yml` covers AWS spend, the cron report covers whether the scheduled jobs we depend on actually ran in the trailing 24h and what they produced.
-
-Lands at 00:30 UTC = **10:30 AEST**, late enough for the worst-case `videos` refresh (kicked off 23:15 UTC, can take ~45 min) to have completed.
-
-Each row is one of:
-
-| Status | Means |
-|---|---|
-| `✓ ok` | Run landed in the expected window AND exited clean AND wrote rows to its destination table/object |
-| `⚠ warn` | Run landed but something is off — non-clean exit, suspiciously zero rows, or status couldn't be determined (e.g. missing `GITHUB_TOKEN` for the cost-report row) |
-| `✗ fail` | No evidence of a run in the 25h window OR the run exited non-zero / non-2xx |
-
-### Why on the box, not GHA
-
-The digest needs to read Postgres (to count what each job actually wrote) and `/var/log/jeromelu/*.log` (to know exit status). Running from GHA would force us to expose a new admin endpoint or push job summaries to S3 first — needless indirection.
-
-Trade: if the Lightsail box itself is down, no digest arrives. That is the dead-man's switch — **no morning email means check the box**. The Lightsail dashboard is the external monitor.
-
-### How the rows are determined
-
-| Job | "Did it run?" | "What it did" |
-|---|---|---|
-| GHA cost-report | GitHub Actions REST API — most recent run of `cost-report.yml` | Workflow conclusion (success/failure/in_progress) |
-| Scout: channel-stats | `scout-refresh.log` — latest `channel-stats` line, parse `status=` and `curl_rc=` | DB: total + distinct rows in `channel_metrics` over 24h |
-| Scout: videos | Same file, `videos` lines | DB: total + distinct rows in `video_metrics` over 24h + count of new `sources(source_type='video')` rows |
-| pg-backup | S3 `list_objects_v2` on `s3://jeromelu-public-assets/backups/postgres/` — latest object's `LastModified` | S3 key + size |
-
-Zero rows on a successful run is **suspicious** for channel-stats and videos (every run snapshots every existing entity, so zero rows means the work didn't land) — those get `⚠ warn`. Zero *new* videos on a clean videos run is fine — most days there are no new uploads.
-
-### Required env
-
-Lives in `/opt/jeromelu/.env`, sourced by `scripts/cron-report.sh`:
-
-| Var | Purpose | Required? |
-|---|---|---|
-| `POSTGRES_USER`, `POSTGRES_DB` | `docker exec ... psql` into the postgres container | Already present for the rest of the stack |
-| `GITHUB_TOKEN` | Fine-grained PAT with `actions:read` on this repo. Lets the digest query GHA API for cost-report run status. | Optional — without it the cost-report row degrades to `⚠ warn` (status unknown) rather than failing the whole report |
-
-### IAM
-
-The `jeromelu-instance` user gets `ses:SendEmail` scoped to the existing SES identities — see the `SESSendCronReport` statement in [`infra/terraform/iam.tf`](../../infra/terraform/iam.tf). Same SES sender (`reports@jeromelu.ai`) and recipient (`kristopher.lopez@gmail.com`) as the GHA cost report — no new SES identity setup needed.
-
-### Python deps
-
-The script needs `boto3` (everything else is stdlib). Installed once on the box via `apt-get install python3-boto3` by `lightsail-deploy.sh` on first deploy. Ubuntu's distro version is ~v1.20 — old, but plenty for SES + S3 list_objects. No venv: one system package is simpler than venv + python3-venv.
-
-### Testing without waiting for cron
-
-```bash
-ssh jeromelu-prod
-. /opt/jeromelu/.env
-python3 /opt/jeromelu/scripts/cron_report.py
-```
-
-Prints the plaintext digest to stdout, then `---sending---`, then `sent OK` once SES accepts it. To dry-run without actually sending, comment the `send_email(...)` call in `main()` — there is no `--dry-run` flag.
+The four report scripts (`*_report.py`) need `boto3` and nothing else. Installed once on the box via `apt-get install python3-boto3` by `lightsail-deploy.sh` on first deploy. Ubuntu's distro version is ~v1.20 — old, but plenty for SES + S3 list_objects. No venv: one system package is simpler than venv + python3-venv.
 
 ---
 
@@ -325,6 +261,7 @@ The image tag must exist in ECR — only the *changed* service is built per push
 
 ## Related docs
 
+- [`docs/ops/reports.md`](./reports.md) — every email Jeromelu sends to me (cost, cron, errors, content, capacity).
 - [`docs/architecture/12-aws-architecture.md`](../architecture/12-aws-architecture.md) — AWS topology the pipeline deploys onto.
 - [`docs/operations/aws-setup-guide.md`](../operations/aws-setup-guide.md) — one-time provisioning runbook (Phase L8 covers CI secrets).
 - [`docs/operations/aws-resource-inventory.md`](../operations/aws-resource-inventory.md) — live IAM / ECR / CloudFront resource inventory.

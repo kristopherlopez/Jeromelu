@@ -41,3 +41,19 @@ MAILTO=""
 # a per-job status table (run? exit clean? what did it write?) via SES.
 # Sister to .github/workflows/cost-report.yml — different signal, same shape.
 30 0 * * *      ubuntu  /opt/jeromelu/scripts/cron-report.sh >> /var/log/jeromelu/cron-report.log 2>&1
+
+# Daily app-error digest — 00:35 UTC = 10:35 AEST / 11:35 AEDT.
+# Scrapes `docker logs --since 24h` for api + web containers, counts
+# error lines + exception classes, surfaces samples. Lands five min
+# after cron-report so the morning batch arrives together.
+35 0 * * *      ubuntu  /opt/jeromelu/scripts/error-report.sh >> /var/log/jeromelu/error-report.log 2>&1
+
+# Weekly content digest — Mondays 22:00 UTC = Tuesday 08:00 AEST.
+# New videos, channel velocity, claims-by-type, predictions resolved.
+# Different signal from the ops emails — this is the product-owner view.
+0 22 * * 1      ubuntu  /opt/jeromelu/scripts/content-report.sh >> /var/log/jeromelu/content-report.log 2>&1
+
+# Weekly capacity report — Mondays 22:30 UTC = Tuesday 08:30 AEST.
+# `df -h /`, `pg_database_size`, top tables by size. Catches "you're
+# 60 days from full" before a crash does.
+30 22 * * 1     ubuntu  /opt/jeromelu/scripts/disk-report.sh >> /var/log/jeromelu/disk-report.log 2>&1
