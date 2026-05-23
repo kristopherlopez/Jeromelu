@@ -1,21 +1,20 @@
 ---
 tags: [area/architecture, subarea/agents]
-status: draft
 ---
 
-# Scout Charter Expansion (Draft)
+# Scout Charter
 
-> Draft. Last reviewed: 2026-05-12. **Decisions D1–D13 locked 2026-05-12.** Phase 0 doc reconciliation shipped; Phase 1 (SuperCoach roster) shipped; Phase 2 (SuperCoach stats) shipped.
+> Last reviewed: 2026-05-24. **Decisions D1–D13 locked 2026-05-12.** Phase 0 doc reconciliation shipped; Phase 1 (SuperCoach roster) shipped; Phase 2 (SuperCoach stats) shipped. See [roadmap.md](roadmap.md) for the full phasing and status.
 >
-> Formalises the proposal in [`docs/pages/wiki/data-feeds.md`](../../pages/wiki/data-feeds.md) §"Scout's expanded charter": Scout's scope grows from *media inventory* to *all external data acquisition*. The full surface area — verified by direct endpoint exploration on 2026-05-12 — spans **nrl.com** (6 endpoints, history back to 1908 for fixtures and 2000 for full match-centre detail), **supercoach.com.au** (6 endpoints across classic + draft modes, current + prior season only), and **nrlsupercoachstats.com** (1 jqGrid endpoint, 9 seasons of history). Cleaning, parsing, diarisation, and claim extraction stay with the Analyst.
+> The decision record for Scout's scope. Formalises the proposal in [`docs/pages/wiki/data-feeds.md`](../../../pages/wiki/data-feeds.md) §"Scout's expanded charter": Scout's scope grows from *media inventory* to *all external data acquisition*. The full surface area — verified by direct endpoint exploration on 2026-05-12 — spans **nrl.com** (6 endpoints, history back to 1908 for fixtures and 2000 for full match-centre detail), **supercoach.com.au** (6 endpoints across classic + draft modes, current + prior season only), and **nrlsupercoachstats.com** (1 jqGrid endpoint, 9 seasons of history). Cleaning, parsing, diarisation, and claim extraction stay with the Analyst.
 
 ---
 
-## What this draft is for
+## Charter rationale
 
-The data-feeds doc surfaced that the input layers feeding the wiki are owned by **three different crew/system concepts**: Scout (media), the scraper (numeric NRL data — currently Bookkeeper-owned), and the player-roster pipeline (identity). The split is artificial — acquisition is one job regardless of source. This draft proposes consolidating that job under Scout, lays out the architectural pattern that makes it work, and stages the migration.
+The data-feeds doc surfaced that the input layers feeding the wiki are owned by **three different crew/system concepts**: Scout (media), the scraper (numeric NRL data — currently Bookkeeper-owned), and the player-roster pipeline (identity). The split is artificial — acquisition is one job regardless of source. This charter consolidates that job under Scout, lays out the architectural pattern that makes it work, and stages the migration.
 
-It does **not** propose changing what the Analyst, Bookkeeper, or Archivist do downstream — only changes where the data they consume comes from.
+It does **not** change what the Analyst, Bookkeeper, or Archivist do downstream — only where the data they consume comes from.
 
 ---
 
@@ -35,7 +34,7 @@ This mirrors how Scout's media work is already structured today — `scout/loop.
 
 ### D3. Cron orchestration
 
-**Recommendation: external cron hitting admin endpoints.** Each Scout pipeline exposes a `POST /api/admin/scout/<pipeline>` endpoint that returns a `run_id`. Cron (or the `scheduler` skill, or a `make` target) just hits the endpoint with the admin key. This matches the existing pattern — the daily YouTube refresh already works this way per [scout.md §3.4](../../agents/crew/scout.md) — and avoids introducing a new container or scheduler service for the prod footprint we already have.
+**Recommendation: external cron hitting admin endpoints.** Each Scout pipeline exposes a `POST /api/admin/scout/<pipeline>` endpoint that returns a `run_id`. Cron (or the `scheduler` skill, or a `make` target) just hits the endpoint with the admin key. This matches the existing pattern — the daily YouTube refresh already works this way per [architecture.md §3.4](architecture.md) — and avoids introducing a new container or scheduler service for the prod footprint we already have.
 
 A future Phase 5 could replace external cron with an in-process APScheduler if cadence management becomes painful, but that's not the V1 problem.
 
@@ -290,170 +289,19 @@ Pipeline inventory after full source enumeration (2026-05-12). Each row is a fol
 
 ### What Scout still does NOT do (Extract-only rule, unchanged)
 
-- **Cleaning, parsing, diarisation, embedding** — Analyst.
-- **Speaker → Person attribution** — Analyst.
-- **Claim / quote extraction** — Analyst.
-- **Cross-source consensus / contradiction detection** — Analyst.
-- **Numerical derivations** (advisor-accuracy index, alignment scores, breakeven trajectories beyond what the source itself reports) — Bookkeeper.
-- **Wiki composition** — Archivist.
-- **Voicing** — Jaromelu.
-
-The Extract-only rule is the spine of the charter — Scout fetches raw, persists raw, sets `ingestion_status='collected'`, and stops. Every downstream agent reads from Scout's outputs; Scout never reads back from them.
+The Extract-only rule is the spine of the charter — Scout fetches raw, persists raw, sets `ingestion_status='collected'`, and stops. Every downstream agent reads from Scout's outputs; Scout never reads back from them. Cleaning, parsing, diarisation, embedding, speaker→Person attribution, claim/quote extraction, and cross-source consensus all stay with the Analyst; numerical derivations with the Bookkeeper; wiki composition with the Archivist; voicing with Jaromelu. The canonical prose breakdown lives in [README § What Scout DOES NOT cover](README.md#what-scout-does-not-cover).
 
 ---
 
 ## Architecture under the new charter
 
-```
-External world
-       │
-       ▼
-┌─────────────────────────────────────────────────────────┐
-│ Scout (one agent identity, many modules)                │
-│                                                         │
-│  Media (legacy flat files, scout/media/ later):         │
-│    • discovery (loop.py + refresh.py)                   │
-│    • audio acquisition (audio.py)                       │
-│    • metadata refresh                                   │
-│                                                         │
-│  Data — supercoach.com.au (folder per pipeline, D9):    │
-│    • scout/supercoach_roster/                  shipped  │
-│    • scout/supercoach_teams/                   new      │
-│    • scout/supercoach_settings/                new      │
-│    • scout/supercoach_draft_*/                 optional │
-│                                                         │
-│  Data — nrl.com (canonical per D11):                    │
-│    • scout/nrlcom_draw/                        new      │
-│    • scout/nrlcom_match_centre/                new ★    │
-│    • scout/nrlcom_casualty_ward/               new      │
-│    • scout/nrlcom_ladder/                      new      │
-│    • scout/nrlcom_stats/                       new      │
-│    • scout/nrlcom_players_roster/              partial  │
-│                                                         │
-│  Data — nrlsupercoachstats.com:                         │
-│    • scout/supercoach_stats/                   shipped  │
-└─────────────────────────────────────────────────────────┘
-       │
-       ▼ (S3-first per D10)
-┌─────────────────────────────────────────────────────────┐
-│ s3://jeromelu-clean-documents/scout/{source}/{pipeline} │
-│        — raw JSON snapshots, durable, replayable        │
-└─────────────────────────────────────────────────────────┘
-       │
-       ▼ (extractors per D13)
-┌─────────────────────────────────────────────────────────┐
-│ DB tables — projection of S3 with trust-hierarchy (D11) │
-│   people, matches, match_team_lists, player_rounds,     │
-│   injuries, team_standings, claims/quotes from notes,…  │
-└─────────────────────────────────────────────────────────┘
-       │
-       ▼
-┌──────────────────────────────────────────────┐
-│ Analyst — cleaning, diarisation, extraction  │
-│ Bookkeeper — math, derivations               │
-│ Archivist — wiki prose composition           │
-│ Jaromelu — voicing                           │
-└──────────────────────────────────────────────┘
-```
-
-**Shared shape across all Scout modules:**
-
-1. Each module exposes a single function (e.g. `refresh_supercoach_roster(session) -> RunResult`) that fetches, upserts idempotently, returns counts.
-2. Each module gets an admin endpoint (`POST /api/admin/scout/<pipeline>`) that wraps the function in the `agent_runs` audit pattern (`record_agent_started/ended`).
-3. Each module's wrapper writes one `agent_runs` row with `agent_id='scout'`, `detail_json.pipeline='<module>'`, plus per-run counts (rows fetched, rows upserted, rows skipped, errors).
-4. Each module is independently cron-triggerable via the endpoint.
-5. Each module emits unknown-field warnings to `agent_events` when the upstream source returns shapes the parser doesn't recognise — early-warning for source drift.
-
-This is the pattern Scout's media side already follows; the expansion just instantiates it for more modules.
+The S3-first architecture diagram (one identity, many modules → S3 → DB extractors) and the shared-module shape live in [architecture.md § Architecture under the expanded charter](architecture.md#architecture-under-the-expanded-charter). In brief: every module exposes a single idempotent fetch function, wraps it in an admin endpoint with the `agent_runs` audit pattern (`agent_id='scout'`, `detail_json.pipeline='<module>'`), captures raw JSON to S3 first (D10), and projects to DB via downstream extractors (D13).
 
 ---
 
 ## Phasing
 
-### Phase 0 — Scope reconciliation in docs (~half a day)
-
-- Land this draft after review.
-- Update [`scout.md`](../../agents/crew/scout.md): §"What Scout DOES cover" gains the new modules; §"What Scout DOES NOT cover" loses "Numeric NRL data" and "Player roster registry"; pipeline-position diagram updated.
-- Reframe [`scraper.md`](../../agents/system/scraper.md) as a Scout component (specifically: the `worker-scraper` Temporal worker, marked for retirement) rather than a Bookkeeper subsystem.
-- Update [`bookkeeper.md`](../../agents/crew/bookkeeper.md): consume-only over Scout-fetched data; Bookkeeper no longer acquires anything.
-- Update [`crew/dynamics.md`](../../agents/crew/dynamics.md) Cadence row: Bookkeeper trigger becomes "Scout scrape complete" instead of "scraper sweep complete".
-- Update [`crew/README.md`](../../agents/crew/README.md) Bookkeeper one-liner.
-
-### Phase 1 — One pipeline migrated end-to-end (the proof slice)
-
-Pick the smallest pipeline: **SuperCoach player roster**. It already has a working fetcher script and a skill (to be retired).
-
-- Move `scripts/data/fetchers/fetch_supercoach_players.py` → `services/api/app/scout/supercoach_roster/` (folder per D9) as a callable function (no behavioural changes).
-- **Add the D8 drift fixture and test:** `tests/fixtures/scout/supercoach_roster/canonical_response.json` + `tests/integration/scout/supercoach_roster/test_response_shape.py` (Pydantic-strict, live-mode env-flagged). This is the pattern every subsequent pipeline copies — getting it right on Phase 1 means it's cheap to apply for Phases 2-4.
-- Add `POST /api/admin/scout/supercoach-roster` endpoint that wraps the function in the agent audit pattern.
-- Add a `make scout-supercoach-roster` target for ad-hoc operator runs that hits the endpoint with admin auth.
-- Retire the `scrape-supercoach` Claude Code skill — operators use the endpoint or the `make` target.
-- Schedule via external cron — daily.
-- Phase 1 done = the SuperCoach roster refreshes daily, an audit row lands per run, the drift test runs in CI (fixture-mode) and on a schedule (live-mode), the `make` target works for ad-hoc operator use, the skill is retired, and `people`/`player_attributes` row counts move when the upstream data does.
-
-### Phase 2 — SuperCoach per-round stats (the high-leverage one)
-
-Same pattern applied to `fetch_player_stats.py`. This is the **highest-leverage move on the entire roadmap** — it's what unblocks `player_rounds` from being empty and turns 600+ wiki stubs into pages with actual `## Current Form` and `## Price Analysis` content.
-
-- Move into `services/api/app/scout/supercoach_stats/` (folder per D9).
-- Admin endpoint + cron (post-round cadence, plus on-demand for re-pulls).
-- The existing `services/worker-scraper/` Temporal worker can stop being touched after this; its activities are now sibling Scout modules.
-
-### Phase 2.5 — S3-first retrofit + lightweight SC siblings (~1 day)
-
-Bring shipped pipelines into compliance with D10 (S3-first), and add the small SC siblings:
-
-- Retrofit `scout/supercoach_roster/` and `scout/supercoach_stats/` to write the raw response to S3 before any DB extraction. Existing DB writes continue unchanged; S3 becomes an additional write.
-- New `scout/supercoach_teams/` — tiny (17 rows, ~3KB), weekly cadence, cross-references `teams.metadata_json.supercoach`.
-- New `scout/supercoach_settings/` — captures SC game rules (lockouts, scoring config, captains/emergencies/dual-position rules) per season; weekly.
-- Run once with current season → S3 archive is complete for the SC surface.
-
-### Phase 3 — NRL.com draw + match-centre (the big unlock)
-
-The two pipelines that turn the wiki from "stubs" to "rich" for every player who's ever played a match in the last 25 years.
-
-- New `scout/nrlcom_draw/` — fetches `/draw/data` per (competition, season, round); writes S3. Discovers the list of matches with their `matchCentreUrl` slugs.
-- New `scout/nrlcom_match_centre/` — fetches `/draw/.../{slug}/data/` per match; writes S3. **Highest-leverage single pipeline** — one call per match yields lineups, per-player 58-field stat lines, timeline of 100+ typed events, officials, scoring narrative.
-- DB extractors (Phase 3.5 or concurrent): `extract_matches` (writes `matches`, `match_team_lists`, `player_match_stats`, `match_timeline`, `match_officials`). The `player_round_stats` extractor that runs against both nrlcom + nrlsupercoachstats with D11 trust-hierarchy merge.
-
-This phase unblocks: every team page's `## Recent Results`, every round page's `## Team Lists` + `## Results`, and every player page's per-match history including timeline events (try at 53', sin bin, etc.).
-
-### Phase 4 — NRL.com casualty ward + ladder (~half a day each)
-
-- New `scout/nrlcom_casualty_ward/` — daily snapshot of the official league injury roll. Writes S3 with timestamped key (state changes daily). DB extractor populates `injuries`.
-- New `scout/nrlcom_ladder/` — per-round team standings + the 22 per-team metrics (form, streak, points-for/against, home/away/day/night records, average margins). DB extractor populates `team_standings` (new table).
-
-Retire `services/worker-scraper/` at the end of this phase — no Scout work runs through it anymore.
-
-### Phase 4.5 — NRL.com stats + players roster + Draft mode (optional)
-
-- New `scout/nrlcom_stats/` — pre-computed leaderboards (top-25 per category) for the wiki's `## Key Players` and Bookkeeper's leaderboard queries.
-- New `scout/nrlcom_players_roster/` — fold the existing `jeromelu_shared/players/nrlcom_refresh.py` enrichment into a proper folder per D9.
-- Optional: SuperCoach Draft mode (`scout/supercoach_draft_*`) — parallel of classic, if Draft becomes a product concern.
-
-### Phase 5 — Historical backfill (one-time, ~4-5 hours operationally)
-
-Per D12. Each pipeline supports a `?season=Y[&round=N]` backfill mode that hits the same admin endpoint with explicit parameters. One-time operator-triggered job per pipeline:
-
-1. `make scout-backfill SOURCE=nrlcom-draw SEASON_FROM=1908` → ~3,000 GETs over 1h
-2. `make scout-backfill SOURCE=nrlcom-match-centre SEASON_FROM=2000` → ~5,200 GETs over 3-4h
-3. `make scout-backfill SOURCE=nrlcom-ladder` → 30 GETs
-4. `make scout-backfill SOURCE=nrlcom-stats` → 14 GETs
-5. `make scout-backfill SOURCE=supercoach-stats SEASON_FROM=2018` → ~250 jqGrid sessions over 1-2h
-
-Total: ~4-5 hours single-machine, rate-limited at 1 req/sec per origin. ~1-2GB S3.
-
-Backfill produces the same S3 keys daily cron does — re-running future cron over the same range is a no-op.
-
-### Phase 6 — Unified Scout dashboard
-
-Operator view at `/admin/scout` showing health across every pipeline (media + identity + stats + fixtures + injuries + ladder + leaderboards). Reads from `agent_runs` filtered by `agent_id='scout'`, groups by `detail_json.pipeline`. Per-pipeline: last run, status, row counts, cost. No new data — just the view.
-
-This phase isn't blocked by anything earlier; could ship in parallel with Phases 3-4 to give visibility while migration happens.
-
-### Phase 7 (future) — Multi-platform expansion
-
-The roadmap items in [`scout.md` §4 "Multi-platform expansion"](../../agents/crew/scout.md) (podcasts, Twitter/X, blogs, Reddit) instantiate the same shape: each becomes a `scout/<platform>_<thing>/` folder with an admin endpoint. Out of scope for this draft; tracked for visibility.
+The full phasing (Phase 0–7) lives in [roadmap.md § Charter phasing](roadmap.md#charter-phasing-phase-07). Phase 0–2 shipped (doc reconciliation + SuperCoach roster + stats); Phase 2.5 onward is the remaining migration work.
 
 ---
 
@@ -467,7 +315,7 @@ The roadmap items in [`scout.md` §4 "Multi-platform expansion"](../../agents/cr
 
 4. **Schema drift in fetcher outputs.** SuperCoach API or NRL.com endpoint shapes can change silently — new fields, renamed fields, removed fields. Mitigation is locked in **D8**: strict Pydantic parsing + fixture-backed drift tests + live-mode scheduled runs that surface failures to the user. The agent does not auto-adapt.
 
-5. **Bookkeeper-shaped hole in the crew docs.** Moving acquisition out of Bookkeeper's territory leaves [`bookkeeper.md`](../../agents/crew/bookkeeper.md) with a smaller, less-clearly-defined scope. Mitigation: Phase 0 doc updates explicitly redefine Bookkeeper as the *derivation/math* layer over Scout-fetched data — alignment indices, accuracy scores, trend extraction, breakeven-trajectory math. Not nothing, but narrower than today.
+5. **Bookkeeper-shaped hole in the crew docs.** Moving acquisition out of Bookkeeper's territory leaves [`bookkeeper.md`](../bookkeeper.md) with a smaller, less-clearly-defined scope. Mitigation: Phase 0 doc updates explicitly redefine Bookkeeper as the *derivation/math* layer over Scout-fetched data — alignment indices, accuracy scores, trend extraction, breakeven-trajectory math. Not nothing, but narrower than today.
 
 6. **Cron ownership ambiguity.** "External cron" per D3 is correct but vague — who actually maintains the crontab? Probably the same place Scout's media refresh cron lives today; needs to be documented.
 
@@ -506,27 +354,10 @@ Five steps × six pipelines is the bulk of the migration work — couple of week
 
 ---
 
-## Documentation Updates
-
-The full list (matching [`data-feeds.md` §Documentation Updates](../../pages/wiki/data-feeds.md#documentation-updates)) plus this draft's own changes:
-
-| Doc | Change |
-|-----|--------|
-| [`docs/agents/crew/scout.md`](../../agents/crew/scout.md) | Major rewrite of §scope, §pipeline position, §components. Adds all new modules. Removes "Numeric NRL data" and "Player roster registry" from §"What Scout DOES NOT cover". |
-| [`docs/agents/system/scraper.md`](../../agents/system/scraper.md) | Reframe as a Scout component (the `worker-scraper` Temporal worker, marked for retirement). Cross-link to Scout instead of Bookkeeper. |
-| [`docs/agents/crew/bookkeeper.md`](../../agents/crew/bookkeeper.md) | Scope clarification: derivation/math over Scout-fetched data; acquisition moved out. |
-| [`docs/agents/crew/README.md`](../../agents/crew/README.md) | Update Bookkeeper one-liner. |
-| [`docs/agents/crew/dynamics.md`](../../agents/crew/dynamics.md) | Cadence: Bookkeeper trigger row updates from "scraper sweep complete" to "Scout scrape complete". |
-| [`docs/pages/wiki/data-feeds.md`](../../pages/wiki/data-feeds.md) | Replace "*proposed*" / "*tracked as a follow-up*" hedges with links to this draft and the implementing migrations as each phase ships. |
-| New: `docs/agents/system/scout-data-acquisition.md` | Companion doc to `scout.md`; operational details for each new pipeline (CLI, endpoint, cron cadence, debugging). Splits the doc weight so `scout.md` stays readable. |
-| New: `services/api/app/scout/README.md` | Top-level Scout README explaining the folder-per-pipeline convention (D9), how to add a new pipeline (cp -r template), and the legacy-flat-media-files exception. |
-
----
-
 ## Open questions
 
 1. **Cron mechanics.** "External cron" is right architecturally but the prod box doesn't have a documented crontab pattern yet. Where do schedules actually land? Same place Scout's daily YouTube refresh runs today; needs to be documented as part of Phase 1.
-2. **Auth on admin endpoints.** Today's pattern is `X-Admin-Key` (per `scout.md` §3.4). Reused for all the new Scout endpoints; rotating story unchanged.
+2. **Auth on admin endpoints.** Today's pattern is `X-Admin-Key` (per [architecture.md §3.4](architecture.md)). Reused for all the new Scout endpoints; rotating story unchanged.
 3. **One module per data table, or one module per source?** E.g. is `nrlcom_matches.py` separate from `nrlcom_rounds.py` (both come from `/draw/data`)? Lean: one module per *upstream endpoint*, even if it writes multiple tables. Simpler to rate-limit and audit.
 4. **Source-of-truth conflicts.** SuperCoach has player rosters; NRL.com has team lists. When they disagree (player listed at HOK in SuperCoach but FRF on the team list), who wins? Almost certainly: SuperCoach for "registered position", NRL.com for "this match's lineup". Worth documenting; not a blocker for the migration.
 5. **Backfill strategy.** For historical `player_rounds`, do we backfill all of 2025 + 2026 on first run, or only refresh forward from now? Per-pipeline decision — for the wiki to have meaningful trend data, backfill is needed.
@@ -534,10 +365,10 @@ The full list (matching [`data-feeds.md` §Documentation Updates](../../pages/wi
 
 ---
 
-## Drafting notes (delete before merge)
+## Related
 
-This draft formalises the data-feeds doc's §"Scout's expanded charter" without re-litigating the principle. The bulk of the new content is the **phasing**, the **architecture under the new charter** (one identity, many modules), and the **idempotency contract** in D7 — those are the implementation-shape decisions that need to be locked before any code moves.
-
-The most consequential decision is D4 — retiring the Temporal worker. It's the right call given the project memory note that Temporal isn't in production, but it means `services/worker-scraper/` migrates *into* the API process. That's a footprint shift that should be obvious to anyone watching prod for the first time after the migration lands; flag it in the relevant operational docs.
-
-The Bookkeeper scope shrinkage (Risk #5) is the second-most-consequential. Bookkeeper currently owns the scraper; after this, Bookkeeper owns *math over the scraped data*. Worth a separate, focused pass on the Bookkeeper docs once this draft is approved — the role isn't smaller, it's *clearer*, and saying that clearly is worth the doc work.
+- [README.md](README.md) — Scout's identity, scope, and voice
+- [architecture.md](architecture.md) — pipeline position, flow, component internals, S3-first architecture
+- [roadmap.md](roadmap.md) — status and the full Phase 0–7 phasing
+- [plans/phase-1-supercoach-roster.md](plans/phase-1-supercoach-roster.md) — the Phase 1 implementation plan
+- [Data lineage](../../../architecture/data-lineage.md) — locked D1–D13 govern the lineage

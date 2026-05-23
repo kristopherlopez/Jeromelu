@@ -138,7 +138,7 @@ When Jaromelu is in active source-discovery mode, the UI surfaces this as a visi
 - A live activity stream shows what he's looking at: current search query, page being fetched, candidate just spotted
 - Each judgement publishes as a Jaromelu-authored card ("Found a new pod — 'Tackles and Tinnies' — three episodes deep, mentions Munster a lot")
 
-This is the only place the *process* of recon is rendered visibly. Internally it's the Scout function (see [agents/crew/scout.md](../agents/crew/scout.md)), but on screen it's always Jaromelu.
+This is the only place the *process* of recon is rendered visibly. Internally it's the Scout function (see [agents/crew/scout/README.md](../agents/crew/scout/README.md)), but on screen it's always Jaromelu.
 
 ---
 

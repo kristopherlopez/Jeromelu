@@ -4,15 +4,15 @@ tags: [area/agents, subarea/system, status/partial]
 
 # Scraper
 
-> **Reframe note (2026-05-12).** Per the [Scout charter expansion](../../architecture/drafts/scout-charter-expansion.draft.md), the scraper is a **Scout component, marked for retirement**. The Temporal-shaped `worker-scraper` is being unwound: its activities migrate into per-pipeline folders under `services/api/app/scout/<pipeline_name>/` (per D9), wrapped by admin endpoints, all writing under `agent_id='scout'` with a `detail_json.pipeline` discriminator. The "Fixture / Match / Injury sync (planned)" section below describes pipelines that are now part of Scout's expanded charter and will be built there, not as new Temporal activities. The Bookkeeper consumes the resulting `player_rounds` rows but no longer owns the acquisition.
+> **Reframe note (2026-05-12).** Per the [Scout charter expansion](../crew/scout/charter.md), the scraper is a **Scout component, marked for retirement**. The Temporal-shaped `worker-scraper` is being unwound: its activities migrate into per-pipeline folders under `services/api/app/scout/<pipeline_name>/` (per D9), wrapped by admin endpoints, all writing under `agent_id='scout'` with a `detail_json.pipeline` discriminator. The "Fixture / Match / Injury sync (planned)" section below describes pipelines that are now part of Scout's expanded charter and will be built there, not as new Temporal activities. The Bookkeeper consumes the resulting `player_rounds` rows but no longer owns the acquisition.
 >
-> This doc remains as the historical reference for the Temporal worker until it's retired in Phase 4 of the charter rollout. New scraping work should look at [`scout.md`](../crew/scout.md) and the [charter expansion draft](../../architecture/drafts/scout-charter-expansion.draft.md), not here.
+> This doc remains as the historical reference for the Temporal worker until it's retired in Phase 4 of the charter rollout. New scraping work should look at [`scout.md`](../crew/scout/README.md) and the [charter expansion draft](../crew/scout/charter.md), not here.
 
 | | |
 |---|---|
 | **Worker** | `services/worker-scraper/app/main.py` *(legacy; marked for retirement)* |
 | **Task Queue** | `scraper` |
-| **New crew counterpart** | [Scout](../crew/scout.md) *(Bookkeeper consumes downstream)* |
+| **New crew counterpart** | [Scout](../crew/scout/README.md) *(Bookkeeper consumes downstream)* |
 | **Status** | Active in dev only; per-project-memory, Temporal is not in production. |
 
 ---
@@ -78,7 +78,7 @@ FKs on `player_rounds`. See [data-catalogue](../../operations/data-catalogue/REA
 for table shapes.
 
 Five sync jobs build on top. **These are now formalised as Scout modules
-under the [charter expansion](../../architecture/drafts/scout-charter-expansion.draft.md)**
+under the [charter expansion](../crew/scout/charter.md)**
 — sibling to media discovery, sharing one `agent_id='scout'` audit
 identity with `detail_json.pipeline` discriminating. They're cron-driven
 admin endpoints, not Temporal activities.

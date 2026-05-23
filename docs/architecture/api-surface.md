@@ -245,7 +245,7 @@ Per-agent URL prefix for every admin endpoint. The shape:
 
 ### What changes at the *file* layout level
 
-Per [D9 of the Scout charter](drafts/scout-charter-expansion.draft.md), each Scout pipeline already has its own folder with a `routes.py`. Applying the same shape to admin endpoints across the API:
+Per [D9 of the Scout charter](../agents/crew/scout/charter.md), each Scout pipeline already has its own folder with a `routes.py`. Applying the same shape to admin endpoints across the API:
 
 ```
 services/api/app/
@@ -392,6 +392,6 @@ For now, hand-maintained. Revisit auto-generation once the migration is underway
 
 ## Related
 
-- [Scout charter expansion (draft)](drafts/scout-charter-expansion.draft.md) — D9 establishes the folder-per-pipeline pattern this doc extends across all agents
+- [Scout charter expansion (draft)](../agents/crew/scout/charter.md) — D9 establishes the folder-per-pipeline pattern this doc extends across all agents
 - [Crew docs](../agents/crew/README.md) — who the agents are
 - Live OpenAPI: `http://localhost:8000/openapi.json` (dev) — authoritative source of current shape

@@ -8,7 +8,7 @@ tags: [area/agents, subarea/system, status/live]
 |---|---|
 | **Package** | `services/api/app/scout/presenters.py` |
 | **Trigger** | `make scout-presenters CHANNEL_ID=…` (CLI) or `POST /api/admin/presenters/scout/{channel_id}` (admin UI) |
-| **Crew counterpart** | [Scout](../crew/scout.md) — research/discovery mode, scoped to one channel |
+| **Crew counterpart** | [Scout](../crew/scout/README.md) — research/discovery mode, scoped to one channel |
 | **ETL role** | **Extract only.** Files candidates; promotion happens via human review. |
 | **Status** | Phase 1 ✅ + Phase 2 ✅ shipped 2026-05-05. Phase 3 (priors integration with Lineup) backlog. |
 

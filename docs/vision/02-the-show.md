@@ -121,7 +121,7 @@ The bloke who sits through every podcast, panel and post so you don't have to.
 - *"Scout found something nobody's said out loud yet. Hold on."*
 - *"While you slept: every Round 6 preview, listened to and logged."*
 
-Detail: [agents/crew/scout.md](../agents/crew/scout.md).
+Detail: [agents/crew/scout/README.md](../agents/crew/scout/README.md).
 
 ### Analyst — the one who joins the dots
 

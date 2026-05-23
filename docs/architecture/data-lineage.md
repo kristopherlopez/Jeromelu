@@ -15,8 +15,8 @@ tags: [area/architecture, area/operations]
 >
 > Other related docs:
 > - [`docs/pages/wiki/data-feeds.md`](../pages/wiki/data-feeds.md) — wiki-centric "what feeds the wiki" view
-> - [`docs/agents/crew/scout.md`](../agents/crew/scout.md) — Scout's pipeline inventory
-> - [`docs/architecture/drafts/scout-charter-expansion.draft.md`](drafts/scout-charter-expansion.draft.md) — the charter governing all this
+> - [`docs/agents/crew/scout/README.md`](../agents/crew/scout/README.md) — Scout's pipeline inventory
+> - [`docs/architecture/../agents/crew/scout/charter.md`](../agents/crew/scout/charter.md) — the charter governing all this
 > - Per-pipeline `services/api/app/scout/{pipeline}/README.md` — implementation details
 
 ---
@@ -54,7 +54,7 @@ Every piece of structured NRL data in Jeromelu transits three layers:
 
 - L1 → L2: every fetch is idempotent (deterministic S3 key per identity). Re-runs overwrite the same key.
 - L2 → L3: extractors are derived. Drop a DB table, replay extractors, the table comes back. No need to re-fetch L1.
-- **L1 is never trusted as authoritative for derived facts** — L2 is. The trust hierarchy ([D11](drafts/scout-charter-expansion.draft.md)) is applied at extraction time, not capture time.
+- **L1 is never trusted as authoritative for derived facts** — L2 is. The trust hierarchy ([D11](../agents/crew/scout/charter.md)) is applied at extraction time, not capture time.
 
 ---
 
@@ -104,7 +104,7 @@ For each domain concept, we trace: **external source → Scout pipeline → S3 p
 
 ### Match team lists (lineups)
 
-Per [D11](drafts/scout-charter-expansion.draft.md) trust hierarchy + the captured shape:
+Per [D11](../agents/crew/scout/charter.md) trust hierarchy + the captured shape:
 
 | Field | Source | S3 archive | Extractor | DB target |
 |---|---|---|---|---|
@@ -148,7 +148,7 @@ Per [D11](drafts/scout-charter-expansion.draft.md) trust hierarchy + the capture
 
 ### Player rounds (SuperCoach overlay)
 
-`player_rounds` is the SC scoring-breakdown table. Per [D11](drafts/scout-charter-expansion.draft.md), the SC scoring components (`base`/`attack`/`playmaking`/`power`/`negative`) only exist in nrlsupercoachstats.
+`player_rounds` is the SC scoring-breakdown table. Per [D11](../agents/crew/scout/charter.md), the SC scoring components (`base`/`attack`/`playmaking`/`power`/`negative`) only exist in nrlsupercoachstats.
 
 | Field | Source | S3 archive | Extractor | DB target |
 |---|---|---|---|---|
@@ -214,7 +214,7 @@ This pipeline is **already shipped end-to-end** — no extractor needed. It runs
 
 For each DB table, which S3 archives populate it, and via which code path.
 
-| DB table | S3 archive(s) | Extractor | Status | Trust source per [D11](drafts/scout-charter-expansion.draft.md) |
+| DB table | S3 archive(s) | Extractor | Status | Trust source per [D11](../agents/crew/scout/charter.md) |
 |---|---|---|---|---|
 | `people` | `scout/supercoach/classic/players-cf/*` (primary) + `scout/nrlcom/match-centre/*` (coaches + nrlcom IDs) + `scout/nrlsupercoachstats/stats/*` (historical union, pending) | `scout/supercoach_roster/` + `scripts/data/populate/phase_identity.py` (nrlcom IDs + coaches) ⊕ future `extract_people_history` (for the 735 historical-only players) | ✅ shipped (593 = 572 SC + 21 coaches; 516 have nrlcom_player_id) / 🟡 history pending | SC for SC-eligible roster; nrl.com for biographical (DOB, image) + coaches |
 | `player_attributes` | SC roster + nrl.com profile enrichment | `scout/supercoach_roster/` (SCD-2 close/open on diff) | ✅ shipped | SC for team/position; nrl.com for height/weight/contract |
@@ -325,7 +325,7 @@ This document only changes when the **conceptual** model changes (L1/L2/L3 bound
 ## Related
 
 - [`docs/pages/wiki/data-feeds.md`](../pages/wiki/data-feeds.md) — wiki-centric reverse view
-- [`docs/agents/crew/scout.md`](../agents/crew/scout.md) — pipeline inventory + hand-off contract
+- [`docs/agents/crew/scout/README.md`](../agents/crew/scout/README.md) — pipeline inventory + hand-off contract
 - [`docs/architecture/01-information-architecture.md`](01-information-architecture.md) — domain model
-- [`docs/architecture/drafts/scout-charter-expansion.draft.md`](drafts/scout-charter-expansion.draft.md) — locked D1–D13 governing the lineage
+- [`docs/architecture/../agents/crew/scout/charter.md`](../agents/crew/scout/charter.md) — locked D1–D13 governing the lineage
 - Per-pipeline READMEs in `services/api/app/scout/{pipeline}/README.md`

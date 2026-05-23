@@ -8,7 +8,7 @@ tags: [area/agents, subarea/system, status/live]
 |---|---|
 | **Module** | `services/api/app/scout/audio.py` |
 | **Driver** | `python -m app.scout.audio_cli <source_id>` · `make collect-audio SOURCE_ID=<uuid>` |
-| **Crew counterpart** | [Scout](../crew/scout.md) — this is Scout's audio-pull surface (§3.5). |
+| **Crew counterpart** | [Scout](../crew/scout/README.md) — this is Scout's audio-pull surface (§3.5). |
 | **ETL role** | **Extract only.** Pulls audio bytes via yt-dlp and persists to S3. No interpretation. |
 | **Status** | Single-source CLI shipped. Recurring drain job not yet built. |
 
@@ -79,7 +79,7 @@ OK
 
 ## Related
 
-- [Scout — § 3.5 audio acquisition](../crew/scout.md#35-audio-acquisition-deterministic-shipped)
+- [Scout — § 3.5 audio acquisition](../crew/scout/architecture.md#35-audio-acquisition-deterministic-shipped)
 - [Transcription (Analyst)](transcription-pipeline.md) — what runs on Scout's audio next
 - [Source discovery](source-discovery.md) — Scout's discovery + enumeration; produces the `sources` rows that this module drains
 - [Sources § extraction method](../../sources/extraction-method.md) — full pipeline cost model

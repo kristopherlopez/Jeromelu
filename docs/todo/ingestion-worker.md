@@ -8,7 +8,7 @@ The Temporal-shaped worker described below was never deployed. The audio-first r
 
 - [docs/agents/system/ingestion.md](../agents/system/ingestion.md) — current spec
 - [docs/sources/extraction-method.md](../sources/extraction-method.md) — tier definitions, keyterm strategy, cost model
-- [docs/agents/crew/scout.md § 3.5](../agents/crew/scout.md#35-tracked-channel-ingestion-deterministic-audio-first)
+- [docs/agents/crew/scout/architecture.md § 3.5](../agents/crew/scout/architecture.md#35-audio-acquisition-deterministic-shipped)
 
 What's still outstanding (now tracked in scout.md roadmap, not here):
 

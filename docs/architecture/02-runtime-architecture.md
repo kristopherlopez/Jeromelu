@@ -47,7 +47,7 @@ Deepgram + pyannote JSON artefacts are also retained so transcripts can be
 re-merged from raw bytes without re-paying ASR cost.
 
 Owned by **Scout** today (see
-[../agents/crew/scout.md](../agents/crew/scout.md) §3.5 and
+[../agents/crew/scout/README.md](../agents/crew/scout/README.md) §3.5 and
 [../agents/system/ingestion.md](../agents/system/ingestion.md)). Article /
 RSS / Twitter ingest is on the backlog; audio is the only live extractor.
 

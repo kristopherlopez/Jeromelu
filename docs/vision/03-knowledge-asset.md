@@ -83,5 +83,5 @@ NRL is where it gets proven (see [01 — Why NRL](01-venture-thesis.md)). The as
 - [Data Lineage](../architecture/data-lineage.md) — the concrete L1→L4 model and the operations trinity
 - [The Ledger](../pages/ledger/overview.md) — the Alignment Index in practice
 - [The Wiki](../pages/wiki/overview.md) — the asset made visible and auditable
-- [Scout](../agents/crew/scout.md) — the ingestion pipelines that feed the asset
+- [Scout](../agents/crew/scout/README.md) — the ingestion pipelines that feed the asset
 

@@ -8,7 +8,7 @@ tags: [area/agents, subarea/crew]
 
 **Internal tonal mode:** Neat, precise, unemotional — the numbers are the numbers.
 
-> **Scope clarification (2026-05-12).** Per the [Scout charter expansion](../../architecture/drafts/scout-charter-expansion.draft.md), Bookkeeper is now **consume-only** over Scout-fetched data. Acquisition — the SuperCoach scraper, NRL.com fetchers, etc. — moved to Scout. Bookkeeper computes derived metrics (alignment indices, accuracy scores, breakeven trajectories, consensus snapshots) on top of whatever Scout has put into `player_rounds`, `matches`, `claims`, and friends.
+> **Scope clarification (2026-05-12).** Per the [Scout charter expansion](scout/charter.md), Bookkeeper is now **consume-only** over Scout-fetched data. Acquisition — the SuperCoach scraper, NRL.com fetchers, etc. — moved to Scout. Bookkeeper computes derived metrics (alignment indices, accuracy scores, breakeven trajectories, consensus snapshots) on top of whatever Scout has put into `player_rounds`, `matches`, `claims`, and friends.
 
 ---
 

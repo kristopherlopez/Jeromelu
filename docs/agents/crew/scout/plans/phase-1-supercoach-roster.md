@@ -1,19 +1,18 @@
 ---
 tags: [area/architecture, subarea/agents]
-status: draft
 ---
 
 # Scout Phase 1 — SuperCoach Roster (Implementation Plan)
 
-> Draft. Last reviewed: 2026-05-12.
+> Last reviewed: 2026-05-24.
 >
-> Step-by-step plan for Phase 1 of the [Scout charter expansion](scout-charter-expansion.draft.md): bring the SuperCoach roster pipeline into compliance with the locked decisions (D1–D8). The proof slice that sets the pattern for Phases 2–4.
+> Step-by-step plan for Phase 1 of the [Scout charter](../charter.md): bring the SuperCoach roster pipeline into compliance with the locked decisions (D1–D8). The proof slice that sets the pattern for Phases 2–4. See [../roadmap.md](../roadmap.md) for how Phase 1 fits the broader phasing.
 
 ---
 
 ## What this plan is for
 
-The Scout charter draft describes Phase 1 as a deliverables list. This doc translates that into an ordered, verifiable sequence of steps with file paths, code shapes, and per-step verification commands. It's the document an implementer (you, me, a future session) opens and works against.
+The [Scout charter](../charter.md) describes Phase 1 as a deliverables list. This doc translates that into an ordered, verifiable sequence of steps with file paths, code shapes, and per-step verification commands. It's the document an implementer (you, me, a future session) opens and works against.
 
 ---
 
@@ -166,13 +165,13 @@ Per D5.
 
 - **Delete:** `.claude/skills/scrape-supercoach/skill.md` (and the directory if empty).
 - **Update any docs that reference the skill** — likely `docs/agents/system/player-roster.md` (mentioned in the skill body), MEMORY.md if relevant.
-- **Verify:** `grep -r scrape-supercoach docs/ .claude/` returns no hits (other than expected historical references in the charter draft itself).
+- **Verify:** `grep -r scrape-supercoach docs/ .claude/` returns no hits (other than expected historical references in the [charter](../charter.md) itself).
 
 ### Step 14 — Schedule daily cron
 
 External cron per D3.
 
-- **Determine:** where does Scout's daily YouTube refresh cron currently live? (Per `scout.md` §3.4 there's a daily job — likely an external cron entry, a Render/Lightsail scheduled task, or a documented `crontab` invocation.)
+- **Determine:** where does Scout's daily YouTube refresh cron currently live? (Per [architecture.md §3.4](../architecture.md) there's a daily job — likely an external cron entry, a Render/Lightsail scheduled task, or a documented `crontab` invocation.)
 - **Add:** an equivalent entry for `make scout-supercoach-roster` once daily (suggested: 06:30 AET, after the YouTube refresh window).
 - **Verify:** the cron entry is documented (in the same place the YouTube cron lives) and a manual test run produces an `agent_runs` row.
 
@@ -239,13 +238,3 @@ Out of scope for Phase 1 — these belong to Phases 2+ or are addressed by other
 - **Unified Scout dashboard** — Phase 5.
 - **Live-mode drift CI scheduling** — operational follow-up.
 - **Cleaning up `agent_id='stats'`/`fixtures'` reservations** — housekeeping pass.
-
----
-
-## Drafting notes (delete before merge)
-
-The real revelation in scoping Phase 1 was that most of the work is *already shipped* — the fetcher, the SCD-2 refresh, the prod endpoint, the make targets, the skill. The actual Phase 1 work is **a thin retrofit** to bring the existing pipeline into charter compliance: audit row + drift test + naming + cron. That's a tighter scope than the bullet list in the charter draft suggested, and should land in well under a day of focused work.
-
-The two things worth being careful about are (1) **verifying the `/fetch-and-refresh` endpoint actually exists** before relying on it (Step 1) and (2) the **`data/players.yaml` side-effect** (Open Question 4) — that file feeds the transcript-cleaning pipeline downstream, and if the cutover breaks the yaml regeneration without anyone noticing, transcript cleaning silently regresses.
-
-The plan is deliberately step-by-step at the level "do this, verify this works, then do the next thing" so any session executing it can stop and surface findings without losing context.

@@ -8,8 +8,8 @@ tags: [area/agents, subarea/system, status/live]
 |---|---|
 | **Package** | `services/api/app/scout/` |
 | **Trigger** | Manual CLI for now (`python -m app.scout.cli`); admin endpoint + cron later |
-| **Crew counterpart** | [Scout](../crew/scout.md) — this is Scout's source-discovery surface |
-| **ETL role** | **Extract only.** No Transform. (Cleaning, diarisation, parsing, embedding are downstream — see [crew/scout.md § Hand-off contract](../crew/scout.md#hand-off-contract).) |
+| **Crew counterpart** | [Scout](../crew/scout/README.md) — this is Scout's source-discovery surface |
+| **ETL role** | **Extract only.** No Transform. (Cleaning, diarisation, parsing, embedding are downstream — see [crew/scout/architecture.md § Hand-off contract](../crew/scout/architecture.md#hand-off-contract).) |
 | **Status** | Discovery + admin recon API + post-approval video enumeration shipped |
 
 Scout's "find new sources" job. An autonomous Anthropic agent that hunts the web for NRL YouTube channels and videos, scores them, and files them to `scout_candidates` for human review. **Not Temporal-based** — runs in-process, see [project-temporal-not-in-prod note](../../operations/aws-resource-inventory.md).
@@ -18,7 +18,7 @@ Approval of a channel candidate triggers deterministic post-processing: the chan
 
 ### Extract-only boundary
 
-Per Scout's [ETL role](../crew/scout.md), this surface only writes **raw inventory**:
+Per Scout's [ETL role](../crew/scout/README.md), this surface only writes **raw inventory**:
 - `scout_candidates` (full row at discovery)
 - `channels` (full row at approval)
 - `sources` (full row at enumeration; `ingestion_status='pending'`, `cleaned_text` left for Transform)

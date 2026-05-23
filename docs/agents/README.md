@@ -21,7 +21,7 @@ Internal reasoning architecture for Jaromelu — not separate visible characters
 | Internal function | What it does |
 |---|---|
 | [Jaromelu](crew/jaromelu.md) | The on-screen character — integrates everything below |
-| [Scout](crew/scout.md) | Research / intelligence gathering mode |
+| [Scout](crew/scout/README.md) | Research / intelligence gathering mode |
 | [Analyst](crew/analyst.md) | Cross-reference / contradiction-detection mode |
 | [Critic](crew/critic.md) | Self-doubt / pre-call challenge mode |
 | [Bookkeeper](crew/bookkeeper.md) | Math / numbers mode |
