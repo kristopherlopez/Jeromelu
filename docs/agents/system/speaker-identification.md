@@ -3,6 +3,13 @@ tags: [area/agents, subarea/system, status/live]
 ---
 # Speaker Identification (Voice + Visual Fusion)
 
+> **LEGACY notice (2026-05-23):** This surface — the in-repo "Lineup"
+> (voice + face + fusion) — is being moved out of this repo. End state is
+> an external API call returning a speaker-attributed transcript;
+> `services/api/app/routers/lineup.py`, `services/api/app/analyst/`, and
+> `services/gpu/` are legacy until then. Keep the live pipeline working;
+> don't invest in new features here. See `memory/project_lineup_external.md`.
+
 ## Purpose
 
 Podcast transcripts come back from diarization as anonymous turn labels — `SPEAKER_00`, `SPEAKER_01`, etc. Speaker Identification attaches a real `Person` (e.g. *Denan Kemp*) to each spoken turn, so transcripts read like a conversation between named hosts rather than unattributed voices.

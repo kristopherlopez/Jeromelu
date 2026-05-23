@@ -6,6 +6,7 @@ from .routers.ask import router as ask_router
 from .routers.crew import router as crew_router
 from .routers.feed import router as feed_router
 from .routers.insights import router as insights_router
+from .routers.lineup import router as lineup_router
 from .routers.players import router as players_router
 from .routers.presenters import router as presenters_router
 from .routers.recon import router as recon_router
@@ -35,6 +36,9 @@ app.add_middleware(
 )
 
 app.include_router(sources_router, prefix="/api")
+# Lineup (speaker identification) — legacy in-repo surface, slated to move
+# behind an external API. See memory/project_lineup_external.md.
+app.include_router(lineup_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 app.include_router(ask_router, prefix="/api")
 app.include_router(crew_router, prefix="/api")

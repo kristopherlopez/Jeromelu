@@ -1,5 +1,13 @@
 # Lineup on SageMaker Async — one-time setup
 
+> **LEGACY — Lineup is being moved out of this repo.** Speaker
+> identification (voice + face + fusion) will be replaced by an external
+> API call returning a speaker-attributed transcript. This SageMaker
+> pathway and the `services/gpu/` container will be deleted once the
+> external service is live. Keep the existing endpoint working if it's
+> still in use; do not invest in extending it. See
+> `memory/project_lineup_external.md`.
+
 Phase 5.5 ships Lineup's GPU-bound steps (pyannote diarization +
 InsightFace visual ID) as a SageMaker Async Inference endpoint, so the
 audit loop drops from ~50 min CPU to ~3 min wall time end-to-end.

@@ -1,5 +1,16 @@
 """Analyst — Jaromelu's Transform-stage agent.
 
+.. warning::
+
+   **LEGACY — speaker identification ("Lineup") is being moved out of this repo.**
+   Much of this package — diarization, voiceprint matching, visual ID, fusion,
+   the recluster runner, and the SageMaker ``LINEUP_REMOTE`` pathway — is the
+   in-repo Lineup surface. It will be replaced by an external API call that
+   returns a speaker-attributed transcript. Keep this code working (the live
+   pipeline still depends on it) but do not invest in new features here. See
+   ``memory/project_lineup_external.md`` and
+   ``docs/agents/system/speaker-identification.md``.
+
 Owns everything that interprets Scout's raw bytes:
 
     1. Transcript materialisation — Deepgram-driven audio→text+speakers+chunks

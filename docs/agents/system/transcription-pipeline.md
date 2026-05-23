@@ -4,6 +4,15 @@ tags: [area/agents, subarea/system, status/live]
 
 # Transcription Pipeline
 
+> **LEGACY notice (2026-05-23):** Stages 2–5 below (pyannote diarization,
+> Deepgram merge, voice + face + fusion) are the in-repo **Lineup** surface,
+> which is being moved out of this repo. The end state is an external API
+> call that returns a speaker-attributed transcript; the diarization /
+> visual_id / fusion code in `services/api/app/analyst/` and
+> `services/gpu/` is legacy until then. Stage 1 (Scout audio acquisition)
+> and downstream stages (cleaning, claim extraction, wiki, ledger) stay in
+> Jaromelu. See `memory/project_lineup_external.md`.
+
 The orchestration surface for the audio → identified-transcript flow. Takes an audio (and optionally video) source from Scout and walks it through diarization, Automatic Speech Recognition (ASR), merge, and speaker identification — producing the structured transcript every downstream pass (cleaning, claim extraction, the wiki, the ledger) reads from.
 
 This doc is the **end-to-end view**. For matching algorithm detail (voice + face + fusion), see [speaker-identification.md](speaker-identification.md). For audio acquisition, see [ingestion.md](ingestion.md). The rest of this doc owns the pyannote / Deepgram / merge stages and the orchestration that ties everything together.

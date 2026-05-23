@@ -1,5 +1,11 @@
 "use client";
 
+// LEGACY — the Faces / Voices / Alignment / FaceTranscript / Review tabs and
+// their VideoOverlay / YouTubeFaceOverlay companions consume the in-repo
+// Lineup endpoints (routers/lineup.py). When Lineup moves to an external API
+// returning a speaker-attributed transcript, these surfaces will be removed.
+// See memory/project_lineup_external.md.
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, User, Calendar, Video, PenLine, Hourglass, Smartphone } from "lucide-react";
