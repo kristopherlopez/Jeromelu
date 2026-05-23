@@ -137,7 +137,7 @@ ECR
 | Lightsail snapshots (1 weekly × ~5 GB) | ~0.25 |
 | Route 53 hosted zone | 0.50 |
 | S3 storage (3 buckets, low GB) | <0.20 |
-| S3 lifecycle backups (30 d × ~5 MB/d) | ~0.01 |
+| S3 lifecycle backups (14 d × ~5 MB/d) | ~0.01 |
 | ECR storage (2 repos × ~500 MB) | ~0.10 |
 | CloudFront | 0.00 (free plan) |
 | ACM | 0.00 |
@@ -149,7 +149,7 @@ Tax (~10% AU GST) brings the bill to ~$14.00/mo all-in. Egress beyond the 3 TB i
 
 ## Future scale path (when V1 outgrows Lightsail)
 
-Trigger to migrate: sustained CPU/RAM > 70% on the $5 plan after upgrading to $10, OR clear need for multi-AZ HA.
+Trigger to migrate: sustained CPU/RAM > 70% on the `small_3_2` ($12) plan after a bump to the next Lightsail tier, OR clear need for multi-AZ HA.
 
 Migration target:
 1. Move Postgres back to RDS or Aurora Serverless v2 (min 0 ACU).

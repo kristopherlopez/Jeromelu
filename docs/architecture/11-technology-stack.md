@@ -14,7 +14,7 @@ the full status of each module, see
 - **Next.js 16 + TypeScript**
 - Tailwind CSS
 - Server-rendered pages for SEO
-- Dynamic modules for feed, wiki, ledger, analysis, ask-me
+- Dynamic modules for feed, wiki, ledger, ask-me
 
 ## Public / Admin API
 - **FastAPI + Python**

@@ -4,41 +4,13 @@ tags: [area/architecture]
 
 # Workflow Architecture
 
-Implementation of each workflow lives in [`docs/agents/system/`](../agents/system/README.md). This doc describes intent; the agent pages describe what's actually built and which worker owns it.
+> **Status (2026-05-23): intent sketch — not the system that runs today.** There is no workflow engine in production. Temporal is local-dev only (see [11-technology-stack](11-technology-stack.md)); the decision and extraction workers aren't built. What actually runs is **cron jobs** (`scripts/cron.d/jeromelu`) and one-shot CLI invocations. For what's built and which worker owns it, see [`docs/agents/system/`](../agents/system/README.md) and the layer map in [05-runtime-architecture](05-runtime-architecture.md).
 
-## Core Scheduled Workflows
+The intended workflow shapes, once the pipeline supports them:
 
-### Daily Intel Sweep
-- check all approved sources
-- ingest new content
-- extract claims / predictions
-- refresh consensus
-- publish notable feed events
+- **Daily intel sweep** — Scout ingests approved sources; Analyst extracts claims/predictions; consensus refreshes; notable Feed events publish.
+- **Match review** — collect outcomes, grade against predictions, publish hits/misses, update the Alignment Index.
+- **Continuous wiki maintenance** — the Archivist updates affected pages whenever upstream data lands (async, no weekly climax).
+- **Event-triggered re-evaluation** — breaking injury news, late team changes, an urgent source claim, or an operator event trigger partial re-evaluation. This is the engine behind the live-number heartbeat in [02 — The Show](../vision/02-the-show.md).
 
-### Match Review Workflow
-- collect match outcomes
-- compare against predictions
-- publish hits / misses
-- update expert accuracy
-
-### Strategy Refresh Workflow
-- rebuild candidate player board
-- refresh plans
-- detect changed assumptions
-- publish internal thought updates
-
-### Weekly Decision Workflow
-- lock on team state
-- generate decision options
-- score options via heuristics
-- optionally allow safe contrarian override
-- publish final move
-- log immutable decision event
-
-## Event-Triggered Workflows
-- breaking injury news
-- late team changes
-- source publishes urgent claim
-- operator injects event
-
-These trigger partial re-evaluation, not full system recomputation unless required.
+> SuperCoach-specific flows (squad / team-state decisions) belong to the deferred V2 overlay, not V1 NRL commentary.
