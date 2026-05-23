@@ -159,7 +159,7 @@ Current jobs (all run as `ubuntu`, times in UTC):
 | `15 23 * * *` | `scout-refresh.sh videos` | Daily video enumeration + metrics (23:15 UTC = 09:15 AEST) |
 | `30 16 * * *` | `pg-backup.sh` | Nightly Postgres dump → S3 (16:30 UTC = 02:30 AEST) |
 
-S3 lifecycle on `jeromelu-public-assets` prefix `backups/postgres/` expires dumps after 30 days (managed in Terraform via `s3.tf`).
+S3 lifecycle on `jeromelu-public-assets` prefix `backups/postgres/` expires dumps after 14 days (managed in Terraform via `s3.tf`).
 
 The deploy script `chmod +x`'s both wrapper scripts and uses a `sudo install` to copy the cron file into `/etc/cron.d/`. `ubuntu` already has `NOPASSWD:ALL` from cloud-init, so no extra sudoers entry is required.
 

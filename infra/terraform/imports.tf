@@ -93,7 +93,7 @@ import {
 # NOT imported — the lifecycle rule documented in the inventory was never
 # actually configured on the live bucket. On first apply, Terraform creates
 # the rule from HCL, finally bringing the bucket in line with the documented
-# 30-day expiry on `backups/postgres/`.
+# 14-day expiry on `backups/postgres/`.
 
 # ---- ECR ---------------------------------------------------------------------
 

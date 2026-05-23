@@ -43,7 +43,7 @@ or one-shot CLI invocations driven via `make` targets.
   - `jeromelu-raw-transcripts` — Deepgram + pyannote JSON, face-track JSON
   - `jeromelu-clean-documents` — cleaned transcripts (when cleaning pass exists)
   - `jeromelu-public-assets` — Postgres backups under `backups/postgres/`, public images
-- Backups: nightly `pg_dump` to S3 with 30-day lifecycle expiry
+- Backups: nightly `pg_dump` to S3 with 14-day lifecycle expiry
 - Migrations: hand-numbered SQL under `packages/db/migrations/`, applied via `make migrate`
 
 ## AI / ML Layer

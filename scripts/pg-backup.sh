@@ -4,8 +4,8 @@
 # Scheduled via scripts/cron.d/jeromelu (installed by lightsail-deploy.sh).
 # Runs daily at 16:30 UTC = 02:30 AEST. Logs to /var/log/jeromelu/pg-backup.log.
 #
-# Retention: S3 lifecycle on jeromelu-public-assets/backups/ deletes after 30 days.
-# Storage cost at 30d × ~5MB/day ≈ $0.003/mo.
+# Retention: S3 lifecycle on jeromelu-public-assets/backups/ deletes after 14 days.
+# Storage cost at 14d × ~120MB/day ≈ 1.7GB on STANDARD_IA ≈ $0.02/mo.
 
 set -euo pipefail
 

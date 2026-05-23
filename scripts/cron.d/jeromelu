@@ -32,7 +32,7 @@ MAILTO=""
 
 # Nightly Postgres backup — 16:30 UTC = 02:30 AEST / 03:30 AEDT.
 # Streams pg_dump from the postgres container to s3://jeromelu-public-assets/
-# backups/postgres/. Retention via S3 lifecycle (30d). The wrapper writes its
+# backups/postgres/. Retention via S3 lifecycle (14d). The wrapper writes its
 # own status line to stdout; cron redirects that into the log file.
 30 16 * * *     ubuntu  /opt/jeromelu/scripts/pg-backup.sh >> /var/log/jeromelu/pg-backup.log 2>&1
 

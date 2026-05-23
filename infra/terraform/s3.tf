@@ -8,7 +8,7 @@
 # - jeromelu-public-assets   : site assets and nightly Postgres dumps.
 #
 # All four: ap-southeast-2, public access blocked, SSE-S3 (AES256).
-# Only public-assets has a lifecycle rule (30-day expiry on backups/postgres/).
+# Only public-assets has a lifecycle rule (14-day expiry on backups/postgres/).
 ################################################################################
 
 # ---- jeromelu-raw-transcripts ------------------------------------------------
@@ -135,7 +135,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "public_assets" {
     }
 
     expiration {
-      days = 30
+      days = 14
     }
   }
 }

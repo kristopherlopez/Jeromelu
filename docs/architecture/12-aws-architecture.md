@@ -77,7 +77,7 @@ ECR
 ### Database — Postgres on Lightsail
 - `pgvector/pgvector:pg16` container with a named Docker volume on the instance's local SSD.
 - Migrations run on container init via `packages/db/docker-entrypoint-initdb.sh`.
-- **Backups:** `scripts/pg-backup.sh` runs via cron at 02:30 Sydney → `s3://jeromelu-public-assets/backups/postgres/jeromelu-<ts>.sql.gz`. S3 lifecycle deletes after 30 days.
+- **Backups:** `scripts/pg-backup.sh` runs via cron at 02:30 Sydney → `s3://jeromelu-public-assets/backups/postgres/jeromelu-<ts>.sql.gz`. S3 lifecycle deletes after 14 days.
 - **DR:** restore = pull most recent dump from S3 → `gunzip | psql` into the container. Tested as part of cutover (Phase 2).
 
 ### Object Storage — S3 (unchanged from V0)

@@ -392,7 +392,7 @@ Cron is repo-managed: schedule lives at `scripts/cron.d/jeromelu`, synced into `
 |---|---|---|---|
 | `0 23 * * *` | `scout-refresh.sh channel-stats` | Snapshot subscriber/video/view counts into `channel_metrics` (~3 quota units) | 09:00 AEST / 10:00 AEDT |
 | `15 23 * * *` | `scout-refresh.sh videos` | Enumerate new videos per channel + snapshot `video_metrics` (~750 quota units, offset 15 min from channel-stats to avoid DB connection contention) | 09:15 AEST / 10:15 AEDT |
-| `30 16 * * *` | `pg-backup.sh` | Stream `pg_dump` from postgres container → `s3://jeromelu-public-assets/backups/postgres/` (S3 lifecycle expires after 30d) | 02:30 AEST / 03:30 AEDT |
+| `30 16 * * *` | `pg-backup.sh` | Stream `pg_dump` from postgres container → `s3://jeromelu-public-assets/backups/postgres/` (S3 lifecycle expires after 14d) | 02:30 AEST / 03:30 AEDT |
 
 Logs:
 - pg-backup → `/var/log/jeromelu/pg-backup.log`

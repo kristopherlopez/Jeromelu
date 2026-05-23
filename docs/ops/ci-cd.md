@@ -124,7 +124,7 @@ GitHub Actions only handles `cost-report.yml`. Everything else recurring runs as
 |---|---|---|
 | `0 23 * * *` / 09:00 | `scout-refresh.sh channel-stats` | POSTs to `/api/admin/scout/refresh-channel-stats`. Snapshots subscriber/video/view counts into `channel_metrics`. ~3 YouTube quota units. |
 | `15 23 * * *` / 09:15 | `scout-refresh.sh videos` | POSTs to `/api/admin/scout/refresh-videos`. Enumerates new videos per channel + snapshots `video_metrics`. ~750 quota units. Staggered 15 min after channel-stats to avoid DB-connection contention. |
-| `30 16 * * *` / 02:30 | `pg-backup.sh` | Streams `pg_dump` to `s3://jeromelu-public-assets/backups/postgres/`. 30-day S3 lifecycle retention. |
+| `30 16 * * *` / 02:30 | `pg-backup.sh` | Streams `pg_dump` to `s3://jeromelu-public-assets/backups/postgres/`. 14-day S3 lifecycle retention. |
 | `30 0 * * *` / 10:30 | `cron-report.sh` → `cron_report.py` | Sends the daily cron-health digest email (see below). Runs *after* all other jobs so it can report on the trailing 24h. |
 
 All jobs run as the `ubuntu` user — the deploy user, member of the `docker` group, owner of `/opt/jeromelu` and `~/.aws/credentials`. AEST clock times are nominal — during AEDT each job fires an hour later in local time. Box stays in UTC.
