@@ -8,7 +8,7 @@ Backend workers. Temporal workflows, LLM activities, and scrapers that actually 
 
 All Temporal agents share infrastructure defined in `packages/shared/jeromelu_shared/temporal.py` — task queue constants, client factory, deterministic workflow ID generation.
 
-See also: [`../../architecture/05-runtime-architecture.md`](../../architecture/05-runtime-architecture.md), [`../../architecture/06-llm-architecture.md`](../../architecture/06-llm-architecture.md), [`../../architecture/07-workflow-architecture.md`](../../architecture/07-workflow-architecture.md).
+See also: [`../../architecture/02-runtime-architecture.md`](../../architecture/02-runtime-architecture.md), [`../../architecture/03-llm-architecture.md`](../../architecture/03-llm-architecture.md), [`../../architecture/04-workflow-architecture.md`](../../architecture/04-workflow-architecture.md).
 
 ---
 

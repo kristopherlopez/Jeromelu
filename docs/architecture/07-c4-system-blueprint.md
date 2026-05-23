@@ -8,9 +8,9 @@ tags: [area/architecture]
 
 Rather than maintain a formal C4 of an aspirational system, the real architecture is documented where it's actually true:
 
-- **Containers / deployment / topology** → [12-aws-architecture](12-aws-architecture.md)
-- **Runtime layers + which crew member owns each** → [05-runtime-architecture](05-runtime-architecture.md)
-- **Technology choices + service split** → [11-technology-stack](11-technology-stack.md)
+- **Containers / deployment / topology** → [09-aws-architecture](09-aws-architecture.md)
+- **Runtime layers + which crew member owns each** → [02-runtime-architecture](02-runtime-architecture.md)
+- **Technology choices + service split** → [08-technology-stack](08-technology-stack.md)
 - **Data model / lineage** → [data-lineage](data-lineage.md) + the `operations/` catalogue
 
 A fresh C4 of the *actual* system can be written here if and when the topology grows complex enough to warrant a formal diagram. The previous content is recoverable from git history (pre-2026-05-23).

@@ -4,7 +4,7 @@ tags: [area/architecture]
 
 # Workflow Architecture
 
-> **Status (2026-05-23): intent sketch — not the system that runs today.** There is no workflow engine in production. Temporal is local-dev only (see [11-technology-stack](11-technology-stack.md)); the decision and extraction workers aren't built. What actually runs is **cron jobs** (`scripts/cron.d/jeromelu`) and one-shot CLI invocations. For what's built and which worker owns it, see [`docs/agents/system/`](../agents/system/README.md) and the layer map in [05-runtime-architecture](05-runtime-architecture.md).
+> **Status (2026-05-23): intent sketch — not the system that runs today.** There is no workflow engine in production. Temporal is local-dev only (see [08-technology-stack](08-technology-stack.md)); the decision and extraction workers aren't built. What actually runs is **cron jobs** (`scripts/cron.d/jeromelu`) and one-shot CLI invocations. For what's built and which worker owns it, see [`docs/agents/system/`](../agents/system/README.md) and the layer map in [02-runtime-architecture](02-runtime-architecture.md).
 
 The intended workflow shapes, once the pipeline supports them:
 

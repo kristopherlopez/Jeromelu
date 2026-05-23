@@ -69,7 +69,7 @@ Each LLM-powered activity inside `worker-publishing` calls OpenAI via `chat_json
 | `update_consensus_snapshots` | `activities/update_consensus.py` | None (deterministic) | Compute consensus scores, detect sentiment flips |
 | `generate_review_data` | `activities/generate_reviews.py` | None (deterministic) | Match past predictions against actual player round scores |
 
-LLM task types map to the categories in [`../../architecture/06-llm-architecture.md`](../../architecture/06-llm-architecture.md).
+LLM task types map to the categories in [`../../architecture/03-llm-architecture.md`](../../architecture/03-llm-architecture.md).
 
 ## Related
 

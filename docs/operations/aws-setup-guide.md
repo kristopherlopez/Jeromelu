@@ -17,7 +17,7 @@ tags: [area/operations]
 > [`infra/terraform/README.md`](../../infra/terraform/README.md)) and as the
 > historical record of how the account was originally provisioned.
 
-> **Active V1 setup is the Lightsail Production Setup section below.** The V0 ECS/Fargate phases that follow it are kept for history but **superseded as of 2026-04-25** — do not follow them for new setups. See `docs/architecture/12-aws-architecture.md` for the rationale.
+> **Active V1 setup is the Lightsail Production Setup section below.** The V0 ECS/Fargate phases that follow it are kept for history but **superseded as of 2026-04-25** — do not follow them for new setups. See `docs/architecture/09-aws-architecture.md` for the rationale.
 
 ---
 

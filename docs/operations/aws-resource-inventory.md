@@ -25,7 +25,7 @@ Track all created AWS resources here. Updated as infrastructure is provisioned.
 > The V0 VPC and all its children (IGW, S3 endpoint, subnets, route tables,
 > security groups) were deleted on 2026-04-30 by `cleanup-v0.sh`. None of
 > these are recoverable; if multi-AZ networking is ever needed again, see
-> the future scale path in `docs/architecture/12-aws-architecture.md`.
+> the future scale path in `docs/architecture/09-aws-architecture.md`.
 
 | Resource | ID / Value |
 |----------|------------|
@@ -224,7 +224,7 @@ Tag immutability enabled, scan on push enabled.
 
 ## Phase 11 — Lightsail Migration (V1 — 2026-04-25)
 
-V0 architecture replaced by a single Lightsail VM running Docker Compose. See `docs/architecture/12-aws-architecture.md` for the rationale and topology.
+V0 architecture replaced by a single Lightsail VM running Docker Compose. See `docs/architecture/09-aws-architecture.md` for the rationale and topology.
 
 ### 11.1 — Lightsail Instance (COMPLETE 2026-04-25)
 

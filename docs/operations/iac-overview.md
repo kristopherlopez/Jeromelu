@@ -106,7 +106,7 @@ OIDC + a `jeromelu-terraform-apply` IAM role. Manual approval gating via a
 ## Future scale path
 
 If Jeromelu outgrows Lightsail (see
-[`docs/architecture/12-aws-architecture.md`](../architecture/12-aws-architecture.md)
+[`docs/architecture/09-aws-architecture.md`](../architecture/09-aws-architecture.md)
 "Future scale path"), the migration target is ECS Fargate behind an ALB. The
 existing Terraform layout absorbs that cleanly — add `vpc.tf`, `alb.tf`,
 `ecs.tf`, `rds.tf`; remove `lightsail.tf`. CloudFront, Route 53, ECR, S3, IAM,

@@ -97,7 +97,7 @@ Contains:
 - expert performance history
 
 ### G. Decision Engine
-**Status: not built.** `worker-decision` is unbuilt (see [11-technology-stack](11-technology-stack.md)); Jaromelu's calls are produced directly today. The shape below is the intended V1 design — rules + heuristics, not ML.
+**Status: not built.** `worker-decision` is unbuilt (see [08-technology-stack](08-technology-stack.md)); Jaromelu's calls are produced directly today. The shape below is the intended V1 design — rules + heuristics, not ML.
 
 Inputs:
 - consensus signals across ingested sources
@@ -116,7 +116,7 @@ Contrarian behaviour should be policy-bounded, not random. It should only occur 
 *(SuperCoach squad/trade decisions are a deferred V2 overlay on this same engine.)*
 
 ### H. Orchestration Layer
-**Status: not in production.** Temporal exists in local dev only ([11-technology-stack](11-technology-stack.md)); production runs **cron jobs** and one-shot CLI invocations, not a workflow engine. The chain-of-workflows model below is the aspirational shape — see [07-workflow-architecture](07-workflow-architecture.md).
+**Status: not in production.** Temporal exists in local dev only ([08-technology-stack](08-technology-stack.md)); production runs **cron jobs** and one-shot CLI invocations, not a workflow engine. The chain-of-workflows model below is the aspirational shape — see [04-workflow-architecture](04-workflow-architecture.md).
 
 Supports (intended):
 - scheduled jobs

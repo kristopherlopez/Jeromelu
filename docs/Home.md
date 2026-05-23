@@ -26,17 +26,17 @@ The strategy spine — what Jaromelu is and why. Start here.
 
 ## Architecture
 
-How it's built (numbered 04+, continuing from the vision spine):
+How it's built. Its own 01–09 series.
 
-4. [Information Architecture](architecture/04-information-architecture.md)
-5. [Runtime Architecture](architecture/05-runtime-architecture.md)
-6. [LLM Architecture](architecture/06-llm-architecture.md)
-7. [Workflow Architecture](architecture/07-workflow-architecture.md)
-8. [Explainability & Governance](architecture/08-explainability-and-governance.md)
-9. [V1 Scope & Roadmap](architecture/09-v1-scope-and-roadmap.md)
-10. [C4 System Blueprint](architecture/10-c4-system-blueprint.md)
-11. [Technology Stack](architecture/11-technology-stack.md)
-12. [AWS Architecture](architecture/12-aws-architecture.md)
+1. [Information Architecture](architecture/01-information-architecture.md)
+2. [Runtime Architecture](architecture/02-runtime-architecture.md)
+3. [LLM Architecture](architecture/03-llm-architecture.md)
+4. [Workflow Architecture](architecture/04-workflow-architecture.md)
+5. [Explainability & Governance](architecture/05-explainability-and-governance.md)
+6. [V1 Scope & Roadmap](architecture/06-v1-scope-and-roadmap.md)
+7. [C4 System Blueprint](architecture/07-c4-system-blueprint.md)
+8. [Technology Stack](architecture/08-technology-stack.md)
+9. [AWS Architecture](architecture/09-aws-architecture.md)
 
 ## Agents
 

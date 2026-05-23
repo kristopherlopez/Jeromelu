@@ -90,4 +90,4 @@ Qualitative success signals:
 - references in podcasts or YouTube channels — especially the named rival responding
 - people citing Jaromelu's takes unprompted
 
-Failure signal: silence. No mentions means the architecture isn't producing enough spectacle or value. (Operating-signals detail: [08 — Explainability & Governance](08-explainability-and-governance.md).)
+Failure signal: silence. No mentions means the architecture isn't producing enough spectacle or value. (Operating-signals detail: [08 — Explainability & Governance](05-explainability-and-governance.md).)

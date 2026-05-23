@@ -228,7 +228,7 @@ channel ↔ advisor links populate.
 
 - [Wiki overview](../pages/wiki/overview.md) — page types and routes
 - [Wiki content pipeline](../pages/wiki/content-pipeline.md) — agent role-transition responsibilities + channel section conventions
-- [Information architecture](../architecture/04-information-architecture.md) — full data model
+- [Information architecture](../architecture/01-information-architecture.md) — full data model
 - `packages/db/migrations/018_entity_roles.sql` — entity_roles schema
 - `packages/db/migrations/019_wiki_channels.sql` — channel wiki pages
 - `packages/db/migrations/027_consolidate_player_scd.sql` — sibling SCD-2 table (player_attributes; absorbs the deprecated player_team_history)

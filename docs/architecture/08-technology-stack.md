@@ -5,7 +5,7 @@ tags: [area/architecture]
 # Technology Stack
 
 Current as of 2026-05-05. Reflects the post-Lightsail, audio-first reality
-(see [12-aws-architecture](12-aws-architecture.md) and
+(see [09-aws-architecture](09-aws-architecture.md) and
 [../sources/extraction-method.md](../sources/extraction-method.md)). For
 the full status of each module, see
 [../agents/system/README.md](../agents/system/README.md).

@@ -51,7 +51,7 @@ Component-level work has its own file under `docs/todo/`. Cross-cutting items (i
 
 ## Phase 4 — Infrastructure & Operations
 
-V1 architecture is single-instance Lightsail + Docker Compose. See `docs/architecture/12-aws-architecture.md` and Phase 11 of `docs/operations/aws-resource-inventory.md` for live state.
+V1 architecture is single-instance Lightsail + Docker Compose. See `docs/architecture/09-aws-architecture.md` and Phase 11 of `docs/operations/aws-resource-inventory.md` for live state.
 
 ### 4.1 Lightsail V1 Cutover
 

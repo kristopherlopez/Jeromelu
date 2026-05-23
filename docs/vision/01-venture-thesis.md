@@ -94,4 +94,4 @@ None of these were true two years ago. Most are still novel enough that a captiv
 - [Knowledge Asset](03-knowledge-asset.md) — what compounds, what it unlocks, what it costs
 - [Design Principles](../concepts/00-design-principles.md) — visual and editorial rules
 - [Audience](../concepts/06-audience.md) — how participation works
-- [V1 Scope & Roadmap](../architecture/09-v1-scope-and-roadmap.md) — what ships first against this thesis
+- [V1 Scope & Roadmap](../architecture/06-v1-scope-and-roadmap.md) — what ships first against this thesis

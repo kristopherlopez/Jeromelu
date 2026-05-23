@@ -208,7 +208,7 @@ Out of scope:
   Lightsail box's existence and its perimeter, not its contents.
 - Setting up auto-apply on `master`. Deferred until the team grows.
 - Migrating to ECS Fargate. The future scale path
-  ([`12-aws-architecture.md`](../architecture/12-aws-architecture.md#future-scale-path))
+  ([`09-aws-architecture.md`](../architecture/09-aws-architecture.md#future-scale-path))
   is independent of the IaC migration; doing both at once would be reckless.
 - Multi-environment (`dev`/`stg`/`prod`). One environment, one state file.
   The layout splits cleanly into `envs/<env>/` if a second environment is

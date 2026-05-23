@@ -46,15 +46,15 @@ How it's built.
 
 | Doc | Contents |
 |-----|----------|
-| [04 — Information Architecture & Data Model](docs/architecture/04-information-architecture.md) | Core objects, lineage principle, recommended schema |
-| [05 — Runtime Architecture](docs/architecture/05-runtime-architecture.md) | System topology: discovery, ingestion, extraction, decision, publishing |
-| [06 — LLM Architecture](docs/architecture/06-llm-architecture.md) | Role-specific LLM tasks, retrieval pattern |
-| [07 — Workflow Architecture](docs/architecture/07-workflow-architecture.md) | Scheduled and event-triggered workflows |
-| [08 — Explainability & Governance](docs/architecture/08-explainability-and-governance.md) | Public reasoning rules, truthfulness, risk, operating signals |
-| [09 — V1 Scope & Roadmap](docs/architecture/09-v1-scope-and-roadmap.md) | Must-haves, phased roadmap, architectural principles, success criteria |
-| [10 — C4 System Blueprint](docs/architecture/10-c4-system-blueprint.md) | Full C4 breakdown: context, containers, components, flows, cross-cutting concerns |
-| [11 — Technology Stack](docs/architecture/11-technology-stack.md) | Next.js, FastAPI, Temporal, PostgreSQL, service split |
-| [12 — AWS Architecture](docs/architecture/12-aws-architecture.md) | Lightsail single-VM deployment, CloudFront, S3, ECR, cost ~$5.50/mo |
+| [01 — Information Architecture & Data Model](docs/architecture/01-information-architecture.md) | Core objects, lineage principle, recommended schema |
+| [02 — Runtime Architecture](docs/architecture/02-runtime-architecture.md) | System topology: discovery, ingestion, extraction, decision, publishing |
+| [03 — LLM Architecture](docs/architecture/03-llm-architecture.md) | Role-specific LLM tasks, retrieval pattern |
+| [04 — Workflow Architecture](docs/architecture/04-workflow-architecture.md) | Scheduled and event-triggered workflows |
+| [05 — Explainability & Governance](docs/architecture/05-explainability-and-governance.md) | Public reasoning rules, truthfulness, risk, operating signals |
+| [06 — V1 Scope & Roadmap](docs/architecture/06-v1-scope-and-roadmap.md) | Must-haves, phased roadmap, architectural principles, success criteria |
+| [07 — C4 System Blueprint](docs/architecture/07-c4-system-blueprint.md) | Full C4 breakdown: context, containers, components, flows, cross-cutting concerns |
+| [08 — Technology Stack](docs/architecture/08-technology-stack.md) | Next.js, FastAPI, Temporal, PostgreSQL, service split |
+| [09 — AWS Architecture](docs/architecture/09-aws-architecture.md) | Lightsail single-VM deployment, CloudFront, S3, ECR, cost ~$5.50/mo |
 
 > Character Architecture and Agent Inventory (former standalone architecture docs) now live under [`agents/`](docs/agents/README.md), with the crew detailed in [`agents/crew/`](docs/agents/crew/README.md).
 
@@ -68,7 +68,7 @@ Global tokens, typography, and component conventions: [docs/design-system/](docs
 
 ## Deployment
 
-Production runs on a single AWS Lightsail instance ($7/mo) at `jeromelu.ai` and `api.jeromelu.ai`. Push to `master` builds via GitHub Actions, pushes to ECR, and a self-hosted runner on the Lightsail box itself restarts the compose stack — no inbound SSH from GitHub. See [docs/ops/ci-cd.md](docs/ops/ci-cd.md) for the full CI/CD picture, [docs/architecture/12-aws-architecture.md](docs/architecture/12-aws-architecture.md) for the AWS shape, and [docs/operations/aws-setup-guide.md](docs/operations/aws-setup-guide.md) for the provisioning runbook.
+Production runs on a single AWS Lightsail instance ($7/mo) at `jeromelu.ai` and `api.jeromelu.ai`. Push to `master` builds via GitHub Actions, pushes to ECR, and a self-hosted runner on the Lightsail box itself restarts the compose stack — no inbound SSH from GitHub. See [docs/ops/ci-cd.md](docs/ops/ci-cd.md) for the full CI/CD picture, [docs/architecture/09-aws-architecture.md](docs/architecture/09-aws-architecture.md) for the AWS shape, and [docs/operations/aws-setup-guide.md](docs/operations/aws-setup-guide.md) for the provisioning runbook.
 
 ```bash
 make deploy-prod IMAGE_TAG=<sha>   # manual deploy

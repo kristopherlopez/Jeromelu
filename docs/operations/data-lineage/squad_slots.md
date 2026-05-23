@@ -17,4 +17,4 @@ Reserved for the upcoming SuperCoach squad management feature ([[project_v1_scop
 
 ## Planned mapping
 
-Player references will return as typed FKs (`player_id` → people) when the SuperCoach feature is built. See `docs/architecture/04-information-architecture.md`.
+Player references will return as typed FKs (`player_id` → people) when the SuperCoach feature is built. See `docs/architecture/01-information-architecture.md`.

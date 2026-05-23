@@ -262,7 +262,7 @@ The image tag must exist in ECR — only the *changed* service is built per push
 ## Related docs
 
 - [`docs/ops/reports.md`](./reports.md) — every email Jeromelu sends to me (cost, cron, errors, content, capacity).
-- [`docs/architecture/12-aws-architecture.md`](../architecture/12-aws-architecture.md) — AWS topology the pipeline deploys onto.
+- [`docs/architecture/09-aws-architecture.md`](../architecture/09-aws-architecture.md) — AWS topology the pipeline deploys onto.
 - [`docs/operations/aws-setup-guide.md`](../operations/aws-setup-guide.md) — one-time provisioning runbook (Phase L8 covers CI secrets).
 - [`docs/operations/aws-resource-inventory.md`](../operations/aws-resource-inventory.md) — live IAM / ECR / CloudFront resource inventory.
 - [`docs/operations/iac-overview.md`](../operations/iac-overview.md) / [`iac-runbook.md`](../operations/iac-runbook.md) — Terraform decisions and apply procedure.

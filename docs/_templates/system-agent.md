@@ -20,7 +20,7 @@ What this agent does in one paragraph. Pair this with [agents/README](../agents/
 
 ## Workflow
 
-Activities, retries, idempotency considerations. Reference relevant entries in [architecture/07-workflow-architecture](../architecture/07-workflow-architecture.md).
+Activities, retries, idempotency considerations. Reference relevant entries in [architecture/04-workflow-architecture](../architecture/04-workflow-architecture.md).
 
 ## Audit
 

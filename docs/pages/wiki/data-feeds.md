@@ -19,7 +19,7 @@ Two questions kept coming up that no single doc could answer:
 1. *"What has to be populated for a wiki page to be more than a stub?"*
 2. *"Which acquisition pipeline produces each input the wiki needs?"*
 
-Pieces of the answer were scattered across [`content-pipeline.md`](content-pipeline.md), [`scout.md`](../../agents/crew/scout.md), [`scraper.md`](../../agents/system/scraper.md), [`sources/README.md`](../../sources/README.md), and [`04-information-architecture.md`](../../architecture/04-information-architecture.md). This doc consolidates that view in one place and uses it to define **Scout's expanded charter** — the user-stated intent that Scout should eventually own all data gathering, not just transcripts and media.
+Pieces of the answer were scattered across [`content-pipeline.md`](content-pipeline.md), [`scout.md`](../../agents/crew/scout.md), [`scraper.md`](../../agents/system/scraper.md), [`sources/README.md`](../../sources/README.md), and [`01-information-architecture.md`](../../architecture/01-information-architecture.md). This doc consolidates that view in one place and uses it to define **Scout's expanded charter** — the user-stated intent that Scout should eventually own all data gathering, not just transcripts and media.
 
 This is the doc to read when:
 - Asking "why is Wests Tigers still a stub?"

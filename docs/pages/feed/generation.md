@@ -197,7 +197,7 @@ After parsing, the activity validates `event_type` against the 7 allowed values,
 
 ### Architecture classification
 
-This is a **Characterisation Model** per `docs/architecture/06-llm-architecture.md` — it converts internal state (structured claims) into Jaromelu's voice for the live feed.
+This is a **Characterisation Model** per `docs/architecture/03-llm-architecture.md` — it converts internal state (structured claims) into Jaromelu's voice for the live feed.
 
 ---
 

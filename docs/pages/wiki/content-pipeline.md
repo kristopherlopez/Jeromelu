@@ -222,5 +222,5 @@ Transition detection is slow-moving and operator-confirmed by default. See
 
 - [Wiki Feature](overview.md) — schema, API, frontend
 - [Source system](../../sources/README.md) — upstream of this pipeline
-- [Information Architecture](../../architecture/04-information-architecture.md) — data model
+- [Information Architecture](../../architecture/01-information-architecture.md) — data model
 - [LLM Wiki Pattern](llm-wiki-pattern.md) — conceptual foundation

@@ -326,6 +326,6 @@ This document only changes when the **conceptual** model changes (L1/L2/L3 bound
 
 - [`docs/pages/wiki/data-feeds.md`](../pages/wiki/data-feeds.md) — wiki-centric reverse view
 - [`docs/agents/crew/scout.md`](../agents/crew/scout.md) — pipeline inventory + hand-off contract
-- [`docs/architecture/04-information-architecture.md`](04-information-architecture.md) — domain model
+- [`docs/architecture/01-information-architecture.md`](01-information-architecture.md) — domain model
 - [`docs/architecture/drafts/scout-charter-expansion.draft.md`](drafts/scout-charter-expansion.draft.md) — locked D1–D13 governing the lineage
 - Per-pipeline READMEs in `services/api/app/scout/{pipeline}/README.md`
