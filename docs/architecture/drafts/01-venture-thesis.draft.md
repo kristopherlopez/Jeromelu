@@ -80,7 +80,7 @@ The crew is building a continuously growing knowledge base of all things NRL —
 
 And the shape isn't NRL-specific. Done well, the same operation — ingest a domain, form opinions, grade them in public, surface the voices worth following — extends to any sport, and very likely any topic with a passionate audience and a steady content cycle.
 
-→ Detail in [Knowledge Asset](04-knowledge-asset.md) *(to be drafted)*.
+→ Detail in [Knowledge Asset](03-knowledge-asset.draft.md).
 
 ## Why This Is Possible Now
 
@@ -97,9 +97,8 @@ None of these were true two years ago. Most are still novel enough that a captiv
 
 ## Related
 
-- [Value & Delivery](02-value-and-delivery.md) — the promise unpacked into pillars and signals
-- [Experience Architecture](03-experience-architecture.md) — the crew, surfaces, episode arc, and how the audience participates
-- [Knowledge Asset](04-knowledge-asset.md) — what compounds, what it unlocks, the moat *(to be drafted)*
+- [The Show (draft)](02-the-show.draft.md) — how the experience works: the crew, surfaces, episode arc, participation, and what we won't build
+- [Knowledge Asset (draft)](03-knowledge-asset.draft.md) — what compounds, what it unlocks, what it costs
 - [Design Principles](../concepts/00-design-principles.md) — visual and editorial rules
 - [Audience](../concepts/06-audience.md) — how participation works
 - [V1 Scope & Roadmap](09-v1-scope-and-roadmap.md) — what ships first against this thesis
@@ -128,7 +127,7 @@ None of these were true two years ago. Most are still novel enough that a captiv
 - *"Predominantly male"* demographic line — cut as noise.
 - SC reference in the audience section — SC isn't load-bearing here and is properly covered downstream.
 - Long V1 trade-off paragraph about real-time AI video being research-grade — moved out of the Feel section.
-- *"What They Do Here"* (participation: react/challenge/grade/PAI) — moved to [03-the-show.draft.md]. Participation is a layer on top of watching, not part of the venture thesis.
+- *"What They Do Here"* (participation: react/challenge/grade/PAI) — moved to the show (now `02-the-show.draft.md`). Participation is a layer on top of watching, not part of the venture thesis.
 
 **Resolves prior tensions:**
 
@@ -146,8 +145,10 @@ None of these were true two years ago. Most are still novel enough that a captiv
 - *Betting language softened* from "influence sports betting markets" to "intersect with sports betting" (regulatory reality; light touch only).
 - *Held for user feedback (no change):* the ambient-aquarium return-driver, and the "no stated risk" critique.
 
-**Follow-ups (separate tasks):**
+**Follow-ups:**
 
-- Draft `04-knowledge-asset.md` — referenced in "What Compounds" and "Related."
-- Move participation content (react / challenge / Personal Alignment Index) into `03-the-show.draft.md`.
-- Update memory note `project_crew_terminology` — current note ("crew = internal reasoning, not visible agents") is now stale. Correct framing: crew is internal to *voice* but external to *visibility*.
+- ✅ Knowledge Asset drafted — now `03-knowledge-asset.draft.md` (renumbered from the proposed 04).
+- ✅ Participation content (react / challenge / Personal Alignment Index) already lives in the show (`02-the-show.draft.md`) — nothing to move.
+- ✅ Memory note `project_crew_terminology` updated to "single voice, visible labour."
+
+**Series renumber (2026-05-23):** spine is now **01 thesis → 02 the show → 03 knowledge asset.** The old `02-what-we-promise` (Scope & Non-Goals) was dissolved into the show's closing "Scope — What We Won't Build" section. Related links above point to the draft spine, not the committed `02-value-and-delivery.md` / `03-experience-architecture.md` (full series renumber on merge is a separate decision).
