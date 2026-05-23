@@ -32,4 +32,4 @@ Code: `services/web/src/app/feed/`
 - [Concepts · The Stream](../../concepts/01-the-stream.md) — the single-screen model the feed is built on
 - [Concepts · Episode Beats](../../concepts/03-episode-beats.md) — narrative structure of feed items
 - [Concepts · Remarks](../../concepts/02-remarks.md) — remark cards in the feed
-- [Architecture · The Show](../../architecture/02-the-show.md)
+- [Architecture · The Show](../../vision/02-the-show.md)

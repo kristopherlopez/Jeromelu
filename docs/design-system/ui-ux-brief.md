@@ -18,7 +18,7 @@ They're on their phone, on the bus, on the couch — checking in for 90 seconds 
 
 **Not designing for:** casual NRL viewers.
 
-→ [Venture Thesis §Who Finds This Irresistible](../architecture/01-venture-thesis.md#who-finds-this-irresistible)
+→ [Venture Thesis §Who Finds This Irresistible](../vision/01-venture-thesis.md#who-finds-this-irresistible)
 
 ## 2. What You're Designing Toward
 
@@ -26,7 +26,7 @@ A presence that **feels alive** — a non-human commentator with opinions, a voi
 
 The website is **the digital home** — a place Jaromelu lives, not a dashboard you visit. The visual language, editorial voice, and weekly rhythm all serve this single feeling.
 
-→ [Venture Thesis §What We Want People To Feel](../architecture/01-venture-thesis.md#what-we-want-people-to-feel)
+→ [Venture Thesis §What We Want People To Feel](../vision/01-venture-thesis.md#what-we-want-people-to-feel)
 
 ## 3. Hard Constraints (V1)
 
@@ -50,7 +50,7 @@ The website is **the digital home** — a place Jaromelu lives, not a dashboard 
 
 The Feed *is* the product. The other four are reachable from the Feed and reward deeper interest. **If you're tempted to create a new page, make it a panel instead.**
 
-→ [The Show §The Surfaces](../architecture/02-the-show.md#the-surfaces), [pages/](../pages/)
+→ [The Show §The Surfaces](../vision/02-the-show.md#the-surfaces), [pages/](../pages/)
 
 ## 5. Design Principles
 
@@ -138,7 +138,7 @@ States: `OPEN → LOCKED → RESOLVED`. Resolution generates a **receipt card** 
 - **No raw-data dashboards.** Compressed, voiced opinion is the value; raw stats are not.
 - **No ISO timestamps in user-facing copy.** Conversational time only ("3 hours ago").
 
-→ [The Show §What This Is Not](../architecture/02-the-show.md#what-this-is-not)
+→ [The Show §What This Is Not](../vision/02-the-show.md#what-this-is-not)
 
 ## 10. Open Questions for Design Exploration
 
@@ -155,9 +155,9 @@ Worth playing with as you explore — these are unresolved, and good design here
 ## Related (deeper reading)
 
 **Strategic frame:**
-- [Venture Thesis](../architecture/01-venture-thesis.md)
-- [The Show](../architecture/02-the-show.md)
-- [Knowledge Asset](../architecture/03-knowledge-asset.md)
+- [Venture Thesis](../vision/01-venture-thesis.md)
+- [The Show](../vision/02-the-show.md)
+- [Knowledge Asset](../vision/03-knowledge-asset.md)
 
 **Design rules and tokens:**
 - [Design Principles](../concepts/00-design-principles.md)

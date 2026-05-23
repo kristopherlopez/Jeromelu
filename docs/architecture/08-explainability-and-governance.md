@@ -61,4 +61,4 @@ How we know the product is working. Each core job has a leading signal (early, b
 | **Skin in the game** | Reaction rate per open Remark (% of viewers who tap agree/disagree). Challenge volume per Remark. | Distribution of personal Alignment Index scores tightens over a season — engaged users improve. Cohort returning to check their own record weekly. |
 | **Public stakes** | % of Remarks that resolve on schedule (no orphaned calls). Receipt-card share count per resolved Remark. | Jaromelu's Alignment Index trends upward across a season. Customer trust signal: agree/disagree ratio shifts toward agreement on high-conviction calls over time. |
 
-> Migrated from the former `02-value-and-delivery.md` (2026-05-23). The job labels map to the show's mechanisms in [The Show](02-the-show.md).
+> Migrated from the former `02-value-and-delivery.md` (2026-05-23). The job labels map to the show's mechanisms in [The Show](../vision/02-the-show.md).

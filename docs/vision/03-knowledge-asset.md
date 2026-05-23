@@ -21,7 +21,7 @@ The asset is a structured projection of the entire NRL information ecosystem. Tw
 
 Every claim that lands in the asset is **speaker-attributed** (who said it), **time-stamped** (when), **typed** (what kind of call), and **linked to the entities it's about** (which players, teams, rounds). The claims that are *predictions* are tracked through a lifecycle — open, locked, resolved — and graded when reality arrives.
 
-The capture model is deliberately patient: external sources (L1) are archived durably and idempotently in S3 (L2), projected into a queryable database (L3), and surfaced in the app (L4). The archive is forensic; the database is fully re-derivable from it. **Capture everything now, compose richer later** — today's text-mined claim is tomorrow's input to a feature that doesn't exist yet. Full model in [data-lineage.md](data-lineage.md).
+The capture model is deliberately patient: external sources (L1) are archived durably and idempotently in S3 (L2), projected into a queryable database (L3), and surfaced in the app (L4). The archive is forensic; the database is fully re-derivable from it. **Capture everything now, compose richer later** — today's text-mined claim is tomorrow's input to a feature that doesn't exist yet. Full model in [data-lineage.md](../architecture/data-lineage.md).
 
 ---
 
@@ -80,7 +80,7 @@ NRL is where it gets proven (see [01 — Why NRL](01-venture-thesis.md)). The as
 
 - [Venture Thesis](01-venture-thesis.md) — "What Compounds" is the seed this doc grows from
 - [The Show](02-the-show.md) — the asset, made watchable; the crew that builds it
-- [Data Lineage](data-lineage.md) — the concrete L1→L4 model and the operations trinity
+- [Data Lineage](../architecture/data-lineage.md) — the concrete L1→L4 model and the operations trinity
 - [The Ledger](../pages/ledger/overview.md) — the Alignment Index in practice
 - [The Wiki](../pages/wiki/overview.md) — the asset made visible and auditable
 - [Scout](../agents/crew/scout.md) — the ingestion pipelines that feed the asset

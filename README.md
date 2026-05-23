@@ -30,13 +30,22 @@ Jaromelu is an agent-first product. Three kinds of agents, one folder per kind �
 | **System** | Backend Temporal workflows + LLM activities | [agents/system/](docs/agents/system/README.md) |
 | **Skills** | Claude Code dev-time skill agents | [agents/skills/](docs/agents/skills/README.md) |
 
-## Architecture
+## Vision
+
+The strategy spine — what Jaromelu is and why. Start here.
 
 | Doc | Contents |
 |-----|----------|
-| [01 — Venture Thesis](docs/architecture/01-venture-thesis.md) | What Jaromelu is, the feel (awe + aquarium), the show, why NRL, what compounds |
-| [02 — The Show](docs/architecture/02-the-show.md) | The crew, episode arc, remarks, surfaces, alignment index, participation, scope |
-| [03 — Knowledge Asset](docs/architecture/03-knowledge-asset.md) | What compounds, what it unlocks, what it costs |
+| [01 — Venture Thesis](docs/vision/01-venture-thesis.md) | What Jaromelu is, the feel (awe + aquarium), the show, why NRL, what compounds |
+| [02 — The Show](docs/vision/02-the-show.md) | The crew, episode arc, remarks, surfaces, alignment index, participation, scope |
+| [03 — Knowledge Asset](docs/vision/03-knowledge-asset.md) | What compounds, what it unlocks, what it costs |
+
+## Architecture
+
+How it's built.
+
+| Doc | Contents |
+|-----|----------|
 | [04 — Information Architecture & Data Model](docs/architecture/04-information-architecture.md) | Core objects, lineage principle, recommended schema |
 | [05 — Runtime Architecture](docs/architecture/05-runtime-architecture.md) | System topology: discovery, ingestion, extraction, decision, publishing |
 | [06 — LLM Architecture](docs/architecture/06-llm-architecture.md) | Role-specific LLM tasks, retrieval pattern |

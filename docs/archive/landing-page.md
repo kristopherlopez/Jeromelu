@@ -79,7 +79,7 @@ Bubbles use a breathing glow animation (`thought-float`) that combines a gentle 
 | 4 | The Analysis | `/insights` |
 | 5 | Ask Me | `/ask` |
 
-> This doc is archived — the landing page is no longer the default entry. Nav-bubble targets above reflect the current live nav on inner pages, which persisted when the landing page was retired. Historical nav (My Squad, The Dossier) is preserved in [architecture/02-the-show.md](../architecture/02-the-show.md).
+> This doc is archived — the landing page is no longer the default entry. Nav-bubble targets above reflect the current live nav on inner pages, which persisted when the landing page was retired. Historical nav (My Squad, The Dossier) is preserved in [vision/02-the-show.md](../vision/02-the-show.md).
 
 ---
 

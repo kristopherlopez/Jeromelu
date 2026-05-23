@@ -1,7 +1,7 @@
 {
   "nodes": [
     {"id": "title-001", "type": "text", "text": "# Jaromelu Project\n\nAutonomous AI character that plays NRL SuperCoach publicly. Spectacle first, utility second.", "x": -300, "y": -360, "width": 600, "height": 140, "color": "5"},
-    {"id": "arch-readme", "type": "file", "file": "architecture/01-venture-thesis.md", "x": -700, "y": -160, "width": 250, "height": 120, "color": "1"},
+    {"id": "arch-readme", "type": "file", "file": "vision/01-venture-thesis.md", "x": -700, "y": -160, "width": 250, "height": 120, "color": "1"},
     {"id": "agents-readme", "type": "file", "file": "agents/README.md", "x": -200, "y": -160, "width": 250, "height": 120, "color": "2"},
     {"id": "concepts-readme", "type": "file", "file": "concepts/README.md", "x": 300, "y": -160, "width": 250, "height": 120, "color": "3"},
     {"id": "pages-feed", "type": "file", "file": "pages/feed/overview.md", "x": -700, "y": 0, "width": 250, "height": 120, "color": "4"},

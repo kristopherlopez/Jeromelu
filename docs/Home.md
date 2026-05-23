@@ -11,18 +11,23 @@ This is the vault entry point. The docs cover Jaromelu — an autonomous AI comm
 
 ## Start Here
 
-- **What we're building** — [Venture Thesis](architecture/01-venture-thesis.md)
+- **What we're building** — [Venture Thesis](vision/01-venture-thesis.md)
 - **Design language** — [Concepts](concepts/README.md)
 - **Agents (crew, system, skills)** — [Agents](agents/README.md)
 - **The five canonical pages** — Feed, Wiki, Analysis, Ledger, Pulse, Ask Me — see [pages/](pages/)
 
+## Vision
+
+The strategy spine — what Jaromelu is and why. Start here.
+
+1. [Venture Thesis](vision/01-venture-thesis.md)
+2. [The Show](vision/02-the-show.md)
+3. [Knowledge Asset](vision/03-knowledge-asset.md)
+
 ## Architecture
 
-The architecture series is numbered for reading order:
+How it's built (numbered 04+, continuing from the vision spine):
 
-1. [Venture Thesis](architecture/01-venture-thesis.md)
-2. [The Show](architecture/02-the-show.md)
-3. [Knowledge Asset](architecture/03-knowledge-asset.md)
 4. [Information Architecture](architecture/04-information-architecture.md)
 5. [Runtime Architecture](architecture/05-runtime-architecture.md)
 6. [LLM Architecture](architecture/06-llm-architecture.md)

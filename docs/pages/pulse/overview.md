@@ -86,5 +86,5 @@ type TimelineEntry = {
 ## Related
 
 - [docs/pages/feed/overview.md](../feed/overview.md) — adjacent surface, "what's happening" focused
-- [docs/architecture/02-the-show.md](../../architecture/02-the-show.md)
+- [docs/vision/02-the-show.md](../../vision/02-the-show.md)
 - [design-artifacts/claude-design/Jaromelu Scheduled.html](../../../design-artifacts/claude-design/) — the design source (Pulse is the first of four modes there)
