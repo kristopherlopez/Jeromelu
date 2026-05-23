@@ -4,9 +4,9 @@ tags: [area/architecture, subarea/agents]
 
 # Scout Charter
 
-> Last reviewed: 2026-05-24. **Decisions D1–D13 locked 2026-05-12.** Phase 0 doc reconciliation shipped; Phase 1 (SuperCoach roster) shipped; Phase 2 (SuperCoach stats) shipped. See [roadmap.md](roadmap.md) for the full phasing and status.
+> Last reviewed: 2026-05-24. **Decisions D8–D13 locked 2026-05-12; D1–D7 locked 2026-05-24.** Phase 0 doc reconciliation shipped; Phase 1 (SuperCoach roster) shipped; Phase 2 (SuperCoach stats) shipped. See [roadmap.md](roadmap.md) for the full phasing and status.
 >
-> The decision record for Scout's scope. Formalises the proposal in [`docs/pages/wiki/data-feeds.md`](../../../pages/wiki/data-feeds.md) §"Scout's expanded charter": Scout's scope grows from *media inventory* to *all external data acquisition*. The full surface area — verified by direct endpoint exploration on 2026-05-12 — spans **nrl.com** (6 endpoints, history back to 1908 for fixtures and 2000 for full match-centre detail), **supercoach.com.au** (6 endpoints across classic + draft modes, current + prior season only), and **nrlsupercoachstats.com** (1 jqGrid endpoint, 9 seasons of history). Cleaning, parsing, diarisation, and claim extraction stay with the Analyst.
+> The decision record for Scout's scope. Formalises the proposal in [`docs/pages/wiki/data-feeds.md`](../../../pages/wiki/data-feeds.md) §"Scout's expanded charter": Scout's scope grows from *media inventory* to *all external data acquisition* — making Scout the project's **bronze layer** (raw capture for every external source). The full surface area — verified by direct endpoint exploration on 2026-05-12 — spans **nrl.com** (6 endpoints, history back to 1908 for fixtures and 2000 for full match-centre detail), **supercoach.com.au** (6 endpoints across classic + draft modes, current + prior season only), and **nrlsupercoachstats.com** (1 jqGrid endpoint, 9 seasons of history). Cleaning, parsing, diarisation, and claim extraction stay with the Analyst.
 
 ---
 
@@ -20,41 +20,47 @@ It does **not** change what the Analyst, Bookkeeper, or Archivist do downstream 
 
 ## Decisions to lock before any code is written
 
-### D1. The boundary principle
+### D1. The boundary principle — Scout owns the bronze layer
 
-**Recommendation: Scout owns every external source of truth.** If data comes from outside Jeromelu — a third-party API, a public JSON endpoint, a scraped HTML page, an RSS feed, an mp3 from a podcast host — Scout fetches it. Anything *derived* inside Jeromelu (claim extraction, embeddings, KB synthesis, voiceprint clustering, agreement-edges between advisors) stays downstream and is not Scout's.
+**Decision (locked): Scout owns every external source of truth — it is the project's bronze layer.** If data comes from outside Jeromelu — a third-party API, a public JSON endpoint, a scraped HTML page, an RSS feed, an mp3 from a podcast host — Scout fetches it and lands it **raw, as-ingested, never interpreted**.
 
-This principle gives one answer to *"who fetches X?"* for every X, including future expansions (Twitter/X mentions, blog RSS, Reddit, league injury reports). Scout, always.
+In medallion terms:
+
+- **Bronze — Scout.** Raw external data landed faithfully (the S3 JSON-first capture, [D10](#d10-storage--json-first-to-s3-db-derivative)) — no interpretation. Scout's remit extends one *mechanical* step further for **structured** feeds: the deterministic projection of its own raw JSON into typed DB rows (the [D13](#d13-db-extraction-is-downstream-of-s3) extractors, trust-resolved per [D11](#d11-trust-hierarchy--which-source-wins-per-field)). That projection is **deserialization, not judgement**, so it stays Scout's.
+- **Silver — downstream (Analyst).** The *interpretive* transform: cleaning, diarisation, speaker→Person attribution, and claim/quote extraction from unstructured sources.
+- **Gold — downstream (Bookkeeper + Archivist).** Curated and derived: alignment indices, accuracy scores, consensus snapshots, the wiki.
+
+This gives one answer to *"who fetches X?"* for every X, including future expansions (Twitter/X mentions, blog RSS, Reddit, league injury reports): **Scout, always.** And one answer to *"is this Scout's job?"* — only if it's raw acquisition. Anything *derived* inside Jeromelu (claim extraction, embeddings, KB synthesis, voiceprint clustering, agreement-edges between advisors) is silver or gold, lives downstream, and is not Scout's.
 
 ### D2. One agent or many?
 
-**Recommendation: one Scout identity, multiple execution modules.** All acquisition runs under `agent_id='scout'` in the audit table, with `detail_json.pipeline` discriminating which module ran (`media-discovery`, `supercoach-roster`, `supercoach-stats`, `nrlcom-matches`, `nrlcom-teamlists`, `nrlcom-injuries`, `nrlcom-rounds`, `youtube-refresh`, etc.). Each pipeline is its own module under `services/api/app/scout/`; they share utilities (audit, idempotency, rate-limiting) but execute independently.
+**Decision (locked): one Scout identity, multiple execution modules.** All acquisition runs under `agent_id='scout'` in the audit table, with `detail_json.pipeline` discriminating which module ran (`media-discovery`, `supercoach-roster`, `supercoach-stats`, `nrlcom-matches`, `nrlcom-teamlists`, `nrlcom-injuries`, `nrlcom-rounds`, `youtube-refresh`, etc.). Each pipeline is its own module under `services/api/app/scout/`; they share utilities (audit, idempotency, rate-limiting) but execute independently.
 
 This mirrors how Scout's media work is already structured today — `scout/loop.py`, `scout/refresh.py`, `scout/audio.py` are already sibling modules under one agent identity. The expansion adds more siblings, not a new architecture.
 
 ### D3. Cron orchestration
 
-**Recommendation: external cron hitting admin endpoints.** Each Scout pipeline exposes a `POST /api/admin/scout/<pipeline>` endpoint that returns a `run_id`. Cron (or the `scheduler` skill, or a `make` target) just hits the endpoint with the admin key. This matches the existing pattern — the daily YouTube refresh already works this way per [architecture.md §3.4](architecture.md) — and avoids introducing a new container or scheduler service for the prod footprint we already have.
+**Decision (locked): external cron hitting admin endpoints.** Each Scout pipeline exposes a `POST /api/admin/scout/<pipeline>` endpoint that returns a `run_id`. Cron (or the `scheduler` skill, or a `make` target) just hits the endpoint with the admin key. This matches the existing pattern — the daily YouTube refresh already works this way per [architecture.md §3.4](architecture.md) — and avoids introducing a new container or scheduler service for the prod footprint we already have.
 
 A future Phase 5 could replace external cron with an in-process APScheduler if cadence management becomes painful, but that's not the V1 problem.
 
 ### D4. Disposition of `services/worker-scraper/`
 
-**Recommendation: migrate the activities into per-pipeline folders under `services/api/app/scout/` per D9; retire the Temporal worker.** Per project memory, Temporal is not in production. The activities (`teamlists.py` and any siblings) become module-level functions inside the relevant pipeline folder (`scout/nrlcom_teamlists/fetcher.py`, etc.), called from admin endpoints under the unified Scout audit pattern. The `worker-scraper` directory stays in tree for a phase, with no new code, and is retired in Phase 4.
+**Decision (locked): migrate the activities into per-pipeline folders under `services/api/app/scout/` per D9; retire the Temporal worker.** Per project memory, Temporal is not in production. The activities (`teamlists.py` and any siblings) become module-level functions inside the relevant pipeline folder (`scout/nrlcom_teamlists/fetcher.py`, etc.), called from admin endpoints under the unified Scout audit pattern. The `worker-scraper` directory stays in tree for a phase, with no new code, and is retired in Phase 4.
 
 ### D5. Skills disposition
 
 **Decision (locked): no Claude Code skills for deterministic fetchers.** The endpoint + cron is the surface. Ad-hoc operator runs use the endpoint directly (curl, a `make` target, or the admin UI when one exists), not a skill. The existing `scrape-supercoach` Claude Code skill is retired as part of Phase 1 — operators move to hitting the endpoint.
 
-The Claude Agent SDK remains the right tool for *agentic* work — Scout's existing media-discovery loop uses it, and any future build that needs a Claude agent to *orchestrate* a Scout fetch (e.g. as one tool call inside a larger reasoning loop) can call the same endpoint. The endpoint is the universal surface; skills are not on the critical path.
+**If agentic behaviour is genuinely required, build it on the Claude Agent SDK — never a Claude Code skill.** Scout's existing media-discovery loop already uses the SDK, and any future build that needs a Claude agent to *orchestrate* a Scout fetch (e.g. as one tool call inside a larger reasoning loop) calls the same admin endpoint. The endpoint is the universal surface; Claude Code skills are off the critical path entirely.
 
 ### D6. Audit granularity
 
-Tied to D2 — single `agent_id='scout'`, pipeline discriminator in `detail_json`. This gives one dashboard ("is Scout healthy?") that breaks down by pipeline when needed.
+**Decision (locked): as per D2** — single `agent_id='scout'`, pipeline discriminator in `detail_json`. This gives one dashboard ("is Scout healthy?") that breaks down by pipeline when needed.
 
 ### D7. Idempotency contract
 
-**Every Scout pipeline writes idempotent upserts on natural keys.** Re-running the same fetch with no upstream change is a no-op. Existing media pipelines already mostly hold this property; spelling it out as a Scout-wide contract makes the property load-bearing for the cron orchestration in D3 (cron can hammer the endpoint without consequence).
+**Decision (locked): every Scout pipeline writes idempotent upserts on natural keys.** Re-running the same fetch with no upstream change is a no-op. Existing media pipelines already mostly hold this property; spelling it out as a Scout-wide contract makes the property load-bearing for the cron orchestration in D3 (cron can hammer the endpoint without consequence).
 
 | Pipeline | Natural key for upsert |
 |---|---|
@@ -70,7 +76,7 @@ Tied to D2 — single `agent_id='scout'`, pipeline discriminator in `detail_json
 
 **Decision (locked 2026-05-12):** Every Scout scraper module ships with **endpoint-drift tests**. When the upstream source's response shape changes — new fields, removed fields, renamed fields, type changes, response-shape reorganisation — the test fails loudly and routes to the user. The agent does not auto-adapt or degrade to partial data.
 
-**Why:** External sources (`nrl.com`, `supercoach.com.au`, `nrlsupercoachstats.com`, Zero Tackle) are out of our control. Silent degradation — e.g. a renamed field becoming null in every row — would propagate wrong/incomplete content downstream into the wiki. The user wants to be the one who decides the response: rewrite the parser, wait for the source to revert, accept the change, switch sources.
+**Why:** External sources (`nrl.com`, `supercoach.com.au`, `nrlsupercoachstats.com`) are out of our control. Silent degradation — e.g. a renamed field becoming null in every row — would propagate wrong/incomplete content downstream into the wiki. The user wants to be the one who decides the response: rewrite the parser, wait for the source to revert, accept the change, switch sources.
 
 **Concrete contract** (applies to every pipeline folder under `services/api/app/scout/`):
 
@@ -92,7 +98,8 @@ This decision tightens the mitigation language that was previously in Risk #4 ("
 
 - Python paths (module folder, Python identifiers, test folder): **snake_case** — e.g. `supercoach_roster`.
 - URL paths and pipeline labels (`detail_json.pipeline`, admin endpoint URL, `make` target): **kebab-case** — e.g. `supercoach-roster`.
-- The two are 1:1 translations. Code that wants the pipeline label from the module name does `module.__name__.split('.')[-1].replace('_', '-')`.
+- **S3 path segments** (D10) mirror the *upstream endpoint's* own naming, hyphenated where the source uses it — e.g. `nrlcom/match-centre/`, `casualty-ward/`, `players-cf/`. They name the source artefact, not the module, so they don't follow the snake_case folder name.
+- The first two are 1:1 translations. Code that wants the pipeline label from the module name does `module.__name__.split('.')[-1].replace('_', '-')`.
 
 **Source layout per pipeline:**
 
@@ -124,6 +131,8 @@ tests/integration/scout/supercoach_roster/test_endpoint.py
 **Why:** We don't yet know the full schema we want for every endpoint, and we want every endpoint's history captured before we lock decisions. JSON-first means: (a) **re-extractable** — adding a new field to the DB schema replays against S3, no re-fetch needed; (b) **drift-detectable** — the saved raw object is the artifact you diff when the D8 test fires; (c) **historical-once** — backfill writes to S3 once and the DB extractor can be re-run forever; (d) **cheap** — ~1-2GB of S3 covers years of NRL data; (e) **decoupled** — schema changes don't require touching the fetcher.
 
 **Bucket convention:** `s3://jeromelu-clean-documents/scout/{source}/{pipeline}/{...identity path}.json`
+
+> Note: the `jeromelu-clean-documents` bucket name predates the bronze framing — Scout's captures under `scout/` are **raw/bronze**, not cleaned. Renaming the bucket is deferred infra churn; treat the path, not the bucket name, as authoritative.
 
 ```
 s3://jeromelu-clean-documents/scout/
@@ -287,9 +296,9 @@ Pipeline inventory after full source enumeration (2026-05-12). Each row is a fol
 
 **Future (multi-platform expansion):** podcasts (RSS), Twitter/X, blogs/news, Reddit — same pattern, each gets a folder per D9.
 
-### What Scout still does NOT do (Extract-only rule, unchanged)
+### What Scout still does NOT do (the bronze boundary)
 
-The Extract-only rule is the spine of the charter — Scout fetches raw, persists raw, sets `ingestion_status='collected'`, and stops. Every downstream agent reads from Scout's outputs; Scout never reads back from them. Cleaning, parsing, diarisation, embedding, speaker→Person attribution, claim/quote extraction, and cross-source consensus all stay with the Analyst; numerical derivations with the Bookkeeper; wiki composition with the Archivist; voicing with Jaromelu. The canonical prose breakdown lives in [README § What Scout DOES NOT cover](README.md#what-scout-does-not-cover).
+The bronze boundary is the spine of the charter — Scout fetches raw, persists raw, sets `ingestion_status='collected'`, and (for structured feeds) projects the JSON into typed rows; then it stops. Every downstream agent reads from Scout's outputs; Scout never reads back from them. The *interpretive* transform — cleaning, diarisation, embedding, speaker→Person attribution, claim/quote extraction, and cross-source consensus — stays with the Analyst; numerical derivations with the Bookkeeper; wiki composition with the Archivist; voicing with Jaromelu. The canonical prose breakdown lives in [README § What Scout DOES NOT cover](README.md#what-scout-does-not-cover).
 
 ---
 

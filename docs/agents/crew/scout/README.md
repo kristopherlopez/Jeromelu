@@ -6,16 +6,16 @@ tags: [area/agents, subarea/crew]
 
 > **Charter expansion (2026-05-12).** Scout's scope has been formally expanded from *media inventory* to *all external data acquisition* per the [Scout charter](charter.md) (decisions D1–D13 locked). Some sections describe modules that are still in design (SuperCoach roster + stats, NRL.com fetchers for matches, team lists, injuries, rounds). Media-acquisition content is shipped today; data-acquisition content is in design — see [roadmap.md](roadmap.md) for status.
 
-**Role:** Acquire and maintain Jeromelu's raw inventory across every external source of truth — NRL media (podcasts, video, blogs, web) and NRL data (SuperCoach API, NRL.com endpoints, league feeds). **Scout is the *Extract* in the system's ETL** — it pulls raw bytes from external sources and persists them as-is. **It does no Transformation** (no cleaning, parsing, diarisation, embedding, normalisation, or interpretation). Those are downstream agents.
+**Role:** Acquire and maintain Jeromelu's raw inventory across every external source of truth — NRL media (podcasts, video, blogs, web) and NRL data (SuperCoach API, NRL.com endpoints, league feeds). **Scout is the project's bronze layer** — it pulls raw external data, lands it faithfully, and deterministically projects *structured* feeds into typed rows. It does **no interpretive transformation** (cleaning, diarisation, speaker attribution, claim/quote extraction, embedding) — those are downstream agents. See [charter D1](charter.md#d1-the-boundary-principle--scout-owns-the-bronze-layer).
 
-Scope is everything from *we don't know about this source* to *raw rows persisted in the database*. Stops at the raw layer.
+Scope is everything from *we don't know about this source* to *typed rows persisted in the database*. Stops at bronze: raw landing plus the mechanical projection of structured feeds; interpretive silver and gold are downstream.
 
 **Not a separate visible character.** When this mode is active, Jaromelu's voice (and the UI activity status) reflects it. Scout files inventory reports only — claims, contradictions, calls are all downstream.
 
 |                       |                                                                                                                                                              |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Type**              | Crew mode (internal reasoning) + data-acquisition worker                                                                                                     |
-| **ETL role**          | **Extract only.** No Transform. (Cleaning, diarisation, parsing, embedding, normalisation are all downstream.)                                               |
+| **ETL role**          | **Bronze.** Extract + the deterministic typed-projection of structured feeds. No *interpretive* transform (cleaning, diarisation, claim/quote extraction, embedding — all downstream).                |
 | **Scope**             | Media discovery + enumeration + raw transcript pull · SuperCoach roster + stats · NRL.com matches / team lists / injuries / rounds · future: podcasts, Twitter/X, blogs, Reddit |
 | **Status**            | **Media side shipped:** agentic discovery, recon API, post-approval enumeration, daily video-stats refresh. **Data side in design:** per the charter expansion, SuperCoach + NRL.com fetchers migrate from `scripts/data/fetchers/` and `services/worker-scraper/` into per-pipeline folders under `services/api/app/scout/` (per D9). See [roadmap.md](roadmap.md). |
 | **Platform coverage** | Media: YouTube only today; podcasts/RSS/Twitter/blogs/Reddit on backlog. Data: SuperCoach API + NRL.com endpoints land in the charter rollout.            |
@@ -62,7 +62,7 @@ Each pipeline lives as a folder under `services/api/app/scout/<pipeline_name>/` 
 
 ## What Scout DOES NOT cover
 
-Per the **Extract-only** rule, anything that interprets, structures, or enriches the raw bytes is downstream:
+Per the **bronze boundary**, anything that *interprets* or *enriches* the raw bytes — turning it into meaning — is downstream (the mechanical typed-projection of structured feeds is Scout's; semantic transformation is not):
 
 - **Transcript cleaning** — fixing mangled player names, garbled words, auto-caption errors. Scout writes `raw_text`; the cleaning pass writes `cleaned_text` / `clean_text`. Owned by the [transcript pipeline](../../skills/transcript-pipeline.md) / [Analyst](../analyst/README.md).
 - **Diarisation + transcription** — turning Scout's audio into `source_documents`, `source_speakers` (turn-level), and `source_chunks` (per-utterance) is owned by [Analyst](../analyst/README.md). Scout stops at the m4a in S3.
