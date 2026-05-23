@@ -33,10 +33,7 @@ Used for:
 - generating live feed thoughts
 - generating chat replies
 
-**Implementation: Feed Generation** (`services/worker-publishing/app/activities/generate_events.py`)
-- Converts structured claims into opinionated feed events in Jaromelu's voice
-- Uses `chat_json()` from `packages/shared/jeromelu_shared/llm.py` (gpt-4o, temp 0.2, JSON mode)
-- Full details: `docs/pages/feed/generation.md` → LLM Infrastructure section
+**Implementation note.** A reference implementation of feed-event generation lives in the **dev-only** `worker-publishing` (`services/worker-publishing/app/activities/generate_events.py`), via `chat_json()` in `packages/shared/jeromelu_shared/llm.py`. It predates the move to Anthropic-primary (it used an OpenAI model) and is **not** the production path — treat it as illustrative until the characterisation step is rebuilt on the current stack. Background: `docs/pages/feed/generation.md`.
 
 ### 4. Review Models
 Used for:

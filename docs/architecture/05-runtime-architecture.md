@@ -97,31 +97,28 @@ Contains:
 - expert performance history
 
 ### G. Decision Engine
-V1 choice:
-Rules + heuristics.
+**Status: not built.** `worker-decision` is unbuilt (see [11-technology-stack](11-technology-stack.md)); Jaromelu's calls are produced directly today. The shape below is the intended V1 design — rules + heuristics, not ML.
 
 Inputs:
-- consensus signals
+- consensus signals across ingested sources
 - matchup narratives
-- public stats / fixture context later
-- prior Jaromelu plans
-- current squad state
+- public stats / fixture context
+- Jaromelu's prior calls and current standing positions
 
 Outputs:
-- candidate moves
-- preferred moves
-- public-facing rationale
-- deliberate contrarian moves when allowed
+- candidate calls
+- the call he commits to, with public-facing rationale
+- deliberate contrarian calls when allowed
 
 Important:
-Contrarian behaviour should be policy-bounded, not random.
-It should only occur inside safe thresholds.
+Contrarian behaviour should be policy-bounded, not random. It should only occur inside safe thresholds.
+
+*(SuperCoach squad/trade decisions are a deferred V2 overlay on this same engine.)*
 
 ### H. Orchestration Layer
-Purpose:
-Run the system as a chain of workflows.
+**Status: not in production.** Temporal exists in local dev only ([11-technology-stack](11-technology-stack.md)); production runs **cron jobs** and one-shot CLI invocations, not a workflow engine. The chain-of-workflows model below is the aspirational shape — see [07-workflow-architecture](07-workflow-architecture.md).
 
-Supports:
+Supports (intended):
 - scheduled jobs
 - event-triggered jobs
 - workflow-to-workflow triggering
@@ -130,21 +127,19 @@ Supports:
 - audit logs
 
 Typical flows:
-1. discover source -> ingest -> extract -> update consensus -> publish thought
-2. injury news -> inject event -> re-evaluate plans -> publish update
-3. weekly deadline window -> generate options -> choose move -> publish decision
+1. discover source → ingest → extract → update consensus → publish a Remark
+2. injury news → inject event → re-evaluate open calls → publish the update (the live-number heartbeat)
+3. round window → form the call → lock it → resolve against the result
 
 ### I. Publishing Layer
 Purpose:
-Convert machine state into public experience.
+Convert machine state into the public experience.
 
 Produces:
-- live feed events
-- team dashboard updates
-- prediction ledger updates
-- chat answers
-- war room state
-- article drafts later
+- live Feed events (crew activity + Remarks)
+- Wiki page updates (the Archivist)
+- prediction Ledger updates (the Alignment Index)
+- Ask Me chat answers
 
 ### J. Admin / Operator Layer
 Needs on day one:
@@ -167,9 +162,8 @@ Why:
 - enough for near-real-time
 - avoids overengineering early
 
-Dynamic modules:
-- live feed
-- team state
-- war room panels
-- chat
-- opinion explorer
+Dynamic modules — the four surfaces:
+- the Feed (`/`)
+- the Wiki (`/wiki`)
+- the Ledger (`/ledger`)
+- Ask Me (`/ask`)
