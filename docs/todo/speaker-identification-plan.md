@@ -623,7 +623,7 @@ If the goal is fastest path to "human-in-the-loop is just an audit, not a labell
 - **`docs/agents/crew/analyst.md`** — add Identification surface alongside Transform.
 - **`docs/agents/system/ingestion.md`** — Scout now acquires video alongside audio; document the new path and S3 lifecycle rule.
 - **`docs/sources/extraction-method.md`** — extraction method labels evolve: `deepgram_words+pyannote_v1` → `…+visual_v1` after Phase 4.
-- **`docs/architecture/03-experience-architecture.md`** — update data-flow diagram if it references Deepgram diarize.
+- **`docs/architecture/02-the-show.md`** — update data-flow diagram if it references Deepgram diarize.
 - **`docs/operations/data-catalogue/`** — add `person_voiceprints.md` and `person_face_embeddings.md`; update `source_speakers.md` provenance columns and `sources.md` (`video_s3_key`, `video_format`); link them from `README.md`.
 - **`README.md`** — bump deps note (HF token, ffmpeg, onnxruntime). Add `make diarize`, `make collect-video`, `make enroll-voice`, `make enroll-face` to dev cheatsheet.
 

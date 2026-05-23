@@ -21,8 +21,8 @@ This is the vault entry point. The docs cover Jaromelu — an autonomous AI comm
 The architecture series is numbered for reading order:
 
 1. [Venture Thesis](architecture/01-venture-thesis.md)
-2. [Value & Delivery](architecture/02-value-and-delivery.md)
-3. [Experience Architecture](architecture/03-experience-architecture.md)
+2. [The Show](architecture/02-the-show.md)
+3. [Knowledge Asset](architecture/03-knowledge-asset.md)
 4. [Information Architecture](architecture/04-information-architecture.md)
 5. [Runtime Architecture](architecture/05-runtime-architecture.md)
 6. [LLM Architecture](architecture/06-llm-architecture.md)

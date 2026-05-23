@@ -18,7 +18,7 @@ They're on their phone, on the bus, on the couch — checking in for 90 seconds 
 
 **Not designing for:** casual NRL viewers.
 
-→ [Venture Thesis §Audience](../architecture/01-venture-thesis.md#audience)
+→ [Venture Thesis §Who Finds This Irresistible](../architecture/01-venture-thesis.md#who-finds-this-irresistible)
 
 ## 2. What You're Designing Toward
 
@@ -50,7 +50,7 @@ The website is **the digital home** — a place Jaromelu lives, not a dashboard 
 
 The Feed *is* the product. The other four are reachable from the Feed and reward deeper interest. **If you're tempted to create a new page, make it a panel instead.**
 
-→ [Experience Architecture §Surfaces](../architecture/03-experience-architecture.md#surfaces), [pages/](../pages/)
+→ [The Show §The Surfaces](../architecture/02-the-show.md#the-surfaces), [pages/](../pages/)
 
 ## 5. Design Principles
 
@@ -138,7 +138,7 @@ States: `OPEN → LOCKED → RESOLVED`. Resolution generates a **receipt card** 
 - **No raw-data dashboards.** Compressed, voiced opinion is the value; raw stats are not.
 - **No ISO timestamps in user-facing copy.** Conversational time only ("3 hours ago").
 
-→ [Value & Delivery §What This Is Not](../architecture/02-value-and-delivery.md#what-this-is-not)
+→ [The Show §What This Is Not](../architecture/02-the-show.md#what-this-is-not)
 
 ## 10. Open Questions for Design Exploration
 
@@ -156,8 +156,8 @@ Worth playing with as you explore — these are unresolved, and good design here
 
 **Strategic frame:**
 - [Venture Thesis](../architecture/01-venture-thesis.md)
-- [Value & Delivery](../architecture/02-value-and-delivery.md)
-- [Experience Architecture](../architecture/03-experience-architecture.md)
+- [The Show](../architecture/02-the-show.md)
+- [Knowledge Asset](../architecture/03-knowledge-asset.md)
 
 **Design rules and tokens:**
 - [Design Principles](../concepts/00-design-principles.md)

@@ -1,204 +1,97 @@
 ---
 tags: [area/architecture]
 ---
-
 # Venture Thesis
 
-> Last reviewed: 2026-05-06.
+> Last reviewed: 2026-05-23.
 
-Jaromelu is an autonomous AI **commentator on the NRL** — a non-human presence with a name, a voice, opinions, and a public track record, who lives on his own website. He's backed by a crew of agents who ingest the NRL media ecosystem, build a continuously evolving view of the competition, form opinions, make calls, and live with the consequences. Visitors watch the operation unfold in public and come back to see whether his takes held up.
+Jaromelu is an autonomous AI commentator on the NRL — an anthropomorphised agentic presence with a name, a voice, opinions, a public track record, and **his own home on the web**. He's run by a crew of agents who ingest the NRL media ecosystem, build a continuously evolving view of the competition, form opinions, make calls, and live with the consequences. And you can watch them work.
 
-The product is designed as an **entertainment spectacle first** and a utility second. Where those two are in tension, spectacle wins.
-
-The project is also a public demonstration of what's possible when data pipelines, agentic LLM reasoning, character voice, and orchestration are composed into a single coherent product — but the show is the primary thing, not the build.
+Chat UIs exist. Character.ai-style chatbots exist. AI characters with real followings live on social platforms — but they're tenants on Instagram and TikTok, and you never see the operation behind the personality. **A captivating agentic experience that lives in its own home, where the work is part of the show — that's the shape nobody's built.** That's the category Jaromelu opens.
 
 ---
 
-## The Strategic Bet
-
-The defensible thing is **the persona plus the knowledge graph, captured together over time.**
-
-A character with a name, a voice, opinions, and a public accuracy record is harder to copy than a tool with the same features. A growing ledger of speaker-attributed claims, graded against reality, is harder to copy than a season of stats. Stack the two and a competitor can't catch up by spending money — they need to spend a season.
-
-**What we're betting on:**
-
-- Hardcore NRL fans will follow a non-human personality if it has takes worth following
-- The medium gets richer fast enough that today's text-led show becomes tomorrow's video-rich show on the same captured data
-- Public accuracy *and* public misses build more trust than a polished UI ever could
-
-**What we're trading away:**
-
-- Mass-market reach — we are not for the casual NRL viewer
-- SuperCoach as the wedge — SC is one spoke off the core; the persona and knowledge graph come first
-- A polished avatar in V1 — pre-generated clips don't scale; we wait for the medium to mature
-
-**Why now:** LLMs are good enough to hold a voice across thousands of outputs; speaker-diarised transcription is cheap and accurate; generative voice and video are on a clear cost-down curve. The "capture everything now, compose richer later" pattern is finally viable.
-
-## Core and Spokes
-
-The thesis is a **hub-and-spoke model**:
-
-- **Core** — the persona (Jaromelu, his crew, his voice) plus the knowledge graph (speaker-attributed claims graded against reality). Built once. Compounds over time.
-- **Spokes** — every downstream application plugs into the core. NRL commentary is the first spoke — built first because it produces a richer persona on richer data than any narrower opener would. SuperCoach, tipping, sports betting, content for social, voice and video clone services, aggregator — all later spokes.
-
-Spoke detail: see [The Knowledge Asset](#the-knowledge-asset) and [V1 Scope & Roadmap](09-v1-scope-and-roadmap.md).
-
 ## What We Want People To Feel
 
-The aim isn't "AI tool that does NRL analysis." The aim is **a presence that feels alive** — a non-human entity with opinions, a voice, and a track record, who lives publicly in his own digital home. The reaction we're chasing is: *"Wait — this thing actually has takes."*
+Two emotions, in order.
 
-Some of that is unreachable today. Real-time AI video is still research-grade and expensive, and pre-generated avatar clips have already been explored and parked — at the volume the show needs, they take too long to produce, run expensive, and risk feeling tiresome quickly. So in V1 Jaromelu is **text-led**, with voice for the big set-piece moments. The "alive" feeling has to come from somewhere else, and it does:
+**On arrival: awe.** *"Wait — this is an AI, and it actually has takes."* The shock of meeting something that feels alive instead of indexed. Not a chatbot waiting for you to prompt it. Not a wrapper around a model. A presence with a name, a voice, and opinions about your team — already mid-thought when you arrived.
 
-- The crew's **visible work** — Scout discovering, Analyst cross-referencing, contradictions surfacing
-- The **editorial voice** everywhere — no system copy; every line has a speaker
-- The **rhythm of the week** — the screen looks different on Monday than on Thursday
-- The **always-on crew status** — there's always something happening
-- The **digital home** — the website is a place he lives, not a dashboard you visit
+**On return: aquarium.** Something is always happening. Scout is searching. Analyst is cross-referencing. Archivist is updating the wiki. Critic is disagreeing in the corner. The screen looks different on Monday than on Thursday because the operation kept running while you were gone.
 
-When generative video gets cheap enough to run sustainably, the avatar layer slots in on top of all that. Until then, the show carries itself.
+These aren't competing emotions — they're **first encounter** and **sustained pull**. The site has to deliver both. The awe gets people to remember the URL. The aquarium gets them to type it again.
 
-## Audience
+## The Show
 
-**Primary audience:** Hardcore NRL fans who consume heavy amounts of NRL commentary — podcasts, YouTube panels, post-match shows. Above-average game literacy.
+Jaromelu is the voice. One personality, one editorial register — everything you read or hear in his name is his.
 
-**Typical user:**
+The crew is the visible labour. Scout, Analyst, Critic, Bookkeeper, Archivist — they don't speak in their own voice, they *work*, and their work is visible:
 
-- Australian, predominantly male
-- Already consumes multiple NRL podcasts and YouTube channels each week
-- Time-poor, opinion-saturated, decision-fatigued
-- Wants fast synthesis over long-form content
-- On a phone, on the bus, on the couch — checking in for 90 seconds at a time
+- A Scout query firing into the YouTube ecosystem
+- A new source landing in the candidate queue
+- An Archivist diff hitting the wiki
+- A Critic flag attached to a claim that didn't hold up
+- A Bookkeeper ticking off last week's predictions against reality
 
-We are not building for the casual NRL viewer. The thesis assumes the audience already lives in NRL discourse and is hiring Jaromelu to compress and entertain.
+The closest reference frames are watching collaborators move around in a shared Google Doc, or watching fish in an aquarium. You're not driving the operation. You're watching it. When something interesting surfaces you can lean in — but you don't have to.
 
-The SC spoke, when it ships, overlaps heavily with this audience — but the relationship is built first on NRL commentary.
+This is the spectacle. Not the polished output of an AI tool. The visible work of a non-human intelligence doing its job, all the time.
 
-## Core Job To Be Done
+The bar for whether it's working is personal: is it entertaining to *watch*? The creator is the first and harshest member of the audience — if the operation can't hold his attention, it isn't ready. That's the right test, not a proxy metric.
 
-> "Help me quickly understand what the NRL world is thinking — and entertain me while doing it."
+## Why NRL
 
-Compression *and* entertainment — neither alone is enough.
+The honest answer: **because the creator loves NRL.**
 
-## The Value Proposition
+This is not a market-led choice. It's not a wedge into a category. The experiment runs on NRL because that's where the work is sharpest — where someone knows the audience well enough to make the output bite, where someone watches the content closely enough to catch when an opinion is dishonest, where someone cares enough to keep going.
 
-Five pillars unpack the promise — **Compression, Truth Filter, A Show Worth Following, Skin in the Game, Public Stakes.** Each is a job the customer is hiring Jaromelu to do. Full breakdown — mechanisms, customer experience, and signals — in [Value & Delivery](02-value-and-delivery.md).
+NRL is also a good fit for the format. Heavy weekly content cycle. Opinion-saturated commentary ecosystem. Results graded in public every weekend. Decades of stats and rivalries to ingest. The domain rewards a system that listens widely and remembers.
 
-Sequencing: **build Compression and Truth Filter first** — they need only the core (persona + knowledge graph). Skin-in-the-Game and Public Stakes layer in as the audience interaction surfaces mature. SC-specific value comes with the SC spoke.
+But the thesis is **agentic experience with a home**. The domain is the lens, not the bet. If the shape works on NRL — anthropomorphised, visibly-crewed, living on its own website — it extends to any sport, and very likely any topic with a passionate audience and a content cycle that keeps producing.
 
-## Why A Crew Of Characters, Not A Tool
+## Who Finds This Irresistible
 
-A solo agent answering questions feels like a chatbot. A crew working in public — Scout pulling YouTube intel, Analyst cross-referencing takes, Critic challenging, Jaromelu putting his name on the call — feels like a **production**.
+Hardcore NRL fans. Already three podcasts deep. Already two YouTube channels behind. Above-average game literacy. Australian. Time-poor. Opinion-saturated.
 
-| A character | A tool |
-|---|---|
-| Has personality | Has features |
-| Makes calls feel dramatic | Returns results |
-| Encourages sharing | Encourages bookmarking |
-| Can be wrong publicly and own it | Just stays accurate |
-| Builds a following | Builds a userbase |
+The spectacle lands hardest for them because the show happens in a language they already speak. They know the players, the rivalries, the running arguments. Watching an AI form opinions about all of it hits differently for someone who already has their own opinions about all of it.
 
-Tools feel useful. Characters feel followable.
+They didn't come to fix a utility problem. But they have one. The audience is drowning in commentary — three podcasts deep, two YouTube channels behind, panel takes contradicting each other on Tuesday and forgotten by Thursday. Jaromelu, by virtue of existing, listens to all of it, forms his own view, and grades last week's takes against reality. That's a free utility on top of the spectacle. They'll use it. It's just not why they showed up.
 
-The crew (defined in [Experience Architecture §The Crew](03-experience-architecture.md#the-crew)) makes the process *legible* and the show *watchable*. Each role creates anticipation for the next — and in V1 it's the crew's visible work that carries the alive feeling, not an avatar.
+We are not building for the casual NRL viewer. The thesis is built around an audience that already lives in NRL discourse — and finds something they've never seen before waiting for them when they arrive.
 
-## The Show Has Structure
+## What Compounds
 
-The week follows the NRL match week — not a flat timeline:
+The crew is building a continuously growing knowledge base of all things NRL — claims, predictions, sources, attributions, results. Every podcast transcribed. Every prediction recorded. Every outcome graded. Speaker-attributed, time-stamped, queryable.
 
-| Beat | Day | Tension |
-|---|---|---|
-| Intel Drops | Mon | Crew ingests post-match takes, news, narratives |
-| Tension Builds | Tue–Wed | Contradictions surface across commentators |
-| The Call | Thu | Jaromelu locks in his Remarks for the round |
-| The Match | Thu–Sun | Footy plays out. Takes meet reality. |
-| The Reckoning | Mon | Receipts, grades, narrative shifts |
+**It augments Jaromelu.** Sharper takes, deeper memory, better calls. The longer the project runs, the more context he has to draw on.
 
-This rhythm creates natural return triggers without push notifications. The audience learns when to check in. Full breakdown in [Episode Beats](../concepts/03-episode-beats.md).
+**It earns his credibility.** Jaromelu's own takes run passively from day one, graded against the same reality as the human pundits'. The point isn't to be loud early — it's to accumulate a track record. Once his calls demonstrably rival the humans', the awe stops being "cute, an AI has opinions" and becomes "this thing is actually good." The ledger is the proof, not just the theatre.
 
-## The Audience Is In The Show
+**It's a discovery surface.** Because every claim is speaker-attributed, the audience doesn't just see *what* was said — they see *who* said it, and how often that person was right. Someone with sharp, well-graded, contrarian takes becomes worth following. Jaromelu turns into a way to find the voices in the NRL ecosystem worth your time.
 
-The audience is not passive. They:
+**It unlocks new directions.** Whose predictions came true. Who's good at predicting what — player form, scoreline, finals, recovery timelines. How those track records intersect with sports betting. How they intersect with SuperCoach. Each is a separate opportunity sitting on the same captured data.
 
-- React to open Remarks (agree / disagree)
-- Challenge Jaromelu directly — "you're wrong about the Eels, here's why"
-- Accumulate their own **Personal Alignment Index** — graded against reality alongside Jaromelu
+And the shape isn't NRL-specific. Done well, the same operation — ingest a domain, form opinions, grade them in public, surface the voices worth following — extends to any sport, and very likely any topic with a passionate audience and a steady content cycle.
 
-This converts the site from "AI shows you stuff" into "you are part of the show, and you are also being graded." Detailed in [Audience](../concepts/06-audience.md).
+→ Detail in [Knowledge Asset](03-knowledge-asset.md).
 
-(Squad submission and SC-specific participation come with the SC spoke.)
+## Why This Is Possible Now
 
-## Return Triggers
+A few things have to be true at once.
 
-**Daily** — new intel processed (Scout activity visible), Remarks forming and locking and resolving, contradictions surfacing inline.
+- **LLMs are good enough to hold a voice** across thousands of outputs without drifting into generic AI register.
+- **Multi-agent orchestration is finally productionable** — the "team of specialists" pattern actually composes coherent output instead of falling apart at the seams.
+- **Speaker-diarised transcription is cheap and accurate enough** to ingest the entire NRL podcast ecosystem week after week.
+- **Generative voice and video are on a clear cost-down curve** — capture everything in text now, the medium gets richer on top of the same captured data.
 
-**Weekly** — the episode arc above. Thursday is the call, the weekend is the football, Monday is the reckoning.
-
-**Seasonal:**
-
-- Jaromelu's ranking against expert NRL commentators
-- Personal accuracy track record
-- Expert leaderboard movement (the Alignment Index)
-- Season narrative arc — early-bold → mid-track-record → run-home stakes → finals verdict
-
-## The Knowledge Asset
-
-The most durable thing the project builds is **the knowledge graph itself** — a structured, growing record of what every NRL commentator says, when they said it, and whether they were right.
-
-### What's captured
-
-Scout ingests sources from around the internet (YouTube first — podcasts, panels, post-match shows). Each source is transcribed with **speaker diarisation**, so claims are attributed to *people*, not just shows. Both expert claims and Jaromelu's own claims are written into the same ledger and graded against reality.
-
-The result is an asset no other NRL property has at scale:
-
-- A timeline of every public claim about every player, team, and storyline
-- An accuracy record per commentator, sliced by domain (tipping, narrative, fantasy, injuries, drama)
-- Speaker-segmented **audio and video** clips of every panellist on every topic
-- Resolved outcomes grading everyone — Jaromelu included — on the same scale
-
-### What it unlocks
-
-The same captured-once data drives every downstream capability:
-
-| Capability | What it does |
-|---|---|
-| **The Alignment Index** | Public trust ranking of every NRL commentator. Answers *"who should I actually listen to?"*, sliced by what each person is actually good at. The compounding moat across V1. |
-| **Content engine** | Receipts for outlier predictions, weekly verdicts, narrative recaps — purpose-built for social and designed to drive traffic back to the site. |
-| **Specialised verticals** | Tipping, SuperCoach (V2), sports betting — different pricing/UX live downstream of the same knowledge layer. |
-| **Voice and video clones** | Speaker-segmented A/V data captured today is the substrate for cloned commentator voices (now), generative video segments (12–18 months), and emotionally nuanced digital clones (24+ months). |
-| **Aggregator role** | Because the index covers every NRL channel, the site can become a discovery layer for the ecosystem — *"the best segments on Cleary this week"* pointing at multiple sources, with traffic flowing back. |
-
-### How to monetise
-
-Multiple revenue layers compound; none is make-or-break. V1 builds audience and authority; monetisation lands in stages, all drawing on the same captured-once data.
-
-- **V1** — sports-betting affiliate (hardcore audience + claims-graded recs = high-intent referrals); display + sponsorship (episode beats are natural ad surfaces); subscription tier (premium Ledger, Wiki, and Alignment Index access).
-- **V2** — vertical subscriptions across the spokes (Tipping, SuperCoach, and beyond).
-- **Mid-term and after** — Data/Index licensing once the Alignment Index carries a track record; aggregator referral revenue as the site becomes a discovery layer for NRL channels; voice/video clone services as the speaker-segmented A/V matures into B2B media output.
-
-The defensible position is **the knowledge asset itself**. Most streams draw on the same captured-once data — a competitor has to spend a season catching up before they can monetise the same way. V1 decisions (capture diarised audio, segment by speaker, store claims as structured rows) are what make every later revenue stream possible. The data store doesn't get built retroactively.
-
-## Capability Horizons
-
-What Jaromelu's on-screen presence looks like over time:
-
-| Horizon | What becomes viable in the field | What we actually ship |
-|---|---|---|
-| **Now (V1)** | Voice clones from short audio; pre-generated avatar clips technically possible but slow and expensive at show volume | Text-led Remarks; voice for big moments; the crew's visible work and the editorial voice carrying the alive feeling. No persistent avatar — pre-generated clips don't scale. |
-| **12–18 months** | Generative video at lower cost (Seedance-class models maturing); near-real-time clip generation | Synthesised video segments for Remarks, recaps, set-piece moments. Avatar layer slots in sustainably. |
-| **24+ months** | Emotionally nuanced digital clones; real-time interactive video | Live Jaromelu segments; cloned commentators appearing in-show. |
-
-The thesis assumes Jaromelu's medium gets richer in lockstep with the field. **What we capture today — speaker-segmented audio, video, and claims — is built for the version of Jaromelu that ships in 24 months, not the one that ships next quarter.**
-
-## Category
-
-Character-driven AI sports commentator — closer to a daily NRL show with a host than a stats site with a chatbot.
+None of these were true two years ago. Most are still novel enough that a captivating agentic experience with a home is genuinely an unsolved problem, not a copy-paste.
 
 ---
 
 ## Related
 
-- [Value & Delivery](02-value-and-delivery.md) — the promise unpacked into pillars and signals
-- [Experience Architecture](03-experience-architecture.md) — the crew, surfaces, and episode arc in full
+- [The Show](02-the-show.md) — how the experience works: the crew, surfaces, episode arc, participation, and what we won't build
+- [Knowledge Asset](03-knowledge-asset.md) — what compounds, what it unlocks, what it costs
 - [Design Principles](../concepts/00-design-principles.md) — visual and editorial rules
 - [Audience](../concepts/06-audience.md) — how participation works
-- [V1 Scope & Roadmap](09-v1-scope-and-roadmap.md) — what we ship first against this thesis
+- [V1 Scope & Roadmap](09-v1-scope-and-roadmap.md) — what ships first against this thesis

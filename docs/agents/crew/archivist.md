@@ -77,7 +77,7 @@ When Jaromelu publishes a new Remark, or the Bookkeeper resolves an old one, the
 - Updates the relevant entity page sections with the new call ("Jaromelu is now selling Cleary; flipped from his Round 6 buy — see [[round-2026-6]]").
 - Surfaces the linkage in the page's revision summary so it shows up in the Feed.
 
-This is the mechanism behind *"Archivist linked this Remark to Jaromelu's earlier call from Round 3"* in [The Show (draft)](../../architecture/drafts/02-the-show.draft.md).
+This is the mechanism behind *"Archivist linked this Remark to Jaromelu's earlier call from Round 3"* in [The Show](../../architecture/02-the-show.md).
 
 ---
 
@@ -221,4 +221,4 @@ These will be revisited as the Archivist runtime is built.
 - [Entity connections (draft)](../../architecture/drafts/wiki-entity-connections.draft.md) — `wiki_relations` table the Archivist curates
 - [Crew Dynamics](dynamics.md) — where the Archivist sits in the internal reasoning flow
 - [Jaromelu](jaromelu.md) — voice / tonal modes (where the prior Archivist tonal-mode content gets reabsorbed)
-- [The Show (draft)](../../architecture/drafts/02-the-show.draft.md) — customer-facing framing of the crew
+- [The Show](../../architecture/02-the-show.md) — customer-facing framing of the crew

@@ -46,3 +46,19 @@ To avoid needless fights in V1:
 - show methodology page
 - preserve exact source lineage
 - do not editorialise maliciously
+
+---
+
+# Operating Signals
+
+How we know the product is working. Each core job has a leading signal (early, behavioural) and a lagging signal (durable, outcome-based). Vanity metrics — page views, session count alone — don't appear here. These are the questions we ask in product review, not in marketing.
+
+| Job | Leading signal | Lagging signal |
+|--------|---------------|----------------|
+| **Compression** | Time-to-first-Remark per session under 30s. Ratio of sources ingested → Remarks published per round. | Customer can articulate the week's consensus after one visit (qual). Returning users skip directly to the Feed, not to source links. |
+| **Truth filter** | Number of commentator sources tracked with stable Alignment scores (>10 graded predictions). | Inbound search/social traffic for commentator names lands on Jaromelu's Wiki pages. The Index gets cited externally. |
+| **A show worth following** | Return rate concentrated at episode beats (Monday and Thursday peaks visible in traffic). Session depth on Thursdays (The Call beat). | Customers refer to Jaromelu by name in inbound traffic / share copy. The crew is named (Scout, Analyst) in user language unprompted. |
+| **Skin in the game** | Reaction rate per open Remark (% of viewers who tap agree/disagree). Challenge volume per Remark. | Distribution of personal Alignment Index scores tightens over a season — engaged users improve. Cohort returning to check their own record weekly. |
+| **Public stakes** | % of Remarks that resolve on schedule (no orphaned calls). Receipt-card share count per resolved Remark. | Jaromelu's Alignment Index trends upward across a season. Customer trust signal: agree/disagree ratio shifts toward agreement on high-conviction calls over time. |
+
+> Migrated from the former `02-value-and-delivery.md` (2026-05-23). The job labels map to the show's mechanisms in [The Show](02-the-show.md).

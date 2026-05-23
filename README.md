@@ -34,19 +34,20 @@ Jaromelu is an agent-first product. Three kinds of agents, one folder per kind �
 
 | Doc | Contents |
 |-----|----------|
-| [01 — Venture Thesis & Strategy](docs/architecture/01-venture-thesis.md) | What Jaromelu is, audience, core job, return triggers |
-| [03 — Experience Architecture](docs/architecture/03-experience-architecture.md) | The show: crew, episode arc, remarks, surfaces, alignment index, audience participation |
+| [01 — Venture Thesis](docs/architecture/01-venture-thesis.md) | What Jaromelu is, the feel (awe + aquarium), the show, why NRL, what compounds |
+| [02 — The Show](docs/architecture/02-the-show.md) | The crew, episode arc, remarks, surfaces, alignment index, participation, scope |
+| [03 — Knowledge Asset](docs/architecture/03-knowledge-asset.md) | What compounds, what it unlocks, what it costs |
 | [04 — Information Architecture & Data Model](docs/architecture/04-information-architecture.md) | Core objects, lineage principle, recommended schema |
 | [05 — Runtime Architecture](docs/architecture/05-runtime-architecture.md) | System topology: discovery, ingestion, extraction, decision, publishing |
 | [06 — LLM Architecture](docs/architecture/06-llm-architecture.md) | Role-specific LLM tasks, retrieval pattern |
 | [07 — Workflow Architecture](docs/architecture/07-workflow-architecture.md) | Scheduled and event-triggered workflows |
-| [08 — Explainability & Governance](docs/architecture/08-explainability-and-governance.md) | Public reasoning rules, truthfulness, risk management |
+| [08 — Explainability & Governance](docs/architecture/08-explainability-and-governance.md) | Public reasoning rules, truthfulness, risk, operating signals |
 | [09 — V1 Scope & Roadmap](docs/architecture/09-v1-scope-and-roadmap.md) | Must-haves, phased roadmap, architectural principles, success criteria |
 | [10 — C4 System Blueprint](docs/architecture/10-c4-system-blueprint.md) | Full C4 breakdown: context, containers, components, flows, cross-cutting concerns |
 | [11 — Technology Stack](docs/architecture/11-technology-stack.md) | Next.js, FastAPI, Temporal, PostgreSQL, service split |
 | [12 — AWS Architecture](docs/architecture/12-aws-architecture.md) | Lightsail single-VM deployment, CloudFront, S3, ECR, cost ~$5.50/mo |
 
-> The numbering has gaps: 02 (Character Architecture) moved to [`agents/crew/`](docs/agents/crew/README.md); 13 (Agent Inventory) moved to [`agents/`](docs/agents/README.md).
+> Character Architecture and Agent Inventory (former standalone architecture docs) now live under [`agents/`](docs/agents/README.md), with the crew detailed in [`agents/crew/`](docs/agents/crew/README.md).
 
 ## Design Language & Concepts
 

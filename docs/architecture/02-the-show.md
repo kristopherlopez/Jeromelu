@@ -1,19 +1,12 @@
 ---
 tags: [area/architecture]
-status: draft
----
-
-# The Show (Draft — experience-led reframe of `03-experience-architecture.md`)
-
-> Draft created 2026-05-10. Reframes existing 03 around the customer experience and absorbs sections proposed to move from old 01 (already partially in current 03) and old 02 (pillar-to-mechanism mapping, currently absent). Trims technical "Maps to" references that belong in deeper architecture docs.
-
 ---
 
 # The Show
 
-> Draft. Last reviewed: 2026-05-10.
+> Last reviewed: 2026-05-23.
 
-01 says what Jaromelu is and why. This doc says how the show actually works — the crew the audience watches, the rhythm of the week, the surfaces they land on, and the way they get pulled in. The knowledge that powers it all gets [its own doc](03-knowledge-asset.draft.md); the lines we deliberately won't cross are at the end of this one.
+01 says what Jaromelu is and why. This doc says how the show actually works — the crew the audience watches, the rhythm of the week, the surfaces they land on, and the way they get pulled in. The knowledge that powers it all gets [its own doc](03-knowledge-asset.md); the lines we deliberately won't cross are at the end of this one.
 
 ---
 
@@ -75,7 +68,7 @@ Scans the NRL podcast and media ecosystem for new takes, data, and narratives.
 - *"Scout flagged 3 new takes on Cleary from this week's pods"*
 - *"Scanning the ecosystem... 2 new sources found"*
 
-Detail: [agents/crew/scout.md](../../agents/crew/scout.md).
+Detail: [agents/crew/scout.md](../agents/crew/scout.md).
 
 ### Analyst — the knowledge resolver
 
@@ -87,7 +80,7 @@ Cross-references claims across sources, finds contradictions, detects consensus 
 - *"Consensus just shifted: the market is turning bearish on Cleary"*
 - *"Analyst found a contradiction: KingOfSC says buy, NRLBrothers says sell"*
 
-Detail: [agents/crew/analyst.md](../../agents/crew/analyst.md).
+Detail: [agents/crew/analyst.md](../agents/crew/analyst.md).
 
 ### Critic — the challenger
 
@@ -126,7 +119,7 @@ Reviews the crew's work, makes the call, puts his name on it publicly. The voice
 - *"The call is in: selling Cleary this week. Here's why."*
 - *"Jaromelu disagrees with consensus. Going contrarian on Munster."*
 
-Detail: [agents/crew/jaromelu.md](../../agents/crew/jaromelu.md).
+Detail: [agents/crew/jaromelu.md](../agents/crew/jaromelu.md).
 
 ---
 
@@ -226,7 +219,7 @@ Every page links back to the Remarks, crew activity, and source chunks that info
 
 The feel is **editorial**, not dashboard — warm parchment, serif typography. A reading surface that breaks deliberately from the dark broadcast stage of the Feed.
 
-Detail: [pages/wiki/](../../pages/wiki/overview.md).
+Detail: [pages/wiki/](../pages/wiki/overview.md).
 
 ### 3. The Ledger — `/ledger`
 
@@ -239,7 +232,7 @@ Core concerns:
 - Rolling accuracy by domain (tipping / narrative / fantasy / injuries)
 - Shareable receipt cards for bold calls
 
-Detail: [pages/ledger/](../../pages/ledger/overview.md).
+Detail: [pages/ledger/](../pages/ledger/overview.md).
 
 ### 4. The Analysis — `/insights`
 
@@ -247,7 +240,7 @@ Editorial content hub. Each round, Jaromelu publishes opinionated analytical art
 
 Framing: *"Here's what I'm thinking this round, in full."* Long-form to complement the Feed's live cadence.
 
-Detail: [pages/analysis/](../../pages/analysis/overview.md).
+Detail: [pages/analysis/](../pages/analysis/overview.md).
 
 ### 5. Ask Me — `/ask`
 
@@ -255,7 +248,7 @@ Chat. Customers ask Jaromelu about strategy, players, or his own calls. Answers 
 
 Available standalone (`/ask`) and embedded in the Feed as Twitch-style chat — same backend, different surface.
 
-Detail: [pages/ask-me/](../../pages/ask-me/overview.md).
+Detail: [pages/ask-me/](../pages/ask-me/overview.md).
 
 ---
 
@@ -438,43 +431,9 @@ If a proposed feature conflicts with this list, the feature is wrong — not the
 
 ## Related
 
-- [Venture Thesis (draft)](01-venture-thesis.draft.md) — what Jaromelu is and why
-- [Knowledge Asset (draft)](03-knowledge-asset.draft.md) — the asset the crew builds and what it unlocks
-- [Design Principles](../../concepts/00-design-principles.md) — visual and editorial rules
-- Per-page specs in [`docs/pages/`](../../pages/)
-- Per-agent specs in [`docs/agents/crew/`](../../agents/crew/)
+- [Venture Thesis](01-venture-thesis.md) — what Jaromelu is and why
+- [Knowledge Asset](03-knowledge-asset.md) — the asset the crew builds and what it unlocks
+- [Design Principles](../concepts/00-design-principles.md) — visual and editorial rules
+- Per-page specs in [`docs/pages/`](../pages/)
+- Per-agent specs in [`docs/agents/crew/`](../agents/crew/)
 
----
-
-## Drafting notes (delete before merge)
-
-**Source:** `03-experience-architecture.md` (current). This draft is a customer-centered reframe — most content carried over, with these substantive changes:
-
-**Title:** "Experience Architecture" → "The Show." The spine is now 01 (what Jaromelu is — experience-led) → 03 (the show). 02 became a Scope & Non-Goals reference, not a narrative step.
-
-**Crew section:**
-
-- Added **Critic, Bookkeeper, Archivist** — referenced in 01 source but never detailed in current 03. Each gets a one-line role and *"What the customer sees"* examples.
-- Added an explicit **note on voice**: the crew has visible activity, but only Jaromelu has personality. Scout/Analyst/Critic/Bookkeeper/Archivist all report in clean functional voice. This reconciles with the project's settled framing — *single voice, visible labour*: the crew compose into Jaromelu's one voice, but their work is shown as the spectacle.
-- Removed **"Maps to: …"** technical lines from each agent. Those belong in deeper architecture docs (`05-runtime-architecture`, per-agent specs), not in the customer-facing show doc.
-
-**Pillar-to-mechanism mapping:** Added a new "How Each Promise Gets Delivered" section at the end — the content proposed to move from old 02's "How Each Pillar Is Delivered." Compressed from per-pillar prose into a single mapping table. Per-promise depth lives in 02; per-mechanism depth lives throughout 03.
-
-**Sequencing:** The reading flow is now 01 → 03 (02 is a side reference, not a step). Participation lives entirely here in 03 ("How The Audience Plays" + "The Customer In The Index"); 01 no longer carries a "What They Do Here" section, so back-references to it were removed.
-
-**Realignment (2026-05-23).** After 01 flipped to experience-led and 02 collapsed to Scope & Non-Goals, this draft was realigned: rewrote the opening handoff (dropped "02 says what we owe them"); removed the orphaned "How Each Promise Gets Delivered" section (its premise — the five promises in 02 — no longer exists); fixed two now-dead cross-references to 01 (PAI is introduced here now, not in 01; the "What They Do Here" back-ref removed); and resolved the crew-personality contradiction in "Why It's A Crew, Not A Tool" — Jaromelu is the character, the crew are his visible workforce (single voice, visible labour). Body content otherwise unchanged; the doc was already spiritually aligned with experience-led 01.
-
-**Renumber + scope fold (2026-05-23).** New spine: **01 thesis → 02 the show → 03 knowledge asset.** This doc moves into the 02 slot (file to be renamed `02-the-show.draft.md`). The former `02-what-we-promise` (Scope & Non-Goals) was dissolved; its content folded in here as the closing "Scope — What We Won't Build" section. Knowledge-asset detail moved to its own new 03.
-
-**What got tightened or dropped:**
-
-- "What Got Absorbed" table dropped (page-set churn history isn't customer-facing; belongs in a project-history note if anywhere).
-- "UI/UX Specifications" pointer trimmed — Related links section at the bottom covers it.
-- 2026-04-17 status note from current 03 is no longer needed: the consolidated five-page surface set is now the body content, not a retrofit.
-- Some prose tightened throughout but core content preserved.
-
-**Pending decisions:**
-
-- Whether to keep the Crew section inline in 03 or split into its own `04-the-crew.md`. This draft keeps it inline (no separate doc needed since per-agent docs already exist under `docs/agents/crew/`).
-- Where the Seasonal Arc should live — could move to `09-v1-scope-and-roadmap.md` if 03 gets long. Kept here for now since it ties tightly to the rhythm material.
-- The Critic / Bookkeeper / Archivist role descriptions are my best read from 01 + memory; worth verifying against any per-agent docs that may already exist (or flagging as gaps to fill).
