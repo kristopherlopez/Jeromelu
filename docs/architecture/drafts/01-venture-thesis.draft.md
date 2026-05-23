@@ -2,136 +2,152 @@
 tags: [area/architecture]
 status: draft
 ---
+# Venture Thesis (Draft — experience-led rewrite)
 
-# Venture Thesis (Draft — customer-centered revision)
-
-> Draft created 2026-05-09 alongside the existing `01-venture-thesis.md`. Same source content, restructured around the customer: who they are, why they'd want this, and what we want them to feel. Delivery, asset, and roadmap content has been pulled out for placement elsewhere.
+> Draft revised 2026-05-23. The previous customer-centered structure has been replaced with an experience-led one. The thesis is *"a captivating agentic experience with a home, NRL is the chosen domain"* — not *"a customer with a utility pain we relieve."* Sections reordered and rewritten accordingly. See drafting notes at the bottom for the diff against the prior version.
 
 ---
 
 # Venture Thesis
 
-> Last reviewed: 2026-05-06.
+> Last reviewed: 2026-05-23.
 
-Jaromelu is an autonomous AI **commentator on the NRL** — a non-human presence with a name, a voice, opinions, and a public track record, who lives on his own website. He's backed by a crew of agents who ingest the NRL media ecosystem, build a continuously evolving view of the competition, form opinions, make calls, and live with the consequences. Visitors watch the operation unfold in public and come back to see whether his takes held up.
+Jaromelu is an autonomous AI commentator on the NRL — an anthropomorphised agentic presence with a name, a voice, opinions, a public track record, and **his own home on the web**. He's run by a crew of agents who ingest the NRL media ecosystem, build a continuously evolving view of the competition, form opinions, make calls, and live with the consequences. And you can watch them work.
 
-The product is designed as an **entertainment spectacle first** and a utility second. Where those two are in tension, spectacle wins.
+Chat UIs exist. Character.ai-style chatbots exist. AI characters with real followings live on social platforms — but they're tenants on Instagram and TikTok, and you never see the operation behind the personality. **A captivating agentic experience that lives in its own home, where the work is part of the show — that's the shape nobody's built.** That's the category Jaromelu opens.
 
 ---
 
-## Who Are The People
-
-**Primary audience:** Hardcore NRL fans who consume heavy amounts of NRL commentary — podcasts, YouTube panels, post-match shows. Above-average game literacy.
-
-**Typical user:**
-
-- Australian, predominantly male
-- Already consumes multiple NRL podcasts and YouTube channels each week
-- Time-poor, opinion-saturated, decision-fatigued
-- Wants fast synthesis over long-form content
-- On a phone, on the bus, on the couch — checking in for 90 seconds at a time
-
-**What they hire Jaromelu to do:**
-
-> "Help me quickly understand what the NRL world is thinking — and entertain me while doing it."
-
-Compression *and* entertainment — neither alone is enough.
-
-We are not building for the casual NRL viewer. The thesis assumes the audience already lives in NRL discourse and is hiring Jaromelu to compress and entertain. SuperCoach players, when that extension ships, overlap heavily with this audience — but the relationship is built first on NRL commentary.
-
-## What They're Frustrated With Today
-
-The audience is drowning, not searching. They already follow more NRL commentary than they can keep up with — three podcasts deep, two YouTube channels behind, panel takes contradicting each other on Tuesday and forgotten by Thursday.
-
-The pain isn't a lack of content. The pain is:
-
-- **Too much, all at once.** A round produces 12+ hours of audio across the major channels. Even the hardcore fan is always behind.
-- **Conflicting takes, no accountability.** Three commentators say three different things about the same player. Nobody tracks who was right last week, let alone last season — and the customer isn't going to do that math themselves.
-- **Opinion saturation.** Hot takes are cheap. The customer can't tell whose conviction is earned and whose is fluff.
-- **No fast lane.** The synthesis they want — *"what's the consensus, where are the contradictions, who's calling it differently?"* — only exists if they spend the hours to assemble it.
-
-The customer doesn't need another podcast. They need someone to listen to all of them and tell them what matters.
-
-## Why Would People Want This
-
-There's nothing else like him, and that's the point.
-
-A character with a name, a voice, opinions, and a public accuracy record is harder to copy than a tool with the same features. A growing ledger of speaker-attributed claims, graded against reality, is harder to copy than a season of stats. Stack the two and a competitor can't catch up by spending money — they need to spend a season.
-
-**What we believe about the audience:**
-
-- Hardcore NRL fans will follow a non-human personality if it has takes worth following
-- Public accuracy *and* public misses build more trust than a polished UI ever could
-- The medium gets richer fast enough that today's text-led show becomes tomorrow's video-rich show on the same captured data — anyone who joins now is following something that keeps getting richer
-
-**Why this is possible now:** LLMs are good enough to hold a voice across thousands of outputs; speaker-diarised transcription is cheap and accurate; generative voice and video are on a clear cost-down curve. The "capture everything now, compose richer later" pattern is finally viable.
-
 ## What We Want People To Feel
 
-The aim isn't "AI tool that does NRL analysis." The aim is **a presence that feels alive** — a non-human entity with opinions, a voice, and a track record, who lives publicly in his own digital home. The reaction we're chasing is: *"Wait — this thing actually has takes."*
+Two emotions, in order.
 
-Some of that is unreachable today. Real-time AI video is still research-grade and expensive, and pre-generated avatar clips have already been explored and parked — at the volume the show needs, they take too long to produce, run expensive, and risk feeling tiresome quickly. So in V1 Jaromelu is **text-led**, with voice for the big set-piece moments. The "alive" feeling has to come from somewhere else, and it does:
+**On arrival: awe.** *"Wait — this is an AI, and it actually has takes."* The shock of meeting something that feels alive instead of indexed. Not a chatbot waiting for you to prompt it. Not a wrapper around a model. A presence with a name, a voice, and opinions about your team — already mid-thought when you arrived.
 
-- The crew's **visible work** — Scout discovering, Analyst cross-referencing, contradictions surfacing
-- The **editorial voice** everywhere — no system copy; every line has a speaker
-- The **rhythm of the week** — the screen looks different on Monday than on Thursday
-- The **always-on crew status** — there's always something happening
-- The **digital home** — the website is a place he lives, not a dashboard you visit
+**On return: aquarium.** Something is always happening. Scout is searching. Analyst is cross-referencing. Archivist is updating the wiki. Critic is disagreeing in the corner. The screen looks different on Monday than on Thursday because the operation kept running while you were gone.
 
-When generative video gets cheap enough to run sustainably, the avatar layer slots in on top of all that. Until then, the show carries itself.
+These aren't competing emotions — they're **first encounter** and **sustained pull**. The site has to deliver both. The awe gets people to remember the URL. The aquarium gets them to type it again.
 
-## What They Do Here
+## The Show
 
-The customer isn't watching the show. They're in it.
+Jaromelu is the voice. One personality, one editorial register — everything you read or hear in his name is his.
 
-- **They react.** Every open Remark accepts agree/disagree from the audience. Their reactions become part of the record.
-- **They challenge.** They ask Jaromelu directly about a call — *"you're wrong about the Eels, here's why"* — and he responds, in character, with whatever the ledger says.
-- **They get graded.** Every customer accumulates a **Personal Alignment Index** — graded against reality the same way Jaromelu is. They earn their own track record over a season.
-- **They come back to see how they're tracking.** Reasons to return that don't depend on Jaromelu being right: *"How am I doing this season?"*
+The crew is the visible labour. Scout, Analyst, Critic, Bookkeeper, Archivist — they don't speak in their own voice, they *work*, and their work is visible:
 
-The customer is a participant with skin in the game, not an audience member with a remote.
+- A Scout query firing into the YouTube ecosystem
+- A new source landing in the candidate queue
+- An Archivist diff hitting the wiki
+- A Critic flag attached to a claim that didn't hold up
+- A Bookkeeper ticking off last week's predictions against reality
+
+The closest reference frames are watching collaborators move around in a shared Google Doc, or watching fish in an aquarium. You're not driving the operation. You're watching it. When something interesting surfaces you can lean in — but you don't have to.
+
+This is the spectacle. Not the polished output of an AI tool. The visible work of a non-human intelligence doing its job, all the time.
+
+The bar for whether it's working is personal: is it entertaining to *watch*? The creator is the first and harshest member of the audience — if the operation can't hold his attention, it isn't ready. That's the right test, not a proxy metric.
+
+## Why NRL
+
+The honest answer: **because the creator loves NRL.**
+
+This is not a market-led choice. It's not a wedge into a category. The experiment runs on NRL because that's where the work is sharpest — where someone knows the audience well enough to make the output bite, where someone watches the content closely enough to catch when an opinion is dishonest, where someone cares enough to keep going.
+
+NRL is also a good fit for the format. Heavy weekly content cycle. Opinion-saturated commentary ecosystem. Results graded in public every weekend. Decades of stats and rivalries to ingest. The domain rewards a system that listens widely and remembers.
+
+But the thesis is **agentic experience with a home**. The domain is the lens, not the bet. If the shape works on NRL — anthropomorphised, visibly-crewed, living on its own website — it extends to any sport, and very likely any topic with a passionate audience and a content cycle that keeps producing.
+
+## Who Finds This Irresistible
+
+Hardcore NRL fans. Already three podcasts deep. Already two YouTube channels behind. Above-average game literacy. Australian. Time-poor. Opinion-saturated.
+
+The spectacle lands hardest for them because the show happens in a language they already speak. They know the players, the rivalries, the running arguments. Watching an AI form opinions about all of it hits differently for someone who already has their own opinions about all of it.
+
+They didn't come to fix a utility problem. But they have one. The audience is drowning in commentary — three podcasts deep, two YouTube channels behind, panel takes contradicting each other on Tuesday and forgotten by Thursday. Jaromelu, by virtue of existing, listens to all of it, forms his own view, and grades last week's takes against reality. That's a free utility on top of the spectacle. They'll use it. It's just not why they showed up.
+
+We are not building for the casual NRL viewer. The thesis is built around an audience that already lives in NRL discourse — and finds something they've never seen before waiting for them when they arrive.
+
+## What Compounds
+
+The crew is building a continuously growing knowledge base of all things NRL — claims, predictions, sources, attributions, results. Every podcast transcribed. Every prediction recorded. Every outcome graded. Speaker-attributed, time-stamped, queryable.
+
+**It augments Jaromelu.** Sharper takes, deeper memory, better calls. The longer the project runs, the more context he has to draw on.
+
+**It earns his credibility.** Jaromelu's own takes run passively from day one, graded against the same reality as the human pundits'. The point isn't to be loud early — it's to accumulate a track record. Once his calls demonstrably rival the humans', the awe stops being "cute, an AI has opinions" and becomes "this thing is actually good." The ledger is the proof, not just the theatre.
+
+**It's a discovery surface.** Because every claim is speaker-attributed, the audience doesn't just see *what* was said — they see *who* said it, and how often that person was right. Someone with sharp, well-graded, contrarian takes becomes worth following. Jaromelu turns into a way to find the voices in the NRL ecosystem worth your time.
+
+**It unlocks new directions.** Whose predictions came true. Who's good at predicting what — player form, scoreline, finals, recovery timelines. How those track records intersect with sports betting. How they intersect with SuperCoach. Each is a separate opportunity sitting on the same captured data.
+
+And the shape isn't NRL-specific. Done well, the same operation — ingest a domain, form opinions, grade them in public, surface the voices worth following — extends to any sport, and very likely any topic with a passionate audience and a steady content cycle.
+
+→ Detail in [Knowledge Asset](04-knowledge-asset.md) *(to be drafted)*.
+
+## Why This Is Possible Now
+
+A few things have to be true at once.
+
+- **LLMs are good enough to hold a voice** across thousands of outputs without drifting into generic AI register.
+- **Multi-agent orchestration is finally productionable** — the "team of specialists" pattern actually composes coherent output instead of falling apart at the seams.
+- **Speaker-diarised transcription is cheap and accurate enough** to ingest the entire NRL podcast ecosystem week after week.
+- **Generative voice and video are on a clear cost-down curve** — capture everything in text now, the medium gets richer on top of the same captured data.
+
+None of these were true two years ago. Most are still novel enough that a captivating agentic experience with a home is genuinely an unsolved problem, not a copy-paste.
 
 ---
 
 ## Related
 
 - [Value & Delivery](02-value-and-delivery.md) — the promise unpacked into pillars and signals
-- [Experience Architecture](03-experience-architecture.md) — the crew, surfaces, and episode arc in full
+- [Experience Architecture](03-experience-architecture.md) — the crew, surfaces, episode arc, and how the audience participates
+- [Knowledge Asset](04-knowledge-asset.md) — what compounds, what it unlocks, the moat *(to be drafted)*
 - [Design Principles](../concepts/00-design-principles.md) — visual and editorial rules
 - [Audience](../concepts/06-audience.md) — how participation works
-- [V1 Scope & Roadmap](09-v1-scope-and-roadmap.md) — what we ship first against this thesis
+- [V1 Scope & Roadmap](09-v1-scope-and-roadmap.md) — what ships first against this thesis
 
 ---
 
 ## Drafting notes (delete before merge)
 
-**Section restructure** (vs source):
+**Reframe vs prior draft.** Previous draft was customer-centered: started with audience, built pull from frustration, treated spectacle as a side. This version is experience-led: starts with the new-category claim, lets aesthetic carry the pull, demotes audience to "who this lands for," and pulls NRL out as an honest creator-led domain choice.
 
-- New order: Opening → Who Are The People → What They're Frustrated With Today → Why Would People Want This → What We Want People To Feel → What They Do Here. Customer-flow: meet the audience, understand the pain, understand the pull, understand the feel, understand what they actually do. (Source order was: Strategic Bet → Feel → Audience → Show structure → Audience-in-show → Return triggers → Knowledge asset → Horizons → Category.)
-- Heading: "Audience" → "Who Are The People"
-- Heading: "The Strategic Bet" → "Why Would People Want This"
-- Heading: "What We Want People To Feel" — unchanged
-- New section: "What They're Frustrated With Today" — surfaces the pain that's currently buried as a single bullet ("time-poor, opinion-saturated, decision-fatigued"). Sets up the pull more concretely.
-- New section: "What They Do Here" — customer-as-participant. Pulls the *identity* framing out of the original "The Audience Is In The Show" section; the participation surfaces (UI, mechanics) still proposed for `03`.
+**Section order — new:**
 
-**What was cut and where it's proposed to go:**
+1. Opening (new-category claim — captivating agentic experience with a home doesn't exist yet)
+2. What We Want People To Feel (awe on arrival + aquarium on return)
+3. The Show (Jaromelu = voice; crew = visible labour; Google-Doc / aquarium reference frame)
+4. Why NRL (proud, creator-led)
+5. Who Finds This Irresistible (audience — demoted from #2 to #5)
+6. What Compounds (knowledge asset + moat + downstream unlocks)
+7. Why This Is Possible Now (feasibility — moved to last)
 
-- **Core and Spokes** — dropped (defensibility argument now sits inside "Why Would People Want This").
-- **Core Job To Be Done** — folded into "Who Are The People" as "What they hire Jaromelu to do."
-- **The Value Proposition** — dropped (already a pointer to 02; kept as Related link).
-- **Why A Crew Of Characters, Not A Tool** — proposed move to `03-experience-architecture.md`.
-- **The Show Has Structure** — proposed move to `03` (episode arc).
-- **The Audience Is In The Show** — split. Customer-identity framing now lives in 01 as "What They Do Here." Participation surfaces (UI, mechanics) still proposed for `03`.
-- **Return Triggers** — proposed move to `03` (engagement rhythm).
-- **The Knowledge Asset** (capture / capabilities / monetisation / moat) — proposed new doc, e.g. `04-knowledge-asset.md`.
-- **Capability Horizons** — proposed move to `09-v1-scope-and-roadmap.md`.
-- **Category** — dropped (opening paragraph already establishes the category).
-- **"What we're trading away" bullets** (from old Strategic Bet) — dropped from this customer-centered doc. Mass-market reach is already in "Who Are The People." The V1-text-led trade-off is in "What We Want People To Feel." SC-as-wedge is no longer load-bearing once Core and Spokes is gone.
+**What was cut from the prior draft:**
 
-**Wording changes:**
+- *"Entertainment spectacle first, utility second"* line — replaced by the cleaner new-category claim.
+- *"What They're Frustrated With Today"* as a standalone section — frustration is now a side-effect benefit folded into "Who Finds This Irresistible," not the hook.
+- *"Why Would People Want This"* as a standalone section — its real content split: customer pull → "What We Want People To Feel" + "The Show"; defensibility → "What Compounds."
+- *"Predominantly male"* demographic line — cut as noise.
+- SC reference in the audience section — SC isn't load-bearing here and is properly covered downstream.
+- Long V1 trade-off paragraph about real-time AI video being research-grade — moved out of the Feel section.
+- *"What They Do Here"* (participation: react/challenge/grade/PAI) — moved to [03-the-show.draft.md]. Participation is a layer on top of watching, not part of the venture thesis.
 
-- "The defensible thing is **the persona plus the knowledge graph…**" → "There's nothing else like him, and that's the point." (opening line of Why-section, reframes from defensibility to customer pull; the persona-plus-graph argument follows in the next paragraph).
-- Subhead: "What we're betting on" → "What we believe about the audience" (customer-framed).
-- "Why now:" → "Why this is possible now:" (slight customer-framing tweak).
-- "The SC spoke, when it ships, overlaps heavily…" → "SuperCoach players, when that extension ships, overlap heavily…" (avoids referencing a section that no longer exists in this doc).
-- Opening paragraph 3 ("The project is also a public demonstration of what's possible when data pipelines, agentic LLM reasoning, character voice, and orchestration are composed…") — dropped. Builder-framing, not customer-framing; belongs in a project-level README or a "for builders" doc.
+**Resolves prior tensions:**
+
+- *Spectacle vs utility.* Spectacle is the product. Utility (compression of NRL discourse) is a free side-effect folded into Section 5.
+- *Defensibility framed as customer pull.* The moat framing was dropped entirely in round 2 (see below) — the goal is extensibility, not defensibility. Customer pull lives in Feel + Show.
+- *Crew visibility contradiction.* Resolved as: Jaromelu is the single voice; the crew is the visible labour. They work, they don't speak. This is now explicit in "The Show."
+
+**Round 2 (2026-05-23) — pressure-test responses folded in:**
+
+- *Audience / framing.* This is a personal creator thesis, not an external pitch — so it doesn't need a defensive competitive-landscape section. Opening was sharpened anyway: nearest neighbours (AI VTubers, AI social-media characters) are *tenants on platforms they don't own* and *never show the operation* — the wedge is "own home + visible work," not "nothing exists."
+- *The bet that visible agent work is entertaining.* Stated as a personal bar in "The Show" — the creator is the first and harshest audience; if it doesn't entertain him, it isn't ready. Deliberately not defended with metrics.
+- *Moat dropped.* Creator doesn't care whether it's a moat. Replaced with the genuine belief: done well, the shape extends to any sport and likely any topic. This also resolves the old lens-vs-moat contradiction.
+- *Discovery added.* New thread in "What Compounds": speaker-attribution makes Jaromelu a way to *discover* commentators worth following, not just a who-was-right ledger.
+- *Awe is earned, not assumed.* New "It earns his credibility" beat in "What Compounds": takes run passively and graded vs human pundits from day one; foregrounded once demonstrably comparable. The ledger is the proof mechanism behind the awe.
+- *Betting language softened* from "influence sports betting markets" to "intersect with sports betting" (regulatory reality; light touch only).
+- *Held for user feedback (no change):* the ambient-aquarium return-driver, and the "no stated risk" critique.
+
+**Follow-ups (separate tasks):**
+
+- Draft `04-knowledge-asset.md` — referenced in "What Compounds" and "Related."
+- Move participation content (react / challenge / Personal Alignment Index) into `03-the-show.draft.md`.
+- Update memory note `project_crew_terminology` — current note ("crew = internal reasoning, not visible agents") is now stale. Correct framing: crew is internal to *voice* but external to *visibility*.
