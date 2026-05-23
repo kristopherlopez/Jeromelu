@@ -202,7 +202,7 @@ Phase 1 is **done** when all of these are true:
 7. `make scout-supercoach-roster` works from local and prod.
 8. `.claude/skills/scrape-supercoach/` is deleted.
 9. A daily cron is scheduled and has produced at least one `agent_runs` row.
-10. After 3 days of observation, `people`/`people_attributes` are healthy and no drift-test failures.
+10. After 3 days of observation, `people`/`player_attributes` are healthy and no drift-test failures.
 
 ---
 
@@ -211,7 +211,7 @@ Phase 1 is **done** when all of these are true:
 If Phase 1 lands a regression in roster data:
 
 1. **Disable the cron** — comment out the entry; manual operator runs only.
-2. **Revert the endpoint alias** — old `/api/admin/players/fetch-and-refresh` endpoint stays live throughout; nothing else writes to people/people_attributes via the new path until cutover.
+2. **Revert the endpoint alias** — old `/api/admin/players/fetch-and-refresh` endpoint stays live throughout; nothing else writes to people/player_attributes via the new path until cutover.
 3. **The fetch + SCD-2 logic is unchanged** — the underlying shared package functions are not touched in Phase 1. Audit-wrapper + Pydantic-strict + alias + cron are all reversible.
 4. **The drift test is additive** — never blocks a write; failure just surfaces to the operator.
 

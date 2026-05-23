@@ -235,7 +235,7 @@ After backfill: future cron only writes new (current-season, current-round) snap
 | `extract_injuries` | `scout/nrlcom/casualty-ward/*` | `injuries` |
 | `extract_ladder` | `scout/nrlcom/ladder/*` | `team_standings` (new) |
 | `extract_stat_leaderboards` | `scout/nrlcom/stats/*` | `stat_leaderboards` (new) |
-| `extract_roster_identity` | `scout/supercoach/classic/players-cf/*` | `people`, `people_attributes`, `people_roles` (current Phase 1 path — moves to read-from-S3 instead of read-from-upstream) |
+| `extract_roster_identity` | `scout/supercoach/classic/players-cf/*` | `people`, `player_attributes`, `people_roles` (current Phase 1 path — moves to read-from-S3 instead of read-from-upstream) |
 | `extract_editorial_claims` | `scout/supercoach/classic/players-cf/*` (the `notes[]` slice) | `claims`, `quotes`, `claim_associations` |
 | `extract_player_round_stats` | `scout/nrlsupercoachstats/stats/*` ⊕ `scout/nrlcom/match-centre/*` | `player_rounds` (with the D11 trust-hierarchy merge) |
 | `extract_sc_settings` | `scout/supercoach/classic/settings/*` | `sc_settings` (new — game rules per season) |
@@ -262,10 +262,10 @@ Pipeline inventory after full source enumeration (2026-05-12). Each row is a fol
 
 | Pipeline folder | Endpoint | S3 path | DB extraction target | Status |
 |---|---|---|---|---|
-| `scout/supercoach_roster/` | `/api/nrl/classic/v1/players-cf` | `supercoach/classic/players-cf/{season}/{YYYYMMDD}.json` | `people`, `people_attributes`, `people_roles` (+ `claims`/`quotes` from `notes[]`) | ✅ shipped (Phase 1) — needs S3-first retrofit per D10 |
+| `scout/supercoach_roster/` | `/api/nrl/classic/v1/players-cf` | `supercoach/classic/players-cf/{season}/{YYYYMMDD}.json` | `people`, `player_attributes`, `people_roles` (+ `claims`/`quotes` from `notes[]`) | ✅ shipped (Phase 1) — needs S3-first retrofit per D10 |
 | `scout/supercoach_teams/` | `/api/nrl/classic/v1/teams` | `supercoach/classic/teams/{season}.json` | Cross-reference into `teams.metadata_json.supercoach` | 🟡 not built — Phase 1.5 |
 | `scout/supercoach_settings/` | `/api/nrl/classic/v1/settings` | `supercoach/classic/settings/{season}/{YYYYMMDD}.json` | `sc_settings` (new table — SC game rules per season) | 🟡 not built |
-| `scout/supercoach_draft_roster/` | `/api/nrl/draft/v1/players-cf` | `supercoach/draft/players-cf/{season}/{YYYYMMDD}.json` | Draft-mode parallel of `people_attributes` (or `people_attributes.metadata_json.draft`) | 🟡 optional — Phase deferred |
+| `scout/supercoach_draft_roster/` | `/api/nrl/draft/v1/players-cf` | `supercoach/draft/players-cf/{season}/{YYYYMMDD}.json` | Draft-mode parallel of `player_attributes` (or `player_attributes.metadata_json.draft`) | 🟡 optional — Phase deferred |
 | `scout/supercoach_draft_teams/` | `/api/nrl/draft/v1/teams` | `supercoach/draft/teams/{season}.json` | Same cross-reference | 🟡 optional |
 | `scout/supercoach_draft_settings/` | `/api/nrl/draft/v1/settings` | `supercoach/draft/settings/{season}/{YYYYMMDD}.json` | Draft-mode rules | 🟡 optional |
 
@@ -389,7 +389,7 @@ Pick the smallest pipeline: **SuperCoach player roster**. It already has a worki
 - Add a `make scout-supercoach-roster` target for ad-hoc operator runs that hits the endpoint with admin auth.
 - Retire the `scrape-supercoach` Claude Code skill — operators use the endpoint or the `make` target.
 - Schedule via external cron — daily.
-- Phase 1 done = the SuperCoach roster refreshes daily, an audit row lands per run, the drift test runs in CI (fixture-mode) and on a schedule (live-mode), the `make` target works for ad-hoc operator use, the skill is retired, and `people`/`people_attributes` row counts move when the upstream data does.
+- Phase 1 done = the SuperCoach roster refreshes daily, an audit row lands per run, the drift test runs in CI (fixture-mode) and on a schedule (live-mode), the `make` target works for ad-hoc operator use, the skill is retired, and `people`/`player_attributes` row counts move when the upstream data does.
 
 ### Phase 2 — SuperCoach per-round stats (the high-leverage one)
 
