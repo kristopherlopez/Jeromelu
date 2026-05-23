@@ -1,3 +1,24 @@
+## Build Operating Model
+
+The Jaromelu codebase is built by a small team of agents working a persistent task queue (Simon Last's "team-of-agents" model). The human's job is to keep vetted tasks flowing faster than they get drained; the implementer's job is to drain the queue with proof.
+
+**Read at session start:**
+- [docs/build/PLAN.md](./docs/build/PLAN.md) — active and archived plan docs
+- [docs/build/TASKS.md](./docs/build/TASKS.md) — persistent queue (What / How to verify / Proof notes)
+- [docs/build/META.md](./docs/build/META.md) — process rules and project invariants
+
+**Roles** (charters in [.claude/agents/](./.claude/agents/)):
+- `planner` — interviews, drafts plans, appends vetted tasks. Use BEFORE writing code.
+- `implementer` — long-lived session, drains the queue.
+- `adversarial-reviewer` — read-only per-task review before checkoff. Mandatory.
+- `black-box-tester` — independent end-to-end verification.
+- `issue-triager` — turns incoming pain into vetted tasks.
+- `deep-code-reviewer` — periodic subsystem audit.
+
+**Background-execution carve-out:** The user's global CLAUDE.md requires explicit approval before any background execution. Within the Jaromelu implementer session, background execution is **pre-approved by default for any task already in `docs/build/TASKS.md`** whose `What` block describes it. Ad-hoc background commands outside the queue still require human approval.
+
+---
+
 ## Git Workflow
 
 After every change (feature, fix, refactor, docs update), **commit and push to `main`** immediately. Do not batch changes or wait to be asked.

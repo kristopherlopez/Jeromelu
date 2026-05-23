@@ -13,15 +13,16 @@ venv/
 # Build outputs
 .next/
 dist/
-build/
+/build/
 
 # IDE
 .vscode/
 .idea/
 .obsidian/
 
-# Claude Code
-.claude/
+# Claude Code — ignore everything under .claude/ except project-scoped agent charters
+.claude/*
+!.claude/agents/
 
 # Assets (large binaries)
 assets/
