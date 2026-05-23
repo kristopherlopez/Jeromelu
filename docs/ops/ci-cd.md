@@ -185,14 +185,14 @@ The `jeromelu-instance` user gets `ses:SendEmail` scoped to the existing SES ide
 
 ### Python deps
 
-The script needs `boto3` (everything else is stdlib). On the box it lives in a dedicated venv at `/opt/jeromelu/.venv-ops`, bootstrapped by `lightsail-deploy.sh` on first deploy and re-used thereafter. Kept separate from any service venv so a future api image rebuild can't pull deps out from under cron.
+The script needs `boto3` (everything else is stdlib). Installed once on the box via `apt-get install python3-boto3` by `lightsail-deploy.sh` on first deploy. Ubuntu's distro version is ~v1.20 — old, but plenty for SES + S3 list_objects. No venv: one system package is simpler than venv + python3-venv.
 
 ### Testing without waiting for cron
 
 ```bash
 ssh jeromelu-prod
 . /opt/jeromelu/.env
-/opt/jeromelu/.venv-ops/bin/python /opt/jeromelu/scripts/cron_report.py
+python3 /opt/jeromelu/scripts/cron_report.py
 ```
 
 Prints the plaintext digest to stdout, then `---sending---`, then `sent OK` once SES accepts it. To dry-run without actually sending, comment the `send_email(...)` call in `main()` — there is no `--dry-run` flag.

@@ -41,15 +41,13 @@ for svc in api web video-worker; do
 	docker image prune -f
 done
 
-# Bootstrap the cron ops venv if missing. Only dep is boto3 (used by
-# scripts/cron_report.py for SES + S3). Kept separate from any service
-# venv so a service image rebuild can't pull deps out from under cron.
-# Idempotent — no-op when the venv already exists.
-if [[ ! -x /opt/jeromelu/.venv-ops/bin/python ]]; then
-	echo ">>> bootstrapping .venv-ops"
-	python3 -m venv /opt/jeromelu/.venv-ops
-	/opt/jeromelu/.venv-ops/bin/pip install --quiet --upgrade pip
-	/opt/jeromelu/.venv-ops/bin/pip install --quiet 'boto3>=1.34'
+# scripts/cron_report.py needs boto3. Installed once via apt as a system
+# package — Ubuntu's python3-boto3 (~v1.20) is plenty for SES + S3
+# list_objects. Avoids pulling python3-venv just to host one dep, and
+# avoids the cron job depending on any service venv. Idempotent.
+if ! dpkg -s python3-boto3 >/dev/null 2>&1; then
+	echo ">>> installing python3-boto3"
+	sudo -n apt-get install -y -q python3-boto3
 fi
 
 # Sync the checked-in cron schedule into /etc/cron.d/. The `ubuntu` deploy
