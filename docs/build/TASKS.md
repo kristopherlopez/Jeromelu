@@ -95,25 +95,6 @@ Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "One-time S3 seed run" + "D
 _(implementer fills in: three curl responses, three aws s3 ls outputs, two SQL query results, doc diff summary, first-cron-fire log line)_
 
 
-### TASK-17: Refactor `phase_timeline` to pure `_extract_timeline_rows` + `_extract_official_rows` + unit tests
-
-Implements PLAN.md § 2026-05-24 Scout Phase 3.5 / Interface / pure extract (timeline). Depends on TASK-13.
-
-**What**
-1. **Behavior-preserving refactor** of `scripts/data/populate/phase_timeline.py`: extract two pure functions — `_extract_timeline_rows(payload, key, match_id, team_map, player_map) -> list[dict]` (one row per `timeline[]` event: match_id, nrlcom_match_id, sequence, event_type, title, game_seconds, nrlcom_team_id, team_id, nrlcom_player_id, person_id, running_home_score, running_away_score, raw_payload, s3_archive_key) and `_extract_official_rows(payload, key, match_id) -> list[dict]` (one row per `officials[]` with a name: match_id, nrlcom_match_id, first_name, last_name, role, person_id=None, raw_payload, s3_archive_key). `populate_timeline_and_officials` calls both, then UPSERTs via the existing `timeline_sql` / `officials_sql`. No SQL/summary change.
-2. Create `tests/unit/scripts/data/populate/test_phase_timeline.py`. Tests:
-   - `test_extract_timeline_rows` — `sequence` is 0..N-1 in order; `event_type` defaults to `"Unknown"` when an event has no `type`; `running_home_score`/`running_away_score` map from `homeScore`/`awayScore`; team/player resolve via maps (None when absent); row count == `len(payload["timeline"])`.
-   - `test_extract_official_rows` — one row per official with a first or last name; an official with neither is skipped; `role` from `position`; `person_id` is `None`.
-
-**How to verify**
-- `pytest tests/unit/scripts/data/populate/test_phase_timeline.py -v` — all pass.
-- Refactor behavior-preserving: `populate_timeline_and_officials` still UPSERTs via `timeline_sql`/`officials_sql` and returns the same summary keys. `pytest tests/unit/ -q` green.
-- `git status`: modified `phase_timeline.py` + one new test file.
-
-**Proof notes**
-_(implementer fills in)_
-
-
 ### TASK-18: Fix the broken `--dry-run` (thread a `commit` flag through the phases)
 
 Implements PLAN.md § 2026-05-24 Scout Phase 3.5 / Interface / `--dry-run` fix. Closes the META known-bug.

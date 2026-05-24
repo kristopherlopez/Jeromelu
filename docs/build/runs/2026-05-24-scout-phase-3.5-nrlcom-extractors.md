@@ -1,6 +1,6 @@
 # Scout Phase 3.5 — nrl.com match-centre DB extractors (harden + verify + populate)
 
-**Date:** 2026-05-24 · **Status:** 🟡 In progress (TASK-13–16 of TASK-13→19 done) · **Plan:** Scout Phase 3.5 (PLAN.md)
+**Date:** 2026-05-24 · **Status:** 🟡 In progress (TASK-13–17 of TASK-13→19 done; only dry-run fix + prod populate remain) · **Plan:** Scout Phase 3.5 (PLAN.md)
 
 **TL;DR** — The S3→DB extractors for the nrl.com match-centre data already existed (`scripts/data/populate/` + orchestrator, all 6 tables + identity columns present) but had zero tests, a broken `--dry-run`, and no verified run. Phase 3.5 hardens them: fixture-based unit tests for the 4 match-centre phases (via behavior-preserving pure-function refactors), fix `--dry-run`, then populate prod + verify. NRL only (comp 111), season 2026.
 
@@ -24,6 +24,10 @@ Behavior-preserving refactor: extracted the inlined per-player row-building from
 Behavior-preserving refactor: extracted the inlined player row-building into a pure `_extract_player_list_rows(payload, match_id, team_map, player_map) -> list[dict]` (same skip rules: unresolved team / no playerId / no person_id). Caller runs the unchanged existence pre-check + INSERT over the returned rows; `players_no_match` preserved via a resolvable-count; the coach path (`_ensure_coach_person`, DB) stays inline. Added 3 unit tests (one row per resolvable player + jersey/position/is_captain; skip-unresolved-player; skip-unresolved-team).
 **Proof:** `pytest tests/unit/scripts/data/populate/test_phase_team_lists.py` → 3 passed; full `tests/unit/` → **286 passed**. Dispatched the reviewer with a proof-timing note up front (no false-block this time). **Reviewer PASS WITH CONCERNS** — C1 (non-blocking, not realisable): the interleaving change (`[all players] then [all coaches]` vs per-team) could only diverge if a coach and an opposing-team player shared one `profileId` in the same match — impossible in NRL, zero overlap in the fixture; rows are otherwise independent + idempotent.
 
+### TASK-17 — refactor `phase_timeline` → pure timeline/official extractors + unit tests (`2082e2c`)
+Behavior-preserving refactor: extracted `_extract_timeline_rows(payload, key, match_id, team_map, player_map)` (one row per `timeline[]` event — sequence, event_type default `"Unknown"`, running scores, team/player resolution) and `_extract_official_rows(payload, key, match_id)` (one row per named official, `person_id=None`). `populate_timeline_and_officials` calls both and UPSERTs via the unchanged `timeline_sql`/`officials_sql`; all counters + per-50 checkpoint + final commit + summary keys untouched. Added 4 unit tests.
+**Proof:** `pytest tests/unit/scripts/data/populate/test_phase_timeline.py` → 4 passed; full `tests/unit/` → **290 passed**. **Reviewer PASS** (no concerns; clean — the proof-timing note in the dispatch prevented the recurring false-block). The 4 match-centre phases now all have pure-extractor unit coverage.
+
 ---
 
 ## How we know it's done (running)
@@ -33,9 +37,8 @@ Behavior-preserving refactor: extracted the inlined player row-building into a p
 - Used regular package markers (`__init__.py`) over relying on namespace packages, for an explicit, stable import chain. `-m` invocation unaffected.
 
 ## Outstanding
-- ☐ TASK-17 — refactor `phase_timeline` → pure timeline/official extractors + tests.
 - ☐ TASK-18 — fix the broken `--dry-run` (commit-flag thread; close the META bug).
 - ☐ TASK-19 — prod populate run + DB verify + docs; finalise this report + clear the plan.
 
 ## Commits
-`922b591` (TASK-13) · `bb32a84` (TASK-14) · `093de70` (TASK-15) · `a9bea13` (TASK-16).
+`922b591` (TASK-13) · `bb32a84` (TASK-14) · `093de70` (TASK-15) · `a9bea13` (TASK-16) · `2082e2c` (TASK-17).
