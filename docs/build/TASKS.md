@@ -23,28 +23,6 @@ Prefix the title with optional tags in square brackets:
 
 ## Open tasks
 
-### TASK-02: Add D8 live integration drift test for `scout/supercoach_teams/`
-
-Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "Files created" / supercoach_teams item 3.
-
-**What**
-1. Create `tests/integration/scout/test_supercoach_teams_response_shape.py` templated on `tests/integration/scout/test_supercoach_roster_response_shape.py`. Read that file first; mirror its docstring framing about D8, env-flagging, and operator next steps.
-2. The test is `test_live_supercoach_teams_shape`, gated on `os.environ.get("SCOUT_DRIFT_LIVE") == "1"`. It:
-   - Calls `fetch_supercoach_teams(season=date.today().year)` from `app.scout.supercoach_teams.fetcher`.
-   - Parses every returned dict through `SuperCoachTeam.model_validate` (import from `app.scout.supercoach_teams.models`).
-   - Wraps the parse in `try/except (SuperCoachTeamsFetchError, ValidationError)` → `pytest.fail` with this exact message format: `f"SuperCoach teams live drift test failed — upstream shape has changed.\nError: {type(e).__name__}: {e}\nFix path: review the response, update app.scout.supercoach_teams.models, regenerate the fixture under tests/fixtures/scout/supercoach_teams/canonical_response.json, commit with a note on what the upstream changed."`
-   - Sanity asserts after parse: `16 <= len(parsed) <= 18`; `len({t.abbrev for t in parsed}) == len(parsed)` (no duplicate abbrevs); `{t.competition.id for t in parsed} == {2}`.
-
-**How to verify**
-- Without the env flag: `pytest tests/integration/scout/test_supercoach_teams_response_shape.py -v` shows the test as **skipped** with the reason "Set SCOUT_DRIFT_LIVE=1 to run the live-endpoint drift test".
-- With the env flag (from any machine with internet, including local Windows): `SCOUT_DRIFT_LIVE=1 pytest tests/integration/scout/test_supercoach_teams_response_shape.py -v` passes. The test hits the real endpoint — if SC is down it fails; that is correct behaviour and recorded as a known transient.
-- Pollute the model with an invented `extra` field locally (e.g. add `is_relegated: bool` to `SCCompetition` in `app/scout/supercoach_teams/models.py`), re-run live mode → test must fail with a message that names the field. Revert.
-- `git status` shows exactly one new file.
-
-**Proof notes**
-_(implementer fills in: skipped output, passing live output, deliberate-break output)_
-
-
 ### TASK-03: Add D8 fixture + unit drift tests for `scout/supercoach_settings/`
 
 Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "Files created" / supercoach_settings items 1-2.
@@ -196,3 +174,16 @@ Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "Files created" / supercoac
 - `git status` after staging showed exactly the two task artifacts. Pre-existing concurrent-session changes (`services/api/app/analyst/identify_voice.py` modified, `services/web/.claude/` untracked) were left untouched and unstaged.
 - **adversarial-reviewer verdict: PASS** — no Blockers, no Concerns (one awareness note re `season: null`, non-blocking).
 - **Commit:** `fa0cc8f` — `test(scout): add D8 fixture + unit drift tests for supercoach_teams [skip-simplify]`. Pushed to `master`.
+
+### [x] TASK-02: Add D8 live integration drift test for `scout/supercoach_teams/`
+
+Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "Files created" / supercoach_teams item 3.
+
+**Proof notes**
+- **Created** `tests/integration/scout/test_supercoach_teams_response_shape.py`, templated on `test_supercoach_roster_response_shape.py` (D8 / env-flag / operator-fix-path docstring framing preserved). Single test `test_live_supercoach_teams_shape`, gated on `os.environ.get("SCOUT_DRIFT_LIVE") == "1"`. Fetch + parse both inside one `try/except (SuperCoachTeamsFetchError, ValidationError)` → `pytest.fail` with the exact spec message (incl. fixture path). Three sanity asserts: `16 <= len(parsed) <= 18`, unique-abbrev count, `{competition.id} == {2}`.
+- **Skip mode:** `pytest tests/integration/scout/test_supercoach_teams_response_shape.py -v` → **1 skipped**, reason `Set SCOUT_DRIFT_LIVE=1 to run the live-endpoint drift test`.
+- **Live mode:** `SCOUT_DRIFT_LIVE=1 pytest ... -v` → **1 passed** in 1.54s (real SC endpoint hit).
+- **Deliberate break:** temporarily added `is_relegated: bool` to `SCCompetition` in `models.py` → live run **FAILED** naming `competition.is_relegated` in the message. Reverted; `git diff models.py` is empty.
+- `git status` showed exactly one new file (plus untouched concurrent-session changes).
+- **adversarial-reviewer verdict: PASS** — no Blockers, no Concerns.
+- **Commit:** `023716b` — `test(scout): add D8 live integration drift test for supercoach_teams [skip-simplify]`. Pushed to `master`.
