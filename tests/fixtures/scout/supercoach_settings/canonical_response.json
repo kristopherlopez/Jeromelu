@@ -1,0 +1,1189 @@
+{
+    "system": {
+        "currency": "AUD",
+        "data_version": 1,
+        "facebook": {
+            "app_id": 160282657356406
+        },
+        "timezone": "Australia/Sydney"
+    },
+    "game": {
+        "achievements": true,
+        "agree_tc": false,
+        "auto_emergency": false,
+        "aws_img_uploads": true,
+        "captains": true,
+        "cash_games": false,
+        "club_championship": false,
+        "competitions": [
+            {
+                "competition_id": 2,
+                "season": "2026",
+                "final_scoring_round": 27,
+                "statspack_minutes_played": true,
+                "statspack_seasons": [
+                    {
+                        "id": "2025",
+                        "label": "2025",
+                        "rounds": 27
+                    },
+                    {
+                        "id": "2024",
+                        "label": "2024",
+                        "rounds": 27
+                    },
+                    {
+                        "id": "2023",
+                        "label": "2023",
+                        "rounds": 27
+                    },
+                    {
+                        "id": "2022",
+                        "label": "2022",
+                        "rounds": 25
+                    },
+                    {
+                        "id": "2021",
+                        "label": "2021",
+                        "rounds": 25
+                    },
+                    {
+                        "id": "2020",
+                        "label": "2020",
+                        "rounds": 20
+                    },
+                    {
+                        "id": "2019",
+                        "label": "2019",
+                        "rounds": 25
+                    },
+                    {
+                        "id": "2018",
+                        "label": "2018",
+                        "rounds": 25
+                    },
+                    {
+                        "id": "2017",
+                        "label": "2017",
+                        "rounds": 26
+                    },
+                    {
+                        "id": "2016",
+                        "label": "2016",
+                        "rounds": 26
+                    },
+                    {
+                        "id": "2015",
+                        "label": "2015",
+                        "rounds": 26
+                    },
+                    {
+                        "id": "2014",
+                        "label": "2014",
+                        "rounds": 26
+                    },
+                    {
+                        "id": "2013",
+                        "label": "2013",
+                        "rounds": 26
+                    },
+                    {
+                        "id": "2012",
+                        "label": "2012",
+                        "rounds": 26
+                    },
+                    {
+                        "id": "2011",
+                        "label": "2011",
+                        "rounds": 26
+                    },
+                    {
+                        "id": "2010",
+                        "label": "2010",
+                        "rounds": 26
+                    },
+                    {
+                        "id": "2009",
+                        "label": "2009",
+                        "rounds": 26
+                    },
+                    {
+                        "id": "2008",
+                        "label": "2008",
+                        "rounds": 26
+                    }
+                ],
+                "score_breakpoints": [
+                    19,
+                    39,
+                    59
+                ],
+                "default_chart_stats": [
+                    "TR",
+                    "TS",
+                    "TA",
+                    "MT",
+                    "LB",
+                    "LA",
+                    "H8",
+                    "HU"
+                ],
+                "positions": {
+                    "HOK": {
+                        "id": "HOK",
+                        "abbrev": "HOK",
+                        "name": "Hooker",
+                        "plural": "Hookers",
+                        "sort": 1
+                    },
+                    "FRF": {
+                        "id": "FRF",
+                        "abbrev": "FRF",
+                        "name": "Front Row",
+                        "plural": "Front Rowers",
+                        "sort": 2
+                    },
+                    "2RF": {
+                        "id": "2RF",
+                        "abbrev": "2RF",
+                        "name": "2nd Row Forward",
+                        "plural": "2nd Row Forwards",
+                        "sort": 3
+                    },
+                    "HFB": {
+                        "id": "HFB",
+                        "abbrev": "HFB",
+                        "name": "Halfback",
+                        "plural": "Halfbacks",
+                        "sort": 4
+                    },
+                    "5/8": {
+                        "id": "5/8",
+                        "abbrev": "5/8",
+                        "name": "5/8",
+                        "plural": "5/8s",
+                        "sort": 5
+                    },
+                    "CTW": {
+                        "id": "CTW",
+                        "abbrev": "CTW",
+                        "name": "Wing/Centre",
+                        "plural": "Wings/Centres",
+                        "sort": 6
+                    },
+                    "FLB": {
+                        "id": "FLB",
+                        "abbrev": "FLB",
+                        "name": "Fullback",
+                        "plural": "Fullbacks",
+                        "sort": 7
+                    },
+                    "FLX": {
+                        "id": "FLX",
+                        "abbrev": "FLX",
+                        "name": "Flex",
+                        "plural": "Flex",
+                        "sort": 8
+                    }
+                },
+                "available_field_layout": [
+                    {
+                        "starting_salarycap": 11950000,
+                        "limit_scoring_players": 17,
+                        "limits": [
+                            {
+                                "id": "FLB",
+                                "max_players": 2,
+                                "active_max_players": 1
+                            },
+                            {
+                                "id": "CTW",
+                                "max_players": 7,
+                                "active_max_players": 4
+                            },
+                            {
+                                "id": "5/8",
+                                "max_players": 2,
+                                "active_max_players": 1
+                            },
+                            {
+                                "id": "HFB",
+                                "max_players": 2,
+                                "active_max_players": 1
+                            },
+                            {
+                                "id": "2RF",
+                                "max_players": 6,
+                                "active_max_players": 3
+                            },
+                            {
+                                "id": "FRF",
+                                "max_players": 4,
+                                "active_max_players": 2
+                            },
+                            {
+                                "id": "HOK",
+                                "max_players": 2,
+                                "active_max_players": 1
+                            },
+                            {
+                                "id": "FLX",
+                                "max_players": 1,
+                                "active_max_players": 1
+                            }
+                        ],
+                        "description": "1-4-1-1-3-2-1-1/12 | 26 Players",
+                        "team_size": 26
+                    }
+                ],
+                "player_stats": [
+                    {
+                        "id": "tries",
+                        "name": "Trys",
+                        "abbrev": "TR",
+                        "pts": 17
+                    },
+                    {
+                        "id": "try_assists",
+                        "name": "Try Assists",
+                        "abbrev": "TA",
+                        "pts": 12
+                    },
+                    {
+                        "id": "try_contributions",
+                        "name": "Try Contributions",
+                        "abbrev": "TC",
+                        "pts": 4
+                    },
+                    {
+                        "id": "goals",
+                        "name": "Goals",
+                        "abbrev": "GO",
+                        "pts": 4
+                    },
+                    {
+                        "id": "missed_goals",
+                        "name": "Missed Goals",
+                        "abbrev": "MG",
+                        "pts": -2
+                    },
+                    {
+                        "id": "field_goals",
+                        "name": "Field Goals",
+                        "abbrev": "FG",
+                        "pts": 5
+                    },
+                    {
+                        "id": "missed_field_goals",
+                        "name": "Missed Field Goals",
+                        "abbrev": "MF",
+                        "pts": -1
+                    },
+                    {
+                        "id": "tackles",
+                        "name": "Tackles",
+                        "abbrev": "TK",
+                        "pts": 1
+                    },
+                    {
+                        "id": "missed_tackles",
+                        "name": "Missed Tackles",
+                        "abbrev": "MT",
+                        "pts": -1
+                    },
+                    {
+                        "id": "tackle_busts",
+                        "name": "Tackle Breaks",
+                        "abbrev": "TB",
+                        "pts": 2
+                    },
+                    {
+                        "id": "forced_drop_outs",
+                        "name": "Forced Drop Outs",
+                        "abbrev": "FD",
+                        "pts": 6
+                    },
+                    {
+                        "id": "effective_offloads",
+                        "name": "Offload to Hand",
+                        "abbrev": "OH",
+                        "pts": 4
+                    },
+                    {
+                        "id": "ineffective_offloads",
+                        "name": "Offload to Ground",
+                        "abbrev": "OG",
+                        "pts": 2
+                    },
+                    {
+                        "id": "line_breaks",
+                        "name": "Line Breaks",
+                        "abbrev": "LB",
+                        "pts": 10
+                    },
+                    {
+                        "id": "line_break_assists",
+                        "name": "Line Break Assists",
+                        "abbrev": "LA",
+                        "pts": 8
+                    },
+                    {
+                        "id": "40_20",
+                        "name": "40/20",
+                        "abbrev": "FT",
+                        "pts": 10
+                    },
+                    {
+                        "id": "hitups_over_8m",
+                        "name": "All Runs 8m or more",
+                        "abbrev": "R8",
+                        "pts": 2
+                    },
+                    {
+                        "id": "hitups_under_8m",
+                        "name": "All Runs under 8m",
+                        "abbrev": "RU",
+                        "pts": 1
+                    },
+                    {
+                        "id": "holdups_in_goal",
+                        "name": "Try Saves",
+                        "abbrev": "TS",
+                        "pts": 3
+                    },
+                    {
+                        "id": "intercepts_taken",
+                        "name": "Intercepts Taken",
+                        "abbrev": "IT",
+                        "pts": 5
+                    },
+                    {
+                        "id": "dead_kicks",
+                        "name": "Kicks that goes dead",
+                        "abbrev": "KD",
+                        "pts": -3
+                    },
+                    {
+                        "id": "penalties",
+                        "name": "Penalties",
+                        "abbrev": "PC",
+                        "pts": -2
+                    },
+                    {
+                        "id": "errors",
+                        "name": "Errors",
+                        "abbrev": "ER",
+                        "pts": -2
+                    },
+                    {
+                        "id": "sendoffs",
+                        "name": "Sin-Bins/Send Offs",
+                        "abbrev": "SS",
+                        "pts": "-8/-16"
+                    }
+                ],
+                "content": {
+                    "matchterm": "match",
+                    "matchterm_plural": "matches",
+                    "salary_currency_symbol": "$",
+                    "player_statuses": {
+                        "PlayingNextRound": "Selected in initial starting 13",
+                        "EmergencyNextRound": "Selected on interchange (including extended interchange selections)",
+                        "Suspended": "Player is suspended",
+                        "Injury": "Player is reported injured",
+                        "NotPlayingNextRound": "Not selected to play in the upcoming round"
+                    }
+                },
+                "competition": {
+                    "id": 2,
+                    "season": null,
+                    "abbrev": "nrl",
+                    "name": "NRL",
+                    "long_name": "National Rugby League"
+                },
+                "status": {
+                    "current_round": 11,
+                    "next_round": 12,
+                    "status": "lockout",
+                    "is_lockout": true,
+                    "is_partial_lockout": true,
+                    "lockout_start": "2026-05-21T19:50:00+10:00",
+                    "lockout_end": "2026-06-22T19:50:00+10:00",
+                    "is_closed": false,
+                    "num_users": 171196,
+                    "num_leagues": 41101
+                }
+            }
+        ],
+        "dnp": "dnp",
+        "dual_position_players": true,
+        "eliminator": {
+            "start_round": 6,
+            "start_teams": 262144,
+            "end_round": 26,
+            "bye_rounds": [
+                12,
+                15,
+                18
+            ]
+        },
+        "emergencies": true,
+        "enable_real_ladder": true,
+        "experts": {
+            "76": {
+                "mastheads": null,
+                "description": null,
+                "name": "Kane Anderson",
+                "sort": 1
+            },
+            "3727": {
+                "mastheads": null,
+                "description": null,
+                "name": "Max Bryden",
+                "sort": 2
+            },
+            "42431": {
+                "mastheads": null,
+                "description": null,
+                "name": "The Cast Patrol",
+                "sort": 3
+            },
+            "24707": {
+                "mastheads": null,
+                "description": null,
+                "name": "Trent Copeland",
+                "sort": 4
+            },
+            "2731": {
+                "mastheads": null,
+                "description": null,
+                "name": "Mastermind",
+                "sort": 5
+            },
+            "45736": {
+                "mastheads": null,
+                "description": null,
+                "name": "Tim Moodie",
+                "sort": 6
+            },
+            "16320": {
+                "mastheads": null,
+                "description": null,
+                "name": "Joe Naddaf",
+                "sort": 7
+            },
+            "701": {
+                "mastheads": null,
+                "description": null,
+                "name": "Rugby League Guru",
+                "sort": 8
+            },
+            "12": {
+                "mastheads": null,
+                "description": null,
+                "name": "Tom Sangster",
+                "image": "ThomasSangster",
+                "sort": 9
+            },
+            "264": {
+                "mastheads": null,
+                "description": null,
+                "name": "Brandon Savage",
+                "sort": 10
+            },
+            "6936": {
+                "mastheads": null,
+                "description": null,
+                "name": "Wilson Smith",
+                "sort": 11
+            },
+            "1281": {
+                "mastheads": null,
+                "description": null,
+                "name": "Tim Williams",
+                "sort": 12
+            }
+        },
+        "final_scoring_round": 27,
+        "game_finals_round": 23,
+        "game_max_changes": 3,
+        "game_max_total_changes": 46,
+        "game_maxuserleagues": 20,
+        "game_num_emergencies": 4,
+        "game_salarycap": true,
+        "game_team_supported": true,
+        "groups": true,
+        "injury_suspension": true,
+        "injury_suspension_injuries": true,
+        "injury_suspension_starting_lineups": true,
+        "injury_suspension_starting_lineups_emergencies": true,
+        "injury_suspension_byes": true,
+        "league_2nd_ladder_rank": [
+            {
+                "field": "percentage",
+                "label": "Point Difference"
+            },
+            {
+                "field": "total_points",
+                "label": "Points Scored"
+            }
+        ],
+        "league_draft": false,
+        "league_overridable_settings": {
+            "game_leaguemax": "Users",
+            "round_leagues_start": "League Start Round",
+            "game_finals_round": "Finals Start Round",
+            "finals_format": "Finals Format",
+            "skip_byes": "Skip Byes",
+            "secondary_ladder_rank": "Secondary Ladder Rank",
+            "versuscomp": "Versus Comp",
+            "last_join_round": "Last Join Round"
+        },
+        "league_recreator": true,
+        "league_templates": [
+            {
+                "id": "public",
+                "type": "public",
+                "options": {
+                    "versuscomp": true,
+                    "game_leaguemax": 20,
+                    "round_leagues_start": 1,
+                    "game_finals_round": 23,
+                    "skip_byes": 1,
+                    "finals_format": "8-4"
+                }
+            },
+            {
+                "id": "private-20",
+                "type": "private",
+                "options": {
+                    "versuscomp": true,
+                    "game_leaguemax": 20,
+                    "round_leagues_start": 1,
+                    "game_finals_round": 23,
+                    "skip_byes": 1,
+                    "finals_format": "8-4"
+                },
+                "notes": "9th-16th Minor Finals, all teams play each other once"
+            },
+            {
+                "id": "private-12",
+                "type": "private",
+                "options": {
+                    "versuscomp": true,
+                    "game_leaguemax": 12,
+                    "round_leagues_start": 1,
+                    "game_finals_round": 23,
+                    "skip_byes": 0,
+                    "finals_format": "8-4"
+                },
+                "notes": "All teams play each other twice"
+            },
+            {
+                "id": "private-12-top5",
+                "type": "private",
+                "options": {
+                    "versuscomp": true,
+                    "game_leaguemax": 12,
+                    "round_leagues_start": 1,
+                    "game_finals_round": 23,
+                    "skip_byes": 0,
+                    "finals_format": "5-4"
+                },
+                "notes": "6th-10th Minor Finals, all teams play each other twice"
+            }
+        ],
+        "live_stats": true,
+        "max_active_players_for_team": 14,
+        "max_boosts": 5,
+        "max_groups": 10,
+        "max_players_for_team": 26,
+        "max_players_bye_rounds": {
+            "12": 13,
+            "15": 13,
+            "18": 13
+        },
+        "max_user_teams": 1,
+        "show_bye_rounds": [
+            12,
+            13,
+            15,
+            16,
+            18,
+            19
+        ],
+        "real_bye_rounds": [
+            12,
+            15,
+            18
+        ],
+        "news_feed_enabled": true,
+        "player_notes": true,
+        "player_stats": [
+            {
+                "id": "tries",
+                "name": "Trys",
+                "abbrev": "TR",
+                "pts": 17
+            },
+            {
+                "id": "try_assists",
+                "name": "Try Assists",
+                "abbrev": "TA",
+                "pts": 12
+            },
+            {
+                "id": "try_contributions",
+                "name": "Try Contributions",
+                "abbrev": "TC",
+                "pts": 4
+            },
+            {
+                "id": "goals",
+                "name": "Goals",
+                "abbrev": "GO",
+                "pts": 4
+            },
+            {
+                "id": "missed_goals",
+                "name": "Missed Goals",
+                "abbrev": "MG",
+                "pts": -2
+            },
+            {
+                "id": "field_goals",
+                "name": "Field Goals",
+                "abbrev": "FG",
+                "pts": 5
+            },
+            {
+                "id": "missed_field_goals",
+                "name": "Missed Field Goals",
+                "abbrev": "MF",
+                "pts": -1
+            },
+            {
+                "id": "tackles",
+                "name": "Tackles",
+                "abbrev": "TK",
+                "pts": 1
+            },
+            {
+                "id": "missed_tackles",
+                "name": "Missed Tackles",
+                "abbrev": "MT",
+                "pts": -1
+            },
+            {
+                "id": "tackle_busts",
+                "name": "Tackle Breaks",
+                "abbrev": "TB",
+                "pts": 2
+            },
+            {
+                "id": "forced_drop_outs",
+                "name": "Forced Drop Outs",
+                "abbrev": "FD",
+                "pts": 6
+            },
+            {
+                "id": "effective_offloads",
+                "name": "Offload to Hand",
+                "abbrev": "OH",
+                "pts": 4
+            },
+            {
+                "id": "ineffective_offloads",
+                "name": "Offload to Ground",
+                "abbrev": "OG",
+                "pts": 2
+            },
+            {
+                "id": "line_breaks",
+                "name": "Line Breaks",
+                "abbrev": "LB",
+                "pts": 10
+            },
+            {
+                "id": "line_break_assists",
+                "name": "Line Break Assists",
+                "abbrev": "LA",
+                "pts": 8
+            },
+            {
+                "id": "40_20",
+                "name": "40/20",
+                "abbrev": "FT",
+                "pts": 10
+            },
+            {
+                "id": "hitups_over_8m",
+                "name": "All Runs 8m or more",
+                "abbrev": "R8",
+                "pts": 2
+            },
+            {
+                "id": "hitups_under_8m",
+                "name": "All Runs under 8m",
+                "abbrev": "RU",
+                "pts": 1
+            },
+            {
+                "id": "holdups_in_goal",
+                "name": "Try Saves",
+                "abbrev": "TS",
+                "pts": 3
+            },
+            {
+                "id": "intercepts_taken",
+                "name": "Intercepts Taken",
+                "abbrev": "IT",
+                "pts": 5
+            },
+            {
+                "id": "dead_kicks",
+                "name": "Kicks that goes dead",
+                "abbrev": "KD",
+                "pts": -3
+            },
+            {
+                "id": "penalties",
+                "name": "Penalties",
+                "abbrev": "PC",
+                "pts": -2
+            },
+            {
+                "id": "errors",
+                "name": "Errors",
+                "abbrev": "ER",
+                "pts": -2
+            },
+            {
+                "id": "sendoffs",
+                "name": "Sin-Bins/Send Offs",
+                "abbrev": "SS",
+                "pts": "-8/-16"
+            }
+        ],
+        "player_status_for_subscribers": true,
+        "player_notes_for_subscribers": false,
+        "position_emergency_limit": 1,
+        "positions": [
+            {
+                "id": "HOK",
+                "abbrev": "HOK",
+                "name": "Hooker",
+                "plural": "Hookers",
+                "sort": 1,
+                "max_players": 2,
+                "active_max_players": 1
+            },
+            {
+                "id": "FRF",
+                "abbrev": "FRF",
+                "name": "Front Row",
+                "plural": "Front Rowers",
+                "sort": 2,
+                "max_players": 4,
+                "active_max_players": 2
+            },
+            {
+                "id": "2RF",
+                "abbrev": "2RF",
+                "name": "2nd Row Forward",
+                "plural": "2nd Row Forwards",
+                "sort": 3,
+                "max_players": 6,
+                "active_max_players": 3
+            },
+            {
+                "id": "HFB",
+                "abbrev": "HFB",
+                "name": "Halfback",
+                "plural": "Halfbacks",
+                "sort": 4,
+                "max_players": 2,
+                "active_max_players": 1
+            },
+            {
+                "id": "5/8",
+                "abbrev": "5/8",
+                "name": "5/8",
+                "plural": "5/8s",
+                "sort": 5,
+                "max_players": 2,
+                "active_max_players": 1
+            },
+            {
+                "id": "CTW",
+                "abbrev": "CTW",
+                "name": "Wing/Centre",
+                "plural": "Wings/Centres",
+                "sort": 6,
+                "max_players": 7,
+                "active_max_players": 4
+            },
+            {
+                "id": "FLB",
+                "abbrev": "FLB",
+                "name": "Fullback",
+                "plural": "Fullbacks",
+                "sort": 7,
+                "max_players": 2,
+                "active_max_players": 1
+            },
+            {
+                "id": "FLX",
+                "abbrev": "FLX",
+                "name": "Flex",
+                "plural": "Flex",
+                "sort": 8,
+                "max_players": 1,
+                "active_max_players": 1
+            }
+        ],
+        "projections": true,
+        "reserves_are_picks": true,
+        "rivalries": true,
+        "rolling_lockout": true,
+        "round_start": 1,
+        "rounding_price": 100,
+        "sport": "nrl",
+        "starting_salarycap": 11950000,
+        "subscriptions": true,
+        "substitutes": true,
+        "teampicker": false,
+        "teampicker_salarycap": 11650000,
+        "user_field_definitions": [
+            {
+                "id": "think_id",
+                "name": "think id",
+                "label": "Think ID",
+                "validation": [
+                    "string"
+                ]
+            },
+            {
+                "id": "email",
+                "name": "email",
+                "label": "Email",
+                "unique": false,
+                "validation": [
+                    "required_without:id",
+                    "email",
+                    "max:64"
+                ]
+            },
+            {
+                "id": "password",
+                "name": "password",
+                "label": "Password",
+                "validation": [
+                    "string",
+                    "min:6",
+                    "required_without_all:id,service"
+                ]
+            },
+            {
+                "id": "first_name",
+                "name": "first name",
+                "label": "First Name",
+                "validation": [
+                    "required_without:id",
+                    "string",
+                    "profanity",
+                    "max:32"
+                ]
+            },
+            {
+                "id": "last_name",
+                "name": "last name",
+                "label": "Last Name",
+                "validation": [
+                    "required_without:id",
+                    "string",
+                    "max:32"
+                ]
+            },
+            {
+                "id": "postcode",
+                "name": "postcode",
+                "label": "Postcode",
+                "validation": [
+                    "required_without:id",
+                    "max:4"
+                ]
+            },
+            {
+                "id": "state",
+                "name": "state",
+                "label": "State",
+                "validation": [
+                    "string",
+                    "max:32"
+                ]
+            },
+            {
+                "id": "host",
+                "name": "host",
+                "validation": [
+                    "string",
+                    "max:100"
+                ]
+            },
+            {
+                "id": "phone",
+                "name": "phone number",
+                "label": "Contact Number",
+                "validation": [
+                    "regex:/^[0-9+()\\s-]*$/",
+                    "max:32"
+                ]
+            },
+            {
+                "id": "yob",
+                "name": "year of birth",
+                "label": "Year Of Birth",
+                "validation": [
+                    "integer",
+                    "min:1900"
+                ],
+                "messages": {
+                    "required": "Year of birth is required."
+                }
+            },
+            {
+                "id": "sex",
+                "name": "gender",
+                "label": "Gender",
+                "options": [
+                    {
+                        "name": "Male",
+                        "value": "Male"
+                    },
+                    {
+                        "name": "Female",
+                        "value": "Female"
+                    },
+                    {
+                        "name": "Unspecified",
+                        "value": "Unspecified"
+                    }
+                ],
+                "messages": {
+                    "required": "Gender is required."
+                }
+            },
+            {
+                "id": "global_mail",
+                "name": "global mail",
+                "validation": [
+                    "string",
+                    "max:5"
+                ]
+            },
+            {
+                "id": "news_global_optout",
+                "name": "News global optout"
+            },
+            {
+                "id": "fs_sub",
+                "name": "fs subscription",
+                "label": "Do you have a Fox Sports subscription?",
+                "options": [
+                    {
+                        "name": "Yes",
+                        "value": true
+                    },
+                    {
+                        "name": "No",
+                        "value": false
+                    }
+                ]
+            },
+            {
+                "id": "kayo_sub",
+                "name": "kayo subscription",
+                "label": "Do you have a Kayo subscription?",
+                "options": [
+                    {
+                        "name": "Yes",
+                        "value": true
+                    },
+                    {
+                        "name": "No",
+                        "value": false
+                    }
+                ]
+            }
+        ],
+        "user_notification_types": [
+            "injuriesSuspensions",
+            "lockouts",
+            "scores",
+            "teamLists",
+            "newGame"
+        ],
+        "user_regions": [
+            {
+                "abbrev": "VIC",
+                "name": "Victoria"
+            },
+            {
+                "abbrev": "NSW",
+                "name": "New South Wales"
+            },
+            {
+                "abbrev": "ACT",
+                "name": "A.C.T."
+            },
+            {
+                "abbrev": "QLD",
+                "name": "Queensland"
+            },
+            {
+                "abbrev": "SA",
+                "name": "South Australia"
+            },
+            {
+                "abbrev": "NT",
+                "name": "Northern Territory"
+            },
+            {
+                "abbrev": "WA",
+                "name": "Western Australia"
+            },
+            {
+                "abbrev": "TAS",
+                "name": "Tasmania"
+            },
+            {
+                "abbrev": "OTHER",
+                "name": "Other/International"
+            }
+        ],
+        "user_subscriptions": true,
+        "user_team_field_definitions": [
+            {
+                "id": "teamname",
+                "name": "team name",
+                "label": "Team Name",
+                "validation": [
+                    "required",
+                    "string",
+                    "profanity",
+                    "max:18"
+                ]
+            },
+            {
+                "id": "team",
+                "compulsory": true,
+                "name": "NRL Team supported",
+                "validation": [
+                    "required",
+                    "integer"
+                ],
+                "messages": {
+                    "required": "Please select which team you support"
+                }
+            },
+            {
+                "id": "team_optin",
+                "name": "club optin",
+                "label": "Do you agree to share your details with the NRL club you support so they can contact you directly with official updates, news, and offers?",
+                "options": [
+                    {
+                        "name": "Yes",
+                        "value": true
+                    },
+                    {
+                        "name": "No",
+                        "value": false
+                    }
+                ]
+            },
+            {
+                "id": "experience",
+                "compulsory": false,
+                "name": "experience",
+                "validation": [
+                    "required"
+                ],
+                "options": [
+                    {
+                        "name": "Beginner - This is my first crack at playing %name% and I'm here for some fun.",
+                        "value": "beginner"
+                    },
+                    {
+                        "name": "Intermediate - I have played %name% before and think I know what I'm doing.",
+                        "value": "intermediate"
+                    },
+                    {
+                        "name": "Expert - I'm a seasoned player and know %name% like the back of my hand.",
+                        "value": "expert"
+                    }
+                ]
+            }
+        ],
+        "user_team_history_seasons": [
+            "2025",
+            "2024",
+            "2023",
+            "2022",
+            "2021",
+            "2020",
+            "2019",
+            "2018",
+            "2017",
+            "2016",
+            "2015",
+            "2014"
+        ],
+        "versuscomp": true,
+        "vice_captains": true
+    },
+    "content": {
+        "athlete": "player",
+        "athlete_plural": "players",
+        "coachbox": "Activity Feed",
+        "currencySymbol": "$",
+        "emergencies": "reserves",
+        "entrytype": "team",
+        "forgot_password_link": "https://myaccount.news.com.au/dailytelegraph/forgotPassword",
+        "gameLength": "Season",
+        "gametype": "round",
+        "gametypeabv": "Rd",
+        "hashtag": "#Supercoach",
+        "last_season": "2025",
+        "league_term": "league",
+        "name": "SuperCoach NRL",
+        "newspaper": "The Daily Telegraph",
+        "play_verb": "Play",
+        "played_verb": "played",
+        "playertype": "position",
+        "premium_abv_name": "SuperCoach Plus",
+        "premium_name": "SuperCoach Plus",
+        "premium_name_2line": "SuperCoach<br><strong>Stats</strong>",
+        "remaining_salary_cap": "Rem. Salary Cap",
+        "reserves": "substitutes",
+        "season": "2026",
+        "sponsor": "SuperCoach",
+        "sport": "NRL",
+        "title": "Fantasy NRL - SuperCoach NRL",
+        "user_region_term": "state",
+        "usertype": "Coach",
+        "usertype_plural": "Coaches"
+    },
+    "competition": {
+        "current_round": 11,
+        "next_round": 12,
+        "status": "lockout",
+        "is_lockout": true,
+        "is_partial_lockout": true,
+        "lockout_start": "2026-05-21T19:50:00+10:00",
+        "lockout_end": "2026-06-22T19:50:00+10:00",
+        "is_closed": false,
+        "num_users": 171196,
+        "num_leagues": 41101
+    }
+}
