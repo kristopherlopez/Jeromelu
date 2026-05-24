@@ -1,0 +1,410 @@
+{
+    "matchId": "20261111310",
+    "matchMode": "Pre",
+    "matchState": "Upcoming",
+    "updated": "2026-05-24T01:34:10Z",
+    "gameSeconds": 0,
+    "roundNumber": 13,
+    "roundTitle": "Round 13",
+    "startTime": "2026-05-29T10:00:00Z",
+    "url": "https://www.nrl.com/draw/nrl-premiership/2026/round-13/sharks-v-sea-eagles/",
+    "homeTeam": {
+        "teamId": 500028,
+        "nickName": "Sharks",
+        "name": "Cronulla-Sutherland Sharks",
+        "odds": "1.67",
+        "teamPosition": "9th",
+        "theme": {
+            "key": "sharks",
+            "logos": {
+                "badge-basic24-light.svg": "202605110452",
+                "badge-basic24-mono.svg": "202605110452",
+                "badge-basic24.svg": "202605110452",
+                "badge-light.png": "202605110452",
+                "badge-light.svg": "202605110452",
+                "badge.png": "202605110452",
+                "badge.svg": "202605110452",
+                "header-background.png": "202605110452",
+                "header-background.svg": "202605110452",
+                "silhouette.png": "202605110452",
+                "silhouette.svg": "202605110452",
+                "text.svg": "202605110452"
+            }
+        },
+        "recentForm": [
+            {
+                "result": "Won",
+                "summary": "vs Bulldogs",
+                "score": "38-16",
+                "url": "https://www.nrl.com/draw/nrl-premiership/2026/round-11/sharks-v-bulldogs/"
+            },
+            {
+                "result": "Lost",
+                "summary": "vs Rabbitohs",
+                "score": "12-36",
+                "url": "https://www.nrl.com/draw/nrl-premiership/2026/round-10/rabbitohs-v-sharks/"
+            },
+            {
+                "result": "Won",
+                "summary": "vs Wests Tigers",
+                "score": "52-10",
+                "url": "https://www.nrl.com/draw/nrl-premiership/2026/round-9/sharks-v-wests-tigers/"
+            },
+            {
+                "result": "Lost",
+                "summary": "vs Cowboys",
+                "score": "34-46",
+                "url": "https://www.nrl.com/draw/nrl-premiership/2026/round-8/cowboys-v-sharks/"
+            },
+            {
+                "result": "Lost",
+                "summary": "vs Roosters",
+                "score": "22-34",
+                "url": "https://www.nrl.com/draw/nrl-premiership/2026/round-6/sharks-v-roosters/"
+            }
+        ],
+        "nextOpponent": {
+            "teamId": 500022,
+            "nickName": "Dragons",
+            "name": "St. George Illawarra Dragons",
+            "theme": {
+                "key": "dragons",
+                "logos": {
+                    "badge-basic24-light.svg": "202605110452",
+                    "badge-basic24-mono.svg": "202605110452",
+                    "badge-basic24.svg": "202605110452",
+                    "badge.png": "202602250432",
+                    "badge.svg": "202602250432",
+                    "header-background.png": "202605110452",
+                    "header-background.svg": "202605110452",
+                    "silhouette.png": "202605110452",
+                    "silhouette.svg": "202605110452",
+                    "text.svg": "202605110452",
+                    "badge-light.svg": "202602250432",
+                    "badge-light.png": "202602250432"
+                }
+            }
+        },
+        "url": "https://www.sharks.com.au/teams/nrl-premiership/cronulla-sutherland-sharks/"
+    },
+    "awayTeam": {
+        "teamId": 500002,
+        "nickName": "Sea Eagles",
+        "name": "Manly-Warringah Sea Eagles",
+        "odds": "2.22",
+        "teamPosition": "3rd",
+        "theme": {
+            "key": "sea-eagles",
+            "logos": {
+                "badge-basic24-mono.svg": "202605110452",
+                "badge-basic24.svg": "202605110452",
+                "badge-light.png": "202605110452",
+                "badge-light.svg": "202510300111",
+                "badge.png": "202605110452",
+                "badge.svg": "202510300111",
+                "header-background.png": "202605110452",
+                "header-background.svg": "202605110452",
+                "silhouette.png": "202605110452",
+                "silhouette.svg": "202605110452",
+                "text.svg": "202605110452"
+            }
+        },
+        "recentForm": [
+            {
+                "result": "Won",
+                "summary": "vs Wests Tigers",
+                "score": "46-18",
+                "url": "https://www.nrl.com/draw/nrl-premiership/2026/round-11/wests-tigers-v-sea-eagles/"
+            },
+            {
+                "result": "Won",
+                "summary": "vs Broncos",
+                "score": "32-4",
+                "url": "https://www.nrl.com/draw/nrl-premiership/2026/round-10/sea-eagles-v-broncos/"
+            },
+            {
+                "result": "Lost",
+                "summary": "vs Panthers",
+                "score": "16-18",
+                "url": "https://www.nrl.com/draw/nrl-premiership/2026/round-9/panthers-v-sea-eagles/"
+            },
+            {
+                "result": "Won",
+                "summary": "vs Eels",
+                "score": "33-18",
+                "url": "https://www.nrl.com/draw/nrl-premiership/2026/round-8/sea-eagles-v-eels/"
+            },
+            {
+                "result": "Won",
+                "summary": "vs Cowboys",
+                "score": "38-6",
+                "url": "https://www.nrl.com/draw/nrl-premiership/2026/round-7/cowboys-v-sea-eagles/"
+            }
+        ],
+        "nextOpponent": {
+            "teamId": 500005,
+            "nickName": "Rabbitohs",
+            "name": "South Sydney Rabbitohs",
+            "theme": {
+                "key": "rabbitohs",
+                "logos": {
+                    "badge-basic24-light.svg": "202605110452",
+                    "badge-basic24-mono.svg": "202605110452",
+                    "badge-basic24.svg": "202605110452",
+                    "badge-light.png": "202605110452",
+                    "badge-light.svg": "202605110452",
+                    "badge.png": "202605110452",
+                    "badge.svg": "202605110452",
+                    "silhouette.png": "202605110452",
+                    "silhouette.svg": "202605110452",
+                    "text.svg": "202605110452"
+                }
+            }
+        },
+        "url": "https://www.seaeagles.com.au/teams/nrl-premiership/manly-warringah-sea-eagles/"
+    },
+    "venue": "Ocean Protect Stadium",
+    "venueCity": "Sydney",
+    "broadcastChannels": [
+        "Nine Network",
+        "Nine Now",
+        "Kayo",
+        "Foxtel"
+    ],
+    "animateMatchClock": true,
+    "competition": {
+        "competitionId": 111,
+        "name": "Telstra Premiership",
+        "theme": {
+            "key": "nrl-premiership",
+            "logos": {
+                "badge-light.png": "202605110452",
+                "badge-light.svg": "202605110452",
+                "badge.png": "202605110452",
+                "badge.svg": "202605110452"
+            }
+        }
+    },
+    "hasExtraTime": true,
+    "hasOnFieldTracking": true,
+    "segmentCount": 2,
+    "segmentDuration": 2400,
+    "showTeamPositions": true,
+    "showPlayerPositions": true,
+    "stats": {
+        "groups": [
+            {
+                "title": "Current Season",
+                "stats": [
+                    {
+                        "title": "Wins this season",
+                        "type": "PercentageAndFraction",
+                        "homeValue": {
+                            "value": 50.0,
+                            "numerator": 5,
+                            "denominator": 10,
+                            "isLeader": false
+                        },
+                        "awayValue": {
+                            "value": 64.0,
+                            "numerator": 7,
+                            "denominator": 11,
+                            "isLeader": true
+                        }
+                    },
+                    {
+                        "title": "Points Scored",
+                        "type": "Number",
+                        "homeValue": {
+                            "value": 294.0,
+                            "isLeader": false
+                        },
+                        "awayValue": {
+                            "value": 317.0,
+                            "isLeader": true
+                        }
+                    },
+                    {
+                        "title": "Points Conceded",
+                        "type": "Number",
+                        "homeValue": {
+                            "value": 260.0,
+                            "isLeader": false
+                        },
+                        "awayValue": {
+                            "value": 208.0,
+                            "isLeader": true
+                        }
+                    },
+                    {
+                        "title": "Completion Rate",
+                        "type": "Percentage",
+                        "homeValue": {
+                            "value": 80.0,
+                            "isLeader": false
+                        },
+                        "awayValue": {
+                            "value": 80.0,
+                            "isLeader": false
+                        }
+                    },
+                    {
+                        "title": "Tackle Efficiency",
+                        "type": "Percentage",
+                        "homeValue": {
+                            "value": 87.9,
+                            "isLeader": true
+                        },
+                        "awayValue": {
+                            "value": 86.6,
+                            "isLeader": false
+                        }
+                    },
+                    {
+                        "title": "Average Points Scored",
+                        "type": "Number",
+                        "homeValue": {
+                            "value": 29.0,
+                            "isLeader": true
+                        },
+                        "awayValue": {
+                            "value": 28.0,
+                            "isLeader": false
+                        }
+                    },
+                    {
+                        "title": "Average Points Conceded",
+                        "type": "Number",
+                        "homeValue": {
+                            "value": 26.0,
+                            "isLeader": false
+                        },
+                        "awayValue": {
+                            "value": 18.0,
+                            "isLeader": true
+                        }
+                    },
+                    {
+                        "title": "Average Play The Ball",
+                        "type": "Range",
+                        "units": "Seconds",
+                        "homeValue": {
+                            "value": 3.49,
+                            "isLeader": true
+                        },
+                        "awayValue": {
+                            "value": 3.55,
+                            "isLeader": false
+                        },
+                        "maxValue": 5.0
+                    }
+                ]
+            },
+            {
+                "title": "Key Stats",
+                "stats": [
+                    {
+                        "title": "Wins at this venue",
+                        "type": "PercentageAndFraction",
+                        "homeValue": {
+                            "value": 59.0,
+                            "numerator": 182,
+                            "denominator": 311,
+                            "isLeader": true
+                        },
+                        "awayValue": {
+                            "value": 58.0,
+                            "numerator": 11,
+                            "denominator": 19,
+                            "isLeader": false
+                        }
+                    },
+                    {
+                        "title": "Wins overall",
+                        "type": "PercentageAndFraction",
+                        "homeValue": {
+                            "value": 49.0,
+                            "numerator": 365,
+                            "denominator": 740,
+                            "isLeader": true
+                        },
+                        "awayValue": {
+                            "value": 50.0,
+                            "numerator": 332,
+                            "denominator": 659,
+                            "isLeader": false
+                        }
+                    }
+                ]
+            }
+        ],
+        "history": {
+            "played": 40,
+            "draws": 0,
+            "homeWins": 16,
+            "awayWins": 24,
+            "recentMatches": [
+                {
+                    "matchId": "20251111080",
+                    "roundNumber": 10,
+                    "roundName": "Round 10",
+                    "startTime": "2025-05-11T06:05:00Z",
+                    "homeTeam": {
+                        "teamId": 500002,
+                        "nickName": "Sea Eagles",
+                        "score": 14
+                    },
+                    "awayTeam": {
+                        "teamId": 500028,
+                        "nickName": "Sharks",
+                        "score": 30
+                    },
+                    "url": "https://www.nrl.com/draw/nrl-premiership/2025/round-10/sea-eagles-v-sharks/"
+                },
+                {
+                    "matchId": "20251110640",
+                    "roundNumber": 6,
+                    "roundName": "Round 6",
+                    "startTime": "2025-04-12T05:00:00Z",
+                    "homeTeam": {
+                        "teamId": 500028,
+                        "nickName": "Sharks",
+                        "score": 24
+                    },
+                    "awayTeam": {
+                        "teamId": 500002,
+                        "nickName": "Sea Eagles",
+                        "score": 18
+                    },
+                    "url": "https://www.nrl.com/draw/nrl-premiership/2025/round-6/sharks-v-sea-eagles/"
+                }
+            ]
+        }
+    },
+    "videoProviders": [
+        {
+            "id": "NINE",
+            "name": "Nine Network",
+            "url": "https://www.9now.com.au/",
+            "logoSmallUrl": "https://www.nrl.com/globalassets/media-stream-providers/video-providers/nine-small.svg"
+        },
+        {
+            "id": "9NOW",
+            "name": "Nine Now",
+            "url": "https://www.9now.com.au/",
+            "logoSmallUrl": "https://www.nrl.com/globalassets/media-stream-providers/video-providers/nine-now.svg"
+        },
+        {
+            "id": "KAYO",
+            "name": "Kayo",
+            "url": "https://kayosports.app.link/xtDzpvGKaHb",
+            "logoSmallUrl": "https://www.nrl.com/globalassets/media-stream-providers/video-providers/kayo.svg"
+        },
+        {
+            "id": "FOX",
+            "name": "Foxtel",
+            "url": "https://www.foxtel.com.au/foxtel-go.html",
+            "logoSmallUrl": "https://www.nrl.com/globalassets/media-stream-providers/video-providers/foxtel.svg"
+        }
+    ]
+}
