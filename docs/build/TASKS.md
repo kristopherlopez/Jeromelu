@@ -93,27 +93,6 @@ Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "One-time S3 seed run" + "D
 _(implementer fills in: three curl responses, three aws s3 ls outputs, two SQL query results, doc diff summary, first-cron-fire log line)_
 
 
-### TASK-10: Wire strict-parse (non-aborting) + round-optional resolution into the `nrlcom_match_centre` route + live drift test
-
-Implements PLAN.md § 2026-05-24 Scout Phase 3 / Interface / route changes (match-centre) + verification.
-
-**What**
-1. Edit `services/api/app/scout/nrlcom_match_centre/routes.py`:
-   - Make round optional: `round: int | None = Query(default=None, ...)` on the endpoint and `run_nrlcom_match_centre(..., round: int | None = None)`. When `round is None`, after the first `fetch_draw(competition, season, round=None)` set `round = draw.get("selectedRoundId")` and record `detail["resolved_round"]`. If still `None` → `HTTPException(502, "could not resolve current round")`.
-   - Import `NrlcomMatchCentre` + `ValidationError`. After each per-match `archive_response(...)`, `NrlcomMatchCentre.model_validate(match_data)` inside the per-match `try`; on `ValidationError` append `{"slug": slug, "error": str(e)}` to a new `validation_failures` list — **do not abort the walk**. Add `detail["validation_failures"]` and include its count in the completed `summary_text`.
-2. Edit the `scout-nrlcom-match-centre` Makefile target: remove the `ifndef ROUND` error and conditionalise round in the URL (`$(if $(ROUND),&round=$(ROUND))`), so the target works with ROUND omitted (cron uses current-round resolution). Keep `ifndef SEASON`.
-3. Create `tests/integration/scout/test_nrlcom_match_centre_response_shape.py` templated on the settings integration test. `test_live_nrlcom_match_centre_shape`, gated on `SCOUT_DRIFT_LIVE=1`: `fetch_draw(111, date.today().year)` → first fixture's `matchCentreUrl` → `fetch_match_centre(...)` → `NrlcomMatchCentre.model_validate(raw)`; wrap in `try/except (NrlcomMatchCentreFetchError, NrlcomDrawFetchError, ValidationError)` → `pytest.fail(...)` naming `app.scout.nrlcom_match_centre.models`. Sanity: `parsed.matchId` present.
-
-**How to verify**
-- Skip mode: 1 skipped. Live: `SCOUT_DRIFT_LIVE=1 pytest ... -v` → 1 passed.
-- Round resolution: `make scout-nrlcom-match-centre COMPETITION=111 SEASON=<yr>` (no ROUND) returns `ok:true`, `detail.resolved_round` set, `matches_archived >= 1`.
-- Wiring: pollute `NrlcomMatchCentre` (bogus required field) → live test fails naming it, and a local seed run reports non-empty `validation_failures`; revert.
-- `git status`: two modified (`routes.py`, `Makefile`) + one new (integration test).
-
-**Proof notes**
-_(implementer fills in)_
-
-
 ### TASK-11: Cron — extend `scripts/scout-refresh.sh` + add daily cron lines for nrlcom draw + match-centre
 
 Implements PLAN.md § 2026-05-24 Scout Phase 3 / Interface / Cron.

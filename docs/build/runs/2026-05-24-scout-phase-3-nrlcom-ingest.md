@@ -1,6 +1,6 @@
 # Scout Phase 3 — nrl.com draw + match-centre ingest hardening
 
-**Date:** 2026-05-24 · **Status:** 🟡 In progress (TASK-07, 08, 09 of TASK-07→12 done) · **Plan:** Scout Phase 3 (PLAN.md)
+**Date:** 2026-05-24 · **Status:** 🟡 In progress (TASK-07–10 of TASK-07→12 done; cron + seed remain) · **Plan:** Scout Phase 3 (PLAN.md)
 
 **TL;DR** — The draw + match-centre ingest pipelines already existed (fetch → S3 archive → audit) but lacked charter discipline. Phase 3 hardens them: D8 envelope models, strict-parse wired into the routes, fixtures + unit/live drift tests, daily-during-round cron, seed. NRL only (comp 111), forward-only; DB extractors deferred to Phase 3.5.
 
@@ -22,6 +22,14 @@ Captured **two** fixtures — `canonical_response.json` (FullTime, ~196KB) and `
 **Deviation from spec (evidence-driven, reviewer-approved):** spec said 1 fixture / 3 tests / "~29 keys"; shipped 2 fixtures / 4 tests / 31-key union. Reason: a FullTime-only model would 500 every upcoming match the daily cron (TASK-10/11) walks. Reviewer independently confirmed `extra="forbid"` still trips on a genuinely novel key outside the union — the D8 guard survives the widening.
 **Proof:** `pytest tests/unit/api/scout/test_nrlcom_match_centre_models.py` → 4 passed; full scout unit suite → 39 passed (no regression). Reviewer **PASS WITH CONCERNS** — all non-blocking (deviation recorded here; mutual-exclusivity of state-key groups intentionally not enforced — envelope guard, not a state machine; proof recorded here).
 
+### TASK-10 — nrlcom_match_centre: route strict-parse (non-aborting) + round-optional + live drift test (`f92d4bd`)
+Wired the D8 contract into the route + made the daily cron viable:
+- **round optional** on the endpoint and `run_nrlcom_match_centre`; when omitted it resolves the current round from the draw's `selectedRoundId` (recorded as `detail.resolved_round`; `HTTPException(502)` if unresolvable) — resolved **before** the `round-{NN}` S3 path is built.
+- **Per-match strict-parse**: each match is `NrlcomMatchCentre.model_validate`'d after archiving; a `ValidationError` is appended to a new `validation_failures` list and does **not** abort the round walk (one bad match shouldn't lose the rest). Surfaced in `detail` + the completed `summary_text`.
+- Relaxed the `scout-nrlcom-match-centre` Makefile target — `ROUND` now optional (`$(if $(ROUND),&round=$(ROUND))`, `ifndef SEASON` kept).
+- Added `tests/integration/scout/test_nrlcom_match_centre_response_shape.py` (env-flagged live drift test).
+**Proof:** route imports clean; `make -n scout-nrlcom-match-centre SEASON=2026` (no ROUND) → URL with no `&round=`, no error; skip → 1 skipped; live → 1 passed; deliberate model-break (`is_replay`) → live test failed naming it, reverted (`models.py` no diff). The end-to-end run (`resolved_round` set, `matches_archived ≥ 1`, `validation_failures` populated) is verified **by construction** (route calls the identical, live-exercised `model_validate`; round resolution is straight-line) and will be exercised at TASK-12's prod seed (round omitted). Reviewer **PASS WITH CONCERNS** — proof level ruled acceptable (same split as TASK-08); non-blocking: 502-message superset + `str(e)[:300]` truncation (defensive, audit-row size); doc update scheduled to TASK-12.
+
 ---
 
 ## How we know it's done (running)
@@ -31,9 +39,8 @@ Captured **two** fixtures — `canonical_response.json` (FullTime, ~196KB) and `
 - `callToAction`/`secondaryCallToAction` typed `dict[str, Any] | None` (CTAs vary by match state across rounds); `disclaimer` `str | None`. Load-bearing `matchCentreUrl` is strictly required.
 
 ## Outstanding
-- ☐ TASK-10 — match-centre route wiring (non-aborting) + round-optional resolution + live test.
 - ☐ TASK-11 — daily cron (scout-refresh.sh + cron.d).
 - ☐ TASK-12 — prod seed + S3 verify + docs; finalise this report + clear the plan.
 
 ## Commits
-`f02a678` (TASK-07) · `a0ecbd7` (TASK-08) · `45fd6fe` (TASK-09).
+`f02a678` (TASK-07) · `a0ecbd7` (TASK-08) · `45fd6fe` (TASK-09) · `f92d4bd` (TASK-10).
