@@ -8,4 +8,5 @@ Newest first.
 
 | Date | Run | Status |
 |---|---|---|
+| 2026-05-24 | [Scout Phase 3 — nrl.com draw + match-centre ingest hardening](./2026-05-24-scout-phase-3-nrlcom-ingest.md) | 🟡 In progress |
 | 2026-05-24 | [Scout Phase 2.5 closure — SC teams + settings](./2026-05-24-scout-phase-2.5-closure.md) | 🟢 Shipped (1 verification pending) |

@@ -93,28 +93,6 @@ Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "One-time S3 seed run" + "D
 _(implementer fills in: three curl responses, three aws s3 ls outputs, two SQL query results, doc diff summary, first-cron-fire log line)_
 
 
-### TASK-07: D8 model + fixture + unit drift tests for `scout/nrlcom_draw/`
-
-Implements PLAN.md § 2026-05-24 Scout Phase 3 / Interface / nrlcom_draw models + tests.
-
-**What**
-1. Capture a live draw response, pretty-printed, to `tests/fixtures/scout/nrlcom_draw/canonical_response.json`: `curl -s "https://www.nrl.com/draw/data?competition=111&season=$(date -u +%Y)" -H "Accept: application/json" -H "User-Agent: Mozilla/5.0" | python -m json.tool > tests/fixtures/scout/nrlcom_draw/canonical_response.json`. Confirm it's a JSON object with a non-empty `fixtures` list and that every fixture carries `matchCentreUrl`.
-2. Create `services/api/app/scout/nrlcom_draw/models.py` with two strict models (`model_config = ConfigDict(extra="forbid")`), imports top-level: `NrlcomDraw` (envelope — enumerate the exact top-level keys from the captured fixture per PLAN; `fixtures: list[DrawFixture]`) and `DrawFixture` (`matchCentreUrl: str` load-bearing + the other observed fixture keys; keep `homeTeam`/`awayTeam`/`clock`/`callToAction`/`secondaryCallToAction` as `dict[str, Any]` / `... | None`).
-3. Create `tests/unit/api/scout/test_nrlcom_draw_models.py` templated on `tests/unit/api/scout/test_supercoach_settings_models.py`. Use the `fixtures_dir` conftest fixture; `fixture_draw` returns `json.loads(path.read_text(encoding="utf-8"))`. Four tests:
-   - `test_canonical_fixture_parses(fixture_draw)` — `NrlcomDraw.model_validate(fixture_draw)`; assert `len(parsed.fixtures) >= 1`; assert every `f.matchCentreUrl` is a non-empty str.
-   - `test_unknown_top_level_field_raises(fixture_draw)` — `deepcopy`, set `bad["loot_boxes"] = {}`; `ValidationError` contains `"loot_boxes"`.
-   - `test_unknown_fixture_field_raises(fixture_draw)` — set `bad["fixtures"][0]["is_grand_final"] = True`; `ValidationError` contains `"is_grand_final"`.
-   - `test_missing_matchcentreurl_raises(fixture_draw)` — `del bad["fixtures"][0]["matchCentreUrl"]`; `ValidationError` contains `"matchCentreUrl"`.
-
-**How to verify**
-- `pytest tests/unit/api/scout/test_nrlcom_draw_models.py -v` — all four pass.
-- `pytest tests/unit/api/scout/ -v` — full scout unit suite stays green.
-- Fixture is pretty-printed. `git status` shows exactly three new paths: `models.py`, the fixture JSON, the test module.
-
-**Proof notes**
-_(implementer fills in)_
-
-
 ### TASK-08: Wire strict-parse into the `nrlcom_draw` route + live integration drift test
 
 Implements PLAN.md § 2026-05-24 Scout Phase 3 / Interface / route changes (draw) + verification.
