@@ -27,6 +27,8 @@ dist/
 !.claude/skills/
 .claude/skills/*
 !.claude/skills/run-implement/
+!.claude/skills/run-plan/
+!.claude/skills/run-triage/
 
 # Assets (large binaries)
 assets/
