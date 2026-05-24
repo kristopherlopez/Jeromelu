@@ -43,6 +43,18 @@ Ad-hoc background commands outside the queue still require human approval.
 
 During long-running work (builds, deploys, polls), report only on **phase transitions** or errors. Don't echo routine progress lines.
 
+### Run reports — the durable record (completion condition)
+
+`PLAN.md` and `TASKS.md` are **working documents that get reused** — they hold only active/future plans and the live queue, never the history. The durable account of completed work lives in **`docs/build/runs/`**, one report per plan/initiative (`YYYY-MM-DD-<slug>.md`), written as a status update to the human: what **each task** delivered (not just a count), how it was verified, decisions/deviations, what's outstanding, and lessons learned. Git history is the immutable log; the run report is the readable one.
+
+**Producing the run report is a completion condition for every run** — a plan is not "done" until its report exists and reflects every task.
+
+Ritual:
+1. When a plan's first task is checked off, create its report under `docs/build/runs/` and add a row to `docs/build/runs/README.md` (newest first).
+2. As each task passes review and is checked off, record what it delivered (files, proof, commit SHA) in the report — then **remove the task from `TASKS.md`**. TASKS.md keeps no completed-task graveyard.
+3. When all the plan's tasks are done, set the report status to Shipped (note any deferred verification), and **remove the plan from `PLAN.md`'s "Active plan"**.
+4. Promote any reusable lessons to the invariants / "Known bugs and pitfalls" sections below.
+
 ---
 
 ## Project invariants
@@ -115,6 +127,14 @@ If a file you edit imports from an `??` untracked file, your local build passes 
 ### Worker local dev
 
 `video-worker` published `8001:8000`, `~/.aws` mounted, `S3_AUDIO_BUCKET=jeromelu-raw-audio` (the pre-2026-05-10 bug).
+
+### On-box admin API calls need `--resolve`
+
+The Lightsail box cannot hairpin-NAT to its own public IP — a `curl` to `https://api.jeromelu.ai` *from the box itself* just times out. Admin endpoints invoked on the box (one-time seeds, manual refreshes) must route to loopback: `curl --resolve api.jeromelu.ai:443:127.0.0.1 ...` (the same trick `scripts/scout-refresh.sh` already uses). Calls from outside (local machine, CI) hit the public IP normally.
+
+### Prod secrets come from the box, not SSM
+
+The human IAM user (`kristopher.lopez`) has `ssm:DescribeParameters` but **not** `ssm:GetParameter` on `/jeromelu/*` — `aws ssm get-parameter` returns `ParameterNotFound` (not `AccessDenied`). Only the instance role reads the SecureStrings. To get a prod secret (e.g. `ADMIN_KEY`), SSH the box — `aws lightsail get-instance-access-details --instance-name jeromelu --region ap-southeast-2` for temp creds — and read `/opt/jeromelu/.env`. Don't burn a cycle on SSM.
 
 ---
 

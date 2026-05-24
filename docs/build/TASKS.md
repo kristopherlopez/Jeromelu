@@ -10,7 +10,7 @@ Each task is a level-3 heading with three labelled blocks:
 - **How to verify** — concrete checks. Commands, files, expected output. Bar: "if satisfied exactly as written, the result is trustworthy."
 - **Proof notes** — filled in by the implementer after completion. Commands run, output observed, files changed, commit SHA. Empty until done.
 
-Mark as `[x]` only after `adversarial-reviewer` passes. Move completed tasks to the bottom section.
+Mark as `[x]` only after `adversarial-reviewer` passes. Once checked off, record what the task delivered in the active run report under [`docs/build/runs/`](./runs/) and **remove it from this file** — TASKS.md holds only the live queue, not a completed-task graveyard (see the run-report ritual in [META.md](./META.md)).
 
 ### Tags
 
@@ -95,71 +95,6 @@ _(implementer fills in: three curl responses, three aws s3 ls outputs, two SQL q
 
 ---
 
-## Completed tasks
+## Completed work
 
-### [x] TASK-01: Add D8 fixture + unit drift tests for `scout/supercoach_teams/`
-
-Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "Files created" / supercoach_teams items 1-2.
-
-**Proof notes**
-- **Fixture captured** via `curl -s "https://www.supercoach.com.au/$(date +%Y)/api/nrl/classic/v1/teams" | python -m json.tool > tests/fixtures/scout/supercoach_teams/canonical_response.json` (season=2026, current calendar year). File is **pretty-printed**: 223 lines / 5442 bytes (≫ 17). Validated programmatically: JSON `list` of **17** objects, each carrying `id`/`abbrev`/`feed_name`/`name`/`competition`; **17** unique abbrevs; every `competition.id == 2`; every `competition.name == "NRL"`. (The nested `competition.season` is `null` in the live payload — faithful capture; the model permits `season: int | None`.)
-- **Test module** `tests/unit/api/scout/test_supercoach_teams_models.py` created, templated on `test_supercoach_roster_models.py` — same `@pytest.fixture(scope="module")` + `fixtures_dir` pattern, imports `SuperCoachTeam` from `app.scout.supercoach_teams.models`. Four functions in spec order: `test_canonical_fixture_parses`, `test_unknown_field_on_team_raises` (`is_new_franchise`), `test_unknown_field_on_nested_competition_raises` (`is_super_league`), `test_missing_required_field_raises` (`del abbrev`).
-- `pytest tests/unit/api/scout/test_supercoach_teams_models.py -v` → **4 passed** in 1.87s.
-- `pytest tests/unit/api/scout/ -v` → **28 passed** in 1.34s (24 pre-existing + 4 new; no regression).
-- `git status` after staging showed exactly the two task artifacts. Pre-existing concurrent-session changes (`services/api/app/analyst/identify_voice.py` modified, `services/web/.claude/` untracked) were left untouched and unstaged.
-- **adversarial-reviewer verdict: PASS** — no Blockers, no Concerns (one awareness note re `season: null`, non-blocking).
-- **Commit:** `fa0cc8f` — `test(scout): add D8 fixture + unit drift tests for supercoach_teams [skip-simplify]`. Pushed to `master`.
-
-### [x] TASK-02: Add D8 live integration drift test for `scout/supercoach_teams/`
-
-Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "Files created" / supercoach_teams item 3.
-
-**Proof notes**
-- **Created** `tests/integration/scout/test_supercoach_teams_response_shape.py`, templated on `test_supercoach_roster_response_shape.py` (D8 / env-flag / operator-fix-path docstring framing preserved). Single test `test_live_supercoach_teams_shape`, gated on `os.environ.get("SCOUT_DRIFT_LIVE") == "1"`. Fetch + parse both inside one `try/except (SuperCoachTeamsFetchError, ValidationError)` → `pytest.fail` with the exact spec message (incl. fixture path). Three sanity asserts: `16 <= len(parsed) <= 18`, unique-abbrev count, `{competition.id} == {2}`.
-- **Skip mode:** `pytest tests/integration/scout/test_supercoach_teams_response_shape.py -v` → **1 skipped**, reason `Set SCOUT_DRIFT_LIVE=1 to run the live-endpoint drift test`.
-- **Live mode:** `SCOUT_DRIFT_LIVE=1 pytest ... -v` → **1 passed** in 1.54s (real SC endpoint hit).
-- **Deliberate break:** temporarily added `is_relegated: bool` to `SCCompetition` in `models.py` → live run **FAILED** naming `competition.is_relegated` in the message. Reverted; `git diff models.py` is empty.
-- `git status` showed exactly one new file (plus untouched concurrent-session changes).
-- **adversarial-reviewer verdict: PASS** — no Blockers, no Concerns.
-- **Commit:** `023716b` — `test(scout): add D8 live integration drift test for supercoach_teams [skip-simplify]`. Pushed to `master`.
-
-### [x] TASK-03: Add D8 fixture + unit drift tests for `scout/supercoach_settings/`
-
-Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "Files created" / supercoach_settings items 1-2.
-
-**Proof notes**
-- **Fixture captured** via `curl -s "https://www.supercoach.com.au/$(date +%Y)/api/nrl/classic/v1/settings" | python -m json.tool > tests/fixtures/scout/supercoach_settings/canonical_response.json` (season=2026). **Pretty-printed: 1189 lines / 38900 bytes (~38KB)** — note this is ~2× the planner's "~15–20KB" estimate; kept untrimmed per the spec. Validated: JSON `dict` whose top-level keys are **exactly** `{competition, content, game, system}` (nothing else, so the `extra="forbid"` envelope parses); `system.currency == "AUD"`; `system.timezone == "Australia/Sydney"`; `current_round` ∈ `competition`; `player_stats` ∈ `game`; `game` has **69** sub-keys.
-- **Test module** `tests/unit/api/scout/test_supercoach_settings_models.py` created, templated on `test_supercoach_roster_models.py`, imports `SuperCoachSettings` from `app.scout.supercoach_settings.models`. `fixture_settings` returns a single dict via `json.loads(...)` (not a list); uses the `fixtures_dir` conftest fixture. Three functions: `test_canonical_fixture_parses` (with the four smoke asserts), `test_unknown_top_level_field_raises` (envelope guard, `loot_boxes`), `test_missing_required_top_level_raises` (`del game`).
-- `pytest tests/unit/api/scout/test_supercoach_settings_models.py -v` → **3 passed** in 1.27s.
-- `pytest tests/unit/api/scout/ -q` → **31 passed** in 1.40s (28 prior + 3 new; no regression).
-- `git status` showed exactly the two task artifacts staged (plus untouched concurrent-session changes).
-- **adversarial-reviewer verdict: PASS WITH CONCERNS** — both concerns non-blocking and required no code change: (1) fixture ~38KB vs estimate — recorded above; (2) proof notes empty at review time — filled here before checkoff.
-- **Commit:** `b602e88` — `test(scout): add D8 fixture + unit drift tests for supercoach_settings [skip-simplify]`. Pushed to `master`.
-
-### [x] TASK-04: Add D8 live integration drift tests (classic + draft) for `scout/supercoach_settings/`
-
-Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "Files created" / supercoach_settings item 3.
-
-**Proof notes**
-- **Created** `tests/integration/scout/test_supercoach_settings_response_shape.py`, templated on `test_supercoach_roster_response_shape.py` (D8 / env-flag framing preserved, plus a draft-mode-rationale paragraph). Single function `test_live_supercoach_settings_shape(mode)` with `@pytest.mark.parametrize("mode", ["classic", "draft"])`, gated on `os.environ.get("SCOUT_DRIFT_LIVE") == "1"`. Fetch + parse both inside one `try/except (SuperCoachSettingsFetchError, ValidationError)` → `pytest.fail` with the exact spec message (reviewer confirmed runtime-rendered string matches char-for-char). Sanity asserts: `system["timezone"] == "Australia/Sydney"`, `len(game) > 50`.
-- **Skip mode:** `pytest tests/integration/scout/test_supercoach_settings_response_shape.py -v -rs` → **2 skipped** (`[classic]`, `[draft]`), reason `Set SCOUT_DRIFT_LIVE=1 to run the live-endpoint drift test`.
-- **Live mode:** `SCOUT_DRIFT_LIVE=1 pytest ... -v` → **2 passed** in 2.24s (real SC endpoint, both modes). Observed live `game` sub-key counts: classic **69**, draft **54** — both clear the `> 50` gate. Note (reviewer concern, non-blocking): the draft margin is thin (54 vs threshold 50); a modest upstream trim of draft's `game` block could trip the assert before genuine envelope drift. Acceptable as the intended conservative stub-guard; left to-spec.
-- **Deliberate break:** temporarily renamed `game` → `gameplay` in `SuperCoachSettings` → both live cases **FAILED** with messages naming `game` (extra-forbidden) and `gameplay` (missing-required). Reverted; `git diff models.py` is empty.
-- `git status` showed exactly one new file (plus untouched concurrent-session changes).
-- **adversarial-reviewer verdict: PASS WITH CONCERNS** — both non-blocking (proof notes pending at review time → filled here; thin draft margin → recorded).
-- **Commit:** `fa16afa` — `test(scout): add D8 live integration drift tests (classic+draft) for supercoach_settings [skip-simplify]`. Pushed to `master`.
-
-### [x] TASK-05: Extend `scripts/scout-refresh.sh` + add cron lines for SC teams + settings
-
-Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "Cron schedule".
-
-**Proof notes**
-- **`scripts/scout-refresh.sh`:** added two case clauses (`supercoach-teams) ENDPOINT="supercoach-teams"`, `supercoach-settings) ENDPOINT="supercoach-settings"` — no leading `scout/`, so the URL template yields `/api/admin/scout/supercoach-{teams,settings}`). Updated the `echo "usage: ..."` message and the file-header `# Usage:` comment to list the two new args (header sync = documentation discipline; reviewer explicitly approved as in-spirit, not out-of-spec). Curl block / `--resolve` / `--max-time 3600` / log-line format untouched.
-- **`scripts/cron.d/jeromelu`:** inserted the spec's exact two-block (weekly `30 23 * * 1` teams + `35 23 * * 1` settings, user `ubuntu`, absolute wrapper paths) immediately after the `15 23 * * *` videos entry.
-- `bash -n scripts/scout-refresh.sh` → clean (no syntax errors).
-- Dry-run `JOB=supercoach-teams ... bash -x ... supercoach-teams` → trace shows `case` matched, `ENDPOINT=supercoach-teams`, `API_URL=https://api.jeromelu.ai/api/admin/scout/supercoach-teams`, reached curl (CURL_RC=7 at connect — proves the clause matched). Same for `supercoach-settings` → `API_URL=.../supercoach-settings`.
-- Cron lines verified: 5 timing fields + `ubuntu` + absolute path each.
-- `grep -n cron.d/jeromelu scripts/lightsail-deploy.sh` → lines 59–60; the sync is `sudo -n install -m 0644 -o root -g root /opt/jeromelu/scripts/cron.d/jeromelu /etc/cron.d/jeromelu` (lines 58–60), and line 64 `chmod +x /opt/jeromelu/scripts/*.sh`. So the wrapper arg + cron lines publish to `/etc/cron.d/jeromelu` on next deploy; prod crontab is never hand-edited.
-- `git status` showed exactly two modified files (the wrapper + crontab), no new files (plus untouched concurrent-session changes).
-- **adversarial-reviewer verdict: PASS** — no Blockers, no Concerns; header-comment sync explicitly approved.
-- **Commit:** `b031fff` — `feat(scout): wire SC teams + settings into scout-refresh.sh + cron [skip-simplify]`. Pushed to `master`.
+Completed tasks are not kept here. When a task passes review and is checked off, what it delivered is recorded in the active run report under [`docs/build/runs/`](./runs/) and the task is removed from this file. This queue holds only open/in-flight work.

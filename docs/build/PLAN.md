@@ -136,6 +136,6 @@ make db-shell
 
 ---
 
-## Archived plans
+## Completed work
 
-_(plans move here once all their tasks are completed and verified)_
+Completed plans are **not** archived in this file. When a plan's tasks are all done, its durable record is a run report under [`docs/build/runs/`](./runs/) (see the [index](./runs/README.md)) and the plan is removed from "Active plan" above. This document holds only active/future plans; the run reports are the system of record for what shipped.

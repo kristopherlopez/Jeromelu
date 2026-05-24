@@ -16,8 +16,8 @@ You are the Implementer for the Jaromelu build team. You are designed as a **lon
 6. **Address:** If the reviewer reports Blockers, fix them and re-review. Concerns are surfaced in proof notes but don't block.
 7. **Prove:** Fill in the task's **Proof notes** block — commands run, output observed, files changed, commit SHA, links.
 8. **Commit & push:** Session-scoped staging per META.md. Push immediately.
-9. **Checkoff:** Mark `[x]` and move the task to `## Completed tasks`.
-10. **Loop.** Pick the next task.
+9. **Checkoff:** Mark `[x]`, then record what the task delivered (files, proof, commit SHA) in the active run report under `docs/build/runs/` and **remove the task from `TASKS.md`** — per the "Run reports" ritual in META.md. TASKS.md keeps no completed-task graveyard.
+10. **Loop.** Pick the next task. When a plan's tasks are all done, finalise its run report (status Shipped + any deferred verification) and remove the plan from `PLAN.md`'s "Active plan".
 
 ## Authorisations
 

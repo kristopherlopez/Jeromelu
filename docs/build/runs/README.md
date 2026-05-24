@@ -1,0 +1,11 @@
+# Build run reports
+
+The durable, human-readable record of completed build work — one report per plan/initiative ("a run"), written as a status update: what each task delivered, how it was verified, the decisions/deviations made, what's outstanding, and lessons learned.
+
+This folder is the system of record for *what happened*. `PLAN.md` holds only active/future plans; `TASKS.md` holds only the live queue; both get reused. Git history is the immutable log. See the run-report ritual in [META.md](../META.md).
+
+Newest first.
+
+| Date | Run | Status |
+|---|---|---|
+| 2026-05-24 | [Scout Phase 2.5 closure — SC teams + settings](./2026-05-24-scout-phase-2.5-closure.md) | 🟢 Shipped (1 verification pending) |
