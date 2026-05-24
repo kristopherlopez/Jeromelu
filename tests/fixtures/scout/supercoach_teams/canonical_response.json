@@ -1,0 +1,223 @@
+[
+    {
+        "id": 1,
+        "abbrev": "BRO",
+        "feed_name": "Brisbane",
+        "name": "Broncos",
+        "competition": {
+            "id": 2,
+            "season": null,
+            "abbrev": "nrl",
+            "name": "NRL",
+            "long_name": "National Rugby League"
+        }
+    },
+    {
+        "id": 2,
+        "abbrev": "CBR",
+        "feed_name": "Canberra",
+        "name": "Raiders",
+        "competition": {
+            "id": 2,
+            "season": null,
+            "abbrev": "nrl",
+            "name": "NRL",
+            "long_name": "National Rugby League"
+        }
+    },
+    {
+        "id": 3,
+        "abbrev": "BUL",
+        "feed_name": "Canterbury",
+        "name": "Bulldogs",
+        "competition": {
+            "id": 2,
+            "season": null,
+            "abbrev": "nrl",
+            "name": "NRL",
+            "long_name": "National Rugby League"
+        }
+    },
+    {
+        "id": 4,
+        "abbrev": "SHA",
+        "feed_name": "Cronulla",
+        "name": "Sharks",
+        "competition": {
+            "id": 2,
+            "season": null,
+            "abbrev": "nrl",
+            "name": "NRL",
+            "long_name": "National Rugby League"
+        }
+    },
+    {
+        "id": 5,
+        "abbrev": "MNL",
+        "feed_name": "Manly",
+        "name": "Sea Eagles",
+        "competition": {
+            "id": 2,
+            "season": null,
+            "abbrev": "nrl",
+            "name": "NRL",
+            "long_name": "National Rugby League"
+        }
+    },
+    {
+        "id": 6,
+        "abbrev": "MEL",
+        "feed_name": "Melbourne",
+        "name": "Storm",
+        "competition": {
+            "id": 2,
+            "season": null,
+            "abbrev": "nrl",
+            "name": "NRL",
+            "long_name": "National Rugby League"
+        }
+    },
+    {
+        "id": 7,
+        "abbrev": "NZL",
+        "feed_name": "Warriors",
+        "name": "Warriors",
+        "competition": {
+            "id": 2,
+            "season": null,
+            "abbrev": "nrl",
+            "name": "NRL",
+            "long_name": "National Rugby League"
+        }
+    },
+    {
+        "id": 8,
+        "abbrev": "NEW",
+        "feed_name": "Newcastle",
+        "name": "Knights",
+        "competition": {
+            "id": 2,
+            "season": null,
+            "abbrev": "nrl",
+            "name": "NRL",
+            "long_name": "National Rugby League"
+        }
+    },
+    {
+        "id": 9,
+        "abbrev": "NQC",
+        "feed_name": "North QLD",
+        "name": "Cowboys",
+        "competition": {
+            "id": 2,
+            "season": null,
+            "abbrev": "nrl",
+            "name": "NRL",
+            "long_name": "National Rugby League"
+        }
+    },
+    {
+        "id": 10,
+        "abbrev": "PAR",
+        "feed_name": "Parramatta",
+        "name": "Eels",
+        "competition": {
+            "id": 2,
+            "season": null,
+            "abbrev": "nrl",
+            "name": "NRL",
+            "long_name": "National Rugby League"
+        }
+    },
+    {
+        "id": 11,
+        "abbrev": "PTH",
+        "feed_name": "Penrith",
+        "name": "Panthers",
+        "competition": {
+            "id": 2,
+            "season": null,
+            "abbrev": "nrl",
+            "name": "NRL",
+            "long_name": "National Rugby League"
+        }
+    },
+    {
+        "id": 12,
+        "abbrev": "STH",
+        "feed_name": "South Sydney",
+        "name": "Rabbitohs",
+        "competition": {
+            "id": 2,
+            "season": null,
+            "abbrev": "nrl",
+            "name": "NRL",
+            "long_name": "National Rugby League"
+        }
+    },
+    {
+        "id": 13,
+        "abbrev": "STG",
+        "feed_name": "St George Illawarra",
+        "name": "Dragons",
+        "competition": {
+            "id": 2,
+            "season": null,
+            "abbrev": "nrl",
+            "name": "NRL",
+            "long_name": "National Rugby League"
+        }
+    },
+    {
+        "id": 14,
+        "abbrev": "SYD",
+        "feed_name": "Sydney Roosters",
+        "name": "Roosters",
+        "competition": {
+            "id": 2,
+            "season": null,
+            "abbrev": "nrl",
+            "name": "NRL",
+            "long_name": "National Rugby League"
+        }
+    },
+    {
+        "id": 15,
+        "abbrev": "WST",
+        "feed_name": "Wests Tigers",
+        "name": "Tigers",
+        "competition": {
+            "id": 2,
+            "season": null,
+            "abbrev": "nrl",
+            "name": "NRL",
+            "long_name": "National Rugby League"
+        }
+    },
+    {
+        "id": 16,
+        "abbrev": "GCT",
+        "feed_name": "Gold Coast Titans",
+        "name": "Titans",
+        "competition": {
+            "id": 2,
+            "season": null,
+            "abbrev": "nrl",
+            "name": "NRL",
+            "long_name": "National Rugby League"
+        }
+    },
+    {
+        "id": 17,
+        "abbrev": "DOL",
+        "feed_name": "Doplhins",
+        "name": "Dolphins",
+        "competition": {
+            "id": 2,
+            "season": null,
+            "abbrev": "nrl",
+            "name": "NRL",
+            "long_name": "National Rugby League"
+        }
+    }
+]
