@@ -270,8 +270,8 @@ Pipeline inventory after full source enumeration (2026-05-12). Each row is a fol
 
 | Pipeline folder | Endpoint | S3 path | DB extraction target | Status |
 |---|---|---|---|---|
-| `scout/supercoach_roster/` | `/api/nrl/classic/v1/players-cf` | `supercoach/classic/players-cf/{season}/{YYYYMMDD}.json` | `people`, `player_attributes`, `people_roles` (+ `claims`/`quotes` from `notes[]`) | ✅ shipped (Phase 1) — needs S3-first retrofit per D10 |
-| `scout/supercoach_teams/` | `/api/nrl/classic/v1/teams` | `supercoach/classic/teams/{season}.json` | Cross-reference into `teams.metadata_json.supercoach` | 🟡 not built — Phase 1.5 |
+| `scout/supercoach_roster/` | `/api/nrl/classic/v1/players-cf` | `supercoach/classic/players-cf/{season}/{YYYYMMDD}.json` | `people`, `player_attributes`, `people_roles` (+ `claims`/`quotes` from `notes[]`) | ✅ shipped (Phase 1) — now S3-first per D10 |
+| `scout/supercoach_teams/` | `/api/nrl/classic/v1/teams` | `supercoach/classic/teams/{season}.json` | Cross-reference into `teams.metadata_json.supercoach` | 🟡 not built — Phase 2.5 |
 | `scout/supercoach_settings/` | `/api/nrl/classic/v1/settings` | `supercoach/classic/settings/{season}/{YYYYMMDD}.json` | `sc_settings` (new table — SC game rules per season) | 🟡 not built |
 | `scout/supercoach_draft_roster/` | `/api/nrl/draft/v1/players-cf` | `supercoach/draft/players-cf/{season}/{YYYYMMDD}.json` | Draft-mode parallel of `player_attributes` (or `player_attributes.metadata_json.draft`) | 🟡 optional — Phase deferred |
 | `scout/supercoach_draft_teams/` | `/api/nrl/draft/v1/teams` | `supercoach/draft/teams/{season}.json` | Same cross-reference | 🟡 optional |
@@ -292,7 +292,7 @@ Pipeline inventory after full source enumeration (2026-05-12). Each row is a fol
 
 | Pipeline folder | Endpoint | S3 path | DB extraction target | Status |
 |---|---|---|---|---|
-| `scout/supercoach_stats/` | `nrlsupercoachstats.com/stats.php` (jqGrid) | `nrlsupercoachstats/stats/{season}/round-{NN}.json` | `player_rounds` (SC scoring breakdown columns) | ✅ shipped (Phase 2) — needs S3-first retrofit per D10 |
+| `scout/supercoach_stats/` | `nrlsupercoachstats.com/stats.php` (jqGrid) | `nrlsupercoachstats/stats/{season}/round-{NN}.json` | `player_rounds` (SC scoring breakdown columns) | ✅ shipped (Phase 2) — now S3-first per D10 |
 
 **Future (multi-platform expansion):** podcasts (RSS), Twitter/X, blogs/news, Reddit — same pattern, each gets a folder per D9.
 

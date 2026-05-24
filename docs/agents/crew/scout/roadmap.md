@@ -33,9 +33,11 @@ The expanded charter ([charter.md](charter.md)) stages the migration of all exte
 - Update [`dynamics.md`](../dynamics.md) Cadence row: Bookkeeper trigger becomes "Scout scrape complete" instead of "scraper sweep complete".
 - Update [crew `README.md`](../README.md) Bookkeeper one-liner.
 
-### Phase 1 — One pipeline migrated end-to-end (the proof slice) ✅
+### Phase 1 — One pipeline migrated end-to-end (the proof slice) ✅ *(one loose end)*
 
-Pick the smallest pipeline: **SuperCoach player roster**. It already has a working fetcher script and a skill (to be retired). Full step-by-step plan in [plans/phase-1-supercoach-roster.md](plans/phase-1-supercoach-roster.md).
+Pick the smallest pipeline: **SuperCoach player roster**. Full step-by-step plan in [plans/phase-1-supercoach-roster.md](plans/phase-1-supercoach-roster.md).
+
+> **Loose end:** functionally shipped and bronze-compliant (S3-first per D10, strict-parse per D8), but the `scrape-supercoach` Claude Code skill is **not yet retired** (Step 13 / acceptance #8 — the skill still exists on disk). It's blocked on rehoming the `data/players.yaml` regeneration that skill does for transcript-cleaning (plan Open Q4): delete the skill once the cleaning pipeline reads the roster from the DB instead.
 
 - Move `scripts/data/fetchers/fetch_supercoach_players.py` → `services/api/app/scout/supercoach_roster/` (folder per D9) as a callable function (no behavioural changes).
 - **Add the D8 drift fixture and test:** `tests/fixtures/scout/supercoach_roster/canonical_response.json` + `tests/integration/scout/supercoach_roster/test_response_shape.py` (Pydantic-strict, live-mode env-flagged). This is the pattern every subsequent pipeline copies — getting it right on Phase 1 means it's cheap to apply for Phases 2-4.
@@ -53,16 +55,15 @@ Same pattern applied to `fetch_player_stats.py`. This is the **highest-leverage 
 - Admin endpoint + cron (post-round cadence, plus on-demand for re-pulls).
 - The existing `services/worker-scraper/` Temporal worker can stop being touched after this; its activities are now sibling Scout modules.
 
-### Phase 2.5 — S3-first retrofit + lightweight SC siblings (~1 day)
+### Phase 2.5 — Bronze (S3-first) retrofit ✅ + lightweight SC siblings (In design)
 
-Bring shipped pipelines into compliance with D10 (S3-first), and add the small SC siblings:
+The **bronze/S3-first retrofit is done** — `scout/supercoach_roster/` and `scout/supercoach_stats/` now archive the raw response to S3 (D10) and strict-parse it (D8) before DB extraction (`_s3_archive.archive_response`; `s3_archive_key` recorded per run). Remaining 2.5 work is the small SC siblings:
 
-- Retrofit `scout/supercoach_roster/` and `scout/supercoach_stats/` to write the raw response to S3 before any DB extraction. Existing DB writes continue unchanged; S3 becomes an additional write.
 - New `scout/supercoach_teams/` — tiny (17 rows, ~3KB), weekly cadence, cross-references `teams.metadata_json.supercoach`.
 - New `scout/supercoach_settings/` — captures SC game rules (lockouts, scoring config, captains/emergencies/dual-position rules) per season; weekly.
 - Run once with current season → S3 archive is complete for the SC surface.
 
-### Phase 3 — NRL.com draw + match-centre (the big unlock)
+### Phase 3 — NRL.com draw + match-centre (the big unlock) — In design
 
 The two pipelines that turn the wiki from "stubs" to "rich" for every player who's ever played a match in the last 25 years.
 
@@ -72,20 +73,20 @@ The two pipelines that turn the wiki from "stubs" to "rich" for every player who
 
 This phase unblocks: every team page's `## Recent Results`, every round page's `## Team Lists` + `## Results`, and every player page's per-match history including timeline events (try at 53', sin bin, etc.).
 
-### Phase 4 — NRL.com casualty ward + ladder (~half a day each)
+### Phase 4 — NRL.com casualty ward + ladder (~half a day each) — In design
 
 - New `scout/nrlcom_casualty_ward/` — daily snapshot of the official league injury roll. Writes S3 with timestamped key (state changes daily). DB extractor populates `injuries`.
 - New `scout/nrlcom_ladder/` — per-round team standings + the 22 per-team metrics (form, streak, points-for/against, home/away/day/night records, average margins). DB extractor populates `team_standings` (new table).
 
 Retire `services/worker-scraper/` at the end of this phase — no Scout work runs through it anymore.
 
-### Phase 4.5 — NRL.com stats + players roster + Draft mode (optional)
+### Phase 4.5 — NRL.com stats + players roster + Draft mode (optional) — Backlog
 
 - New `scout/nrlcom_stats/` — pre-computed leaderboards (top-25 per category) for the wiki's `## Key Players` and Bookkeeper's leaderboard queries.
 - New `scout/nrlcom_players_roster/` — fold the existing `jeromelu_shared/players/nrlcom_refresh.py` enrichment into a proper folder per D9.
 - Optional: SuperCoach Draft mode (`scout/supercoach_draft_*`) — parallel of classic, if Draft becomes a product concern.
 
-### Phase 5 — Historical backfill (one-time, ~4-5 hours operationally)
+### Phase 5 — Historical backfill (one-time, ~4-5 hours operationally) — In design
 
 Per D12. Each pipeline supports a `?season=Y[&round=N]` backfill mode that hits the same admin endpoint with explicit parameters. One-time operator-triggered job per pipeline:
 
@@ -99,13 +100,13 @@ Total: ~4-5 hours single-machine, rate-limited at 1 req/sec per origin. ~1-2GB S
 
 Backfill produces the same S3 keys daily cron does — re-running future cron over the same range is a no-op.
 
-### Phase 6 — Unified Scout dashboard
+### Phase 6 — Unified Scout dashboard — In design
 
 Operator view at `/admin/scout` showing health across every pipeline (media + identity + stats + fixtures + injuries + ladder + leaderboards). Reads from `agent_runs` filtered by `agent_id='scout'`, groups by `detail_json.pipeline`. Per-pipeline: last run, status, row counts, cost. No new data — just the view.
 
 This phase isn't blocked by anything earlier; could ship in parallel with Phases 3-4 to give visibility while migration happens.
 
-### Phase 7 (future) — Multi-platform expansion
+### Phase 7 (future) — Multi-platform expansion — Backlog
 
 The multi-platform roadmap items below (podcasts, Twitter/X, blogs, Reddit) instantiate the same shape: each becomes a `scout/<platform>_<thing>/` folder with an admin endpoint. Out of scope for the charter proper; tracked for visibility.
 
