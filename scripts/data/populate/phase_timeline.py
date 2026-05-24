@@ -48,6 +48,77 @@ def _build_player_id_map(db: Session) -> dict[int, str]:
     return {nid: str(pid) for pid, nid in rows}
 
 
+def _extract_timeline_rows(
+    payload: dict[str, Any],
+    key: str,
+    match_id: str,
+    team_map: dict[int, str],
+    player_map: dict[int, str],
+) -> list[dict[str, Any]]:
+    """Pure projection of one match-centre archive into match_timeline rows.
+
+    One row per event in `timeline[]`, ordered by `sequence` (0..N-1). Team
+    and player are resolved via the passed-in maps. No S3, no DB — mirrors
+    the `phase_matches._extract_one` template.
+    """
+    match_ext = str(payload.get("matchId") or "").strip()
+    rows: list[dict[str, Any]] = []
+    for sequence, ev in enumerate(payload.get("timeline") or []):
+        nrlcom_team_id = ev.get("teamId")
+        team_id = team_map.get(int(nrlcom_team_id)) if nrlcom_team_id else None
+        nrlcom_player_id = ev.get("playerId")
+        person_id = player_map.get(int(nrlcom_player_id)) if nrlcom_player_id else None
+        rows.append({
+            "match_id": match_id,
+            "nrlcom_match_id": match_ext,
+            "sequence": sequence,
+            "event_type": ev.get("type") or "Unknown",
+            "title": ev.get("title"),
+            "game_seconds": ev.get("gameSeconds"),
+            "nrlcom_team_id": int(nrlcom_team_id) if nrlcom_team_id else None,
+            "team_id": team_id,
+            "nrlcom_player_id": int(nrlcom_player_id) if nrlcom_player_id else None,
+            "person_id": person_id,
+            "running_home_score": ev.get("homeScore"),
+            "running_away_score": ev.get("awayScore"),
+            "raw_payload": json.dumps(ev, default=str),
+            "s3_archive_key": key,
+        })
+    return rows
+
+
+def _extract_official_rows(
+    payload: dict[str, Any],
+    key: str,
+    match_id: str,
+) -> list[dict[str, Any]]:
+    """Pure projection of one match-centre archive into match_officials rows.
+
+    One row per official in `officials[]` that has a first or last name.
+    `person_id` is left None (officials don't share the players profile-id
+    space cleanly). No S3, no DB.
+    """
+    rows: list[dict[str, Any]] = []
+    match_ext = str(payload.get("matchId") or "").strip()
+    for o in payload.get("officials") or []:
+        fn = (o.get("firstName") or "").strip()
+        ln = (o.get("lastName") or "").strip()
+        if not (fn or ln):
+            continue
+        role = (o.get("position") or "").strip() or None
+        rows.append({
+            "match_id": match_id,
+            "nrlcom_match_id": match_ext,
+            "first_name": fn,
+            "last_name": ln,
+            "role": role,
+            "person_id": None,
+            "raw_payload": json.dumps(o, default=str),
+            "s3_archive_key": key,
+        })
+    return rows
+
+
 def populate_timeline_and_officials(
     db: Session,
     *,
@@ -134,28 +205,7 @@ def populate_timeline_and_officials(
         match_id = match_map[match_ext]
 
         # Timeline events
-        for sequence, ev in enumerate(payload.get("timeline") or []):
-            nrlcom_team_id = ev.get("teamId")
-            team_id = team_map.get(int(nrlcom_team_id)) if nrlcom_team_id else None
-            nrlcom_player_id = ev.get("playerId")
-            person_id = player_map.get(int(nrlcom_player_id)) if nrlcom_player_id else None
-
-            row = {
-                "match_id": match_id,
-                "nrlcom_match_id": match_ext,
-                "sequence": sequence,
-                "event_type": ev.get("type") or "Unknown",
-                "title": ev.get("title"),
-                "game_seconds": ev.get("gameSeconds"),
-                "nrlcom_team_id": int(nrlcom_team_id) if nrlcom_team_id else None,
-                "team_id": team_id,
-                "nrlcom_player_id": int(nrlcom_player_id) if nrlcom_player_id else None,
-                "person_id": person_id,
-                "running_home_score": ev.get("homeScore"),
-                "running_away_score": ev.get("awayScore"),
-                "raw_payload": json.dumps(ev, default=str),
-                "s3_archive_key": key,
-            }
+        for row in _extract_timeline_rows(payload, key, match_id, team_map, player_map):
             res = db.execute(timeline_sql, row)
             if res.scalar():
                 timeline_inserted += 1
@@ -163,25 +213,7 @@ def populate_timeline_and_officials(
                 timeline_updated += 1
 
         # Officials
-        for o in payload.get("officials") or []:
-            fn = (o.get("firstName") or "").strip()
-            ln = (o.get("lastName") or "").strip()
-            if not (fn or ln):
-                continue
-            role = (o.get("position") or "").strip() or None
-            # Try to resolve to person via name match (officials don't share
-            # the players profile id space cleanly — match by name to people).
-            person_id = None
-            row = {
-                "match_id": match_id,
-                "nrlcom_match_id": match_ext,
-                "first_name": fn,
-                "last_name": ln,
-                "role": role,
-                "person_id": person_id,
-                "raw_payload": json.dumps(o, default=str),
-                "s3_archive_key": key,
-            }
+        for row in _extract_official_rows(payload, key, match_id):
             res = db.execute(officials_sql, row)
             if res.scalar():
                 officials_inserted += 1
