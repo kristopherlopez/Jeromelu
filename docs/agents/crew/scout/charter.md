@@ -10,7 +10,7 @@ tags: [area/architecture, subarea/agents]
 
 ---
 
-## Charter rationale
+## Why this charter exists
 
 The data-feeds doc surfaced that the input layers feeding the wiki are owned by **three different crew/system concepts**: Scout (media), the scraper (numeric NRL data — currently Bookkeeper-owned), and the player-roster pipeline (identity). The split is artificial — acquisition is one job regardless of source. This charter consolidates that job under Scout, lays out the architectural pattern that makes it work, and stages the migration.
 
@@ -18,7 +18,88 @@ It does **not** change what the Analyst, Bookkeeper, or Archivist do downstream 
 
 ---
 
-## Decisions to lock before any code is written
+## What Scout owns
+
+> Scout owns **every external source of truth** — it is the project's **bronze layer**: it fetches raw and lands it faithfully (plus the deterministic typed-projection of structured feeds), and does no interpretive transform. The full principle is locked in [D1](#d1-the-boundary-principle--scout-owns-the-bronze-layer); what it means in practice:
+
+### What Scout owns under the expansion
+
+Pipeline inventory after full source enumeration (2026-05-12). Each row is a folder under `services/api/app/scout/` per D9, with S3-first capture per D10.
+
+**Media (legacy flat-file layout — to be folded into `scout/media/` later):**
+
+| Pipeline | Source | Status |
+|---|---|---|
+| Media discovery (YouTube) | YouTube Data API + web | ✅ shipped (`loop.py`, `refresh.py`) |
+| Audio acquisition | yt-dlp | ✅ shipped (`audio.py`) |
+| Video / channel metadata refresh | YouTube Data API | ✅ shipped (`refresh.py`) |
+
+**Data — supercoach.com.au:**
+
+| Pipeline folder | Endpoint | S3 path | DB extraction target | Status |
+|---|---|---|---|---|
+| `scout/supercoach_roster/` | `/api/nrl/classic/v1/players-cf` | `supercoach/classic/players-cf/{season}/{YYYYMMDD}.json` | `people`, `player_attributes`, `people_roles` (+ `claims`/`quotes` from `notes[]`) | ✅ shipped (Phase 1) — now S3-first per D10 |
+| `scout/supercoach_teams/` | `/api/nrl/classic/v1/teams` | `supercoach/classic/teams/{season}.json` | Cross-reference into `teams.metadata_json.supercoach` | 🟡 not built — Phase 2.5 |
+| `scout/supercoach_settings/` | `/api/nrl/classic/v1/settings` | `supercoach/classic/settings/{season}/{YYYYMMDD}.json` | `sc_settings` (new table — SC game rules per season) | 🟡 not built |
+| `scout/supercoach_draft_roster/` | `/api/nrl/draft/v1/players-cf` | `supercoach/draft/players-cf/{season}/{YYYYMMDD}.json` | Draft-mode parallel of `player_attributes` (or `player_attributes.metadata_json.draft`) | 🟡 optional — Phase deferred |
+| `scout/supercoach_draft_teams/` | `/api/nrl/draft/v1/teams` | `supercoach/draft/teams/{season}.json` | Same cross-reference | 🟡 optional |
+| `scout/supercoach_draft_settings/` | `/api/nrl/draft/v1/settings` | `supercoach/draft/settings/{season}/{YYYYMMDD}.json` | Draft-mode rules | 🟡 optional |
+
+**Data — nrl.com (the league-canonical source — highest trust per D11):**
+
+| Pipeline folder | Endpoint | S3 path | DB extraction target | Status |
+|---|---|---|---|---|
+| `scout/nrlcom_draw/` | `/draw/data?competition={N}&season={Y}&round={N}` | `nrlcom/draw/{comp}/{season}/round-{NN}.json` | `matches` (fixtures), `rounds` (round metadata derived) | 🟡 not built — Phase 3 |
+| `scout/nrlcom_match_centre/` | `/draw/{league}/{season}/round-{N}/{slug}/data/` per match | `nrlcom/match-centre/{comp}/{season}/round-{NN}/{slug}.json` | `match_team_lists`, `player_match_stats` (new), `match_timeline` (new), `match_officials` (new), augments `matches` | 🟡 not built — Phase 3 (high leverage) |
+| `scout/nrlcom_casualty_ward/` | `/casualty-ward/data?season={Y}` | `nrlcom/casualty-ward/{comp}/{YYYYMMDD}.json` | `injuries` | 🟡 not built — Phase 4 |
+| `scout/nrlcom_ladder/` | `/ladder/data?competition={N}&season={Y}[&round={N}]` | `nrlcom/ladder/{comp}/{season}/round-{NN}.json` | `team_standings` (new) | 🟡 not built — Phase 4 |
+| `scout/nrlcom_stats/` | `/stats/data?competition={N}&season={Y}` | `nrlcom/stats/{comp}/{season}.json` | `stat_leaderboards` (new) | 🟡 not built — Phase 4.5 |
+| `scout/nrlcom_players_roster/` | `/players/data?competition={N}&team={team_id}` | `nrlcom/players-roster/{comp}/{team_slug}.json` | Enriches `people` with NRL.com profile fields | 🟡 partially exists in `jeromelu_shared/players/nrlcom_refresh.py`; needs folder-organise + S3-first |
+
+**Data — nrlsupercoachstats.com (third-tier, fills SC scoring breakdown gap):**
+
+| Pipeline folder | Endpoint | S3 path | DB extraction target | Status |
+|---|---|---|---|---|
+| `scout/supercoach_stats/` | `nrlsupercoachstats.com/stats.php` (jqGrid) | `nrlsupercoachstats/stats/{season}/round-{NN}.json` | `player_rounds` (SC scoring breakdown columns) | ✅ shipped (Phase 2) — now S3-first per D10 |
+
+**Data — rugbyleagueproject.org (community historical archive — HTML, no API; added 2026-05-24):**
+
+The deep-history source. HTML pages, not JSON, so the fetch shape differs from the feeds above: fetch HTML → archive the raw page to S3 (still bronze, D10) → parse to typed rows. The projection stays strict (D8), but the parser reads HTML structure and the drift fixture is a saved HTML page, not a JSON sample. Be a polite client — it's a volunteer-run community site: conservative rate-limit (≤1 req/sec), cache-friendly, no hammering.
+
+| Pipeline folder | Source | S3 path | DB extraction target | Status |
+|---|---|---|---|---|
+| `scout/rugbyleagueproject_matches/` | season + match pages | `rugbyleagueproject/matches/{comp}/{season}/{slug}.html` | Pre-2000 `matches` + `match_team_lists` (historical lineups, scorers, results) | 🟡 future — HTML scrape; fills the pre-2000 gap nrl.com can't |
+| `scout/rugbyleagueproject_players/` | player career pages | `rugbyleagueproject/players/{slug}.html` | Player career history → enriches `people` / `people_roles` (debut, clubs, rep span) | 🟡 future |
+
+**Why it's worth it / the trade-off:** match-by-match lineups, scorers, and results back to **1908** (plus coach/referee/venue histories and cross-competition coverage) — the data that turns historical wiki pages from stubs into real careers, which no JSON source can supply. But HTML scraping is more brittle than the JSON feeds, so these are **future/optional** pipelines — sequence them after the nrl.com pipelines (Phases 3–4) land.
+
+**Future (multi-platform expansion):** podcasts (RSS), Twitter/X, blogs/news, Reddit — same pattern, each gets a folder per D9.
+
+### What Scout still does NOT do (the bronze boundary)
+
+The bronze boundary is the spine of the charter — Scout fetches raw, persists raw, sets `ingestion_status='collected'`, and (for structured feeds) projects the JSON into typed rows; then it stops. Every downstream agent reads from Scout's outputs; Scout never reads back from them. The *interpretive* transform — cleaning, diarisation, embedding, speaker→Person attribution, claim/quote extraction, and cross-source consensus — stays with the Analyst; numerical derivations with the Bookkeeper; wiki composition with the Archivist; voicing with Jaromelu. The canonical prose breakdown lives in [README § What Scout DOES NOT cover](README.md#what-scout-does-not-cover).
+
+---
+
+## How it works
+
+The S3-first architecture diagram (one identity, many modules → S3 → DB extractors) and the shared-module shape live in [architecture.md § Architecture under the expanded charter](architecture.md#architecture-under-the-expanded-charter). In brief: every module exposes a single idempotent fetch function, wraps it in an admin endpoint with the `agent_runs` audit pattern (`agent_id='scout'`, `detail_json.pipeline='<module>'`), captures raw JSON to S3 first (D10), and projects to DB via downstream extractors (D13).
+
+---
+
+## Phasing
+
+The full phasing (Phase 0–7) lives in [roadmap.md § Charter phasing](roadmap.md#charter-phasing-phase-07). Phase 0–2 shipped (doc reconciliation + SuperCoach roster + stats); Phase 2.5 onward is the remaining migration work.
+
+---
+
+## Decisions register (D1–D13)
+
+> The locked decision record, cited by number across the repo (`per D8`, `per D9`, …). Kept in numeric order; grouped here for navigation:
+> - **Boundary & scope:** D1
+> - **Identity, code & storage:** D2 · D6 · D9 · D10 · D13
+> - **Operations:** D3 · D4 · D5 · D7
+> - **Data integrity & resolution:** D8 · D11 · D12
 
 ### D1. The boundary principle — Scout owns the bronze layer
 
@@ -254,79 +335,6 @@ After backfill: future cron only writes new (current-season, current-round) snap
 | `extract_sc_settings` | `scout/supercoach/classic/settings/*` | `sc_settings` (new — game rules per season) |
 
 Extractors are agent-audited (`agent_id='scout'` works for them too, with `detail_json.role='extractor'`) and idempotent (same S3 → same DB rows on re-run).
-
----
-
-## The expanded charter
-
-### What Scout owns under the expansion
-
-Pipeline inventory after full source enumeration (2026-05-12). Each row is a folder under `services/api/app/scout/` per D9, with S3-first capture per D10.
-
-**Media (legacy flat-file layout — to be folded into `scout/media/` later):**
-
-| Pipeline | Source | Status |
-|---|---|---|
-| Media discovery (YouTube) | YouTube Data API + web | ✅ shipped (`loop.py`, `refresh.py`) |
-| Audio acquisition | yt-dlp | ✅ shipped (`audio.py`) |
-| Video / channel metadata refresh | YouTube Data API | ✅ shipped (`refresh.py`) |
-
-**Data — supercoach.com.au:**
-
-| Pipeline folder | Endpoint | S3 path | DB extraction target | Status |
-|---|---|---|---|---|
-| `scout/supercoach_roster/` | `/api/nrl/classic/v1/players-cf` | `supercoach/classic/players-cf/{season}/{YYYYMMDD}.json` | `people`, `player_attributes`, `people_roles` (+ `claims`/`quotes` from `notes[]`) | ✅ shipped (Phase 1) — now S3-first per D10 |
-| `scout/supercoach_teams/` | `/api/nrl/classic/v1/teams` | `supercoach/classic/teams/{season}.json` | Cross-reference into `teams.metadata_json.supercoach` | 🟡 not built — Phase 2.5 |
-| `scout/supercoach_settings/` | `/api/nrl/classic/v1/settings` | `supercoach/classic/settings/{season}/{YYYYMMDD}.json` | `sc_settings` (new table — SC game rules per season) | 🟡 not built |
-| `scout/supercoach_draft_roster/` | `/api/nrl/draft/v1/players-cf` | `supercoach/draft/players-cf/{season}/{YYYYMMDD}.json` | Draft-mode parallel of `player_attributes` (or `player_attributes.metadata_json.draft`) | 🟡 optional — Phase deferred |
-| `scout/supercoach_draft_teams/` | `/api/nrl/draft/v1/teams` | `supercoach/draft/teams/{season}.json` | Same cross-reference | 🟡 optional |
-| `scout/supercoach_draft_settings/` | `/api/nrl/draft/v1/settings` | `supercoach/draft/settings/{season}/{YYYYMMDD}.json` | Draft-mode rules | 🟡 optional |
-
-**Data — nrl.com (the league-canonical source — highest trust per D11):**
-
-| Pipeline folder | Endpoint | S3 path | DB extraction target | Status |
-|---|---|---|---|---|
-| `scout/nrlcom_draw/` | `/draw/data?competition={N}&season={Y}&round={N}` | `nrlcom/draw/{comp}/{season}/round-{NN}.json` | `matches` (fixtures), `rounds` (round metadata derived) | 🟡 not built — Phase 3 |
-| `scout/nrlcom_match_centre/` | `/draw/{league}/{season}/round-{N}/{slug}/data/` per match | `nrlcom/match-centre/{comp}/{season}/round-{NN}/{slug}.json` | `match_team_lists`, `player_match_stats` (new), `match_timeline` (new), `match_officials` (new), augments `matches` | 🟡 not built — Phase 3 (high leverage) |
-| `scout/nrlcom_casualty_ward/` | `/casualty-ward/data?season={Y}` | `nrlcom/casualty-ward/{comp}/{YYYYMMDD}.json` | `injuries` | 🟡 not built — Phase 4 |
-| `scout/nrlcom_ladder/` | `/ladder/data?competition={N}&season={Y}[&round={N}]` | `nrlcom/ladder/{comp}/{season}/round-{NN}.json` | `team_standings` (new) | 🟡 not built — Phase 4 |
-| `scout/nrlcom_stats/` | `/stats/data?competition={N}&season={Y}` | `nrlcom/stats/{comp}/{season}.json` | `stat_leaderboards` (new) | 🟡 not built — Phase 4.5 |
-| `scout/nrlcom_players_roster/` | `/players/data?competition={N}&team={team_id}` | `nrlcom/players-roster/{comp}/{team_slug}.json` | Enriches `people` with NRL.com profile fields | 🟡 partially exists in `jeromelu_shared/players/nrlcom_refresh.py`; needs folder-organise + S3-first |
-
-**Data — nrlsupercoachstats.com (third-tier, fills SC scoring breakdown gap):**
-
-| Pipeline folder | Endpoint | S3 path | DB extraction target | Status |
-|---|---|---|---|---|
-| `scout/supercoach_stats/` | `nrlsupercoachstats.com/stats.php` (jqGrid) | `nrlsupercoachstats/stats/{season}/round-{NN}.json` | `player_rounds` (SC scoring breakdown columns) | ✅ shipped (Phase 2) — now S3-first per D10 |
-
-**Data — rugbyleagueproject.org (community historical archive — HTML, no API; added 2026-05-24):**
-
-The deep-history source. HTML pages, not JSON, so the fetch shape differs from the feeds above: fetch HTML → archive the raw page to S3 (still bronze, D10) → parse to typed rows. The projection stays strict (D8), but the parser reads HTML structure and the drift fixture is a saved HTML page, not a JSON sample. Be a polite client — it's a volunteer-run community site: conservative rate-limit (≤1 req/sec), cache-friendly, no hammering.
-
-| Pipeline folder | Source | S3 path | DB extraction target | Status |
-|---|---|---|---|---|
-| `scout/rugbyleagueproject_matches/` | season + match pages | `rugbyleagueproject/matches/{comp}/{season}/{slug}.html` | Pre-2000 `matches` + `match_team_lists` (historical lineups, scorers, results) | 🟡 future — HTML scrape; fills the pre-2000 gap nrl.com can't |
-| `scout/rugbyleagueproject_players/` | player career pages | `rugbyleagueproject/players/{slug}.html` | Player career history → enriches `people` / `people_roles` (debut, clubs, rep span) | 🟡 future |
-
-**Why it's worth it / the trade-off:** match-by-match lineups, scorers, and results back to **1908** (plus coach/referee/venue histories and cross-competition coverage) — the data that turns historical wiki pages from stubs into real careers, which no JSON source can supply. But HTML scraping is more brittle than the JSON feeds, so these are **future/optional** pipelines — sequence them after the nrl.com pipelines (Phases 3–4) land.
-
-**Future (multi-platform expansion):** podcasts (RSS), Twitter/X, blogs/news, Reddit — same pattern, each gets a folder per D9.
-
-### What Scout still does NOT do (the bronze boundary)
-
-The bronze boundary is the spine of the charter — Scout fetches raw, persists raw, sets `ingestion_status='collected'`, and (for structured feeds) projects the JSON into typed rows; then it stops. Every downstream agent reads from Scout's outputs; Scout never reads back from them. The *interpretive* transform — cleaning, diarisation, embedding, speaker→Person attribution, claim/quote extraction, and cross-source consensus — stays with the Analyst; numerical derivations with the Bookkeeper; wiki composition with the Archivist; voicing with Jaromelu. The canonical prose breakdown lives in [README § What Scout DOES NOT cover](README.md#what-scout-does-not-cover).
-
----
-
-## Architecture under the new charter
-
-The S3-first architecture diagram (one identity, many modules → S3 → DB extractors) and the shared-module shape live in [architecture.md § Architecture under the expanded charter](architecture.md#architecture-under-the-expanded-charter). In brief: every module exposes a single idempotent fetch function, wraps it in an admin endpoint with the `agent_runs` audit pattern (`agent_id='scout'`, `detail_json.pipeline='<module>'`), captures raw JSON to S3 first (D10), and projects to DB via downstream extractors (D13).
-
----
-
-## Phasing
-
-The full phasing (Phase 0–7) lives in [roadmap.md § Charter phasing](roadmap.md#charter-phasing-phase-07). Phase 0–2 shipped (doc reconciliation + SuperCoach roster + stats); Phase 2.5 onward is the remaining migration work.
 
 ---
 
