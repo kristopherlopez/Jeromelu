@@ -95,50 +95,6 @@ Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "One-time S3 seed run" + "D
 _(implementer fills in: three curl responses, three aws s3 ls outputs, two SQL query results, doc diff summary, first-cron-fire log line)_
 
 
-### [BLOCKED: no ops Python runtime on the box to run the populate] TASK-19: Prod populate run + DB verification + docs + run report (Phase 3.5 closure)
-
-Implements PLAN.md § 2026-05-24 Scout Phase 3.5 / Verification (prod populate) + Documentation updates. **Only run after TASK-13→18 are merged and the box has the refactored code.** Runs on the box (needs prod `DATABASE_URL` + S3 creds + deployed code), like the Phase 3 seed.
-
-> **[BLOCKED 2026-05-24 — runtime gap]** The code side is now unblocked: the box was deployed (git working tree fast-forwarded `cf1cddb → 7319e50`; cron synced — `/etc/cron.d/jeromelu` now has the 3 nrlcom + 5 supercoach lines). **But the populate has no runtime on the box.** Verified:
-> - System `python3` and the stub `/opt/jeromelu/.venv-ops` (just symlinks to system python3) lack the deps — `import sqlalchemy` → `ModuleNotFoundError`. The populate needs sqlalchemy / psycopg / pydantic / httpx / boto3 + `jeromelu_shared`.
-> - The `jeromelu-api` container HAS those deps + `DATABASE_URL` (→ postgres) + S3 creds + `jeromelu_shared`, **but not the scripts** — the api image is `services/api` only (`/app`), and `docker-compose.prod.yml`'s api service has **no `/opt/jeromelu` volume mount**.
-> - The prod DB is `127.0.0.1`-only on the box, so it can't be run from a dev machine either.
->
-> **An ops runtime must be established (infra decision — not an implementer improvisation on prod). Options for the human/planner:**
-> 1. A real ops venv on the box: `python3 -m venv /opt/jeromelu/.venv-ops && .venv-ops/bin/pip install -r services/api/requirements.txt` (then run with `PYTHONPATH=packages/shared .venv-ops/bin/python -m scripts.data.populate_db_from_s3 …`). Watch disk/RAM on the 1GB box.
-> 2. Bake `scripts/` + `packages/shared` into the api image (Dockerfile) so `docker exec jeromelu-api python -m scripts.data.populate_db_from_s3 …` works — most reproducible; the populate then rides the same env as the API.
-> 3. Add a bind-mount of `/opt/jeromelu` (or `scripts/` + `packages/`) to the api service in `docker-compose.prod.yml`, then `docker exec` the populate.
->
-> Recommend option 2 (reproducible, no prod pip, uses the API's exact dependency set). Once a runtime exists: on-box `--dry-run`-then-count delta (confirms the TASK-18 fix; META claims FIXED), `--phase all --seasons 2026` (or the `identity→…→timeline` sequence), the 5 row-count verifications, README + data-catalogue docs, finalise the run report, remove the Phase 3.5 plan from PLAN.md Active. S3 has 2026 rounds 1-18+ ready.
-
-**What**
-1. On the box, confirm the deployed working tree has the refactored phases (`grep -c _extract_stat_rows /opt/jeromelu/scripts/data/populate/phase_stats.py`). Then run the populate for season 2026 in dependency order — the match phases require `identity` (teams.nrlcom_team_id + people.nrlcom_player_id) and `matches` populated first:
-   ```bash
-   cd /opt/jeromelu && set -a; . .env; set +a
-   python -m scripts.data.populate_db_from_s3 --phase all --seasons 2026 --competition 111
-   ```
-   (Or run `identity`, `people`, `rounds`, `matches`, `team_lists`, `stats`, `timeline` individually in that order.) Capture the JSON summary (per-phase inserted/updated counts).
-2. Verify DB rows (on the box, `docker exec jeromelu-postgres psql -U jeromelu_admin -d jeromelu`):
-   ```sql
-   SELECT count(*) FROM matches WHERE season=2026 AND source='nrl_com';            -- ≥ the seeded R12 matches
-   SELECT count(*) FROM match_team_lists ml JOIN matches m ON m.match_id=ml.match_id WHERE m.season=2026;
-   SELECT count(*) FROM player_match_stats pms JOIN matches m ON m.match_id=pms.match_id WHERE m.season=2026;
-   SELECT count(*) FROM match_timeline mt JOIN matches m ON m.match_id=mt.match_id WHERE m.season=2026;
-   SELECT count(*) FROM match_officials mo JOIN matches m ON m.match_id=mo.match_id WHERE m.season=2026;
-   ```
-   All non-zero. Spot-check: for one R12 match, `player_match_stats` row count ≈ its squad size (≈34 for both teams). Capture outputs.
-3. Docs: create/update `scripts/data/populate/README.md` (phase list, run command, the pure-function test seams, the fixed `--dry-run`); add a note in `docs/operations/data-catalogue/` that the 5 match tables are populated by the `phase_*` extractors from `scout/nrlcom/match-centre/*`.
-4. Create + finalise the run report `docs/build/runs/2026-05-24-scout-phase-3.5-nrlcom-extractors.md` (per-task account + verification + decisions + lessons), add its index row, then **remove the Phase 3.5 plan from PLAN.md Active and clear TASK-13→19 from TASKS.md** (run-report ritual).
-
-**How to verify**
-- The populate summary shows non-zero inserts for matches/team_lists/stats/timeline/officials (or non-zero existing rows if already populated — idempotent).
-- The five `count(*)` queries are all > 0 for season 2026; the spot-check match's stat-row count matches its squad size.
-- Run report exists + indexed; PLAN Active no longer lists Phase 3.5; TASKS.md has no TASK-13→19.
-
-**Proof notes**
-_(implementer fills in)_
-
-
 ## Completed work
 
 Completed tasks are not kept here. When a task passes review and is checked off, what it delivered is recorded in the active run report under [`docs/build/runs/`](./runs/) and the task is removed from this file. This queue holds only open/in-flight work.

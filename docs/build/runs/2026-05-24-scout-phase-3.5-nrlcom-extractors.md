@@ -1,6 +1,6 @@
 # Scout Phase 3.5 — nrl.com match-centre DB extractors (harden + verify + populate)
 
-**Date:** 2026-05-24 · **Status:** 🟡 In progress (TASK-13–18 of TASK-13→19 done; only the prod populate closure remains) · **Plan:** Scout Phase 3.5 (PLAN.md)
+**Date:** 2026-05-24 · **Status:** 🟢 Shipped (TASK-13→19 done; reproducible-runtime follow-up noted) · **Plan:** Scout Phase 3.5
 
 **TL;DR** — The S3→DB extractors for the nrl.com match-centre data already existed (`scripts/data/populate/` + orchestrator, all 6 tables + identity columns present) but had zero tests, a broken `--dry-run`, and no verified run. Phase 3.5 hardens them: fixture-based unit tests for the 4 match-centre phases (via behavior-preserving pure-function refactors), fix `--dry-run`, then populate prod + verify. NRL only (comp 111), season 2026.
 
@@ -32,6 +32,13 @@ Behavior-preserving refactor: extracted `_extract_timeline_rows(payload, key, ma
 Closed the META known-bug (phases committed internally before the outer rollback → `--dry-run` silently wrote). Threaded `commit: bool = True` through **all 12** orchestrated phase functions; guarded **every** `db.commit()` (16 sites: finals + the per-50 checkpoints in `phase_stats`/`phase_timeline` + the in-loop commits in `phase_people`/`phase_attributes`) as `if commit: db.commit()`. The orchestrator computes `commit = not args.dry_run` and threads it into every phase call; the outer dry-run rollback is retained; `--dry-run` help updated. Flipped the META known-bug entry to FIXED. Added `test_dry_run_flag.py` — a parametrized signature test over all 12 functions.
 **Proof:** `pytest test_dry_run_flag.py` → 12 passed; full `tests/unit/` → **302 passed**; `grep db.commit()` shows 0 unguarded. **Reviewer PASS WITH CONCERNS** — non-blocking: one-line-`if` style; and the **load-bearing on-box behavioral check** (`--dry-run` then `count(*)` shows no delta) is deferred to TASK-19's prod run — **TASK-19 must capture that delta** since META now publicly claims FIXED.
 
+### TASK-19 — prod populate run + DB verification + docs (Phase 3.5 closure)
+Ran the populate against prod for season 2026 and verified. The box has no standalone Python env with the ORM deps, so — having found the match tables **already populated** (612 matches across seasons, from prior dev-tunnel runs) and the `jeromelu-api` container carrying the full deps + DB + S3 + `jeromelu_shared` — I staged the (just-deployed) scripts into the container (`docker cp … jeromelu-api:/runtmp`) and ran them there with the API's exact dependency set, then cleaned up `/runtmp` (api healthy after).
+- **`--dry-run` fix confirmed on-box (the TASK-18 load-bearing check):** `--phase matches --seasons 2026 --dry-run` parsed 204 matches, computed 0 inserts / 204 updates, logged "rolling back all changes", count stayed 612. Definitive proof via `last_synced_at`: BEFORE the real run it read `2026-05-16 11:07` (the *prior* real run) — **not** `12:41` when the dry-run ran → the dry-run did not commit; AFTER the real run it read `2026-05-24 12:42` (now) → the real run did. ✅
+- **Real populate (`identity, rounds, matches, team_lists, stats, timeline`, `--seasons 2026`):** ran clean, no errors. identity +4 player-id mappings; matches 204 updated; team_lists +189 rows +10 coaches; stats +190 / 3040 updated; timeline 9403 updated, officials +18 / 268 updated. (Skipped `people` — it ignores `--seasons` and walks all archives; 2026's people already exist.)
+- **2026 verification counts (all non-zero):** matches 204, match_team_lists 3767, player_match_stats 3230, match_timeline 9974, match_officials 286. (Lower-than-naive because ~half of 2026's 204 fixtures are Upcoming — no stats/lineups yet — consistent with mid-season.)
+- **Docs:** created `scripts/data/populate/README.md` (phases, run command, pure-function test seams, the fixed `--dry-run`, the runtime caveat). The 5 match-table data-catalogue files already reference the `phase_*` extractors — no redundant edit needed.
+
 ---
 
 ## How we know it's done (running)
@@ -45,8 +52,8 @@ Deployed the Phase 3.5 code + cron to the box (zero-downtime — skipped the ima
 - Fast-forwarded the box git working tree `cf1cddb → 7319e50` (`git -c core.fileMode=false pull --ff-only`; the only local changes were benign chmod mode-bits + an untracked `.venv-ops/`). `_extract_stat_rows` + the `commit` guards are now present on the box.
 - Synced the crontab: `/etc/cron.d/jeromelu` now carries the **3 nrlcom** (Phase 3) + **5 supercoach** (Phase 2.5) lines (nrlcom was 0 before) → also unblocks the Phase 2.5 (TASK-06) and Phase 3 cron-fire verifications.
 
-## Outstanding
-- ☐ **TASK-19 — `[BLOCKED: no ops Python runtime on the box]`.** Deploy done (above), so the code is live — but the populate **can't run**: system `python3` + the stub `.venv-ops` lack the deps (`import sqlalchemy` → ModuleNotFoundError); the `jeromelu-api` container has the deps + DB + S3 + `jeromelu_shared` but **not the scripts** (api image is `services/api`-only; no `/opt/jeromelu` mount); prod DB is `127.0.0.1`-only. An ops runtime must be established first (infra decision — recommend baking `scripts/` + `packages/shared` into the api image; see TASK-19 block note for options). Then: on-box `--dry-run`-then-count delta, `--phase all --seasons 2026`, the 5 row-count verifications, docs, finalise this report + remove the plan. (My `identity` attempt failed at import before any write — no partial DB state.)
+## Follow-up (not blocking — Phase 3.5 shipped)
+- **Reproducible ops runtime for the populate.** TASK-19 ran via a one-off `docker cp` of the scripts into the `jeromelu-api` container (the box has no standalone env with the ORM deps). That works but isn't reproducible for future backfills/cron. Recommended durable fix: **bake `scripts/` + `packages/shared` into the api image** (Dockerfile) so `docker exec jeromelu-api python -m scripts.data.populate_db_from_s3 …` just works — or a managed ops venv. This is an infra decision for the human/planner (surfaced; not self-queued). Documented in `scripts/data/populate/README.md` § Runtime.
 
 ## Commits
-`922b591` (TASK-13) · `bb32a84` (TASK-14) · `093de70` (TASK-15) · `a9bea13` (TASK-16) · `2082e2c` (TASK-17) · `429f4a1` (TASK-18).
+`922b591` (TASK-13) · `bb32a84` (TASK-14) · `093de70` (TASK-15) · `a9bea13` (TASK-16) · `2082e2c` (TASK-17) · `429f4a1` (TASK-18). TASK-19 = the prod populate run (no code commit beyond `scripts/data/populate/README.md` + this report) — the extractor code shipped in TASK-15→18.
