@@ -4,7 +4,7 @@ tags: [area/architecture, subarea/agents]
 
 # Analyst Charter
 
-> Last reviewed: 2026-05-24. **Decisions A1–A10 below; A2 (Lineup is a service boundary) locked 2026-05-23.**
+> Last reviewed: 2026-05-24. **Decisions A1–A11 below; A2 (Lineup is a service boundary) locked 2026-05-23.**
 >
 > The decision record for Analyst's scope. Where the [Scout charter](../scout/charter.md) *expands* one agent to own all external acquisition, this charter does the opposite: it **draws a boundary that sheds work**. Analyst's largest current surface — *Lineup* (transcript materialisation + speaker identification: pyannote, Deepgram, voice/face/fusion, the GPU stack) — is being moved **out of this repo** into an external service. What remains, and what this charter formalises, is Analyst's durable identity: **the interpretive layer** — the agent that turns a speaker-attributed transcript into *meaning* (cleaning, embedding, entity/quote/claim extraction, cross-source consensus and contradiction detection).
 
@@ -19,7 +19,7 @@ This charter exists to record that inversion before it confuses anyone:
 - It names the **medallion seam** Analyst sits on, and where Lineup now sits relative to it.
 - It pins the **input contract** Analyst designs against — a speaker-attributed transcript — so the externalisation of Lineup is a swap of *producer*, not a rewrite of Analyst.
 - It declares the in-repo Lineup code **legacy** (kept alive, not extended) and says what that means in practice.
-- It stages the **forward build** — cleaning, embedding, extraction, consensus — the work that was always Analyst's but has mostly lived in Claude Code skills rather than production code.
+- It stages the **forward build** — cleaning, embedding, extraction, consensus — the work that was always Analyst's but has so far lived only as local Claude Code skill prototypes, never production code ([A11](#a11-production-runs-in-workers-not-claude-code-skills)).
 
 It does **not** change what Scout, Bookkeeper, Critic, or the Archivist do. It only redraws the line between Analyst and the structural transcript-materialisation that used to be lumped in with it.
 
@@ -29,17 +29,17 @@ It does **not** change what Scout, Bookkeeper, Critic, or the Archivist do. It o
 
 > Analyst owns the **interpretive transform** — every step that turns a transcript into structured, cross-referenced *knowledge*. In medallion terms, Analyst is the **silver** layer (and the producer of much of what feeds gold). The full principle is locked in [A1](#a1-the-boundary-principle--analyst-owns-the-interpretive-layer); what it means in practice:
 
-| Pass | What it produces | Status | Surface today |
+| Pass | What it produces | Production status | Local prototype (not production — [A11](#a11-production-runs-in-workers-not-claude-code-skills)) |
 |---|---|---|---|
-| **Cleaning** | `source_documents.cleaned_text`, `source_chunks.clean_text` — garbles fixed, names/nicknames + SC jargon + numbers normalised, restarts merged, filler stripped ([A4](#a4-cleaning--skill-validated-then-workerised)) | Skill-driven | [`/clean-transcript`](../../skills/transcript-pipeline.md); `update-clean-text` admin endpoint backfills from S3 |
-| **Referential resolution** | coreference, claim-source attribution, entity disambiguation (brothers / positional / time-dependent) — resolves what the words *point to* before meaning is extracted ([A9](#a9-referential-resolution--attribution-is-claim-level-not-turn-level)) | Not built (implicit in skill extraction today) | within [`/process-transcript`](../../skills/transcript-pipeline.md) |
-| **Chapter detection** | `source_chapters` — semantic chapters that scope claim extraction | Skill-driven | [`/analyse-transcript`](../../skills/analyse-transcript.md) |
+| **Cleaning** | `source_documents.cleaned_text`, `source_chunks.clean_text` — garbles fixed, names/nicknames + SC jargon + numbers normalised, restarts merged, filler stripped ([A4](#a4-cleaning--skill-validated-then-workerised)) | Not built | [`/clean-transcript`](../../skills/transcript-pipeline.md); `update-clean-text` admin endpoint backfills from S3 |
+| **Referential resolution** | coreference, claim-source attribution, entity disambiguation (brothers / positional / time-dependent) — resolves what the words *point to* before meaning is extracted ([A9](#a9-referential-resolution--attribution-is-claim-level-not-turn-level)) | Not built | implicit in the local `/process-transcript` prototype |
+| **Chapter detection** | `source_chapters` — semantic chapters that scope claim extraction | Not built | [`/analyse-transcript`](../../skills/analyse-transcript.md) |
 | **Annotation** | `source_annotations` — sentiment, sub-topic tags, entity mentions, themes | Not built | — |
 | **Embedding** | `source_chunks.embedding` — text embeddings for retrieval (distinct from the voice/face embeddings Lineup writes) | Not built | — |
-| **Entity / quote / claim extraction** | `quotes`, `claims`, `claim_chunks`, `claim_associations` — multi-pass LLM extraction with stance/strength shaping, dedup, falsifiability + resolution capture ([A10](#a10-claims-carry-falsifiability--resolution-criteria)), and automated verification | Skill-driven | [`/process-transcript`](../../skills/transcript-pipeline.md), [`/verify-claims`](../../system/extraction.md), [`/upload-transcript`](../../skills/transcript-pipeline.md) |
+| **Entity / quote / claim extraction** | `quotes`, `claims`, `claim_chunks`, `claim_associations` — multi-pass LLM extraction with stance/strength shaping, dedup, falsifiability + resolution capture ([A10](#a10-claims-carry-falsifiability--resolution-criteria)), and automated verification | Not built | [`/process-transcript`](../../skills/transcript-pipeline.md), [`/verify-claims`](../../system/extraction.md), [`/upload-transcript`](../../skills/transcript-pipeline.md) |
 | **Cross-reference / consensus** | `consensus_snapshots` — *semantic* consensus shifts and contradictions across sources ("4 say sell, 1 says hold") | Not built | [consensus-engine](../../../todo/consensus-engine.md) |
 
-Every one of these reads a transcript and writes a *derivative of meaning*. None of them acquires raw bytes (Scout/bronze), and none of them does the structural audio→attributed-transcript transform (Lineup, externalising — see [A2](#a2-lineup-is-a-service-boundary-not-a-sub-module)).
+Every one of these reads a transcript and writes a *derivative of meaning*. None of them acquires raw bytes (Scout/bronze), and none of them does the structural audio→attributed-transcript transform (Lineup, externalising — see [A2](#a2-lineup-is-a-service-boundary-not-a-sub-module)). **No interpretive pass is in production yet** — the rightmost column lists *local prototypes* (Claude Code skills, plus one backfill endpoint) used to validate the approach. Production runs in workers, never skills ([A11](#a11-production-runs-in-workers-not-claude-code-skills)).
 
 ## What Analyst does NOT own
 
@@ -61,11 +61,11 @@ The pass chain (receive attributed transcript → clean → resolve references �
 
 ## Phasing
 
-The full forward plan lives in [roadmap.md](roadmap.md). Two tracks run in parallel: **(1) Lineup externalisation** — the carve-out of transcript materialisation + speaker ID into a service, with the in-repo code held as legacy until the API lands; and **(2) the interpretive-pass buildout** — promoting cleaning, embedding, extraction, and consensus from skill experiments to production passes.
+The full forward plan lives in [roadmap.md](roadmap.md). Two tracks run in parallel: **(1) Lineup externalisation** — the carve-out of transcript materialisation + speaker ID into a service, with the in-repo code held as legacy until the API lands; and **(2) the interpretive-pass buildout** — promoting cleaning, embedding, extraction, and consensus from local skill prototypes to production worker passes ([A11](#a11-production-runs-in-workers-not-claude-code-skills)).
 
 ---
 
-## Decisions register (A1–A10)
+## Decisions register (A1–A11)
 
 > The Analyst decision record. Prefixed **A** to disambiguate from Scout's **D**-series (a bare "per D8" always means Scout). Cited by number across the repo (`per A2`, `per A5`, …).
 
@@ -105,7 +105,7 @@ Because Analyst consumes the *contract* and not the producer, the Lineup externa
 
 ### A4. Cleaning — skill-validated, then workerised
 
-**Decision: validate the cleaning approach as a Claude Code skill before committing worker code.** Cleaning normalises the *surface* of the transcript — the ASR + NRL-domain mess — so every later pass reads clean text. It reads the canonical player registry and NRL domain knowledge, and writes `source_documents.cleaned_text` and `source_chunks.clean_text`.
+**Decision: cleaning ships as a production worker pass; the Claude Code skill is a local prototype only ([A11](#a11-production-runs-in-workers-not-claude-code-skills)).** Cleaning normalises the *surface* of the transcript — the ASR + NRL-domain mess — so every later pass reads clean text. It reads the canonical player registry and NRL domain knowledge, and writes `source_documents.cleaned_text` and `source_chunks.clean_text`. The skill is used locally to stabilise the prompt and generate eval fixtures — it never runs in production.
 
 **What the cleaning pass must contend with** — each is a recurring normalisation rule, not a one-off fix:
 
@@ -116,13 +116,13 @@ Because Analyst consumes the *contract* and not the producer, the Lineup externa
 - **Filler, false starts, self-corrections** — strip disfluency ("like, you know") and merge retractions ("I'd start, no — I'd bench him") without losing meaning.
 - **Protect legitimate slang** — do *not* "correct" real NRL terms (e.g. *PVL*) into dictionary words.
 
-Today this is the [`/clean-transcript`](../../skills/transcript-pipeline.md) skill; the `POST /api/admin/update-clean-text` endpoint backfills `clean_text` onto existing chunks from a cleaned S3 document. Workerisation waits until the skill's prompt and pass structure are stable — the skill *is* the spec the worker will encode.
+Today **only a local prototype exists** — the [`/clean-transcript`](../../skills/transcript-pipeline.md) skill (plus the `POST /api/admin/update-clean-text` endpoint, which backfills `clean_text` onto existing chunks from a cleaned S3 document). There is **no production cleaning pass yet.** The prototype's job is to settle the prompt and pass structure — that settled form *is* the spec the worker encodes.
 
 > **Coupling to leave intact:** the cleaning pass and the SuperCoach roster regeneration currently share the `data/players.yaml` registry. Rehoming that (cleaning reads the roster from the DB instead of yaml) is the open loop blocking retirement of the legacy `scrape-supercoach` skill — tracked in the [Scout Phase 1 plan](../scout/plans/phase-1-supercoach-roster.md), surfaced here because it touches Analyst's input.
 
 ### A5. Extraction — skill-validated, then workerised; LLM-graded
 
-**Decision: claim/quote/entity extraction is validated in skills and gated by eval suites, not drift tests.** This is the defining testing contrast with Scout: Scout's deterministic fetchers need *endpoint-drift tests* (the upstream shape is the only thing that can change); Analyst's extraction passes are *LLM-graded* (the model's judgement is what can regress), so they need [DeepEval suites under `tests/evals/`](../../../../tests/README.md).
+**Decision: claim/quote/entity extraction ships as a production worker pass, gated by eval suites (not drift tests); any Claude Code skill is local prototyping only ([A11](#a11-production-runs-in-workers-not-claude-code-skills)).** This is the defining testing contrast with Scout: Scout's deterministic fetchers need *endpoint-drift tests* (the upstream shape is the only thing that can change); Analyst's extraction passes are *LLM-graded* (the model's judgement is what can regress), so they need [DeepEval suites under `tests/evals/`](../../../../tests/README.md).
 
 **Shaping a claim is more than finding it.** Over (cleaned, reference-resolved — [A9](#a9-referential-resolution--attribution-is-claim-level-not-turn-level)) chunks, the extraction pass must also:
 
@@ -133,7 +133,7 @@ Today this is the [`/clean-transcript`](../../skills/transcript-pipeline.md) ski
 - **Deduplicate** — a host repeating "Cleary's a buy" four times is one claim, within and across chapters.
 - **Link to canonical entities** — so claims aggregate across sources and can later be grounded against Scout's actual price/breakeven data.
 
-Today the surface is multi-pass and skill-driven: [`/process-transcript`](../../skills/transcript-pipeline.md) (multi-pass extraction), [`/verify-claims`](../../system/extraction.md) (per-claim Haiku cross-check), [`/analyse-transcript`](../../skills/analyse-transcript.md) (chapter-scoped enrichment), [`/upload-transcript`](../../skills/transcript-pipeline.md) (persist). The `services/worker-extraction/` worker is a skeleton; it is built only once the eval suite locks acceptable precision/recall on a graded corpus. See [extraction-worker](../../../todo/extraction-worker.md).
+Today **only local prototypes exist**, multi-pass: [`/process-transcript`](../../skills/transcript-pipeline.md) (multi-pass extraction), [`/verify-claims`](../../system/extraction.md) (per-claim Haiku cross-check), [`/analyse-transcript`](../../skills/analyse-transcript.md) (chapter-scoped enrichment), [`/upload-transcript`](../../skills/transcript-pipeline.md) (persist). The production surface — the `services/worker-extraction/` worker — is a skeleton; it is built only once the eval suite locks acceptable precision/recall on a graded corpus. See [extraction-worker](../../../todo/extraction-worker.md).
 
 ### A6. Consensus / contradiction detection is *semantic*, not numeric
 
@@ -181,6 +181,17 @@ Per claim, Analyst marks:
 
 **Boundary with Bookkeeper:** *identifying* that a claim is a falsifiable prediction and *capturing its resolution rule* is interpretive — Analyst's. *Scoring* it against the outcome and rolling it into an accuracy index is numeric derivation — Bookkeeper's. Analyst makes the claim **gradeable**; Bookkeeper **grades** it. This is the decision that makes the silver layer worth building: grading advisors is the reason claims are extracted at all.
 
+### A11. Production runs in workers, not Claude Code skills
+
+**Decision: every Analyst pass ships as a worker/service; Claude Code skills are local developer tools only and are never on the production path.** Production cannot depend on a skill — skills run in a developer's local Claude Code session, not in the deployed API/worker fleet. This mirrors [Scout D5](../scout/charter.md#d5-skills-disposition) ("the endpoint is the universal surface; skills are off the critical path entirely").
+
+**What skills are for:** prototyping a pass's prompt, exploring an extraction approach, and generating eval fixtures against real transcripts. **What they are not:** a deployable surface, a cron target, or a dependency of any production pass.
+
+Consequences:
+- The honest production status of every interpretive pass today is **not built** — a working *local prototype* (a skill) is not production. The docs say "not built (production)" and list the skill separately as a prototype.
+- The shippable artefact is a worker module — audited per [A7](#a7-audit--agent_idanalyst-pass-discriminator-in-detail_json), eval-gated per [A5](#a5-extraction--skill-validated-then-workerised-llm-graded), drained on a schedule.
+- A skill and its worker should share one pure module so a settled prototype doesn't rot into a divergent second implementation — but if forced to choose, the worker is canonical and the skill is disposable.
+
 ---
 
 ## Architectural risks
@@ -191,7 +202,7 @@ Per claim, Analyst marks:
 
 3. **LLM extraction quality regresses silently.** Claims/quotes extraction is LLM-graded; without eval coverage, a prompt or model change degrades precision invisibly and propagates wrong claims into the wiki and ledger. Mitigation: [A5](#a5-extraction--skill-validated-then-workerised-llm-graded) — DeepEval suites gate workerisation; no worker ships ahead of its eval.
 
-4. **Skill→worker drift.** The skill and the future worker can diverge — the skill gets a prompt tweak the worker never sees. Mitigation: workerise by extracting a shared pure module the skill also calls, so there is one implementation, not two.
+4. **Skills mistaken for production.** A local prototype skill is convenient enough that ops starts leaning on it — and now production depends on a developer's laptop. Mitigation: [A11](#a11-production-runs-in-workers-not-claude-code-skills) — prod is workers, skills are local-only (prototype + eval-fixture generation). Where a skill and its worker coexist, they share one pure module so the prototype can't rot into a divergent second implementation; the worker is canonical.
 
 5. **Consensus inherits Lineup's attribution quality.** "Who said what" is only as good as speaker identification. If attribution is wrong, consensus detection ([A6](#a6-consensus--contradiction-detection-is-semantic-not-numeric)) confidently reports the wrong host's position. Mitigation: consensus carries `match_confidence` through from `source_speakers`; low-confidence attributions are surfaced, not silently counted.
 
@@ -217,13 +228,13 @@ No drift tests — Analyst doesn't fetch from upstream sources (that's Scout's c
 
 ### Rollout
 
-Each interpretive pass follows the same shape:
+Each interpretive pass follows the same shape — the **worker is the deliverable**; any skill is an optional, local prototyping aid ([A11](#a11-production-runs-in-workers-not-claude-code-skills)):
 
-1. Validate as a Claude Code skill against real transcripts; iterate the prompt.
-2. Lock an eval suite that encodes "good enough" (precision/recall thresholds on a graded corpus).
-3. Extract a shared pure module; point the skill at it.
-4. Wrap the module in a worker pass with the [A7](#a7-audit--agent_idanalyst-pass-discriminator-in-detail_json) audit pattern + a recurring drain job.
-5. Run the worker alongside the skill on a sample; diff outputs; cut over.
+1. Prototype the prompt locally against real transcripts (optionally via a Claude Code skill); iterate.
+2. Lock an eval suite that encodes "good enough" (precision/recall thresholds on a graded corpus); capture eval fixtures from the prototype runs.
+3. Build the production pass as a worker module (a shared pure function is the implementation).
+4. Wire the [A7](#a7-audit--agent_idanalyst-pass-discriminator-in-detail_json) audit pattern + a recurring drain job.
+5. Run the worker against the eval corpus and a live sample; diff; cut over. The prototype skill, if any, is now disposable.
 
 ---
 
@@ -245,5 +256,5 @@ Each interpretive pass follows the same shape:
 - [Scout charter](../scout/charter.md) — the bronze-layer charter Analyst's silver boundary abuts (decisions D1–D13)
 - [Transcription pipeline](../../system/transcription-pipeline.md) — the in-repo Lineup surface (legacy), stages 1–5
 - [Speaker identification](../../system/speaker-identification.md) — voice + face + fusion (legacy Lineup detail)
-- [Extraction](../../system/extraction.md) — claim/entity/quote extraction surface (skill-driven today)
+- [Extraction](../../system/extraction.md) — claim/entity/quote extraction surface (local prototype today; production worker not built)
 - [Crew Dynamics](../dynamics.md) — Analyst mode's place in Jaromelu's internal reasoning flow

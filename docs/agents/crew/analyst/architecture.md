@@ -26,7 +26,7 @@ Scout        →  Lineup          →  Analyst        →  Bookkeeper + Critic  
 |---|---|---|---|---|
 | Acquire | [Scout](../scout/README.md) | [source-discovery](../../system/source-discovery.md), [ingestion](../../system/ingestion.md) | Discover, enumerate, pull audio/video to S3, fetch structured feeds | Media shipped; data in design |
 | **Structural transform** | **Lineup** *(externalising)* | [transcription-pipeline](../../system/transcription-pipeline.md), [speaker-identification](../../system/speaker-identification.md) | Diarize + ASR + merge + speaker ID → a speaker-attributed transcript | In-repo path **live but legacy** (per [charter A8](charter.md#a8-disposition-of-the-in-repo-lineup-code--legacy-not-deleted)); external API not built |
-| **Interpret** | **Analyst** *(this doc)* | [extraction](../../system/extraction.md), [Transcript Pipeline skill](../../skills/transcript-pipeline.md) | Clean, chapter, annotate, embed, extract entities/quotes/claims, cross-reference for consensus + contradictions | Skill-driven today; workers not built |
+| **Interpret** | **Analyst** *(this doc)* | [extraction](../../system/extraction.md); local prototypes in [skills/](../../skills/transcript-pipeline.md) | Clean, chapter, annotate, embed, extract entities/quotes/claims, cross-reference for consensus + contradictions | No production pipeline yet — prototyped locally ([charter A11](charter.md#a11-production-runs-in-workers-not-claude-code-skills)) |
 | Derive | [Bookkeeper](../bookkeeper/README.md) + [Critic](../critic/README.md) | [decision](../../system/decision.md) | Numeric derivations over extracted claims (alignment, accuracy, breakevens); challenge thin evidence | Partial; decision worker not built |
 | Voice | [Jaromelu](../jaromelu/README.md) | [publishing](../../system/publishing.md) | Integrate, commit to a call, publish in the on-screen voice | Live |
 
@@ -55,15 +55,15 @@ Speaker attribution reads use `coalesce(cluster_label, speaker_label)` — the `
 
 | Table | What Analyst writes | Pass | Status |
 |---|---|---|---|
-| `source_documents.cleaned_text` | Garbles fixed, restarts merged, filler normalised | Cleaning | Skill-driven |
-| `source_chunks.clean_text` | Per-chunk cleaned text | Cleaning | Skill-driven |
-| `source_chapters` | Semantic chapters scoping extraction | Chapter detection | Skill-driven (`/analyse-transcript`) |
+| `source_documents.cleaned_text` | Garbles fixed, restarts merged, filler normalised | Cleaning | Not built (local prototype) |
+| `source_chunks.clean_text` | Per-chunk cleaned text | Cleaning | Not built (local prototype) |
+| `source_chapters` | Semantic chapters scoping extraction | Chapter detection | Not built (local prototype: `/analyse-transcript`) |
 | `source_annotations` | Sentiment, sub-topic tags, entity mentions, themes | Annotation | Not built |
 | `source_chunks.embedding` | Text embedding for retrieval (≠ voice/face embeddings) | Embedding | Not built |
-| `quotes` | Verbatim pulls attributed to a `Person` | Extraction | Skill-driven |
-| `claims` | Structured claims (type, text, strength, polarity, timestamps; + falsifiability flag, resolution criterion, horizon per [charter A10](charter.md#a10-claims-carry-falsifiability--resolution-criteria) — design intent) | Extraction | Skill-driven |
-| `claim_chunks` | Claim ↔ evidence-chunk links | Extraction | Skill-driven |
-| `claim_associations` | Claim ↔ entity links (the subject/source resolved by referential resolution) | Extraction | Skill-driven |
+| `quotes` | Verbatim pulls attributed to a `Person` | Extraction | Not built (local prototype) |
+| `claims` | Structured claims (type, text, strength, polarity, timestamps; + falsifiability flag, resolution criterion, horizon per [charter A10](charter.md#a10-claims-carry-falsifiability--resolution-criteria) — design intent) | Extraction | Not built (local prototype) |
+| `claim_chunks` | Claim ↔ evidence-chunk links | Extraction | Not built (local prototype) |
+| `claim_associations` | Claim ↔ entity links (the subject/source resolved by referential resolution) | Extraction | Not built (local prototype) |
 | `consensus_snapshots` | Semantic consensus shifts + contradictions across sources | Cross-reference | Not built |
 
 Analyst writes **nothing** to the bronze tables (`scout_candidates`, `channels`, `sources` audio/ingestion fields, `people`, `matches`, `player_rounds`, …) — those are Scout's. It writes **nothing** to the numeric-derivation tables (`predictions`, `decisions`, alignment/accuracy metrics) — those are Bookkeeper's. And it does not compose `wiki_pages` — that's the Archivist's read over Analyst's outputs.
@@ -144,11 +144,11 @@ The audio→attributed-transcript transform. **This is the surface moving out of
 
 **Status** — live in-repo, **legacy**. Per [charter A8](charter.md#a8-disposition-of-the-in-repo-lineup-code--legacy-not-deleted): fixes only, no new features. End state is an external API returning the same contract. Phase ledger: [README § Lineup status](README.md#lineup-status).
 
-### 4.1 Cleaning pass `[skill-driven]`
+### 4.1 Cleaning pass `[not built — local prototype]`
 
 Fixes auto-caption artifacts so downstream extraction reads clean text.
 
-**Trigger** — [`/clean-transcript`](../../skills/transcript-pipeline.md) skill. The `POST /api/admin/update-clean-text` endpoint backfills `clean_text` onto existing chunks from an already-cleaned S3 document.
+**Trigger (production, not built)** — a worker drain over `transcription_status='transcribed' AND cleaned_text IS NULL`. **Local prototype** — the [`/clean-transcript`](../../skills/transcript-pipeline.md) skill ([charter A11](charter.md#a11-production-runs-in-workers-not-claude-code-skills)); the `POST /api/admin/update-clean-text` endpoint backfills `clean_text` onto existing chunks from an already-cleaned S3 document.
 
 **Inputs** — `source_documents.raw_text` / `source_chunks.raw_text`; the canonical player registry (`people` + `data/players.yaml`); the alias table (`people.aliases`); NRL domain knowledge (slang, nicknames, known garbles); the SuperCoach jargon lexicon.
 
@@ -163,17 +163,17 @@ Fixes auto-caption artifacts so downstream extraction reads clean text.
 
 **Outputs** — `source_documents.cleaned_text`, `source_chunks.clean_text`.
 
-**Status** — skill-driven; production worker pending the prompt stabilising ([charter A4](charter.md#a4-cleaning--skill-validated-then-workerised)).
+**Status** — **not built in production**; a local prototype (the `/clean-transcript` skill) exists ([charter A11](charter.md#a11-production-runs-in-workers-not-claude-code-skills)). The worker is pending the prompt stabilising ([charter A4](charter.md#a4-cleaning--skill-validated-then-workerised)).
 
-### 4.2 Chapter detection `[skill-driven]`
+### 4.2 Chapter detection `[not built — local prototype]`
 
 Segments the transcript into semantic chapters so extraction runs with scoped, enriched context.
 
-**Trigger** — [`/analyse-transcript`](../../skills/analyse-transcript.md) skill (hierarchical multi-agent: detect chapters → spawn a specialist per chapter with scoped enrichment data).
+**Local prototype** — the [`/analyse-transcript`](../../skills/analyse-transcript.md) skill (hierarchical multi-agent: detect chapters → spawn a specialist per chapter with scoped enrichment data). Production worker not built ([charter A11](charter.md#a11-production-runs-in-workers-not-claude-code-skills)).
 
 **Outputs** — `source_chapters`, plus sub-topic-granular claims when run as the full alternative pipeline.
 
-**Status** — skill-driven; an alternative to the clean→process pipeline, used for chapter-level context.
+**Status** — **not built in production**; local prototype only ([charter A11](charter.md#a11-production-runs-in-workers-not-claude-code-skills)). An alternative to the clean→process prototype, used for chapter-level context.
 
 ### 4.3 Embedding pass `[not built]`
 
@@ -201,11 +201,11 @@ Resolves *what the words point to* before any claim is shaped. Necessary because
 
 **Status** — not a discrete pass yet; folded into the extraction prompt. Splitting it out is [roadmap T2](roadmap.md#track-2--interpretive-pass-buildout) scope.
 
-### 4.5 Entity / quote / claim extraction & shaping `[skill-driven]`
+### 4.5 Entity / quote / claim extraction & shaping `[not built — local prototype]`
 
 The historical Analyst surface: turn (cleaned, reference-resolved, chaptered) chunks into structured claims and quotes — and *shape* them so they're usable downstream.
 
-**Trigger** — [`/process-transcript`](../../skills/transcript-pipeline.md) (multi-pass extraction with automated verification) → [`/verify-claims`](../../system/extraction.md) (per-claim Haiku cross-check) → [`/upload-transcript`](../../skills/transcript-pipeline.md) (persist).
+**Trigger (production, not built)** — a worker drain over cleaned, reference-resolved sources, audited under `agent_id='analyst'`. **Local prototype chain** ([charter A11](charter.md#a11-production-runs-in-workers-not-claude-code-skills)) — [`/process-transcript`](../../skills/transcript-pipeline.md) (multi-pass extraction with automated verification) → [`/verify-claims`](../../system/extraction.md) (per-claim Haiku cross-check) → [`/upload-transcript`](../../skills/transcript-pipeline.md) (persist).
 
 **Inputs** — cleaned + reference-resolved chunks, chapters, the entity registry (`people`, `teams`).
 
@@ -222,7 +222,7 @@ Verification spins a Haiku agent per claim to cross-check the extracted fields a
 
 **Outputs** — `quotes`, `claims` (+ falsifiability/resolution fields, design intent), `claim_chunks`, `claim_associations`.
 
-**Status** — skill-driven; `services/worker-extraction/` is a skeleton. Workerisation is gated by a DeepEval suite ([charter A5](charter.md#a5-extraction--skill-validated-then-workerised-llm-graded)). See [extraction-worker](../../../todo/extraction-worker.md).
+**Status** — **not built in production**; the `services/worker-extraction/` worker is a skeleton and a local prototype chain exists ([charter A11](charter.md#a11-production-runs-in-workers-not-claude-code-skills)). Workerisation is gated by a DeepEval suite ([charter A5](charter.md#a5-extraction--skill-validated-then-workerised-llm-graded)). See [extraction-worker](../../../todo/extraction-worker.md).
 
 ### 4.6 Cross-reference / consensus `[not built]`
 
@@ -240,11 +240,11 @@ The pass that makes Analyst *Analyst* in Jaromelu's voice — detecting agreemen
 
 ## Current vs target architecture
 
-Analyst is mid-transition on two axes at once: **producer** (in-repo Lineup → external service) and **execution** (Claude Code skills → workerised passes).
+Analyst is mid-transition on two axes at once: **producer** (in-repo Lineup → external service) and **execution** (local prototypes today → production worker passes; [charter A11](charter.md#a11-production-runs-in-workers-not-claude-code-skills)). Note there is **no production interpretive pipeline yet** — everything below the transcript is, today, a local prototype.
 
 ```
-TODAY                                          TARGET
-─────                                          ──────
+TODAY (local prototyping only — no production pipeline)   TARGET (production)
+───────────────────────────────────────────────────────  ───────────────────
 Scout audio in S3                              Scout audio in S3
    │                                              │
    ▼                                              ▼
@@ -255,13 +255,13 @@ in-repo Lineup (transcribe.py + GPU)          external Lineup API
 attributed transcript  ◄────────── same contract (charter A3) ──────────►  attributed transcript
    │                                              │
    ▼                                              ▼
-Claude Code skills:                            Workerised passes (agent_id='analyst'):
-  /clean-transcript                              clean  →  chapter  →  annotate
-  /analyse-transcript                              →  embed  →  extract  →  verify
-  /process-transcript → /verify-claims             →  consensus
+local prototypes (skills) — NOT production:    workerised passes (agent_id='analyst'):
+  /clean-transcript                              clean → resolve refs → chapter
+  /analyse-transcript                              → annotate → embed
+  /process-transcript → /verify-claims             → extract & shape → verify → consensus
   /upload-transcript                             each: idempotent, audited (A7),
-   │  (operator-run, per source)                  eval-gated (A5), drained on a schedule
-   ▼                                              │
+   │  (operator-run on a laptop, per source)      eval-gated (A5), drained on a schedule
+   ▼                                              │  (charter A11)
 quotes · claims · consensus(by hand)           ▼
                                                quotes · claims · consensus_snapshots
 ```
@@ -271,19 +271,19 @@ quotes · claims · consensus(by hand)           ▼
 1. Each pass is an idempotent transform over the previous pass's output, keyed so a re-run is a no-op when inputs are unchanged.
 2. Each pass writes one `agent_runs` row with `agent_id='analyst'`, `detail_json.pass='<pass>'`, plus per-run counts ([charter A7](charter.md#a7-audit--agent_idanalyst-pass-discriminator-in-detail_json)).
 3. LLM passes ship behind an eval suite, not a drift test ([charter A5](charter.md#a5-extraction--skill-validated-then-workerised-llm-graded)).
-4. Each pass is independently triggerable and drained by a recurring job over the predecessor's completion state.
-5. The skill and the worker share one pure module, so they cannot drift ([charter risk #4](charter.md#architectural-risks)).
+4. Each pass is a **worker**, independently triggerable and drained by a recurring job over the predecessor's completion state — never a Claude Code skill ([charter A11](charter.md#a11-production-runs-in-workers-not-claude-code-skills)).
+5. Where a local prototype skill exists, it shares one pure module with the worker so the prototype can't rot into a divergent implementation; the worker is canonical ([charter risk #4](charter.md#architectural-risks)).
 
 ---
 
 ## Related
 
 - [README.md](README.md) — Analyst's identity, scope, and voice
-- [charter.md](charter.md) — locked design decisions A1–A10
+- [charter.md](charter.md) — locked design decisions A1–A11
 - [roadmap.md](roadmap.md) — status and the two-track forward plan
 - [Transcription pipeline](../../system/transcription-pipeline.md) — the legacy in-repo Lineup surface (stages 1–5)
 - [Speaker identification](../../system/speaker-identification.md) — voice + face + fusion detail (legacy Lineup)
 - [Extraction](../../system/extraction.md) — claim/entity/quote extraction surface
-- [Transcript Pipeline skill](../../skills/transcript-pipeline.md) — the clean → process → verify → upload skill chain
+- [Transcript Pipeline skill](../../skills/transcript-pipeline.md) — the clean → process → verify → upload chain (local prototype only; not production — [charter A11](charter.md#a11-production-runs-in-workers-not-claude-code-skills))
 - [Agent audit pattern](../../system/agent-audit.md) — `agent_runs` / `agent_events` / S3 conventions shared across agents
 - [Scout architecture](../scout/architecture.md) — the bronze-stage architecture Analyst's interpretive stage consumes

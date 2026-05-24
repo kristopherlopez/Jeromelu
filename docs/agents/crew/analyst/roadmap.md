@@ -9,11 +9,11 @@ tags: [area/agents, subarea/crew]
 The forward plan for Analyst runs on **two tracks at once**:
 
 1. **Lineup externalisation** — moving transcript materialisation + speaker identification out of this repo into a service ([charter A2](charter.md#a2-lineup-is-a-service-boundary-not-a-sub-module)). The in-repo code is held as legacy until the external API lands.
-2. **The interpretive-pass buildout** — promoting cleaning, chapter detection, annotation, embedding, extraction, and consensus from Claude Code skill experiments to production passes ([charter A4](charter.md#a4-cleaning--skill-validated-then-workerised)–[A6](charter.md#a6-consensus--contradiction-detection-is-semantic-not-numeric)).
+2. **The interpretive-pass buildout** — promoting cleaning, chapter detection, annotation, embedding, extraction, and consensus from local skill prototypes to production **worker** passes ([charter A4](charter.md#a4-cleaning--skill-validated-then-workerised)–[A6](charter.md#a6-consensus--contradiction-detection-is-semantic-not-numeric), [A11](charter.md#a11-production-runs-in-workers-not-claude-code-skills)). Nothing here is skill-driven in production — skills are local prototyping only.
 
 Status labels:
 - **Shipped** — live in production or dev
-- **Skill-driven** — validated and usable today via a Claude Code skill; production worker not built
+- **Prototype (local)** — a Claude Code skill exists for local experimentation only; **not a production surface**. Production runs in workers, never skills ([charter A11](charter.md#a11-production-runs-in-workers-not-claude-code-skills)). The honest production status of these passes is *not built*.
 - **In design** — specced; implementation not started
 - **Planned** — committed scope; no design yet
 - **Backlog** — deferred or candidate; no commitment
@@ -26,12 +26,12 @@ Status labels:
 |---|---|---|---|
 | Transcript materialisation (Lineup) | `transcribe.py` + GPU stack, in-repo | **Shipped but legacy** | [A2](charter.md#a2-lineup-is-a-service-boundary-not-a-sub-module) · [A8](charter.md#a8-disposition-of-the-in-repo-lineup-code--legacy-not-deleted) |
 | Speaker identification (Lineup) | voice + face + fusion, in-repo | **Shipped but legacy** | [A2](charter.md#a2-lineup-is-a-service-boundary-not-a-sub-module) · [A8](charter.md#a8-disposition-of-the-in-repo-lineup-code--legacy-not-deleted) |
-| Cleaning | `/clean-transcript`; `update-clean-text` backfill endpoint | Skill-driven | [A4](charter.md#a4-cleaning--skill-validated-then-workerised) |
-| Referential resolution (coref · claim-source · entity) | implicit in `/process-transcript` | Not a discrete pass | [A9](charter.md#a9-referential-resolution--attribution-is-claim-level-not-turn-level) |
-| Chapter detection | `/analyse-transcript` | Skill-driven | — |
+| Cleaning | `/clean-transcript`; `update-clean-text` backfill endpoint | Not built (prototype local) | [A4](charter.md#a4-cleaning--skill-validated-then-workerised) |
+| Referential resolution (coref · claim-source · entity) | implicit in `/process-transcript` | Not built (not a discrete pass) | [A9](charter.md#a9-referential-resolution--attribution-is-claim-level-not-turn-level) |
+| Chapter detection | `/analyse-transcript` | Not built (prototype local) | — |
 | Annotation | — | Not built | — |
 | Embedding | — | Not built | [Open Q2](charter.md#open-questions) |
-| Entity / quote / claim extraction & shaping | `/process-transcript` → `/verify-claims` → `/upload-transcript` | Skill-driven | [A5](charter.md#a5-extraction--skill-validated-then-workerised-llm-graded) · [A10](charter.md#a10-claims-carry-falsifiability--resolution-criteria) |
+| Entity / quote / claim extraction & shaping | `/process-transcript` → `/verify-claims` → `/upload-transcript` | Not built (prototype local) | [A5](charter.md#a5-extraction--skill-validated-then-workerised-llm-graded) · [A10](charter.md#a10-claims-carry-falsifiability--resolution-criteria) |
 | Cross-reference / consensus | — | Not built | [A6](charter.md#a6-consensus--contradiction-detection-is-semantic-not-numeric) |
 
 ---
@@ -63,18 +63,18 @@ The carve-out of transcript materialisation + speaker ID into an external servic
 
 ## Track 2 — Interpretive-pass buildout
 
-Promoting Analyst's durable scope from skill experiments to production. Every pass follows the [charter rollout shape](charter.md#rollout): skill-validate → lock an eval → shared module → workerise + audit → drain on a schedule. All passes are designed against the L0 contract, so they are indifferent to whether Track 1 has cut over.
+Promoting Analyst's durable scope from local prototypes to production **workers**. Every pass follows the [charter rollout shape](charter.md#rollout): prototype locally → lock an eval → build the worker module → audit → drain on a schedule. **The production surface is a worker, never a Claude Code skill** ([charter A11](charter.md#a11-production-runs-in-workers-not-claude-code-skills)). All passes are designed against the L0 contract, so they are indifferent to whether Track 1 has cut over.
 
 ### T1 — Cleaning worker — Planned
 
-- Encode the [`/clean-transcript`](../../skills/transcript-pipeline.md) skill as a shared pure module + a worker pass, covering the [charter A4](charter.md#a4-cleaning--skill-validated-then-workerised) contention points (garbled/Polynesian names, nicknames+initials, SC jargon, number typing, filler).
+- Build the cleaning **worker** pass (the [`/clean-transcript`](../../skills/transcript-pipeline.md) skill is the local prototype it encodes — [charter A11](charter.md#a11-production-runs-in-workers-not-claude-code-skills)), covering the [charter A4](charter.md#a4-cleaning--skill-validated-then-workerised) contention points (garbled/Polynesian names, nicknames+initials, SC jargon, number typing, filler).
 - Lock a cleaning-fidelity eval (does it fix garbles without "correcting" legitimate NRL slang like *PVL*?).
 - **Prerequisites:** the alias table (`people.aliases`) and a SuperCoach jargon lexicon — both currently absent (see [Backlog](#backlog)). Cleaning quality is capped by these registries.
 - **Open loop:** the cleaning pass shares `data/players.yaml` with SuperCoach roster regeneration. Rehoming it (read the roster from the DB) unblocks retirement of the legacy `scrape-supercoach` skill — see [Scout Phase 1 plan](../scout/plans/phase-1-supercoach-roster.md). ([charter A4](charter.md#a4-cleaning--skill-validated-then-workerised))
 
 ### T2 — Referential resolution + extraction & shaping worker — Planned
 
-- Encode the [`/process-transcript`](../../skills/transcript-pipeline.md) → [`/verify-claims`](../../system/extraction.md) → [`/upload-transcript`](../../skills/transcript-pipeline.md) chain into `services/worker-extraction/` (skeleton today).
+- Build the worker in `services/worker-extraction/` (skeleton today), encoding the locally-prototyped [`/process-transcript`](../../skills/transcript-pipeline.md) → [`/verify-claims`](../../system/extraction.md) → [`/upload-transcript`](../../skills/transcript-pipeline.md) chain — production is the worker, not the skills ([charter A11](charter.md#a11-production-runs-in-workers-not-claude-code-skills)).
 - **Split referential resolution out as its own step + eval slice** ([charter A9](charter.md#a9-referential-resolution--attribution-is-claim-level-not-turn-level)): coreference, claim-source-vs-speaker, same-surname disambiguation, positional + time-dependent entity resolution. Needs a dedicated eval because the claim *text* reads fine when only the subject/source is wrong — the extraction eval won't catch it.
 - **Claim shaping** ([charter A5](charter.md#a5-extraction--skill-validated-then-workerised-llm-graded)): banter filter, stance ownership, strength/polarity from hedging/negation, temporal anchor, dedup.
 - **Falsifiability + resolution capture** ([charter A10](charter.md#a10-claims-carry-falsifiability--resolution-criteria)): mark resolvable predictions and their resolution criterion + horizon — the fields the ledger grades against. Requires the schema additions in [Backlog](#backlog).
@@ -123,7 +123,7 @@ Additive items that layer on the tracks above, pulled from the [transcription-pi
 
 - [README.md](README.md) — Analyst's identity, scope, and voice
 - [architecture.md](architecture.md) — pipeline position, hand-off contract, pass chain, current-vs-target
-- [charter.md](charter.md) — locked design decisions A1–A10
+- [charter.md](charter.md) — locked design decisions A1–A11
 - [Lineup status](README.md#lineup-status) — the in-repo (now legacy) speaker-ID phase ledger
 - [Speaker identification plan](../../../todo/speaker-identification-plan.md) — full Lineup phase ledger and tuning notes
 - [Extraction worker](../../../todo/extraction-worker.md) — claim-extraction worker tasks and local experimentation plan
