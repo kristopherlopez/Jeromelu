@@ -1,6 +1,6 @@
 # Scout Phase 3 — nrl.com draw + match-centre ingest hardening
 
-**Date:** 2026-05-24 · **Status:** 🟡 In progress (TASK-07, 08 of TASK-07→12 done) · **Plan:** Scout Phase 3 (PLAN.md)
+**Date:** 2026-05-24 · **Status:** 🟡 In progress (TASK-07, 08, 09 of TASK-07→12 done) · **Plan:** Scout Phase 3 (PLAN.md)
 
 **TL;DR** — The draw + match-centre ingest pipelines already existed (fetch → S3 archive → audit) but lacked charter discipline. Phase 3 hardens them: D8 envelope models, strict-parse wired into the routes, fixtures + unit/live drift tests, daily-during-round cron, seed. NRL only (comp 111), forward-only; DB extractors deferred to Phase 3.5.
 
@@ -16,6 +16,12 @@ Captured the live `/draw/data` canonical response (comp 111, current season — 
 Wired the D8 contract into the route: `services/api/app/scout/nrlcom_draw/routes.py` now calls `NrlcomDraw.model_validate(data)` **after** `archive_response(...)` (raw captured first), sets `detail["validated"] = True` on success, and adds an `except ValidationError → HTTPException(500)` + failed-audit arm ordered before the generic `except Exception` (the `NrlcomDrawFetchError → 502` path is unchanged). Added `tests/integration/scout/test_nrlcom_draw_response_shape.py` — env-flagged (`SCOUT_DRIFT_LIVE=1`) live drift test.
 **Proof:** skip mode → 1 skipped (exact reason string); live mode → 1 passed against real nrl.com; deliberate model-break (`is_replay: bool` added to `NrlcomDraw`) → live test failed naming `is_replay`, then reverted (`models.py` no diff). The route's `validated:true` / 500-on-drift behaviour is proven by construction — the route calls the identical `NrlcomDraw.model_validate`, exercised green (live) and red (deliberate break); not separately re-run against a live API server. Reviewer **PASS WITH CONCERNS** — non-blocking (run-report update [done here]; live test is calendar-sensitive in the pre-season window, in-scope as written).
 
+### TASK-09 — nrlcom_match_centre: D8 envelope model + fixtures + unit drift tests (`45fd6fe`)
+**Key finding:** the match-centre envelope is **match-state-dependent** (verified live). A `FullTime` match carries 7 result-only top-level keys (`attendance`, `officials`, `positionGroups`, `timeline`, `weather`, `groundConditions`, `imageUrl`); an `Upcoming` match omits those and instead carries `broadcastChannels`/`videoProviders`; 22 keys are shared. So `NrlcomMatchCentre` (envelope-only, `extra="forbid"`) is a **union**: 22 shared required + 9 state-dependent optional (31-key union). Deep internals (lineups, ~58-field stats, 100+ timeline events) stay opaque `dict`/`list`.
+Captured **two** fixtures — `canonical_response.json` (FullTime, ~196KB) and `canonical_response_upcoming.json` (Upcoming, ~15KB). Added `tests/unit/api/scout/test_nrlcom_match_centre_models.py` with **4** tests (one more than the 3 specified): canonical (FullTime) parse, **upcoming parse** (proves the union accepts both states), unknown-top-level negative (`is_replay`), missing-`matchId` negative.
+**Deviation from spec (evidence-driven, reviewer-approved):** spec said 1 fixture / 3 tests / "~29 keys"; shipped 2 fixtures / 4 tests / 31-key union. Reason: a FullTime-only model would 500 every upcoming match the daily cron (TASK-10/11) walks. Reviewer independently confirmed `extra="forbid"` still trips on a genuinely novel key outside the union — the D8 guard survives the widening.
+**Proof:** `pytest tests/unit/api/scout/test_nrlcom_match_centre_models.py` → 4 passed; full scout unit suite → 39 passed (no regression). Reviewer **PASS WITH CONCERNS** — all non-blocking (deviation recorded here; mutual-exclusivity of state-key groups intentionally not enforced — envelope guard, not a state machine; proof recorded here).
+
 ---
 
 ## How we know it's done (running)
@@ -25,10 +31,9 @@ Wired the D8 contract into the route: `services/api/app/scout/nrlcom_draw/routes
 - `callToAction`/`secondaryCallToAction` typed `dict[str, Any] | None` (CTAs vary by match state across rounds); `disclaimer` `str | None`. Load-bearing `matchCentreUrl` is strictly required.
 
 ## Outstanding
-- ☐ TASK-09 — match-centre D8 envelope model + fixture + unit tests.
 - ☐ TASK-10 — match-centre route wiring (non-aborting) + round-optional resolution + live test.
 - ☐ TASK-11 — daily cron (scout-refresh.sh + cron.d).
 - ☐ TASK-12 — prod seed + S3 verify + docs; finalise this report + clear the plan.
 
 ## Commits
-`f02a678` (TASK-07) · `a0ecbd7` (TASK-08).
+`f02a678` (TASK-07) · `a0ecbd7` (TASK-08) · `45fd6fe` (TASK-09).

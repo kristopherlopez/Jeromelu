@@ -93,26 +93,6 @@ Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "One-time S3 seed run" + "D
 _(implementer fills in: three curl responses, three aws s3 ls outputs, two SQL query results, doc diff summary, first-cron-fire log line)_
 
 
-### TASK-09: D8 envelope model + fixture + unit drift tests for `scout/nrlcom_match_centre/`
-
-Implements PLAN.md § 2026-05-24 Scout Phase 3 / Interface / nrlcom_match_centre model + tests.
-
-**What**
-1. Capture a live match-centre response, pretty-printed, to `tests/fixtures/scout/nrlcom_match_centre/canonical_response.json`: resolve a real `matchCentreUrl` from the draw (prefer a completed `FullTime` match so lineups/stats/timeline are populated), then `curl -s "https://www.nrl.com{matchCentreUrl}data/" -H "Accept: application/json" -H "User-Agent: Mozilla/5.0" | python -m json.tool > ...`. ~100KB; **do not trim**. Confirm it's a JSON object with `matchId` and the full top-level key set.
-2. Create `services/api/app/scout/nrlcom_match_centre/models.py`: `NrlcomMatchCentre(BaseModel)`, `ConfigDict(extra="forbid")`, **envelope only** — enumerate the ~29 top-level keys with their observed JSON types (opaque containers `dict[str, Any]` / `list[Any]`; scalars typed; nullable where observed). Deep nesting stays opaque (rich data, archived raw). Imports top-level.
-3. Create `tests/unit/api/scout/test_nrlcom_match_centre_models.py` templated on the settings unit test. `fixture_match_centre` returns `json.loads(...)`. Three tests:
-   - `test_canonical_fixture_parses(fixture_match_centre)` — `NrlcomMatchCentre.model_validate(...)`; assert `parsed.matchId`; assert `isinstance(parsed.timeline, list)`; assert `isinstance(parsed.stats, dict)`.
-   - `test_unknown_top_level_field_raises` — set `bad["is_replay"] = True`; `ValidationError` contains `"is_replay"`.
-   - `test_missing_matchid_raises` — `del bad["matchId"]`; `ValidationError` contains `"matchId"`.
-
-**How to verify**
-- `pytest tests/unit/api/scout/test_nrlcom_match_centre_models.py -v` — all pass.
-- Full scout unit suite green. Fixture pretty-printed. `git status`: three new paths (model, fixture, test).
-
-**Proof notes**
-_(implementer fills in)_
-
-
 ### TASK-10: Wire strict-parse (non-aborting) + round-optional resolution into the `nrlcom_match_centre` route + live drift test
 
 Implements PLAN.md § 2026-05-24 Scout Phase 3 / Interface / route changes (match-centre) + verification.
