@@ -95,27 +95,6 @@ Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "One-time S3 seed run" + "D
 _(implementer fills in: three curl responses, three aws s3 ls outputs, two SQL query results, doc diff summary, first-cron-fire log line)_
 
 
-### TASK-14: Unit tests for `phase_matches._extract_one` (no refactor needed)
-
-Implements PLAN.md § 2026-05-24 Scout Phase 3.5 / Interface / pure extract (matches). Depends on TASK-13.
-
-**What**
-1. Create `tests/unit/scripts/data/populate/test_phase_matches.py`. Import `_extract_one`, `_normalize_status`, `_KEY_RE`, `_GRADE_MAP` from `scripts.data.populate.phase_matches`. Use the `fixtures_dir` conftest fixture; load `fixtures_dir / "scout" / "nrlcom_match_centre" / "canonical_response.json"` (the Phase 3 FullTime fixture). Build fake maps: `team_map = {<homeTeam.teamId>: "11111111-1111-1111-1111-111111111111", <awayTeam.teamId>: "22222222-..."}` (read the two teamIds from the fixture), `venue_map = {}`.
-2. Tests:
-   - `test_extract_one_maps_core_fields` — `_extract_one(payload, "scout/nrlcom/match-centre/111/2026/round-12/raiders-v-dolphins.json", team_map, venue_map)` returns a dict with `source=="nrl_com"`, `external_match_id == payload["matchId"]`, `season==2026`, `round==12`, `grade=="nrl"`, `status=="final"` (FullTime), `home_team_id`/`away_team_id` resolved from the map, and `referee_name` is the referee from `officials[]`.
-   - `test_attendance_zero_becomes_null` — set `payload["attendance"]=0` (deepcopy) → returned `attendance` is `None`.
-   - `test_unresolved_team_returns_none` — `team_map={}` → returns `None` (skip-no-team).
-   - `test_same_team_returns_none` — map both teamIds to the same id → returns `None` (distinct-teams guard).
-   - `test_key_regex_and_status_map` — `_KEY_RE` parses comp/season/round/slug from a sample key; `_normalize_status("FullTime")=="final"`, `_normalize_status("Upcoming")=="scheduled"`, `_normalize_status(None)=="scheduled"`; `_GRADE_MAP[111]=="nrl"`.
-
-**How to verify**
-- `pytest tests/unit/scripts/data/populate/test_phase_matches.py -v` — all pass.
-- `pytest tests/unit/ -q` stays green. `git status` shows one new test file.
-
-**Proof notes**
-_(implementer fills in)_
-
-
 ### TASK-15: Refactor `phase_stats` to a pure `_extract_stat_rows` + unit tests
 
 Implements PLAN.md § 2026-05-24 Scout Phase 3.5 / Interface / pure extract (stats). Depends on TASK-13.
