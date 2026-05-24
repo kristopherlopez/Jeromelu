@@ -1,6 +1,6 @@
 # Scout Phase 3.5 — nrl.com match-centre DB extractors (harden + verify + populate)
 
-**Date:** 2026-05-24 · **Status:** 🟡 In progress (TASK-13–15 of TASK-13→19 done) · **Plan:** Scout Phase 3.5 (PLAN.md)
+**Date:** 2026-05-24 · **Status:** 🟡 In progress (TASK-13–16 of TASK-13→19 done) · **Plan:** Scout Phase 3.5 (PLAN.md)
 
 **TL;DR** — The S3→DB extractors for the nrl.com match-centre data already existed (`scripts/data/populate/` + orchestrator, all 6 tables + identity columns present) but had zero tests, a broken `--dry-run`, and no verified run. Phase 3.5 hardens them: fixture-based unit tests for the 4 match-centre phases (via behavior-preserving pure-function refactors), fix `--dry-run`, then populate prod + verify. NRL only (comp 111), season 2026.
 
@@ -20,6 +20,10 @@ Five fixture-based unit tests for the pure matches extractor (no refactor — `p
 Behavior-preserving refactor: extracted the inlined per-player row-building from `populate_player_match_stats` into a pure `_extract_stat_rows(payload, key, match_id, team_map, player_map) -> list[dict]` (mirrors `phase_matches._extract_one`). The caller UPSERTs the returned rows via the unchanged `upsert_sql`; the `players_no_meta` diagnostic is preserved via a cheap re-walk (provably equivalent — `_build_player_meta_map` never yields an empty dict, so old `if not meta` == new `id not in player_meta`). Added 4 fixture-based unit tests (camelCase→snake `_FIELD_MAP` mapping, roster meta, identity resolution nullable, row count == stat players).
 **Proof:** `pytest tests/unit/scripts/data/populate/test_phase_stats.py` → 4 passed; full `tests/unit/` → **283 passed**. **Reviewer initially BLOCKed** on the empty TASKS.md Proof-notes block → **retracted to PASS WITH CONCERNS** after confirming the run-report ritual (proof is post-review; the Format-section note says an empty block at review time is not a blocker). Same false-block as TASK-11 — recurring across fresh-context reviewers; mitigation: include a proof-timing note in future review dispatches. Non-blocking concerns: C1 test-name `_nullable` (positive half covered in the field-mapping test); C2 explicit-pathspec staging (done).
 
+### TASK-16 — refactor `phase_team_lists` → pure `_extract_player_list_rows` + unit tests (`a9bea13`)
+Behavior-preserving refactor: extracted the inlined player row-building into a pure `_extract_player_list_rows(payload, match_id, team_map, player_map) -> list[dict]` (same skip rules: unresolved team / no playerId / no person_id). Caller runs the unchanged existence pre-check + INSERT over the returned rows; `players_no_match` preserved via a resolvable-count; the coach path (`_ensure_coach_person`, DB) stays inline. Added 3 unit tests (one row per resolvable player + jersey/position/is_captain; skip-unresolved-player; skip-unresolved-team).
+**Proof:** `pytest tests/unit/scripts/data/populate/test_phase_team_lists.py` → 3 passed; full `tests/unit/` → **286 passed**. Dispatched the reviewer with a proof-timing note up front (no false-block this time). **Reviewer PASS WITH CONCERNS** — C1 (non-blocking, not realisable): the interleaving change (`[all players] then [all coaches]` vs per-team) could only diverge if a coach and an opposing-team player shared one `profileId` in the same match — impossible in NRL, zero overlap in the fixture; rows are otherwise independent + idempotent.
+
 ---
 
 ## How we know it's done (running)
@@ -29,10 +33,9 @@ Behavior-preserving refactor: extracted the inlined per-player row-building from
 - Used regular package markers (`__init__.py`) over relying on namespace packages, for an explicit, stable import chain. `-m` invocation unaffected.
 
 ## Outstanding
-- ☐ TASK-16 — refactor `phase_team_lists` → pure `_extract_player_list_rows` + tests.
 - ☐ TASK-17 — refactor `phase_timeline` → pure timeline/official extractors + tests.
 - ☐ TASK-18 — fix the broken `--dry-run` (commit-flag thread; close the META bug).
 - ☐ TASK-19 — prod populate run + DB verify + docs; finalise this report + clear the plan.
 
 ## Commits
-`922b591` (TASK-13) · `bb32a84` (TASK-14) · `093de70` (TASK-15).
+`922b591` (TASK-13) · `bb32a84` (TASK-14) · `093de70` (TASK-15) · `a9bea13` (TASK-16).

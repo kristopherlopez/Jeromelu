@@ -95,26 +95,6 @@ Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "One-time S3 seed run" + "D
 _(implementer fills in: three curl responses, three aws s3 ls outputs, two SQL query results, doc diff summary, first-cron-fire log line)_
 
 
-### TASK-16: Refactor `phase_team_lists` to a pure `_extract_player_list_rows` + unit tests
-
-Implements PLAN.md § 2026-05-24 Scout Phase 3.5 / Interface / pure extract (team_lists). Depends on TASK-13.
-
-**What**
-1. **Behavior-preserving refactor** of `scripts/data/populate/phase_team_lists.py`: extract the inlined **player** row-building (the `for p in team_block["players"]` body, excluding the existence pre-check + INSERT) into a pure `_extract_player_list_rows(payload, match_id, team_map, player_map) -> list[dict]` returning dicts of `{match_id, team_id, player_id, jersey_number, named_position, is_captain}` for every resolvable player (skip players with no `person_id` and teams not in `team_map`, matching current behavior). `populate_team_lists` calls it, then does the existing existence-check + INSERT loop. The **coach** path (`_ensure_coach_person`, DB I/O) stays inline, unchanged — out of unit scope, covered by the prod-run verify.
-2. Create `tests/unit/scripts/data/populate/test_phase_team_lists.py`. Tests:
-   - `test_extract_player_list_rows` — for the FullTime fixture + populated maps, returns one row per resolvable player; spot-check jersey_number/named_position; `is_captain` true exactly for the player whose id == `team_block["captainPlayerId"]`.
-   - `test_skips_unresolved_player` — a playerId not in player_map is omitted.
-   - `test_skips_unresolved_team` — a team whose teamId not in team_map contributes no rows.
-
-**How to verify**
-- `pytest tests/unit/scripts/data/populate/test_phase_team_lists.py -v` — all pass.
-- Refactor behavior-preserving: `populate_team_lists` still does the existence pre-check + INSERT + coach path + returns the same summary keys. `pytest tests/unit/ -q` green.
-- `git status`: modified `phase_team_lists.py` + one new test file.
-
-**Proof notes**
-_(implementer fills in)_
-
-
 ### TASK-17: Refactor `phase_timeline` to pure `_extract_timeline_rows` + `_extract_official_rows` + unit tests
 
 Implements PLAN.md § 2026-05-24 Scout Phase 3.5 / Interface / pure extract (timeline). Depends on TASK-13.
