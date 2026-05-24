@@ -73,7 +73,7 @@ The deep-history source. HTML pages, not JSON, so the fetch shape differs from t
 
 **Why it's worth it / the trade-off:** match-by-match lineups, scorers, and results back to **1908** (plus coach/referee/venue histories and cross-competition coverage) — the data that turns historical wiki pages from stubs into real careers, which no JSON source can supply. But HTML scraping is more brittle than the JSON feeds, so these are **future/optional** pipelines — sequence them after the nrl.com pipelines (Phases 3–4) land.
 
-**Future (multi-platform expansion):** podcasts (RSS), Twitter/X, web articles (blogs/news), Reddit, Instagram, and radio (mostly via podcast feeds) — same pattern, each gets a folder per D9. Per-platform notes (discovery, extraction, feasibility) in [roadmap.md § Multi-platform expansion](roadmap.md#multi-platform-expansion).
+**Future (multi-platform expansion):** podcasts, radio, TV shows, Twitter/X, Instagram, web articles (blogs/news), Reddit — same pattern, each gets a folder per D9. Note **YouTube's gravity**: most podcasts, many radio segments, and TV shows are re-uploaded to YouTube and are already reachable via the shipped YouTube pipeline (they're a video with a *format* tag, not a separate platform); the rest are the off-YouTube residual. Per-platform notes and the platform-vs-format distinction in [roadmap.md § Multi-platform expansion](roadmap.md#multi-platform-expansion).
 
 ### What Scout still does NOT do (the bronze boundary)
 
