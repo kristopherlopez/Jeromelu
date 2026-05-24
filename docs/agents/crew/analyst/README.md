@@ -4,11 +4,13 @@ tags: [area/agents, subarea/crew]
 
 # Analyst — Jaromelu's Cross-Reference Mode
 
-**Internal function** — owns every Transform on top of Scout's raw bytes:
+> **Charter & boundary (2026-05-23).** Analyst's largest *current* surface — **Lineup** (transcript materialisation + speaker identification) — is being moved **out of this repo** into an external service per [charter A2](charter.md#a2-lineup-is-a-service-boundary-not-a-sub-module). What remains is Analyst's durable identity: **the interpretive layer** — turning a speaker-attributed transcript into *meaning* (cleaning, embedding, claim/quote extraction, cross-source consensus). The in-repo Lineup code (`diarize.py`, `identify_voice.py`, `visual_id.py`, `fusion.py`, the GPU stack) is **legacy** — kept working, not extended ([charter A8](charter.md#a8-disposition-of-the-in-repo-lineup-code--legacy-not-deleted)). Decisions A1–A8 in [charter.md](charter.md); architecture in [architecture.md](architecture.md); forward plan in [roadmap.md](roadmap.md).
 
-1. **Transcript materialisation** — turn audio in S3 (Scout's output) into a structured transcript (`source_documents`, `source_chunks`). [System spec → transcription](../../system/transcription-pipeline.md).
-2. **Lineup — speaker identification.** Within transcript materialisation, attribute each turn to a known `Person` using voice fingerprints, face embeddings, and active-speaker mouth-motion fused per turn. Writes `source_speakers` + provenance columns + the registries (`person_voiceprints`, `person_face_embeddings`). [System spec → identification](../../system/speaker-identification.md).
-3. **Cleaning, claim / quote / consensus extraction** — the historical Analyst surface; cross-references claims across sources, finds contradictions, detects consensus shifts, builds structured evidence on top of those chunks.
+**Internal function** — the **interpretive layer**: it turns a speaker-attributed transcript into meaning. In medallion terms Analyst is **silver** (see [charter A1](charter.md#a1-the-boundary-principle--analyst-owns-the-interpretive-layer)):
+
+1. **Cleaning, embedding, entity / quote / claim extraction, cross-source consensus + contradiction detection** — Analyst's durable scope. Cross-references claims across sources, finds contradictions, detects consensus shifts, builds structured evidence on top of the transcript. Skill-driven today; workerised per [roadmap Track 2](roadmap.md#track-2--interpretive-pass-buildout).
+
+The structural transform that *produces* that transcript — **Lineup** (transcript materialisation + speaker identification: pyannote diarization, Deepgram ASR, voice/face/fusion) — currently lives in this repo but is **moving to an external service** ([charter A2](charter.md#a2-lineup-is-a-service-boundary-not-a-sub-module)); the in-repo code is legacy ([charter A8](charter.md#a8-disposition-of-the-in-repo-lineup-code--legacy-not-deleted)). Surface specs: [transcription](../../system/transcription-pipeline.md) · [identification](../../system/speaker-identification.md). It answers *who said what* (structural); Analyst answers *what it means* (interpretive).
 
 **Not a separate visible character.** When this mode is active, Jaromelu's voice (and the UI activity status) reflects it.
 
@@ -17,10 +19,10 @@ tags: [area/agents, subarea/crew]
 |                       |                                                                                                                                                              |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Type**              | Crew mode (internal reasoning)                                                                                                                               |
-| **ETL role**          | **Transform.** Reads Scout's raw bytes, produces structured derivatives.                                                                                     |
-| **Scope today**       | Transcript materialisation (Deepgram words + pyannote turns) and Lineup speaker identification (voice + face + fusion). Both live in `services/api/app/analyst/`. |
-| **Scope planned**     | Cleaning pass (`source_documents.cleaned_text`, `source_chunks.clean_text`), embedding generation (`source_chunks.embedding`), quote / claim extraction. Lineup remaining work (Phase 5 — cross-modal compounding) is tracked separately — see [Lineup status](#lineup-status) below. |
-| **Code**              | `services/api/app/analyst/` — `transcribe.py`, `keyterms.py`, `transcribe_cli.py`, `diarize.py`, `identify_voice.py`, `visual_id.py`, `fusion.py`, `enroll_voice_cli.py`, `enroll_face_cli.py`. |
+| **ETL role**          | **Transform — interpretive / silver.** Reads a speaker-attributed transcript; produces structured knowledge (cleaned text, embeddings, claims, consensus). The *structural* transform (audio→transcript) is Lineup, externalising ([charter A2](charter.md#a2-lineup-is-a-service-boundary-not-a-sub-module)). |
+| **Scope (durable)**   | The interpretive layer: cleaning, chapter detection, annotation, embedding, entity/quote/claim extraction, cross-source consensus + contradiction detection. Skill-driven today; workerised per [roadmap Track 2](roadmap.md#track-2--interpretive-pass-buildout). |
+| **Scope (legacy, externalising)** | Transcript materialisation (Deepgram words + pyannote turns) + Lineup speaker identification (voice + face + fusion). Moving to an external service ([charter A2](charter.md#a2-lineup-is-a-service-boundary-not-a-sub-module)); in-repo code frozen ([charter A8](charter.md#a8-disposition-of-the-in-repo-lineup-code--legacy-not-deleted)). Phase ledger: [Lineup status](#lineup-status) below. |
+| **Code**              | `services/api/app/analyst/`. **Legacy (Lineup, externalising — [charter A8](charter.md#a8-disposition-of-the-in-repo-lineup-code--legacy-not-deleted)):** transcription (`transcribe.py`, `diarize.py`, `keyterms.py`), speaker ID (`identify_voice.py`, `visual_id.py`, `fusion.py`), clustering (`face_clusters.py`, `face_runs.py`, `voice_cluster_*.py`, `identity_alignment.py`), remote GPU (`remote.py`, `video_staging.py`, `services/gpu/`), enroll/CLI helpers. **Durable surface:** cleaning / extraction / consensus — skill-driven today (see [Pipeline position](#pipeline-position)), workerised under [roadmap Track 2](roadmap.md#track-2--interpretive-pass-buildout). |
 | **Trigger**           | Manual CLI: `python -m app.analyst.transcribe_cli <source_id>` runs everything end-to-end. Recurring drain job for `transcription_status IS NULL` sources is on the backlog.            |
 
 ---
@@ -37,7 +39,7 @@ Scout                       Analyst                                           Bo
 | Stage | What | Status |
 |---|---|---|
 | Transcribe | Deepgram nova-3 (words+timestamps, no diarize) + pyannote diarization + keyterm. Writes `source_documents` + `source_speakers` (with voice embeddings) + `source_chunks`. | Shipped 2026-05-03 |
-| **Lineup — speaker ID** | Voice voiceprints + face embeddings + mouth-opening ASD + cross-modal fusion → `source_speakers.speaker_person_id` + `match_method` + `match_confidence`. Per-turn audio_match / visual_match provenance preserved. | Phases 1–4b-display shipped 2026-05-04. Phase 4b-action (click-to-reassign) shipped 2026-05-05. Compounding (Phase 5) pending. See [Lineup status](#lineup-status). |
+| **Lineup — speaker ID** | Voice voiceprints + face embeddings + mouth-opening ASD + cross-modal fusion → `source_speakers.speaker_person_id` + `match_method` + `match_confidence`. Per-turn audio_match / visual_match provenance preserved. | Phases 1–4b-display shipped 2026-05-04. Phase 4b-action (click-to-reassign) shipped 2026-05-05. Compounding (Phase 5) now out-of-scope under externalisation ([charter A2](charter.md#a2-lineup-is-a-service-boundary-not-a-sub-module)). See [Lineup status](#lineup-status). |
 | Clean | Fix garbles, merge restarts, normalise filler. Writes `source_documents.cleaned_text`, `source_chunks.clean_text`. | Skill-driven today (`/clean-transcript`); workerised version pending |
 | Embed | OpenAI / Voyage embeddings → `source_chunks.embedding`. (Distinct from the voice/face embeddings Lineup writes — those live on `source_speakers` / `person_voiceprints` / `person_face_embeddings`.) | Not built |
 | Extract claims / quotes | LLM extraction over chunks. Writes `quotes`, `claims`, `claim_chunks`. | Skill-driven today (`/process-transcript`); workerised version pending |
@@ -105,7 +107,7 @@ Lineup is the speaker-identification surface within Analyst's transcript materia
 | **4b-display-v2** — Ephemeral video + canvas-on-iframe overlay | Stop persisting per-source video. `video_staging.staged_video` yt-dlps into a 24 h-lifecycle staging key, deletes after `visual_identify` returns. `YouTubeFaceOverlay` draws bboxes on the YouTube iframe directly. | ✅ Shipped 2026-05-05. |
 | **5.5** — Remote GPU inference | `services/gpu/` SageMaker Async endpoint (us-east-1, `ml.g5.xlarge`) hosting pyannote + InsightFace. ~50 min CPU → **~3 min** wall time when `LINEUP_REMOTE=1`. | ✅ Shipped 2026-05-05. |
 | **4b-action** — Click-to-reassign | Click a face box → Person picker modal → writes face + voice embeddings + corrects `speaker_person_id`. | ✅ Shipped 2026-05-05. See [Manual reassign](../../system/speaker-identification.md#manual-reassign) for the endpoint sequence. |
-| **5** — Cross-modal compounding | Periodic job auto-promotes high-confidence `voice+face` turns into the registries with `created_by='auto-confirmed'`. The mechanism that grows accuracy without operator effort. | ⏳ Pending (3 days). |
+| **5** — Cross-modal compounding | Periodic job auto-promotes high-confidence `voice+face` turns into the registries with `created_by='auto-confirmed'`. The mechanism that grows accuracy without operator effort. | ⛔ Out-of-scope under externalisation ([charter A2](charter.md#a2-lineup-is-a-service-boundary-not-a-sub-module)) — the compounding mechanism becomes the external service's concern, not this repo's. Was the only pending in-repo item. |
 
 Flagged but not currently scoped:
 
@@ -126,6 +128,9 @@ Analyst mode spans:
 
 ## Related
 
+- [Charter](charter.md) — locked design decisions A1–A8, the Lineup boundary, risks, cost/testing/rollout
+- [Architecture](architecture.md) — pipeline position, hand-off contract, the pass chain, current-vs-target architecture
+- [Roadmap](roadmap.md) — status and the two-track forward plan (Lineup externalisation + interpretive-pass buildout)
 - [Crew Dynamics](../dynamics.md) — Analyst mode's place in Jaromelu's internal reasoning flow
 - [The Wiki](../../../pages/wiki/overview.md) — where cross-referenced knowledge surfaces, authored by Jaromelu
 - [Speaker Identification plan (Lineup)](../../../todo/speaker-identification-plan.md) — full phase ledger, evaluation results, threshold tuning notes
