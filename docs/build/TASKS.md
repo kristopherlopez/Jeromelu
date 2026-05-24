@@ -23,27 +23,6 @@ Prefix the title with optional tags in square brackets:
 
 ## Open tasks
 
-### TASK-04: Add D8 live integration drift tests (classic + draft) for `scout/supercoach_settings/`
-
-Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "Files created" / supercoach_settings item 3.
-
-**What**
-1. Create `tests/integration/scout/test_supercoach_settings_response_shape.py` templated on `tests/integration/scout/test_supercoach_roster_response_shape.py`. Mirror its D8 docstring framing.
-2. Two parameterised tests (or two functions — either is fine; prefer `@pytest.mark.parametrize("mode", ["classic", "draft"])` on a single function for brevity), both gated on `SCOUT_DRIFT_LIVE=1`:
-   - `test_live_supercoach_settings_shape(mode)` — calls `fetch_supercoach_settings(season=date.today().year, mode=mode)` from `app.scout.supercoach_settings.fetcher`, then `SuperCoachSettings.model_validate(raw)`. Wrap in `try/except (SuperCoachSettingsFetchError, ValidationError)` → `pytest.fail` with message: `f"SuperCoach settings live drift test failed (mode={mode}) — upstream shape has changed.\nError: {type(e).__name__}: {e}\nFix path: review the response, update app.scout.supercoach_settings.models (top-level envelope only), regenerate the fixture, commit with a note on what the upstream changed."`
-   - Sanity asserts after parse: `parsed.system["timezone"] == "Australia/Sydney"`; `len(parsed.game) > 50` (the `game` dict has 69+ sub-keys per the README — guards against an empty stub response).
-3. Draft mode is included specifically because the Makefile / fetcher already support it and the upstream draft endpoint has independent drift risk. **Production cron does not run draft** — this test is the only guardrail against silent draft-mode breakage, so it is non-negotiable.
-
-**How to verify**
-- Without the env flag: both parameterised cases show as skipped.
-- With the env flag: `SCOUT_DRIFT_LIVE=1 pytest tests/integration/scout/test_supercoach_settings_response_shape.py -v` shows both `[classic]` and `[draft]` cases passing.
-- Locally pollute `SuperCoachSettings` (e.g. rename `game` → `gameplay`), re-run live mode → both cases must fail with messages naming `game`. Revert.
-- `git status` shows exactly one new file.
-
-**Proof notes**
-_(implementer fills in)_
-
-
 ### TASK-05: Extend `scripts/scout-refresh.sh` + add cron lines for SC teams + settings
 
 Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "Cron schedule".
@@ -179,3 +158,16 @@ Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "Files created" / supercoac
 - `git status` showed exactly the two task artifacts staged (plus untouched concurrent-session changes).
 - **adversarial-reviewer verdict: PASS WITH CONCERNS** — both concerns non-blocking and required no code change: (1) fixture ~38KB vs estimate — recorded above; (2) proof notes empty at review time — filled here before checkoff.
 - **Commit:** `b602e88` — `test(scout): add D8 fixture + unit drift tests for supercoach_settings [skip-simplify]`. Pushed to `master`.
+
+### [x] TASK-04: Add D8 live integration drift tests (classic + draft) for `scout/supercoach_settings/`
+
+Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "Files created" / supercoach_settings item 3.
+
+**Proof notes**
+- **Created** `tests/integration/scout/test_supercoach_settings_response_shape.py`, templated on `test_supercoach_roster_response_shape.py` (D8 / env-flag framing preserved, plus a draft-mode-rationale paragraph). Single function `test_live_supercoach_settings_shape(mode)` with `@pytest.mark.parametrize("mode", ["classic", "draft"])`, gated on `os.environ.get("SCOUT_DRIFT_LIVE") == "1"`. Fetch + parse both inside one `try/except (SuperCoachSettingsFetchError, ValidationError)` → `pytest.fail` with the exact spec message (reviewer confirmed runtime-rendered string matches char-for-char). Sanity asserts: `system["timezone"] == "Australia/Sydney"`, `len(game) > 50`.
+- **Skip mode:** `pytest tests/integration/scout/test_supercoach_settings_response_shape.py -v -rs` → **2 skipped** (`[classic]`, `[draft]`), reason `Set SCOUT_DRIFT_LIVE=1 to run the live-endpoint drift test`.
+- **Live mode:** `SCOUT_DRIFT_LIVE=1 pytest ... -v` → **2 passed** in 2.24s (real SC endpoint, both modes). Observed live `game` sub-key counts: classic **69**, draft **54** — both clear the `> 50` gate. Note (reviewer concern, non-blocking): the draft margin is thin (54 vs threshold 50); a modest upstream trim of draft's `game` block could trip the assert before genuine envelope drift. Acceptable as the intended conservative stub-guard; left to-spec.
+- **Deliberate break:** temporarily renamed `game` → `gameplay` in `SuperCoachSettings` → both live cases **FAILED** with messages naming `game` (extra-forbidden) and `gameplay` (missing-required). Reverted; `git diff models.py` is empty.
+- `git status` showed exactly one new file (plus untouched concurrent-session changes).
+- **adversarial-reviewer verdict: PASS WITH CONCERNS** — both non-blocking (proof notes pending at review time → filled here; thin draft margin → recorded).
+- **Commit:** `fa16afa` — `test(scout): add D8 live integration drift tests (classic+draft) for supercoach_settings [skip-simplify]`. Pushed to `master`.
