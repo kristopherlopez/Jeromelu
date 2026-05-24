@@ -194,6 +194,7 @@ def populate_player_match_stats(
     *,
     seasons: list[int] | None = None,
     competition: int = 111,
+    commit: bool = True,
 ) -> dict[str, Any]:
     team_map = _build_team_id_map(db)
     match_map = _build_match_id_map(db, seasons)
@@ -273,9 +274,9 @@ def populate_player_match_stats(
                 rows_updated += 1
 
         if archives_read % 50 == 0:
-            db.commit()  # checkpoint so a crash doesn't lose 408 archives' work
+            if commit: db.commit()  # checkpoint so a crash doesn't lose 408 archives' work
 
-    db.commit()
+    if commit: db.commit()
     logger.info(
         "phase_stats: inserted=%d updated=%d matches_unmatched=%d players_no_meta=%d",
         rows_inserted, rows_updated, matches_unmatched, players_no_meta,

@@ -124,6 +124,7 @@ def populate_timeline_and_officials(
     *,
     seasons: list[int] | None = None,
     competition: int = 111,
+    commit: bool = True,
 ) -> dict[str, Any]:
     team_map = _build_team_id_map(db)
     match_map = _build_match_id_map(db, seasons)
@@ -221,9 +222,9 @@ def populate_timeline_and_officials(
                 officials_updated += 1
 
         if archives_read % 50 == 0:
-            db.commit()
+            if commit: db.commit()
 
-    db.commit()
+    if commit: db.commit()
     logger.info(
         "phase_timeline: timeline_inserted=%d updated=%d  officials_inserted=%d updated=%d  matches_unmatched=%d",
         timeline_inserted, timeline_updated,

@@ -104,9 +104,9 @@ DB is system of record. The yaml is local-dev seed only — don't write features
 
 ## Known bugs and pitfalls
 
-### `populate_db_from_s3 --dry-run` is broken
+### `populate_db_from_s3 --dry-run` — FIXED 2026-05-24 (Phase 3.5 / TASK-18)
 
-Every phase commits internally before the outer rollback runs. The flag silently writes. **Do not use `--dry-run` for verification** — assume it mutates.
+Previously broken: every phase committed internally before the outer rollback ran, so the flag silently wrote. Fixed by threading `commit: bool = True` through every phase function (the final commit AND the per-50-archive checkpoint commits are now `if commit: db.commit()`); the orchestrator passes `commit=not args.dry_run` and rolls back at the end. `--dry-run` now computes counts and writes nothing. A signature test (`tests/unit/scripts/data/populate/test_dry_run_flag.py`) guards against the `commit` param regressing.
 
 ### Video worker section-seek + JPEG-YUV
 

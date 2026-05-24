@@ -153,6 +153,7 @@ def populate_team_lists(
     *,
     seasons: list[int] | None = None,
     competition: int = 111,
+    commit: bool = True,
 ) -> dict[str, Any]:
     team_map = _build_team_id_map(db)
     match_map = _build_match_id_map(db, seasons)
@@ -280,7 +281,7 @@ def populate_team_lists(
                 )
                 coaches_inserted += 1
 
-    db.commit()
+    if commit: db.commit()
     logger.info(
         "phase_team_lists: rows_inserted=%d already=%d coaches_inserted=%d coaches_already=%d "
         "players_no_match=%d matches_unmatched=%d",

@@ -94,7 +94,7 @@ def _iter_tenures(rows: Iterable[tuple[str, str, datetime, str | None]]) -> list
     return out
 
 
-def populate_player_attributes(db: Session) -> dict[str, Any]:
+def populate_player_attributes(db: Session, *, commit: bool = True) -> dict[str, Any]:
     """Walk every player's match_team_lists chronologically and project
     tenure windows into player_attributes.
     """
@@ -233,7 +233,7 @@ def populate_player_attributes(db: Session) -> dict[str, Any]:
                     "  phase_attributes: %d people processed (tenures=%d, open=%d)",
                     people_seen, tenures_upserted, most_recent_open,
                 )
-                db.commit()
+                if commit: db.commit()
         cur_person = person_id
         buffer.append((row.team_id, row.kickoff_at, row.named_position))
 
@@ -243,7 +243,7 @@ def populate_player_attributes(db: Session) -> dict[str, Any]:
         most_recent_open += opn
         people_seen += 1
 
-    db.commit()
+    if commit: db.commit()
     logger.info(
         "phase_attributes: people_seen=%d tenures_upserted=%d most_recent_open=%d "
         "(sc_owned_current_preserved=%d)",

@@ -211,6 +211,7 @@ def populate_people_history(
     db: Session,
     *,
     competition: int = 111,
+    commit: bool = True,
 ) -> dict[str, Any]:
     """Walk every match-centre archive across every season and ensure a
     `people` row exists for every distinct profileId we see.
@@ -322,7 +323,7 @@ def populate_people_history(
                             {"nid": nrlcom_id, "img": c.get("image_url"),
                              "url": c.get("url"), "pid": candidate_person_id},
                         )
-                        db.commit()
+                        if commit: db.commit()
                         by_nrlcom[nrlcom_id] = candidate_person_id
                         updated_id_only += 1
                         did_merge = True
@@ -367,7 +368,7 @@ def populate_people_history(
                     "role_class": c["role_class"], "url": c.get("url"),
                 },
             ).first()
-            db.commit()
+            if commit: db.commit()
             if row:
                 by_nrlcom[nrlcom_id] = str(row[0])
                 by_slug[slug] = str(row[0])
@@ -398,7 +399,7 @@ def populate_people_history(
     }
 
 
-def reresolve_person_ids(db: Session) -> dict[str, int]:
+def reresolve_person_ids(db: Session, *, commit: bool = True) -> dict[str, int]:
     """Fill in NULL person_id columns now that more people rows exist.
 
     Idempotent — only touches NULLs.
@@ -425,6 +426,6 @@ def reresolve_person_ids(db: Session) -> dict[str, int]:
             continue
         res = db.execute(sql)
         counts[table] = res.rowcount or 0
-    db.commit()
+    if commit: db.commit()
     logger.info("reresolve_person_ids: %s", counts)
     return counts

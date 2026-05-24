@@ -64,6 +64,7 @@ def populate_rounds(
     *,
     seasons: list[int] | None = None,
     competition: int = 111,
+    commit: bool = True,
 ) -> dict[str, Any]:
     keys = list_keys(f"scout/nrlcom/draw/{competition}/")
     if seasons:
@@ -108,7 +109,7 @@ def populate_rounds(
             inserted += 1
         else:
             updated += 1
-    db.commit()
+    if commit: db.commit()
 
     logger.info("phase_rounds: inserted=%d updated=%d", inserted, updated)
     return {

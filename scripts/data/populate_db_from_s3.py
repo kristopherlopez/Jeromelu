@@ -75,12 +75,14 @@ def main() -> int:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Compute counts but rollback the transaction at the end.",
+        help="Compute counts without committing (phases skip their commits; "
+             "the transaction is rolled back at the end).",
     )
     args = parser.parse_args()
 
     chosen = PHASES if args.phase == "all" else (args.phase,)
     results: dict[str, dict] = {}
+    commit = not args.dry_run  # threaded into every phase so --dry-run truly writes nothing
 
     db = SessionLocal()
     try:
@@ -88,40 +90,40 @@ def main() -> int:
             logger.info("======== phase: %s ========", phase)
             if phase == "identity":
                 results[phase] = backfill_identity(
-                    db, seasons=args.seasons, competition=args.competition,
+                    db, seasons=args.seasons, competition=args.competition, commit=commit,
                 )
             elif phase == "people":
-                results[phase] = populate_people_history(db, competition=args.competition)
+                results[phase] = populate_people_history(db, competition=args.competition, commit=commit)
             elif phase == "reresolve":
-                results[phase] = reresolve_person_ids(db)
+                results[phase] = reresolve_person_ids(db, commit=commit)
             elif phase == "attributes":
-                results[phase] = populate_player_attributes(db)
+                results[phase] = populate_player_attributes(db, commit=commit)
             elif phase == "rounds":
                 results[phase] = populate_rounds(
-                    db, seasons=args.seasons, competition=args.competition,
+                    db, seasons=args.seasons, competition=args.competition, commit=commit,
                 )
             elif phase == "matches":
                 results[phase] = populate_matches(
-                    db, seasons=args.seasons, competition=args.competition,
+                    db, seasons=args.seasons, competition=args.competition, commit=commit,
                 )
             elif phase == "team_lists":
                 results[phase] = populate_team_lists(
-                    db, seasons=args.seasons, competition=args.competition,
+                    db, seasons=args.seasons, competition=args.competition, commit=commit,
                 )
             elif phase == "stats":
                 results[phase] = populate_player_match_stats(
-                    db, seasons=args.seasons, competition=args.competition,
+                    db, seasons=args.seasons, competition=args.competition, commit=commit,
                 )
             elif phase == "timeline":
                 results[phase] = populate_timeline_and_officials(
-                    db, seasons=args.seasons, competition=args.competition,
+                    db, seasons=args.seasons, competition=args.competition, commit=commit,
                 )
             elif phase == "standings":
-                results[phase] = populate_team_standings(db, competition=args.competition)
+                results[phase] = populate_team_standings(db, competition=args.competition, commit=commit)
             elif phase == "leaderboards":
-                results[phase] = populate_stat_leaderboards(db, competition=args.competition)
+                results[phase] = populate_stat_leaderboards(db, competition=args.competition, commit=commit)
             elif phase == "injuries":
-                results[phase] = populate_injuries(db, competition=args.competition)
+                results[phase] = populate_injuries(db, competition=args.competition, commit=commit)
             else:
                 logger.warning("phase %s not yet implemented — skipping", phase)
                 results[phase] = {"skipped": True}

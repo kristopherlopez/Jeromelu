@@ -170,6 +170,7 @@ def populate_matches(
     *,
     seasons: list[int] | None = None,
     competition: int = 111,
+    commit: bool = True,
 ) -> dict[str, Any]:
     team_map = _build_team_id_map(db)
     venue_map = _build_venue_id_map(db)
@@ -251,7 +252,7 @@ def populate_matches(
             inserted += 1
         else:
             updated += 1
-    db.commit()
+    if commit: db.commit()
 
     logger.info("phase_matches: inserted=%d updated=%d", inserted, updated)
     return {

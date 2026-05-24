@@ -92,6 +92,7 @@ def populate_team_standings(
     db: Session,
     *,
     competition: int = 111,
+    commit: bool = True,
 ) -> dict[str, Any]:
     team_map = _build_team_nick_map(db)
     keys = list_keys(f"scout/nrlcom/ladder/{competition}/")
@@ -195,7 +196,7 @@ def populate_team_standings(
             else:
                 updated += 1
 
-    db.commit()
+    if commit: db.commit()
     logger.info("phase_standings: inserted=%d updated=%d", inserted, updated)
     return {
         "archives_read": archives_read,
@@ -213,6 +214,7 @@ def populate_stat_leaderboards(
     db: Session,
     *,
     competition: int = 111,
+    commit: bool = True,
 ) -> dict[str, Any]:
     team_map = _build_team_nick_map(db)
     player_map = _build_player_id_map(db)
@@ -305,7 +307,7 @@ def populate_stat_leaderboards(
                         else:
                             updated += 1
 
-    db.commit()
+    if commit: db.commit()
     logger.info("phase_leaderboards: inserted=%d updated=%d", inserted, updated)
     return {
         "archives_read": archives_read,
@@ -347,6 +349,7 @@ def populate_injuries(
     db: Session,
     *,
     competition: int = 111,
+    commit: bool = True,
 ) -> dict[str, Any]:
     team_map = _build_team_nick_map(db)
     people_lookup = _build_people_name_lookup(db)
@@ -501,7 +504,7 @@ def populate_injuries(
             )
             resolved += len(to_resolve)
 
-    db.commit()
+    if commit: db.commit()
     logger.info("phase_injuries: inserted=%d resolved=%d", inserted, resolved)
     return {
         "archives_read": archives_read,

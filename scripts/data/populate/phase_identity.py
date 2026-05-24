@@ -132,6 +132,7 @@ def backfill_identity(
     *,
     seasons: list[int] = (2024, 2025, 2026),
     competition: int = 111,
+    commit: bool = True,
 ) -> dict[str, Any]:
     """Walk match-centre archives → set people.nrlcom_player_id, teams.nrlcom_team_id.
 
@@ -232,7 +233,7 @@ def backfill_identity(
         )
         people_updated += res.rowcount or 0
 
-    db.commit()
+    if commit: db.commit()
 
     logger.info(
         "phase_identity: teams_updated=%d  people_updated=%d  unmatched=%d  collisions=%d",
