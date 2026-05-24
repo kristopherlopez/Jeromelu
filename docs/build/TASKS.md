@@ -95,26 +95,6 @@ Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "One-time S3 seed run" + "D
 _(implementer fills in: three curl responses, three aws s3 ls outputs, two SQL query results, doc diff summary, first-cron-fire log line)_
 
 
-### TASK-18: Fix the broken `--dry-run` (thread a `commit` flag through the phases)
-
-Implements PLAN.md § 2026-05-24 Scout Phase 3.5 / Interface / `--dry-run` fix. Closes the META known-bug.
-
-**What**
-1. Add `commit: bool = True` to each phase function the orchestrator calls in `scripts/data/populate/`: at minimum the 4 match phases (`populate_matches`, `populate_team_lists`, `populate_player_match_stats`, `populate_timeline_and_officials`) and, for consistency, the others (`populate_rounds`, `backfill_identity`, `populate_people_history`, `reresolve_person_ids`, `populate_player_attributes`, `populate_team_standings`, `populate_stat_leaderboards`, `populate_injuries`). Replace every `db.commit()` — both the final commit AND the per-50-archive checkpoint commits in `phase_stats`/`phase_timeline` — with `if commit: db.commit()`.
-2. Edit `scripts/data/populate_db_from_s3.py`: pass `commit=not args.dry_run` into every phase call. Keep the existing outer `if args.dry_run: db.rollback()`. (With phases no longer committing under dry-run, the outer rollback now actually discards the work.)
-3. Update the `--dry-run` argparse help to: `"Compute counts without committing (phases skip their commits; the transaction is rolled back at the end)."`
-
-**How to verify**
-- A test `tests/unit/scripts/data/populate/test_dry_run_flag.py` (or extend an existing one) asserting that each phase function accepts `commit=False` (signature check via `inspect.signature`) — pure-signature test, no DB.
-- On the box (or any env with the prod DB + S3): `python -m scripts.data.populate_db_from_s3 --phase matches --seasons 2026 --dry-run` followed by `SELECT count(*) FROM matches WHERE season=2026 AND source='nrl_com'` shows **no change** vs. before the dry-run. Capture both counts in proof notes. (This is the load-bearing check that the META bug is fixed.)
-- `grep -n "db.commit()" scripts/data/populate/phase_*.py` shows every occurrence guarded by `if commit:`.
-- Update `docs/build/META.md`: change the "`populate_db_from_s3 --dry-run` is broken" entry to record that it's fixed as of this task (commit-flag threaded; outer rollback now effective).
-- `git status`: modified phase files + orchestrator + META.md + one new/extended test.
-
-**Proof notes**
-_(implementer fills in)_
-
-
 ### TASK-19: Prod populate run + DB verification + docs + run report (Phase 3.5 closure)
 
 Implements PLAN.md § 2026-05-24 Scout Phase 3.5 / Verification (prod populate) + Documentation updates. **Only run after TASK-13→18 are merged and the box has the refactored code.** Runs on the box (needs prod `DATABASE_URL` + S3 creds + deployed code), like the Phase 3 seed. If the box is not yet at the merge commit, tag `[BLOCKED: box not deployed with Phase 3.5 code]` and surface to the human.
