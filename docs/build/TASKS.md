@@ -95,9 +95,11 @@ Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "One-time S3 seed run" + "D
 _(implementer fills in: three curl responses, three aws s3 ls outputs, two SQL query results, doc diff summary, first-cron-fire log line)_
 
 
-### TASK-19: Prod populate run + DB verification + docs + run report (Phase 3.5 closure)
+### [BLOCKED: box not deployed with Phase 3.5 code — box at cf1cddb, needs pull past 68e121e] TASK-19: Prod populate run + DB verification + docs + run report (Phase 3.5 closure)
 
 Implements PLAN.md § 2026-05-24 Scout Phase 3.5 / Verification (prod populate) + Documentation updates. **Only run after TASK-13→18 are merged and the box has the refactored code.** Runs on the box (needs prod `DATABASE_URL` + S3 creds + deployed code), like the Phase 3 seed. If the box is not yet at the merge commit, tag `[BLOCKED: box not deployed with Phase 3.5 code]` and surface to the human.
+
+> **[BLOCKED 2026-05-24]** Checked the box: `git HEAD = cf1cddb` (Phase 3 closure) — behind the Phase 3.5 commits (TASK-13→18, `922b591`…`68e121e`). The box working tree lacks `_extract_stat_rows` and the `commit`-guarded commits, so the populate would run the old un-refactored code AND the `--dry-run` fix wouldn't be present. The prod DB is `127.0.0.1`-only on the box, so it can't be run from elsewhere. **To unblock:** let the box pull master past `68e121e` (its usual deploy lag) or run `scripts/lightsail-deploy.sh`, then re-run TASK-19. (S3 already has 2026 match-centre rounds 1-18+, so there's ample data to project once deployed.)
 
 **What**
 1. On the box, confirm the deployed working tree has the refactored phases (`grep -c _extract_stat_rows /opt/jeromelu/scripts/data/populate/phase_stats.py`). Then run the populate for season 2026 in dependency order — the match phases require `identity` (teams.nrlcom_team_id + people.nrlcom_player_id) and `matches` populated first:
