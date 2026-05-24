@@ -93,6 +93,140 @@ Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "One-time S3 seed run" + "D
 _(implementer fills in: three curl responses, three aws s3 ls outputs, two SQL query results, doc diff summary, first-cron-fire log line)_
 
 
+### TASK-07: D8 model + fixture + unit drift tests for `scout/nrlcom_draw/`
+
+Implements PLAN.md § 2026-05-24 Scout Phase 3 / Interface / nrlcom_draw models + tests.
+
+**What**
+1. Capture a live draw response, pretty-printed, to `tests/fixtures/scout/nrlcom_draw/canonical_response.json`: `curl -s "https://www.nrl.com/draw/data?competition=111&season=$(date -u +%Y)" -H "Accept: application/json" -H "User-Agent: Mozilla/5.0" | python -m json.tool > tests/fixtures/scout/nrlcom_draw/canonical_response.json`. Confirm it's a JSON object with a non-empty `fixtures` list and that every fixture carries `matchCentreUrl`.
+2. Create `services/api/app/scout/nrlcom_draw/models.py` with two strict models (`model_config = ConfigDict(extra="forbid")`), imports top-level: `NrlcomDraw` (envelope — enumerate the exact top-level keys from the captured fixture per PLAN; `fixtures: list[DrawFixture]`) and `DrawFixture` (`matchCentreUrl: str` load-bearing + the other observed fixture keys; keep `homeTeam`/`awayTeam`/`clock`/`callToAction`/`secondaryCallToAction` as `dict[str, Any]` / `... | None`).
+3. Create `tests/unit/api/scout/test_nrlcom_draw_models.py` templated on `tests/unit/api/scout/test_supercoach_settings_models.py`. Use the `fixtures_dir` conftest fixture; `fixture_draw` returns `json.loads(path.read_text(encoding="utf-8"))`. Four tests:
+   - `test_canonical_fixture_parses(fixture_draw)` — `NrlcomDraw.model_validate(fixture_draw)`; assert `len(parsed.fixtures) >= 1`; assert every `f.matchCentreUrl` is a non-empty str.
+   - `test_unknown_top_level_field_raises(fixture_draw)` — `deepcopy`, set `bad["loot_boxes"] = {}`; `ValidationError` contains `"loot_boxes"`.
+   - `test_unknown_fixture_field_raises(fixture_draw)` — set `bad["fixtures"][0]["is_grand_final"] = True`; `ValidationError` contains `"is_grand_final"`.
+   - `test_missing_matchcentreurl_raises(fixture_draw)` — `del bad["fixtures"][0]["matchCentreUrl"]`; `ValidationError` contains `"matchCentreUrl"`.
+
+**How to verify**
+- `pytest tests/unit/api/scout/test_nrlcom_draw_models.py -v` — all four pass.
+- `pytest tests/unit/api/scout/ -v` — full scout unit suite stays green.
+- Fixture is pretty-printed. `git status` shows exactly three new paths: `models.py`, the fixture JSON, the test module.
+
+**Proof notes**
+_(implementer fills in)_
+
+
+### TASK-08: Wire strict-parse into the `nrlcom_draw` route + live integration drift test
+
+Implements PLAN.md § 2026-05-24 Scout Phase 3 / Interface / route changes (draw) + verification.
+
+**What**
+1. Edit `services/api/app/scout/nrlcom_draw/routes.py`: import `NrlcomDraw` from `.models` and `ValidationError` from `pydantic`. **After** the `archive_response(...)` call (raw archived first, for drift forensics), add `NrlcomDraw.model_validate(data)`. On `ValidationError`: set `detail["error"] = f"ValidationError: {e}"`, `record_agent_ended(... status="failed" ...)`, then `raise HTTPException(status_code=500, detail=...)`. On success set `detail["validated"] = True`. Leave the existing `NrlcomDrawFetchError` → 502 path intact.
+2. Create `tests/integration/scout/test_nrlcom_draw_response_shape.py` templated on `tests/integration/scout/test_supercoach_settings_response_shape.py`. `test_live_nrlcom_draw_shape`, gated on `SCOUT_DRIFT_LIVE=1`: `fetch_draw(competition=111, season=date.today().year)` → `NrlcomDraw.model_validate(raw)`; wrap in `try/except (NrlcomDrawFetchError, ValidationError)` → `pytest.fail(...)` with a fix-path message naming `app.scout.nrlcom_draw.models` and the fixture path. Sanity: `len(parsed.fixtures) >= 1`, every fixture has `matchCentreUrl`.
+
+**How to verify**
+- Skip mode: `pytest tests/integration/scout/test_nrlcom_draw_response_shape.py -v` → 1 skipped.
+- Live: `SCOUT_DRIFT_LIVE=1 pytest ... -v` → 1 passed.
+- Wiring: with the API running, `make scout-nrlcom-draw COMPETITION=111 SEASON=<yr> API=http://localhost:8000 ADMIN_KEY=...` returns `ok:true` + `validated:true`; temporarily add an unmodeled required field to `NrlcomDraw` → the call 500s and the live test fails naming it; revert.
+- `git status`: one modified (`routes.py`) + one new (integration test).
+
+**Proof notes**
+_(implementer fills in)_
+
+
+### TASK-09: D8 envelope model + fixture + unit drift tests for `scout/nrlcom_match_centre/`
+
+Implements PLAN.md § 2026-05-24 Scout Phase 3 / Interface / nrlcom_match_centre model + tests.
+
+**What**
+1. Capture a live match-centre response, pretty-printed, to `tests/fixtures/scout/nrlcom_match_centre/canonical_response.json`: resolve a real `matchCentreUrl` from the draw (prefer a completed `FullTime` match so lineups/stats/timeline are populated), then `curl -s "https://www.nrl.com{matchCentreUrl}data/" -H "Accept: application/json" -H "User-Agent: Mozilla/5.0" | python -m json.tool > ...`. ~100KB; **do not trim**. Confirm it's a JSON object with `matchId` and the full top-level key set.
+2. Create `services/api/app/scout/nrlcom_match_centre/models.py`: `NrlcomMatchCentre(BaseModel)`, `ConfigDict(extra="forbid")`, **envelope only** — enumerate the ~29 top-level keys with their observed JSON types (opaque containers `dict[str, Any]` / `list[Any]`; scalars typed; nullable where observed). Deep nesting stays opaque (rich data, archived raw). Imports top-level.
+3. Create `tests/unit/api/scout/test_nrlcom_match_centre_models.py` templated on the settings unit test. `fixture_match_centre` returns `json.loads(...)`. Three tests:
+   - `test_canonical_fixture_parses(fixture_match_centre)` — `NrlcomMatchCentre.model_validate(...)`; assert `parsed.matchId`; assert `isinstance(parsed.timeline, list)`; assert `isinstance(parsed.stats, dict)`.
+   - `test_unknown_top_level_field_raises` — set `bad["is_replay"] = True`; `ValidationError` contains `"is_replay"`.
+   - `test_missing_matchid_raises` — `del bad["matchId"]`; `ValidationError` contains `"matchId"`.
+
+**How to verify**
+- `pytest tests/unit/api/scout/test_nrlcom_match_centre_models.py -v` — all pass.
+- Full scout unit suite green. Fixture pretty-printed. `git status`: three new paths (model, fixture, test).
+
+**Proof notes**
+_(implementer fills in)_
+
+
+### TASK-10: Wire strict-parse (non-aborting) + round-optional resolution into the `nrlcom_match_centre` route + live drift test
+
+Implements PLAN.md § 2026-05-24 Scout Phase 3 / Interface / route changes (match-centre) + verification.
+
+**What**
+1. Edit `services/api/app/scout/nrlcom_match_centre/routes.py`:
+   - Make round optional: `round: int | None = Query(default=None, ...)` on the endpoint and `run_nrlcom_match_centre(..., round: int | None = None)`. When `round is None`, after the first `fetch_draw(competition, season, round=None)` set `round = draw.get("selectedRoundId")` and record `detail["resolved_round"]`. If still `None` → `HTTPException(502, "could not resolve current round")`.
+   - Import `NrlcomMatchCentre` + `ValidationError`. After each per-match `archive_response(...)`, `NrlcomMatchCentre.model_validate(match_data)` inside the per-match `try`; on `ValidationError` append `{"slug": slug, "error": str(e)}` to a new `validation_failures` list — **do not abort the walk**. Add `detail["validation_failures"]` and include its count in the completed `summary_text`.
+2. Edit the `scout-nrlcom-match-centre` Makefile target: remove the `ifndef ROUND` error and conditionalise round in the URL (`$(if $(ROUND),&round=$(ROUND))`), so the target works with ROUND omitted (cron uses current-round resolution). Keep `ifndef SEASON`.
+3. Create `tests/integration/scout/test_nrlcom_match_centre_response_shape.py` templated on the settings integration test. `test_live_nrlcom_match_centre_shape`, gated on `SCOUT_DRIFT_LIVE=1`: `fetch_draw(111, date.today().year)` → first fixture's `matchCentreUrl` → `fetch_match_centre(...)` → `NrlcomMatchCentre.model_validate(raw)`; wrap in `try/except (NrlcomMatchCentreFetchError, NrlcomDrawFetchError, ValidationError)` → `pytest.fail(...)` naming `app.scout.nrlcom_match_centre.models`. Sanity: `parsed.matchId` present.
+
+**How to verify**
+- Skip mode: 1 skipped. Live: `SCOUT_DRIFT_LIVE=1 pytest ... -v` → 1 passed.
+- Round resolution: `make scout-nrlcom-match-centre COMPETITION=111 SEASON=<yr>` (no ROUND) returns `ok:true`, `detail.resolved_round` set, `matches_archived >= 1`.
+- Wiring: pollute `NrlcomMatchCentre` (bogus required field) → live test fails naming it, and a local seed run reports non-empty `validation_failures`; revert.
+- `git status`: two modified (`routes.py`, `Makefile`) + one new (integration test).
+
+**Proof notes**
+_(implementer fills in)_
+
+
+### TASK-11: Cron — extend `scripts/scout-refresh.sh` + add daily cron lines for nrlcom draw + match-centre
+
+Implements PLAN.md § 2026-05-24 Scout Phase 3 / Interface / Cron.
+
+**What**
+1. Edit `scripts/scout-refresh.sh` `case "$JOB"` block: add
+   - `nrlcom-draw)         ENDPOINT="nrlcom-draw?competition=111&season=$(date -u +%Y)" ;;`
+   - `nrlcom-match-centre) ENDPOINT="nrlcom-match-centre?competition=111&season=$(date -u +%Y)" ;;`
+   Update the `echo "usage: ..."` message and the file-header `# Usage:` comment to include the two new jobs. The URL template appends `${ENDPOINT}` verbatim, so the query string rides along; round is omitted → resolved server-side. No other changes (curl block / `--resolve` / `--max-time` / log-line format untouched).
+2. Edit `scripts/cron.d/jeromelu`: add two daily lines after the SC settings block, preserving the comment style:
+   ```cron
+   # Daily nrl.com draw refresh — 18:00 UTC = 04:00 AEST. Current-round fixtures for
+   # NRL (111), current season. Archives scout/nrlcom/draw/111/{season}/round-NN.json.
+   0 18 * * *      ubuntu  /opt/jeromelu/scripts/scout-refresh.sh nrlcom-draw
+
+   # Daily nrl.com match-centre walk — 18:15 UTC = 04:15 AEST. Walks the current
+   # round's fixtures, archives each match's full JSON. Round resolved server-side.
+   15 18 * * *     ubuntu  /opt/jeromelu/scripts/scout-refresh.sh nrlcom-match-centre
+   ```
+
+**How to verify**
+- `bash -n scripts/scout-refresh.sh` — clean.
+- Dry-run: `JOB=nrlcom-draw ADMIN_KEY=test bash -x scripts/scout-refresh.sh nrlcom-draw 2>&1 | head` shows `ENDPOINT=nrlcom-draw?competition=111&season=<yr>` and `API_URL=.../api/admin/scout/nrlcom-draw?competition=111&season=<yr>`, curl reached. Same for `nrlcom-match-centre`.
+- Cron lines: 5 timing fields, user `ubuntu`, absolute path each. `grep -n cron.d/jeromelu scripts/lightsail-deploy.sh` confirms the deploy sync.
+- `git status`: two modified (wrapper + crontab).
+
+**Proof notes**
+_(implementer fills in)_
+
+
+### TASK-12: One-time prod seed + S3 verification + docs + run report (Phase 3 closure)
+
+Implements PLAN.md § 2026-05-24 Scout Phase 3 / Verification + Documentation updates. **Only run after TASK-07 → TASK-11 are merged.** Mirrors the Phase 2.5 closure (TASK-06). `ADMIN_KEY` comes from the prod box (SSM denies `GetParameter` to the human user, per META); on-box admin calls need `--resolve api.jeromelu.ai:443:127.0.0.1`.
+
+**What**
+1. Seed current season / current round against prod (on the box, loopback). Round omitted → resolved server-side:
+   - `POST /api/admin/scout/nrlcom-draw?competition=111&season=2026`
+   - `POST /api/admin/scout/nrlcom-match-centre?competition=111&season=2026`
+   Capture both responses — draw `ok:true` + `s3_archive_key` + `validated:true`; match-centre `ok:true` + `resolved_round` + `matches_archived` + `validation_failures` (expect empty).
+2. Verify S3: `aws s3 ls s3://jeromelu-clean-documents/scout/nrlcom/draw/111/2026/` shows `round-NN.json` today-dated; `aws s3 ls s3://jeromelu-clean-documents/scout/nrlcom/match-centre/111/2026/round-NN/` shows per-match keys today-dated.
+3. Docs: add `## Tests` sections to both pipeline READMEs + update cadence to "daily cron (current round)"; flip `docs/agents/crew/scout/roadmap.md` Phase 3 ingest → ✅ Shipped (note extractors deferred to Phase 3.5); flip the nrl.com draw + match-centre Status cells in `docs/agents/crew/scout/charter.md` (if present); generate S3 profile docs for `scout/nrlcom/draw/` and `scout/nrlcom/match-centre/` via `scripts/profile_s3_json.py`.
+4. Create + finalise the run report `docs/build/runs/2026-05-24-scout-phase-3-nrlcom-ingest.md` (per-task account + verification + decisions + lessons), add its index row, then **remove the Phase 3 plan from PLAN.md "Active plan" and clear TASK-07 → TASK-12 from TASKS.md** (run-report ritual).
+5. The recurring-cron first-fire check (daily 18:00 / 18:15 UTC) — record in the run report once observed; defer like Phase 2.5 if not yet fired.
+
+**How to verify**
+- Two seed calls return `ok:true` with archive keys / counts. Two `aws s3 ls` show today-dated keys.
+- Doc diffs are status-flips + generated profiles only.
+- Run report exists + indexed; PLAN Active no longer lists Phase 3; TASKS.md has no TASK-07 → TASK-12.
+
+**Proof notes**
+_(implementer fills in)_
+
+
 ---
 
 ## Completed work
