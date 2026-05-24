@@ -141,6 +141,54 @@ def _build_player_meta_map(payload: dict[str, Any]) -> dict[int, dict[str, Any]]
     return meta
 
 
+def _extract_stat_rows(
+    payload: dict[str, Any],
+    key: str,
+    match_id: str,
+    team_map: dict[int, str],
+    player_map: dict[int, str],
+) -> list[dict[str, Any]]:
+    """Pure projection of one match-centre archive into player_match_stats rows.
+
+    One row per player in `stats.players.{homeTeam,awayTeam}[]`. Identity is
+    resolved via the passed-in maps; jersey/position/on-field come from the
+    roster meta (`_build_player_meta_map`). No S3, no DB — mirrors the
+    `phase_matches._extract_one` template so it's unit-testable.
+    """
+    match_ext = str(payload.get("matchId") or "").strip()
+    player_meta = _build_player_meta_map(payload)
+    stats_block = (payload.get("stats") or {}).get("players") or {}
+
+    rows: list[dict[str, Any]] = []
+    for side_key in ("homeTeam", "awayTeam"):
+        for s in stats_block.get(side_key) or []:
+            nrlcom_player_id = s.get("playerId")
+            if nrlcom_player_id is None:
+                continue
+            meta = player_meta.get(int(nrlcom_player_id)) or {}
+            person_id = player_map.get(int(nrlcom_player_id))
+            team_id = team_map.get(meta.get("nrlcom_team_id"))
+
+            row = {
+                "match_id": match_id,
+                "nrlcom_match_id": match_ext,
+                "nrlcom_player_id": int(nrlcom_player_id),
+                "person_id": person_id,
+                "team_id": team_id,
+                "nrlcom_team_id": meta.get("nrlcom_team_id"),
+                "is_home": meta.get("is_home", side_key == "homeTeam"),
+                "jersey_number": meta.get("jersey_number"),
+                "position": meta.get("position"),
+                "is_on_field": meta.get("is_on_field"),
+                "raw_payload": json.dumps(s, default=str),
+                "s3_archive_key": key,
+            }
+            for src, dst in _FIELD_MAP.items():
+                row[dst] = s.get(src)
+            rows.append(row)
+    return rows
+
+
 def populate_player_match_stats(
     db: Session,
     *,
@@ -208,41 +256,21 @@ def populate_player_match_stats(
             continue
         match_id = match_map[match_ext]
 
+        # Diagnostic: players in the stats block missing from the roster meta.
         player_meta = _build_player_meta_map(payload)
         stats_block = (payload.get("stats") or {}).get("players") or {}
-
         for side_key in ("homeTeam", "awayTeam"):
             for s in stats_block.get(side_key) or []:
-                nrlcom_player_id = s.get("playerId")
-                if nrlcom_player_id is None:
-                    continue
-                meta = player_meta.get(int(nrlcom_player_id)) or {}
-                if not meta:
+                pid = s.get("playerId")
+                if pid is not None and int(pid) not in player_meta:
                     players_no_meta += 1
-                person_id = player_map.get(int(nrlcom_player_id))
-                team_id = team_map.get(meta.get("nrlcom_team_id"))
 
-                row = {
-                    "match_id": match_id,
-                    "nrlcom_match_id": match_ext,
-                    "nrlcom_player_id": int(nrlcom_player_id),
-                    "person_id": person_id,
-                    "team_id": team_id,
-                    "nrlcom_team_id": meta.get("nrlcom_team_id"),
-                    "is_home": meta.get("is_home", side_key == "homeTeam"),
-                    "jersey_number": meta.get("jersey_number"),
-                    "position": meta.get("position"),
-                    "is_on_field": meta.get("is_on_field"),
-                    "raw_payload": json.dumps(s, default=str),
-                    "s3_archive_key": key,
-                }
-                for src, dst in _FIELD_MAP.items():
-                    row[dst] = s.get(src)
-                res = db.execute(upsert_sql, row)
-                if res.scalar():
-                    rows_inserted += 1
-                else:
-                    rows_updated += 1
+        for row in _extract_stat_rows(payload, key, match_id, team_map, player_map):
+            res = db.execute(upsert_sql, row)
+            if res.scalar():
+                rows_inserted += 1
+            else:
+                rows_updated += 1
 
         if archives_read % 50 == 0:
             db.commit()  # checkpoint so a crash doesn't lose 408 archives' work
