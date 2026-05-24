@@ -55,13 +55,13 @@ Same pattern applied to `fetch_player_stats.py`. This is the **highest-leverage 
 - Admin endpoint + cron (post-round cadence, plus on-demand for re-pulls).
 - The existing `services/worker-scraper/` Temporal worker can stop being touched after this; its activities are now sibling Scout modules.
 
-### Phase 2.5 — Bronze (S3-first) retrofit ✅ + lightweight SC siblings (In design)
+### Phase 2.5 — Bronze (S3-first) retrofit ✅ + lightweight SC siblings ✅ Shipped
 
-The **bronze/S3-first retrofit is done** — `scout/supercoach_roster/` and `scout/supercoach_stats/` now archive the raw response to S3 (D10) and strict-parse it (D8) before DB extraction (`_s3_archive.archive_response`; `s3_archive_key` recorded per run). Remaining 2.5 work is the small SC siblings:
+The **bronze/S3-first retrofit is done** — `scout/supercoach_roster/` and `scout/supercoach_stats/` archive the raw response to S3 (D10) and strict-parse it (D8) before DB extraction (`_s3_archive.archive_response`; `s3_archive_key` recorded per run). The lightweight SC siblings **shipped 2026-05-24**:
 
-- New `scout/supercoach_teams/` — tiny (17 rows, ~3KB), weekly cadence, cross-references `teams.metadata_json.supercoach`.
-- New `scout/supercoach_settings/` — captures SC game rules (lockouts, scoring config, captains/emergencies/dual-position rules) per season; weekly.
-- Run once with current season → S3 archive is complete for the SC surface.
+- ✅ Shipped: `scout/supercoach_teams/` — tiny (17 rows, ~3KB), weekly cron (Mon 23:30 UTC), S3 archive at `scout/supercoach/classic/teams/{season}.json`, cross-references `teams.metadata_json.supercoach` (17/17 NRL clubs matched on the seed run). D8 fixture + unit + env-flagged live drift tests.
+- ✅ Shipped: `scout/supercoach_settings/` — captures SC game rules (lockouts, scoring config, captains/emergencies/dual-position rules) per season; weekly cron (Mon 23:35 UTC, classic mode), S3 archive at `scout/supercoach/{mode}/settings/{season}/{YYYYMMDD}.json`, DB snapshots into `sc_settings`. Draft mode stays on-demand. D8 fixture + unit + live (classic + draft) drift tests.
+- ✅ Done: one-time S3 seed for season 2026 (classic teams + classic/draft settings) — S3 archives and `sc_settings` rows verified 2026-05-24.
 
 ### Phase 3 — NRL.com draw + match-centre (the big unlock) — In design
 

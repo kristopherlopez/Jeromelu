@@ -31,3 +31,8 @@ keys is treated as opaque (this is rules data, evolves slowly).
 
 Per D7: unique on `(season, captured_date, mode)`. Same-day re-runs are a no-op
 upsert. New day → new row → preserves daily history.
+
+## Tests
+
+- `tests/unit/api/scout/test_supercoach_settings_models.py` — always-on D8 drift unit tests against the checked-in canonical fixture (`tests/fixtures/scout/supercoach_settings/canonical_response.json`): canonical parse plus the load-bearing top-level envelope-guard negatives (unknown top-level key, missing required group).
+- `tests/integration/scout/test_supercoach_settings_response_shape.py` — env-flagged live drift test (`SCOUT_DRIFT_LIVE=1`), parameterised over `classic` and `draft` modes; hits the real `/settings` endpoint and strict-parses the top-level envelope. Skipped in CI by default. Draft mode is the only guardrail against silent draft breakage (prod cron runs `classic` only). Per D8 the agent does not auto-adapt.
