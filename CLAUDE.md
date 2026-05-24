@@ -75,4 +75,4 @@ Three tiers under `tests/` — see `tests/README.md` for the full layout map:
 - `tests/integration/` — DB / S3 / external infra required. Empty placeholder for now.
 - `tests/evals/` — DeepEval LLM-graded suites. Costs $$ per run. Run with `make test-eval`.
 
-When adding a test, mirror the source path under the matching tier. Pytest's `pythonpath` is preconfigured in `pytest.ini` for `services/api` and `packages/shared`, so imports like `from app.routers.admin import _stitch_segments` and `from jeromelu_shared.scraping.nrl import normalize_team` resolve without further setup. Dev-only deps live in the root `requirements-dev.txt`.
+When adding a test, mirror the source path under the matching tier. Pytest's `pythonpath` is preconfigured in `pytest.ini` for `services/api`, `packages/shared`, and the repo root, so imports like `from app.routers.admin import _stitch_segments`, `from jeromelu_shared.scraping.nrl import normalize_team`, and `from scripts.data.populate.phase_matches import _extract_one` resolve without further setup. Dev-only deps live in the root `requirements-dev.txt`.
