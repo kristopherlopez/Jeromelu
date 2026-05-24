@@ -3,7 +3,7 @@
 # Used by cron (scripts/cron.d/jeromelu) to refresh channel and video
 # metrics on a schedule.
 #
-# Usage: scout-refresh.sh {channel-stats|videos}
+# Usage: scout-refresh.sh {channel-stats|videos|supercoach-teams|supercoach-settings}
 #
 # Sources /opt/jeromelu/.env to pick up ADMIN_KEY. ALWAYS appends a
 # status line to /var/log/jeromelu/scout-refresh.log — including on
@@ -31,7 +31,9 @@ JOB="${1:-}"
 case "$JOB" in
   channel-stats) ENDPOINT="refresh-channel-stats" ;;
   videos)        ENDPOINT="refresh-videos" ;;
-  *) echo "usage: $0 {channel-stats|videos}" >&2; exit 2 ;;
+  supercoach-teams)    ENDPOINT="supercoach-teams" ;;
+  supercoach-settings) ENDPOINT="supercoach-settings" ;;
+  *) echo "usage: $0 {channel-stats|videos|supercoach-teams|supercoach-settings}" >&2; exit 2 ;;
 esac
 
 # shellcheck disable=SC1091

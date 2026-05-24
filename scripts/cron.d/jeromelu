@@ -30,6 +30,16 @@ MAILTO=""
 # has 1-day resolution; comfortably under the 10k daily quota even at peak.
 15 23 * * *     ubuntu  /opt/jeromelu/scripts/scout-refresh.sh videos
 
+# Weekly SuperCoach teams refresh — Mondays 23:30 UTC = Tuesday 09:30 AEST.
+# Tiny payload (17 rows, ~3KB). Refreshes teams.metadata_json.supercoach
+# via /api/admin/scout/supercoach-teams. Audit row under agent_id='scout'.
+30 23 * * 1     ubuntu  /opt/jeromelu/scripts/scout-refresh.sh supercoach-teams
+
+# Weekly SuperCoach settings snapshot — Mondays 23:35 UTC = Tuesday 09:35 AEST.
+# ~15KB payload. Captures game rules per season into sc_settings (classic
+# mode only — draft is on-demand via make scout-supercoach-settings MODE=draft).
+35 23 * * 1     ubuntu  /opt/jeromelu/scripts/scout-refresh.sh supercoach-settings
+
 # Nightly Postgres backup — 16:30 UTC = 02:30 AEST / 03:30 AEDT.
 # Streams pg_dump from the postgres container to s3://jeromelu-public-assets/
 # backups/postgres/. Retention via S3 lifecycle (14d). The wrapper writes its
