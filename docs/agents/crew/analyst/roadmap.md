@@ -27,10 +27,11 @@ Status labels:
 | Transcript materialisation (Lineup) | `transcribe.py` + GPU stack, in-repo | **Shipped but legacy** | [A2](charter.md#a2-lineup-is-a-service-boundary-not-a-sub-module) · [A8](charter.md#a8-disposition-of-the-in-repo-lineup-code--legacy-not-deleted) |
 | Speaker identification (Lineup) | voice + face + fusion, in-repo | **Shipped but legacy** | [A2](charter.md#a2-lineup-is-a-service-boundary-not-a-sub-module) · [A8](charter.md#a8-disposition-of-the-in-repo-lineup-code--legacy-not-deleted) |
 | Cleaning | `/clean-transcript`; `update-clean-text` backfill endpoint | Skill-driven | [A4](charter.md#a4-cleaning--skill-validated-then-workerised) |
+| Referential resolution (coref · claim-source · entity) | implicit in `/process-transcript` | Not a discrete pass | [A9](charter.md#a9-referential-resolution--attribution-is-claim-level-not-turn-level) |
 | Chapter detection | `/analyse-transcript` | Skill-driven | — |
 | Annotation | — | Not built | — |
 | Embedding | — | Not built | [Open Q2](charter.md#open-questions) |
-| Entity / quote / claim extraction | `/process-transcript` → `/verify-claims` → `/upload-transcript` | Skill-driven | [A5](charter.md#a5-extraction--skill-validated-then-workerised-llm-graded) |
+| Entity / quote / claim extraction & shaping | `/process-transcript` → `/verify-claims` → `/upload-transcript` | Skill-driven | [A5](charter.md#a5-extraction--skill-validated-then-workerised-llm-graded) · [A10](charter.md#a10-claims-carry-falsifiability--resolution-criteria) |
 | Cross-reference / consensus | — | Not built | [A6](charter.md#a6-consensus--contradiction-detection-is-semantic-not-numeric) |
 
 ---
@@ -66,14 +67,18 @@ Promoting Analyst's durable scope from skill experiments to production. Every pa
 
 ### T1 — Cleaning worker — Planned
 
-- Encode the [`/clean-transcript`](../../skills/transcript-pipeline.md) skill as a shared pure module + a worker pass.
+- Encode the [`/clean-transcript`](../../skills/transcript-pipeline.md) skill as a shared pure module + a worker pass, covering the [charter A4](charter.md#a4-cleaning--skill-validated-then-workerised) contention points (garbled/Polynesian names, nicknames+initials, SC jargon, number typing, filler).
 - Lock a cleaning-fidelity eval (does it fix garbles without "correcting" legitimate NRL slang like *PVL*?).
+- **Prerequisites:** the alias table (`people.aliases`) and a SuperCoach jargon lexicon — both currently absent (see [Backlog](#backlog)). Cleaning quality is capped by these registries.
 - **Open loop:** the cleaning pass shares `data/players.yaml` with SuperCoach roster regeneration. Rehoming it (read the roster from the DB) unblocks retirement of the legacy `scrape-supercoach` skill — see [Scout Phase 1 plan](../scout/plans/phase-1-supercoach-roster.md). ([charter A4](charter.md#a4-cleaning--skill-validated-then-workerised))
 
-### T2 — Extraction worker — Planned
+### T2 — Referential resolution + extraction & shaping worker — Planned
 
 - Encode the [`/process-transcript`](../../skills/transcript-pipeline.md) → [`/verify-claims`](../../system/extraction.md) → [`/upload-transcript`](../../skills/transcript-pipeline.md) chain into `services/worker-extraction/` (skeleton today).
-- **Gated by a DeepEval suite** locking acceptable claim precision/recall on a graded corpus ([charter A5](charter.md#a5-extraction--skill-validated-then-workerised-llm-graded)). No worker ships ahead of its eval.
+- **Split referential resolution out as its own step + eval slice** ([charter A9](charter.md#a9-referential-resolution--attribution-is-claim-level-not-turn-level)): coreference, claim-source-vs-speaker, same-surname disambiguation, positional + time-dependent entity resolution. Needs a dedicated eval because the claim *text* reads fine when only the subject/source is wrong — the extraction eval won't catch it.
+- **Claim shaping** ([charter A5](charter.md#a5-extraction--skill-validated-then-workerised-llm-graded)): banter filter, stance ownership, strength/polarity from hedging/negation, temporal anchor, dedup.
+- **Falsifiability + resolution capture** ([charter A10](charter.md#a10-claims-carry-falsifiability--resolution-criteria)): mark resolvable predictions and their resolution criterion + horizon — the fields the ledger grades against. Requires the schema additions in [Backlog](#backlog).
+- **Gated by a DeepEval suite** locking acceptable claim precision/recall on a graded corpus. No worker ships ahead of its eval.
 - Audited per [charter A7](charter.md#a7-audit--agent_idanalyst-pass-discriminator-in-detail_json) (`agent_id='analyst'`, `detail_json.pass='extract'`). See [extraction-worker](../../../todo/extraction-worker.md).
 
 ### T3 — Embedding pass — In design
@@ -104,7 +109,9 @@ Additive items that layer on the tracks above, pulled from the [transcription-pi
 | Item | Track | Notes |
 |---|---|---|
 | `agent_runs` rows for the transcription path | — | Not retrofitted — the path is legacy ([charter A8](charter.md#a8-disposition-of-the-in-repo-lineup-code--legacy-not-deleted)). New passes adopt audit from day one ([A7](charter.md#a7-audit--agent_idanalyst-pass-discriminator-in-detail_json)). |
-| Player alias backfill (`people.aliases`) | T1/T2 | Empty today; populating improves keyterm coverage for nicknames and cleaning accuracy — the biggest single keyterm-pool win. |
+| Player alias / nickname table (`people.aliases`) | T1/T2 | Empty today; the registry behind nickname/initial resolution (DCE, RTS, "Nicho", "Turbo") and same-surname disambiguation. Biggest single cleaning + keyterm win ([charter A4](charter.md#a4-cleaning--skill-validated-then-workerised), [A9](charter.md#a9-referential-resolution--attribution-is-claim-level-not-turn-level)). |
+| SuperCoach jargon lexicon | T1/T2 | Not built. Maps BE/POD/donut/ton/loophole/team-slang → canonical concept. Parallel to the player registry; gates cleaning + extraction quality ([charter A4](charter.md#a4-cleaning--skill-validated-then-workerised)). |
+| Falsifiability + resolution schema | T2 | `claims` needs fields for the falsifiability flag, resolution criterion, and horizon ([charter A10](charter.md#a10-claims-carry-falsifiability--resolution-criteria)) — the columns the ledger grades against. Design intent; not in schema yet. |
 | Topic-targeted keyterms | (Lineup) | Per-source keyterms from title/description/channel focus instead of the global roster pool. Lives with the transcription producer — moves out with Lineup. |
 | Backfill legacy `source_chunks_v1` (221k auto-caption chunks) | T1/T2 | Re-clean + re-extract highest-leverage channels first. |
 | "Analyst health" admin panel | T-all | Per-pass run counts, cost, latency from `agent_runs` filtered by `agent_id='analyst'`. Parallels the Scout dashboard. |
@@ -116,7 +123,7 @@ Additive items that layer on the tracks above, pulled from the [transcription-pi
 
 - [README.md](README.md) — Analyst's identity, scope, and voice
 - [architecture.md](architecture.md) — pipeline position, hand-off contract, pass chain, current-vs-target
-- [charter.md](charter.md) — locked design decisions A1–A8
+- [charter.md](charter.md) — locked design decisions A1–A10
 - [Lineup status](README.md#lineup-status) — the in-repo (now legacy) speaker-ID phase ledger
 - [Speaker identification plan](../../../todo/speaker-identification-plan.md) — full Lineup phase ledger and tuning notes
 - [Extraction worker](../../../todo/extraction-worker.md) — claim-extraction worker tasks and local experimentation plan

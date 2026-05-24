@@ -4,7 +4,7 @@ tags: [area/architecture, subarea/agents]
 
 # Analyst Charter
 
-> Last reviewed: 2026-05-24. **Decisions A1–A8 below; A2 (Lineup is a service boundary) locked 2026-05-23.**
+> Last reviewed: 2026-05-24. **Decisions A1–A10 below; A2 (Lineup is a service boundary) locked 2026-05-23.**
 >
 > The decision record for Analyst's scope. Where the [Scout charter](../scout/charter.md) *expands* one agent to own all external acquisition, this charter does the opposite: it **draws a boundary that sheds work**. Analyst's largest current surface — *Lineup* (transcript materialisation + speaker identification: pyannote, Deepgram, voice/face/fusion, the GPU stack) — is being moved **out of this repo** into an external service. What remains, and what this charter formalises, is Analyst's durable identity: **the interpretive layer** — the agent that turns a speaker-attributed transcript into *meaning* (cleaning, embedding, entity/quote/claim extraction, cross-source consensus and contradiction detection).
 
@@ -31,11 +31,12 @@ It does **not** change what Scout, Bookkeeper, Critic, or the Archivist do. It o
 
 | Pass | What it produces | Status | Surface today |
 |---|---|---|---|
-| **Cleaning** | `source_documents.cleaned_text`, `source_chunks.clean_text` — garbles fixed, restarts merged, filler normalised against the player registry + NRL domain knowledge | Skill-driven | [`/clean-transcript`](../../skills/transcript-pipeline.md); `update-clean-text` admin endpoint backfills from S3 |
+| **Cleaning** | `source_documents.cleaned_text`, `source_chunks.clean_text` — garbles fixed, names/nicknames + SC jargon + numbers normalised, restarts merged, filler stripped ([A4](#a4-cleaning--skill-validated-then-workerised)) | Skill-driven | [`/clean-transcript`](../../skills/transcript-pipeline.md); `update-clean-text` admin endpoint backfills from S3 |
+| **Referential resolution** | coreference, claim-source attribution, entity disambiguation (brothers / positional / time-dependent) — resolves what the words *point to* before meaning is extracted ([A9](#a9-referential-resolution--attribution-is-claim-level-not-turn-level)) | Not built (implicit in skill extraction today) | within [`/process-transcript`](../../skills/transcript-pipeline.md) |
 | **Chapter detection** | `source_chapters` — semantic chapters that scope claim extraction | Skill-driven | [`/analyse-transcript`](../../skills/analyse-transcript.md) |
 | **Annotation** | `source_annotations` — sentiment, sub-topic tags, entity mentions, themes | Not built | — |
 | **Embedding** | `source_chunks.embedding` — text embeddings for retrieval (distinct from the voice/face embeddings Lineup writes) | Not built | — |
-| **Entity / quote / claim extraction** | `quotes`, `claims`, `claim_chunks`, `claim_associations` — multi-pass LLM extraction with automated verification | Skill-driven | [`/process-transcript`](../../skills/transcript-pipeline.md), [`/verify-claims`](../../system/extraction.md), [`/upload-transcript`](../../skills/transcript-pipeline.md) |
+| **Entity / quote / claim extraction** | `quotes`, `claims`, `claim_chunks`, `claim_associations` — multi-pass LLM extraction with stance/strength shaping, dedup, falsifiability + resolution capture ([A10](#a10-claims-carry-falsifiability--resolution-criteria)), and automated verification | Skill-driven | [`/process-transcript`](../../skills/transcript-pipeline.md), [`/verify-claims`](../../system/extraction.md), [`/upload-transcript`](../../skills/transcript-pipeline.md) |
 | **Cross-reference / consensus** | `consensus_snapshots` — *semantic* consensus shifts and contradictions across sources ("4 say sell, 1 says hold") | Not built | [consensus-engine](../../../todo/consensus-engine.md) |
 
 Every one of these reads a transcript and writes a *derivative of meaning*. None of them acquires raw bytes (Scout/bronze), and none of them does the structural audio→attributed-transcript transform (Lineup, externalising — see [A2](#a2-lineup-is-a-service-boundary-not-a-sub-module)).
@@ -54,7 +55,7 @@ For the exact tables Analyst reads and writes per pass, see [architecture.md § 
 
 ## How it works
 
-The pass chain (receive attributed transcript → clean → chapter/annotate → embed → extract claims/quotes → verify → cross-reference) and the current-vs-target architecture (in-repo legacy Lineup + Claude Code skills today; external Lineup API + workerised passes tomorrow) live in [architecture.md](architecture.md). In brief: each pass is an idempotent transform over the previous pass's output, validated first as a Claude Code skill and then workerised, with LLM passes gated by eval suites ([A5](#a5-extraction--skill-validated-then-workerised-llm-graded)) rather than the drift tests Scout's deterministic fetchers use.
+The pass chain (receive attributed transcript → clean → resolve references → chapter/annotate → embed → extract & shape claims/quotes → verify → cross-reference) and the current-vs-target architecture (in-repo legacy Lineup + Claude Code skills today; external Lineup API + workerised passes tomorrow) live in [architecture.md](architecture.md). In brief: each pass is an idempotent transform over the previous pass's output, validated first as a Claude Code skill and then workerised, with LLM passes gated by eval suites ([A5](#a5-extraction--skill-validated-then-workerised-llm-graded)) rather than the drift tests Scout's deterministic fetchers use.
 
 ---
 
@@ -64,7 +65,7 @@ The full forward plan lives in [roadmap.md](roadmap.md). Two tracks run in paral
 
 ---
 
-## Decisions register (A1–A8)
+## Decisions register (A1–A10)
 
 > The Analyst decision record. Prefixed **A** to disambiguate from Scout's **D**-series (a bare "per D8" always means Scout). Cited by number across the repo (`per A2`, `per A5`, …).
 
@@ -104,7 +105,16 @@ Because Analyst consumes the *contract* and not the producer, the Lineup externa
 
 ### A4. Cleaning — skill-validated, then workerised
 
-**Decision: validate the cleaning approach as a Claude Code skill before committing worker code.** Cleaning fixes auto-caption garbles (mangled player names, NRL-term errors), merges false-start restarts, and normalises filler, reading the canonical player registry and NRL domain knowledge. It writes `source_documents.cleaned_text` and `source_chunks.clean_text`.
+**Decision: validate the cleaning approach as a Claude Code skill before committing worker code.** Cleaning normalises the *surface* of the transcript — the ASR + NRL-domain mess — so every later pass reads clean text. It reads the canonical player registry and NRL domain knowledge, and writes `source_documents.cleaned_text` and `source_chunks.clean_text`.
+
+**What the cleaning pass must contend with** — each is a recurring normalisation rule, not a one-off fix:
+
+- **Garbled player names** — auto-caption mangles Polynesian / Māori names especially (Tuipulotu, Fonua-Blake, Nofoaluma, Papali'i, To'o, Suaalii). Highest-frequency error class.
+- **Nicknames + initials** — "DCE", "RTS", "JWH", "Nicho" (Hynes), "Turbo", "Teddy", "Foxx". Resolved against a **managed alias table** (`people.aliases` — empty today; populating it is the single biggest accuracy win, see [roadmap backlog](roadmap.md#backlog)).
+- **SuperCoach jargon → canonical concept** — BE (breakeven), POD (point of difference), donut (zero score), ton (100+), loophole / captain's loophole, ceiling/floor, rage trade, the bye; team slang (cows, chooks, green machine). A **domain lexicon** parallel to the player registry.
+- **Number typing** — the same digits mean different things: SuperCoach score vs price ($) vs breakeven vs minutes vs real-life stat (tries/tackles). ASR also renders "fifty-eight" / "58" inconsistently.
+- **Filler, false starts, self-corrections** — strip disfluency ("like, you know") and merge retractions ("I'd start, no — I'd bench him") without losing meaning.
+- **Protect legitimate slang** — do *not* "correct" real NRL terms (e.g. *PVL*) into dictionary words.
 
 Today this is the [`/clean-transcript`](../../skills/transcript-pipeline.md) skill; the `POST /api/admin/update-clean-text` endpoint backfills `clean_text` onto existing chunks from a cleaned S3 document. Workerisation waits until the skill's prompt and pass structure are stable — the skill *is* the spec the worker will encode.
 
@@ -113,6 +123,15 @@ Today this is the [`/clean-transcript`](../../skills/transcript-pipeline.md) ski
 ### A5. Extraction — skill-validated, then workerised; LLM-graded
 
 **Decision: claim/quote/entity extraction is validated in skills and gated by eval suites, not drift tests.** This is the defining testing contrast with Scout: Scout's deterministic fetchers need *endpoint-drift tests* (the upstream shape is the only thing that can change); Analyst's extraction passes are *LLM-graded* (the model's judgement is what can regress), so they need [DeepEval suites under `tests/evals/`](../../../../tests/README.md).
+
+**Shaping a claim is more than finding it.** Over (cleaned, reference-resolved — [A9](#a9-referential-resolution--attribution-is-claim-level-not-turn-level)) chunks, the extraction pass must also:
+
+- **Filter signal from banter** — pods are mates joking. "I'd sell my house on Cleary" is hyperbole, not a trade call; sponsor reads and tangents aren't claims.
+- **Own the stance** — distinguish the host's *own* view from devil's-advocate / hypothetical / audience-question framing ("a lot of people are asking should they sell Cleary" is *not* the host's claim).
+- **Type + structure** — `claim_type` (buy/sell/hold/start/bench/captain/trade/injury/price/role/match-result), subject entity, polarity, strength. Map hedging / conditionals / negation to strength: "lock him in" (strong), "you could start him I guess" (weak), "I'm *not* selling Cleary" (a HOLD via negation).
+- **Anchor in time** — stamp the round/window the claim *pertains to* ("this week", "after Origin"), not just when it was said. Predictions need a horizon ([A10](#a10-claims-carry-falsifiability--resolution-criteria)).
+- **Deduplicate** — a host repeating "Cleary's a buy" four times is one claim, within and across chapters.
+- **Link to canonical entities** — so claims aggregate across sources and can later be grounded against Scout's actual price/breakeven data.
 
 Today the surface is multi-pass and skill-driven: [`/process-transcript`](../../skills/transcript-pipeline.md) (multi-pass extraction), [`/verify-claims`](../../system/extraction.md) (per-claim Haiku cross-check), [`/analyse-transcript`](../../skills/analyse-transcript.md) (chapter-scoped enrichment), [`/upload-transcript`](../../skills/transcript-pipeline.md) (persist). The `services/worker-extraction/` worker is a skeleton; it is built only once the eval suite locks acceptable precision/recall on a graded corpus. See [extraction-worker](../../../todo/extraction-worker.md).
 
@@ -138,6 +157,29 @@ The seam matters because both are tempting to call "consensus." The rule: if the
 - When "Lineup" is mentioned without qualifier, assume the **external project**, not this repo's code.
 
 The legacy file inventory and per-phase Lineup status live in [README § Lineup status](README.md#lineup-status) and [roadmap.md § Lineup externalisation](roadmap.md#track-1--lineup-externalisation).
+
+### A9. Referential resolution — attribution is claim-level, not turn-level
+
+**Decision: Analyst resolves what the words *point to* before extracting meaning — and this is a distinct concern from Lineup's turn attribution.** Lineup ([A2](#a2-lineup-is-a-service-boundary-not-a-sub-module)) answers "*which Person spoke this turn*." Necessary, but not sufficient: the *claim* inside a turn can point elsewhere. The referential problems that **stay in-repo after Lineup leaves**:
+
+- **Coreference / anaphora** — "he's a great buy", "trade him", "this guy". Claim attribution silently depends on resolving these to an entity. The hidden hard problem: if it's wrong, every claim downstream is mis-subjected.
+- **Claim-source ≠ speaker** — the speaker may be quoting ("Gus reckons Cleary's a sell"), reading a tweet, or reciting a stat. The *claim's* source is not always the turn's speaker. This residual attribution work is Analyst's, not Lineup's.
+- **Same-surname disambiguation** — the Trbojevic brothers (Tom vs Jake), the Fifitas. "Turbo" disambiguates; "Trbojevic" alone does not — needs context.
+- **Positional / role reference** — "the fullback", "their halfback", "the captain". Resolvable only with team + round context.
+- **Time-dependent entity resolution** — "Pearce at the Roosters" in a 2023 clip resolves relative to the *source date*, not now. Entities and the player↔team mapping are resolved as-of the source.
+
+**Why it's its own decision:** these are not cleaning (the surface is already fine) and not extraction (no claim has been shaped yet) — they are the *linking* step in between. Getting them wrong produces confidently-attributed garbage the eval suite ([A5](#a5-extraction--skill-validated-then-workerised-llm-graded)) can't catch, because the claim *text* reads fine; only the subject/source is wrong. **Coreference and claim-source resolution are the two I'd hold to the highest bar** — they are what make attribution real rather than nominal.
+
+### A10. Claims carry falsifiability + resolution criteria
+
+**Decision: when a claim is a prediction, Analyst captures *how it resolves* — not just what it says.** This is the keystone for the **ledger** (advisor-accuracy tracking — [Bookkeeper](../bookkeeper/README.md)): a claim is only worth tracking if it can be scored against reality later. "Cleary scores 60+ this round" is resolvable; "Cleary's a gun" is a vibe.
+
+Per claim, Analyst marks:
+- **Is it falsifiable?** — a resolvable prediction vs an unfalsifiable opinion.
+- **Resolution criterion** — what observable outcome settles it (a SuperCoach score threshold, a selection/role, a price move, a match result).
+- **Horizon** — the round/window by which it resolves (from the temporal anchor in [A5](#a5-extraction--skill-validated-then-workerised-llm-graded)).
+
+**Boundary with Bookkeeper:** *identifying* that a claim is a falsifiable prediction and *capturing its resolution rule* is interpretive — Analyst's. *Scoring* it against the outcome and rolling it into an accuracy index is numeric derivation — Bookkeeper's. Analyst makes the claim **gradeable**; Bookkeeper **grades** it. This is the decision that makes the silver layer worth building: grading advisors is the reason claims are extracted at all.
 
 ---
 

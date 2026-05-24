@@ -61,14 +61,16 @@ Speaker attribution reads use `coalesce(cluster_label, speaker_label)` — the `
 | `source_annotations` | Sentiment, sub-topic tags, entity mentions, themes | Annotation | Not built |
 | `source_chunks.embedding` | Text embedding for retrieval (≠ voice/face embeddings) | Embedding | Not built |
 | `quotes` | Verbatim pulls attributed to a `Person` | Extraction | Skill-driven |
-| `claims` | Structured claims (type, text, strength, polarity, timestamps) | Extraction | Skill-driven |
+| `claims` | Structured claims (type, text, strength, polarity, timestamps; + falsifiability flag, resolution criterion, horizon per [charter A10](charter.md#a10-claims-carry-falsifiability--resolution-criteria) — design intent) | Extraction | Skill-driven |
 | `claim_chunks` | Claim ↔ evidence-chunk links | Extraction | Skill-driven |
-| `claim_associations` | Claim ↔ entity links | Extraction | Skill-driven |
+| `claim_associations` | Claim ↔ entity links (the subject/source resolved by referential resolution) | Extraction | Skill-driven |
 | `consensus_snapshots` | Semantic consensus shifts + contradictions across sources | Cross-reference | Not built |
 
 Analyst writes **nothing** to the bronze tables (`scout_candidates`, `channels`, `sources` audio/ingestion fields, `people`, `matches`, `player_rounds`, …) — those are Scout's. It writes **nothing** to the numeric-derivation tables (`predictions`, `decisions`, alignment/accuracy metrics) — those are Bookkeeper's. And it does not compose `wiki_pages` — that's the Archivist's read over Analyst's outputs.
 
 > **Boundary note on `source_speakers`.** Analyst *reads* `speaker_person_id` but does **not** write it — that's Lineup's column. The one exception today is the legacy in-repo path, where transcription writes those rows inline; under the externalised model ([charter A2](charter.md#a2-lineup-is-a-service-boundary-not-a-sub-module)) the producer of `speaker_person_id` is the Lineup service, and Analyst is purely a reader.
+
+> **Referential resolution writes no table of its own.** It determines *which* entity/Person a claim links to (`claim_associations`, the claim's subject) and whether the claim-source differs from the turn's speaker — the linking step ([charter A9](charter.md#a9-referential-resolution--attribution-is-claim-level-not-turn-level)) that feeds extraction, not a separate output surface.
 
 ---
 
@@ -82,10 +84,11 @@ flowchart LR
 
     subgraph Analyst["Analyst — interpretive passes"]
       Clean["Cleaning<br/>cleaned_text · clean_text"]
+      Resolve["Referential resolution<br/>coref · claim-source · entity"]
       Chapter["Chapter detection<br/>source_chapters"]
       Annotate["Annotation<br/>source_annotations"]
       Embed["Embedding<br/>source_chunks.embedding"]
-      Extract["Extraction<br/>quotes · claims · claim_chunks"]
+      Extract["Extraction & shaping<br/>quotes · claims (+ stance,<br/>strength, dedup, falsifiability)"]
       Verify["Verification<br/>per-claim cross-check"]
       Consensus["Cross-reference<br/>consensus_snapshots"]
     end
@@ -93,10 +96,12 @@ flowchart LR
     Down(["Bookkeeper · Critic · Jaromelu · Archivist"])
 
     Lineup --> Clean
-    Clean --> Chapter
+    Clean --> Resolve
+    Resolve --> Chapter
     Chapter --> Annotate
     Chapter --> Extract
     Annotate --> Extract
+    Resolve --> Extract
     Clean --> Embed
     Extract --> Verify
     Verify --> Consensus
@@ -104,19 +109,20 @@ flowchart LR
     Consensus --> Down
 
     classDef notbuilt stroke-dasharray: 5 5,stroke:#888
-    class Annotate,Embed,Consensus notbuilt
+    class Resolve,Annotate,Embed,Consensus notbuilt
 ```
 
-**Legend:** hexagon = upstream producer (Lineup) · rounded oval = downstream consumers · dashed = not built.
+**Legend:** hexagon = upstream producer (Lineup) · rounded oval = downstream consumers · dashed = not built (or not yet a discrete pass).
 
 **Trace:**
-1. **Clean** — the attributed transcript's `raw_text` is corrected against the player registry + NRL domain knowledge; `cleaned_text` / `clean_text` written. Everything downstream reads cleaned text, not raw.
-2. **Chapter** — semantic chapters segment the transcript so extraction runs with scoped context rather than over an undifferentiated wall of text.
-3. **Annotate** *(not built)* — sentiment, sub-topic, entity-mention, and theme tags per chunk/chapter.
-4. **Embed** *(not built)* — text embeddings on chunks for retrieval and similarity.
-5. **Extract** — multi-pass LLM extraction over (cleaned, chaptered) chunks produces `quotes`, `claims`, and their links. Claims carry type, text, strength, polarity, and timestamps.
-6. **Verify** — a per-claim cross-check (Haiku agent per claim) confirms `claim_type`, `claim_text`, `strength`, `polarity`, and timestamps against the transcript before persistence.
-7. **Cross-reference** *(not built)* — claims across sources are compared for semantic consensus and contradiction; `consensus_snapshots` records the direction and the disagreement.
+1. **Clean** — the attributed transcript's `raw_text` is corrected against the player registry + NRL domain knowledge: garbled (esp. Polynesian) names, nicknames/initials, SuperCoach jargon, number typing, filler. Everything downstream reads cleaned text, not raw. ([charter A4](charter.md#a4-cleaning--skill-validated-then-workerised))
+2. **Resolve references** *(not yet discrete)* — coreference ("he", "this guy"), claim-source-vs-speaker (the host *quoting* someone), same-surname disambiguation (Tom vs Jake Trbojevic), positional reference ("the fullback"), and time-dependent entity resolution. Decides *what the words point to* before any claim is shaped. ([charter A9](charter.md#a9-referential-resolution--attribution-is-claim-level-not-turn-level))
+3. **Chapter** — semantic chapters segment the transcript so extraction runs with scoped context rather than over an undifferentiated wall of text.
+4. **Annotate** *(not built)* — sentiment, sub-topic, entity-mention, and theme tags per chunk/chapter.
+5. **Embed** *(not built)* — text embeddings on chunks for retrieval and similarity.
+6. **Extract & shape** — multi-pass LLM extraction over (cleaned, resolved, chaptered) chunks produces `quotes`, `claims`, and their links. Beyond finding a claim, the pass filters banter from signal, owns the stance (own view vs devil's advocate), types + structures it (strength/polarity from hedging/negation), dedups repeats, anchors it in time, and captures falsifiability + resolution criteria. ([charter A5](charter.md#a5-extraction--skill-validated-then-workerised-llm-graded), [A10](charter.md#a10-claims-carry-falsifiability--resolution-criteria))
+7. **Verify** — a per-claim cross-check (Haiku agent per claim) confirms `claim_type`, `claim_text`, `strength`, `polarity`, and timestamps against the transcript before persistence.
+8. **Cross-reference** *(not built)* — claims across sources are compared for semantic consensus and contradiction; `consensus_snapshots` records the direction and the disagreement.
 
 The cadence maps to system events, not on-screen beats — see [dynamics.md § Cadence](../dynamics.md#cadence). Analyst fires on "new transcript materialised" and again on "new claims extracted."
 
@@ -144,9 +150,16 @@ Fixes auto-caption artifacts so downstream extraction reads clean text.
 
 **Trigger** — [`/clean-transcript`](../../skills/transcript-pipeline.md) skill. The `POST /api/admin/update-clean-text` endpoint backfills `clean_text` onto existing chunks from an already-cleaned S3 document.
 
-**Inputs** — `source_documents.raw_text` / `source_chunks.raw_text`; the canonical player registry (`people` + `data/players.yaml`); NRL domain knowledge (slang, nicknames, known garbles).
+**Inputs** — `source_documents.raw_text` / `source_chunks.raw_text`; the canonical player registry (`people` + `data/players.yaml`); the alias table (`people.aliases`); NRL domain knowledge (slang, nicknames, known garbles); the SuperCoach jargon lexicon.
 
-**Processing** — fix mangled player/team names, repair garbled words, merge false-start restarts, normalise filler — without "correcting" legitimate NRL slang (e.g. *PVL*).
+**Processing** — the recurring contention points ([charter A4](charter.md#a4-cleaning--skill-validated-then-workerised)):
+
+- **Garbled names** — repair ASR-mangled player/team names; Polynesian / Māori names (Tuipulotu, Fonua-Blake, Papali'i, To'o, Suaalii) are the highest-frequency error class.
+- **Nicknames + initials** — DCE, RTS, JWH, "Nicho", "Turbo", "Teddy" → canonical Person, via the alias table.
+- **SuperCoach jargon** — BE, POD, donut, ton, loophole, ceiling/floor, rage trade, team slang (cows, chooks) → canonical concept.
+- **Number typing** — disambiguate SC score vs price vs breakeven vs minutes vs real-life stat; normalise "fifty-eight"/"58".
+- **Filler / false starts / self-corrections** — strip disfluency, merge retractions without losing meaning.
+- **Protect legitimate slang** — never "correct" real NRL terms (e.g. *PVL*) into dictionary words.
 
 **Outputs** — `source_documents.cleaned_text`, `source_chunks.clean_text`.
 
@@ -170,21 +183,48 @@ Text embeddings on chunks for retrieval and similarity. **Distinct** from the vo
 
 **Status** — not built. Model (OpenAI vs Voyage) and index location undecided — see [charter Open Questions](charter.md#open-questions).
 
-### 4.4 Entity / quote / claim extraction `[skill-driven]`
+### 4.4 Referential resolution `[not yet a discrete pass]`
 
-The historical Analyst surface: turn (cleaned, chaptered) chunks into structured claims and quotes.
+Resolves *what the words point to* before any claim is shaped. Necessary because Lineup answers "who spoke this turn" — not "who/what the claim inside it is about." Today this happens implicitly inside the extraction prompt; [charter A9](charter.md#a9-referential-resolution--attribution-is-claim-level-not-turn-level) elevates it to a first-class concern.
+
+**Inputs** — cleaned chunks + the turn attribution (`source_speakers.speaker_person_id`); the entity registry (`people`, `teams`) with team tenure as-of the source date.
+
+**Processing** — the referential contention points:
+
+- **Coreference / anaphora** — bind "he", "him", "this guy" to an entity. The hidden hard problem: if wrong, the claim is mis-subjected even though its text reads fine.
+- **Claim-source ≠ speaker** — detect quoting ("Gus reckons…"), tweet/stat reading; attribute the *claim* to its real source, not just the turn's speaker.
+- **Same-surname disambiguation** — Tom vs Jake Trbojevic, the Fifitas; use context where the surname alone can't.
+- **Positional / role reference** — "the fullback", "the captain" → the player, given team + round.
+- **Time-dependent resolution** — "Pearce at the Roosters" resolves against the *source date*, not now.
+
+**Outputs** — no table of its own; it sets the subject/source that extraction writes into `claim_associations` and the claim's subject. Its correctness is invisible to the [A5](charter.md#a5-extraction--skill-validated-then-workerised-llm-graded) eval (text reads fine; only the link is wrong) — so it needs its own eval slice.
+
+**Status** — not a discrete pass yet; folded into the extraction prompt. Splitting it out is [roadmap T2](roadmap.md#track-2--interpretive-pass-buildout) scope.
+
+### 4.5 Entity / quote / claim extraction & shaping `[skill-driven]`
+
+The historical Analyst surface: turn (cleaned, reference-resolved, chaptered) chunks into structured claims and quotes — and *shape* them so they're usable downstream.
 
 **Trigger** — [`/process-transcript`](../../skills/transcript-pipeline.md) (multi-pass extraction with automated verification) → [`/verify-claims`](../../system/extraction.md) (per-claim Haiku cross-check) → [`/upload-transcript`](../../skills/transcript-pipeline.md) (persist).
 
-**Inputs** — cleaned chunks, chapters, the entity registry (`people`, `teams`).
+**Inputs** — cleaned + reference-resolved chunks, chapters, the entity registry (`people`, `teams`).
 
-**Processing** — multi-pass LLM extraction; each claim gets `claim_type`, `claim_text`, `strength`, `polarity`, `start_ts`/`end_ts`, attributed to the speaking `Person` via the chunk's turn. Verification spins a Haiku agent per claim to cross-check the extracted fields against the transcript.
+**Processing** — multi-pass LLM extraction. Finding the claim is the start; shaping it is the work ([charter A5](charter.md#a5-extraction--skill-validated-then-workerised-llm-graded)):
 
-**Outputs** — `quotes`, `claims`, `claim_chunks`, `claim_associations`.
+- **Signal vs banter** — drop hyperbole ("I'd sell my house on Cleary"), sponsor reads, tangents.
+- **Stance ownership** — host's own view vs devil's-advocate / hypothetical / audience-question framing.
+- **Type + structure** — `claim_type`, subject entity, polarity, strength (mapping hedging/conditional/negation: "lock him in" strong, "not selling" = HOLD).
+- **Temporal anchor** — the round/window the claim *pertains to*, not just `start_ts`/`end_ts`.
+- **Dedup** — collapse repeats within and across chapters.
+- **Falsifiability + resolution** — mark resolvable predictions and how they settle ([charter A10](charter.md#a10-claims-carry-falsifiability--resolution-criteria)).
+
+Verification spins a Haiku agent per claim to cross-check the extracted fields against the transcript.
+
+**Outputs** — `quotes`, `claims` (+ falsifiability/resolution fields, design intent), `claim_chunks`, `claim_associations`.
 
 **Status** — skill-driven; `services/worker-extraction/` is a skeleton. Workerisation is gated by a DeepEval suite ([charter A5](charter.md#a5-extraction--skill-validated-then-workerised-llm-graded)). See [extraction-worker](../../../todo/extraction-worker.md).
 
-### 4.5 Cross-reference / consensus `[not built]`
+### 4.6 Cross-reference / consensus `[not built]`
 
 The pass that makes Analyst *Analyst* in Jaromelu's voice — detecting agreement and contradiction across sources.
 
@@ -239,7 +279,7 @@ quotes · claims · consensus(by hand)           ▼
 ## Related
 
 - [README.md](README.md) — Analyst's identity, scope, and voice
-- [charter.md](charter.md) — locked design decisions A1–A8
+- [charter.md](charter.md) — locked design decisions A1–A10
 - [roadmap.md](roadmap.md) — status and the two-track forward plan
 - [Transcription pipeline](../../system/transcription-pipeline.md) — the legacy in-repo Lineup surface (stages 1–5)
 - [Speaker identification](../../system/speaker-identification.md) — voice + face + fusion detail (legacy Lineup)
