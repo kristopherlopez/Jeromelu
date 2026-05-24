@@ -95,6 +95,159 @@ Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "One-time S3 seed run" + "D
 _(implementer fills in: three curl responses, three aws s3 ls outputs, two SQL query results, doc diff summary, first-cron-fire log line)_
 
 
+### TASK-13: Make `scripts.data.populate.*` importable under pytest
+
+Implements PLAN.md § 2026-05-24 Scout Phase 3.5 / Interface / Import path. **Prerequisite for TASK-14→17.**
+
+**What**
+1. Edit `pytest.ini`: change `pythonpath = services/api packages/shared` to `pythonpath = . services/api packages/shared` (add repo root).
+2. Add empty package markers so the populate package resolves as a regular import chain: create `scripts/__init__.py` and `scripts/data/__init__.py` (both empty, or a one-line module docstring). `scripts/data/populate/__init__.py` already exists.
+3. Confirm `python -m scripts.data.populate_db_from_s3 --help` still works (regular packages don't break `-m`).
+
+**How to verify**
+- From repo root with the api venv active: `python -c "from scripts.data.populate.phase_matches import _extract_one; print('ok')"` prints `ok`.
+- `pytest tests/unit/ -q` — the existing suite still collects + passes (no import regressions from adding repo root to pythonpath).
+- `python -m scripts.data.populate_db_from_s3 --help` exits 0 and prints usage.
+- `git status` shows: modified `pytest.ini`, new `scripts/__init__.py`, new `scripts/data/__init__.py`.
+
+**Proof notes**
+_(implementer fills in)_
+
+
+### TASK-14: Unit tests for `phase_matches._extract_one` (no refactor needed)
+
+Implements PLAN.md § 2026-05-24 Scout Phase 3.5 / Interface / pure extract (matches). Depends on TASK-13.
+
+**What**
+1. Create `tests/unit/scripts/data/populate/test_phase_matches.py`. Import `_extract_one`, `_normalize_status`, `_KEY_RE`, `_GRADE_MAP` from `scripts.data.populate.phase_matches`. Use the `fixtures_dir` conftest fixture; load `fixtures_dir / "scout" / "nrlcom_match_centre" / "canonical_response.json"` (the Phase 3 FullTime fixture). Build fake maps: `team_map = {<homeTeam.teamId>: "11111111-1111-1111-1111-111111111111", <awayTeam.teamId>: "22222222-..."}` (read the two teamIds from the fixture), `venue_map = {}`.
+2. Tests:
+   - `test_extract_one_maps_core_fields` — `_extract_one(payload, "scout/nrlcom/match-centre/111/2026/round-12/raiders-v-dolphins.json", team_map, venue_map)` returns a dict with `source=="nrl_com"`, `external_match_id == payload["matchId"]`, `season==2026`, `round==12`, `grade=="nrl"`, `status=="final"` (FullTime), `home_team_id`/`away_team_id` resolved from the map, and `referee_name` is the referee from `officials[]`.
+   - `test_attendance_zero_becomes_null` — set `payload["attendance"]=0` (deepcopy) → returned `attendance` is `None`.
+   - `test_unresolved_team_returns_none` — `team_map={}` → returns `None` (skip-no-team).
+   - `test_same_team_returns_none` — map both teamIds to the same id → returns `None` (distinct-teams guard).
+   - `test_key_regex_and_status_map` — `_KEY_RE` parses comp/season/round/slug from a sample key; `_normalize_status("FullTime")=="final"`, `_normalize_status("Upcoming")=="scheduled"`, `_normalize_status(None)=="scheduled"`; `_GRADE_MAP[111]=="nrl"`.
+
+**How to verify**
+- `pytest tests/unit/scripts/data/populate/test_phase_matches.py -v` — all pass.
+- `pytest tests/unit/ -q` stays green. `git status` shows one new test file.
+
+**Proof notes**
+_(implementer fills in)_
+
+
+### TASK-15: Refactor `phase_stats` to a pure `_extract_stat_rows` + unit tests
+
+Implements PLAN.md § 2026-05-24 Scout Phase 3.5 / Interface / pure extract (stats). Depends on TASK-13.
+
+**What**
+1. **Behavior-preserving refactor** of `scripts/data/populate/phase_stats.py`: extract the inlined per-player row-building (currently inside the `for side_key ... for s in stats_block` loop in `populate_player_match_stats`) into a pure module-level function `_extract_stat_rows(payload, key, match_id, team_map, player_map) -> list[dict]`. It must return the same `row` dicts the loop currently builds (match_id, nrlcom_match_id, nrlcom_player_id, person_id, team_id, nrlcom_team_id, is_home, jersey_number, position, is_on_field, all `_FIELD_MAP` columns, raw_payload, s3_archive_key). `populate_player_match_stats` then calls `_extract_stat_rows(...)` and only does the UPSERT loop over the returned rows. No change to the UPSERT SQL, the maps, or the return summary.
+2. Create `tests/unit/scripts/data/populate/test_phase_stats.py`. Import `_extract_stat_rows`, `_build_player_meta_map`, `_FIELD_MAP`. Load the FullTime fixture; fake maps from the fixture's teamIds/playerIds.
+3. Tests:
+   - `test_build_player_meta_map` — `_build_player_meta_map(payload)` returns playerId → {jersey_number, position, is_on_field, is_home, nrlcom_team_id} for every player in both squads; spot-check one known player.
+   - `test_extract_stat_rows_field_mapping` — for a known player, the returned row maps `tacklesMade→tackles_made`, `allRunMetres→all_run_metres`, `tries→tries` etc. per `_FIELD_MAP`; `jersey_number`/`position`/`is_on_field` come from player_meta; `is_home` correct; `match_id` is the passed-in value; `s3_archive_key==key`.
+   - `test_person_and_team_resolution` — with player_map/team_map populated, `person_id`/`team_id` resolve; with empty maps they are `None` (row still emitted — person_id is nullable).
+   - `test_row_count_equals_stat_players` — `len(_extract_stat_rows(...))` == total players across `stats.players.homeTeam` + `.awayTeam`.
+
+**How to verify**
+- `pytest tests/unit/scripts/data/populate/test_phase_stats.py -v` — all pass.
+- The refactor is behavior-preserving: `grep` confirms `populate_player_match_stats` still UPSERTs via the same `upsert_sql` and returns the same summary keys. `pytest tests/unit/ -q` green.
+- `git status`: modified `phase_stats.py` + one new test file.
+
+**Proof notes**
+_(implementer fills in)_
+
+
+### TASK-16: Refactor `phase_team_lists` to a pure `_extract_player_list_rows` + unit tests
+
+Implements PLAN.md § 2026-05-24 Scout Phase 3.5 / Interface / pure extract (team_lists). Depends on TASK-13.
+
+**What**
+1. **Behavior-preserving refactor** of `scripts/data/populate/phase_team_lists.py`: extract the inlined **player** row-building (the `for p in team_block["players"]` body, excluding the existence pre-check + INSERT) into a pure `_extract_player_list_rows(payload, match_id, team_map, player_map) -> list[dict]` returning dicts of `{match_id, team_id, player_id, jersey_number, named_position, is_captain}` for every resolvable player (skip players with no `person_id` and teams not in `team_map`, matching current behavior). `populate_team_lists` calls it, then does the existing existence-check + INSERT loop. The **coach** path (`_ensure_coach_person`, DB I/O) stays inline, unchanged — out of unit scope, covered by the prod-run verify.
+2. Create `tests/unit/scripts/data/populate/test_phase_team_lists.py`. Tests:
+   - `test_extract_player_list_rows` — for the FullTime fixture + populated maps, returns one row per resolvable player; spot-check jersey_number/named_position; `is_captain` true exactly for the player whose id == `team_block["captainPlayerId"]`.
+   - `test_skips_unresolved_player` — a playerId not in player_map is omitted.
+   - `test_skips_unresolved_team` — a team whose teamId not in team_map contributes no rows.
+
+**How to verify**
+- `pytest tests/unit/scripts/data/populate/test_phase_team_lists.py -v` — all pass.
+- Refactor behavior-preserving: `populate_team_lists` still does the existence pre-check + INSERT + coach path + returns the same summary keys. `pytest tests/unit/ -q` green.
+- `git status`: modified `phase_team_lists.py` + one new test file.
+
+**Proof notes**
+_(implementer fills in)_
+
+
+### TASK-17: Refactor `phase_timeline` to pure `_extract_timeline_rows` + `_extract_official_rows` + unit tests
+
+Implements PLAN.md § 2026-05-24 Scout Phase 3.5 / Interface / pure extract (timeline). Depends on TASK-13.
+
+**What**
+1. **Behavior-preserving refactor** of `scripts/data/populate/phase_timeline.py`: extract two pure functions — `_extract_timeline_rows(payload, key, match_id, team_map, player_map) -> list[dict]` (one row per `timeline[]` event: match_id, nrlcom_match_id, sequence, event_type, title, game_seconds, nrlcom_team_id, team_id, nrlcom_player_id, person_id, running_home_score, running_away_score, raw_payload, s3_archive_key) and `_extract_official_rows(payload, key, match_id) -> list[dict]` (one row per `officials[]` with a name: match_id, nrlcom_match_id, first_name, last_name, role, person_id=None, raw_payload, s3_archive_key). `populate_timeline_and_officials` calls both, then UPSERTs via the existing `timeline_sql` / `officials_sql`. No SQL/summary change.
+2. Create `tests/unit/scripts/data/populate/test_phase_timeline.py`. Tests:
+   - `test_extract_timeline_rows` — `sequence` is 0..N-1 in order; `event_type` defaults to `"Unknown"` when an event has no `type`; `running_home_score`/`running_away_score` map from `homeScore`/`awayScore`; team/player resolve via maps (None when absent); row count == `len(payload["timeline"])`.
+   - `test_extract_official_rows` — one row per official with a first or last name; an official with neither is skipped; `role` from `position`; `person_id` is `None`.
+
+**How to verify**
+- `pytest tests/unit/scripts/data/populate/test_phase_timeline.py -v` — all pass.
+- Refactor behavior-preserving: `populate_timeline_and_officials` still UPSERTs via `timeline_sql`/`officials_sql` and returns the same summary keys. `pytest tests/unit/ -q` green.
+- `git status`: modified `phase_timeline.py` + one new test file.
+
+**Proof notes**
+_(implementer fills in)_
+
+
+### TASK-18: Fix the broken `--dry-run` (thread a `commit` flag through the phases)
+
+Implements PLAN.md § 2026-05-24 Scout Phase 3.5 / Interface / `--dry-run` fix. Closes the META known-bug.
+
+**What**
+1. Add `commit: bool = True` to each phase function the orchestrator calls in `scripts/data/populate/`: at minimum the 4 match phases (`populate_matches`, `populate_team_lists`, `populate_player_match_stats`, `populate_timeline_and_officials`) and, for consistency, the others (`populate_rounds`, `backfill_identity`, `populate_people_history`, `reresolve_person_ids`, `populate_player_attributes`, `populate_team_standings`, `populate_stat_leaderboards`, `populate_injuries`). Replace every `db.commit()` — both the final commit AND the per-50-archive checkpoint commits in `phase_stats`/`phase_timeline` — with `if commit: db.commit()`.
+2. Edit `scripts/data/populate_db_from_s3.py`: pass `commit=not args.dry_run` into every phase call. Keep the existing outer `if args.dry_run: db.rollback()`. (With phases no longer committing under dry-run, the outer rollback now actually discards the work.)
+3. Update the `--dry-run` argparse help to: `"Compute counts without committing (phases skip their commits; the transaction is rolled back at the end)."`
+
+**How to verify**
+- A test `tests/unit/scripts/data/populate/test_dry_run_flag.py` (or extend an existing one) asserting that each phase function accepts `commit=False` (signature check via `inspect.signature`) — pure-signature test, no DB.
+- On the box (or any env with the prod DB + S3): `python -m scripts.data.populate_db_from_s3 --phase matches --seasons 2026 --dry-run` followed by `SELECT count(*) FROM matches WHERE season=2026 AND source='nrl_com'` shows **no change** vs. before the dry-run. Capture both counts in proof notes. (This is the load-bearing check that the META bug is fixed.)
+- `grep -n "db.commit()" scripts/data/populate/phase_*.py` shows every occurrence guarded by `if commit:`.
+- Update `docs/build/META.md`: change the "`populate_db_from_s3 --dry-run` is broken" entry to record that it's fixed as of this task (commit-flag threaded; outer rollback now effective).
+- `git status`: modified phase files + orchestrator + META.md + one new/extended test.
+
+**Proof notes**
+_(implementer fills in)_
+
+
+### TASK-19: Prod populate run + DB verification + docs + run report (Phase 3.5 closure)
+
+Implements PLAN.md § 2026-05-24 Scout Phase 3.5 / Verification (prod populate) + Documentation updates. **Only run after TASK-13→18 are merged and the box has the refactored code.** Runs on the box (needs prod `DATABASE_URL` + S3 creds + deployed code), like the Phase 3 seed. If the box is not yet at the merge commit, tag `[BLOCKED: box not deployed with Phase 3.5 code]` and surface to the human.
+
+**What**
+1. On the box, confirm the deployed working tree has the refactored phases (`grep -c _extract_stat_rows /opt/jeromelu/scripts/data/populate/phase_stats.py`). Then run the populate for season 2026 in dependency order — the match phases require `identity` (teams.nrlcom_team_id + people.nrlcom_player_id) and `matches` populated first:
+   ```bash
+   cd /opt/jeromelu && set -a; . .env; set +a
+   python -m scripts.data.populate_db_from_s3 --phase all --seasons 2026 --competition 111
+   ```
+   (Or run `identity`, `people`, `rounds`, `matches`, `team_lists`, `stats`, `timeline` individually in that order.) Capture the JSON summary (per-phase inserted/updated counts).
+2. Verify DB rows (on the box, `docker exec jeromelu-postgres psql -U jeromelu_admin -d jeromelu`):
+   ```sql
+   SELECT count(*) FROM matches WHERE season=2026 AND source='nrl_com';            -- ≥ the seeded R12 matches
+   SELECT count(*) FROM match_team_lists ml JOIN matches m ON m.match_id=ml.match_id WHERE m.season=2026;
+   SELECT count(*) FROM player_match_stats pms JOIN matches m ON m.match_id=pms.match_id WHERE m.season=2026;
+   SELECT count(*) FROM match_timeline mt JOIN matches m ON m.match_id=mt.match_id WHERE m.season=2026;
+   SELECT count(*) FROM match_officials mo JOIN matches m ON m.match_id=mo.match_id WHERE m.season=2026;
+   ```
+   All non-zero. Spot-check: for one R12 match, `player_match_stats` row count ≈ its squad size (≈34 for both teams). Capture outputs.
+3. Docs: create/update `scripts/data/populate/README.md` (phase list, run command, the pure-function test seams, the fixed `--dry-run`); add a note in `docs/operations/data-catalogue/` that the 5 match tables are populated by the `phase_*` extractors from `scout/nrlcom/match-centre/*`.
+4. Create + finalise the run report `docs/build/runs/2026-05-24-scout-phase-3.5-nrlcom-extractors.md` (per-task account + verification + decisions + lessons), add its index row, then **remove the Phase 3.5 plan from PLAN.md Active and clear TASK-13→19 from TASKS.md** (run-report ritual).
+
+**How to verify**
+- The populate summary shows non-zero inserts for matches/team_lists/stats/timeline/officials (or non-zero existing rows if already populated — idempotent).
+- The five `count(*)` queries are all > 0 for season 2026; the spot-check match's stat-row count matches its squad size.
+- Run report exists + indexed; PLAN Active no longer lists Phase 3.5; TASKS.md has no TASK-13→19.
+
+**Proof notes**
+_(implementer fills in)_
+
+
 ## Completed work
 
 Completed tasks are not kept here. When a task passes review and is checked off, what it delivered is recorded in the active run report under [`docs/build/runs/`](./runs/) and the task is removed from this file. This queue holds only open/in-flight work.

@@ -136,6 +136,47 @@ make db-shell
 
 ---
 
+## 2026-05-24: Scout Phase 3.5 — nrl.com match-centre DB extractors (harden + verify + populate)
+
+**Goal:** Make the pre-existing S3→DB extractors for the nrl.com match-centre data trustworthy and run them — add fixture-based unit tests, fix the broken `--dry-run`, then populate the prod DB from the current S3 archives and verify. This lights up `matches`, `match_team_lists`, `player_match_stats`, `match_timeline`, `match_officials` — the wiki unlock that Phase 3 ingest fed.
+
+**Context (verified 2026-05-24 — the extractors already exist, like Phase 3's ingest):** `scripts/data/populate_db_from_s3.py` orchestrates phases `identity → people → rounds → matches → team_lists → stats → timeline → standings → leaderboards → injuries`, idempotent UPSERTs, run via `python -m scripts.data.populate_db_from_s3 --phase all --seasons 2026`. The 4 match-centre phase modules (`phase_matches.py`, `phase_team_lists.py`, `phase_stats.py`, `phase_timeline.py`) all read `scout/nrlcom/match-centre/{comp}/{season}/round-{NN}/{slug}.json`, resolve identity via `teams.nrlcom_team_id` / `people.nrlcom_player_id` / `matches.external_match_id`, and UPSERT. All six target tables + identity columns exist (migrations through 069). **No new migrations.** **Missing:** zero tests; `--dry-run` is the META known-bug (each phase commits internally → the flag silently writes); no verified populate run.
+
+**Scope:** the **4 match-centre-derived phases only** — `matches`, `team_lists`, `stats` (player_match_stats), `timeline` (+officials). `rounds`/`aux`(standings/leaderboards/injuries)/`identity`/`people`/`attributes` are out of test scope (other subsystems / Phase 4). NRL only (comp 111), season 2026 forward; historical backfill stays Phase 5.
+
+**Constraints:**
+- Unit tier = no IO, no env, no DB. Test the **pure** parse/map functions. `jeromelu_shared.config.Settings` has all-default fields, so importing a phase module needs no env — but the pure functions must not call S3/DB.
+- `scripts.data.populate.*` is **not importable under pytest today** (pytest.ini `pythonpath = services/api packages/shared`; no `scripts/__init__.py` / `scripts/data/__init__.py`; `tests/unit/scripts/` is an empty `.gitkeep`). A prerequisite task fixes this.
+- **Reuse the Phase 3 fixtures** — `tests/fixtures/scout/nrlcom_match_centre/canonical_response.json` (FullTime raiders-v-dolphins R12) + `canonical_response_upcoming.json`. They are real match-centre payloads; no new capture.
+- The testability **refactor must be behavior-preserving** — mirror `phase_matches._extract_one` (the existing template): move the inlined row-building out of the DB loop into a pure `_extract_*` function that returns `list[dict]`; the loop then only UPSERTs.
+- The `--dry-run` fix must thread a `commit` flag through ALL phases **including the per-50-archive checkpoint commits** in `phase_stats`/`phase_timeline`.
+- The prod populate run is **operator-gated** — run on the box (it needs prod `DATABASE_URL` + S3 creds + the deployed code), like the Phase 3 seed. Idempotent UPSERTs make re-runs safe.
+
+**Interface:**
+- **Import path** (prereq): add repo root to `pytest.ini` (`pythonpath = . services/api packages/shared`) and add empty `scripts/__init__.py` + `scripts/data/__init__.py` so `from scripts.data.populate.phase_matches import _extract_one` resolves. `python -m scripts.data.populate_db_from_s3` still works (regular packages).
+- **Pure extract functions** (the test seams):
+  - `phase_matches._extract_one(payload, key, team_map, venue_map) -> dict | None` — **already exists** (template). Tests only.
+  - `phase_stats._extract_stat_rows(payload, key, match_id, team_map, player_map) -> list[dict]` — **new** (extract from the inlined loop). Plus `_build_player_meta_map(payload)` (already pure) + `_FIELD_MAP`.
+  - `phase_team_lists._extract_player_list_rows(payload, match_id, team_map, player_map) -> list[dict]` — **new** (players only; the coach path uses `_ensure_coach_person` DB I/O and stays in the loop, covered by the prod-run verify).
+  - `phase_timeline._extract_timeline_rows(payload, key, match_id, team_map, player_map) -> list[dict]` + `_extract_official_rows(payload, key, match_id) -> list[dict]` — **new**.
+- **`--dry-run` fix:** add `commit: bool = True` to `populate_matches`/`populate_team_lists`/`populate_player_match_stats`/`populate_timeline_and_officials` (and the other phases the orchestrator calls, for consistency); replace each `db.commit()` (final + checkpoint) with `if commit: db.commit()`; the orchestrator passes `commit=not args.dry_run` and keeps its final `db.rollback()` on dry-run. Then `--dry-run` computes counts and writes nothing.
+- **Tests:** `tests/unit/scripts/data/populate/test_phase_{matches,stats,team_lists,timeline}.py`, mirroring the source tree under the unit tier; reuse the Phase 3 fixtures via the `fixtures_dir` conftest fixture.
+
+**Verification strategy:**
+- **Unit:** each `test_phase_*.py` feeds the FullTime fixture + fake id-maps to the pure `_extract_*` function and asserts the row dicts — e.g. matches: `status` mapping (`FullTime→final`), team resolution via map, `attendance==0→None`, referee extracted from officials; stats: `_FIELD_MAP` camelCase→snake (`tacklesMade→tackles_made`), jersey/position/is_on_field from player_meta, person_id/team_id resolution, is_home; team_lists: jersey/position/is_captain, person_id resolution, skip-when-no-person; timeline: `sequence` ordering, `event_type` default `"Unknown"`, running scores, officials fn/ln/role + skip-no-name. All run in CI (no IO).
+- **`--dry-run`:** a unit/integration check that a dry-run leaves row counts unchanged (or, on the box, `--dry-run` followed by a count query showing no delta).
+- **Prod populate (closure):** on the box, run the prerequisite + 4 phases for 2026 (`--phase all --seasons 2026`, or `identity,matches,team_lists,stats,timeline` in order), then verify row counts: `matches` (≥ the seeded R12 fixtures), `match_team_lists`, `player_match_stats`, `match_timeline`, `match_officials` all non-zero for season 2026; spot-check one match's player_match_stats count == its squad size.
+
+**Documentation updates:**
+- `scripts/data/populate/README.md` — create/update: the phase list, how to run, the pure-function test seams, the (now-fixed) `--dry-run`.
+- `docs/build/META.md` — flip the "`populate_db_from_s3 --dry-run` is broken" known-bug entry to fixed (after the fix task).
+- `docs/operations/data-catalogue/` (per the data-docs trinity) — note that `matches`/`match_team_lists`/`player_match_stats`/`match_timeline`/`match_officials` are populated by the `phase_*` extractors from `scout/nrlcom/match-centre/*`.
+- `docs/build/runs/2026-05-24-scout-phase-3.5-nrlcom-extractors.md` — run report (created when the first task lands; finalised at closure).
+
+**Tasks:** TASK-13 → TASK-19 (in TASKS.md).
+
+---
+
 ## Completed work
 
 Completed plans are **not** archived in this file. When a plan's tasks are all done, its durable record is a run report under [`docs/build/runs/`](./runs/) (see the [index](./runs/README.md)) and the plan is removed from "Active plan" above. This document holds only active/future plans; the run reports are the system of record for what shipped.
