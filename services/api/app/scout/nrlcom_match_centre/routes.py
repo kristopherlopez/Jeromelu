@@ -8,6 +8,7 @@ from typing import Any
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from jeromelu_shared.agent_audit import (
@@ -26,6 +27,7 @@ from .fetcher import (
     extract_slug_from_match_centre_url,
     fetch_match_centre,
 )
+from .models import NrlcomMatchCentre
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +46,7 @@ def run_nrlcom_match_centre(
     *,
     competition: int,
     season: int,
-    round: int,
+    round: int | None = None,
 ) -> dict[str, Any]:
     """Walk the draw → fetch each match-centre → archive each to S3."""
     run_id = make_run_id(AGENT_ID)
@@ -79,10 +81,19 @@ def run_nrlcom_match_centre(
     fetch_failures: list[dict[str, Any]] = []
     archive_failures: list[str] = []
     archive_keys: list[str] = []
+    validation_failures: list[dict[str, Any]] = []
 
     try:
-        # 1. Discover fixtures for the round
+        # 1. Discover fixtures for the round (round=None → current round).
         draw = fetch_draw(competition=competition, season=season, round=round)
+        if round is None:
+            round = draw.get("selectedRoundId")
+            if round is None:
+                raise HTTPException(
+                    status_code=502,
+                    detail="could not resolve current round from draw",
+                )
+            detail["resolved_round"] = round
         fixtures = draw.get("fixtures", [])
         detail["fixtures_in_round"] = len(fixtures)
 
@@ -111,12 +122,21 @@ def run_nrlcom_match_centre(
                 archive_keys.append(key)
                 matches_archived += 1
 
+            # D8: strict-parse the envelope (raw already archived above). Drift on
+            # a single match is logged but does NOT abort the round walk — one bad
+            # match shouldn't lose the rest of the round's capture.
+            try:
+                NrlcomMatchCentre.model_validate(match_data)
+            except ValidationError as e:
+                validation_failures.append({"slug": slug, "error": str(e)[:300]})
+
             time.sleep(RATE_LIMIT_SECONDS)
 
         detail.update({
             "matches_archived": matches_archived,
             "fetch_failures": fetch_failures,
             "archive_failures": archive_failures,
+            "validation_failures": validation_failures,
             "archive_keys": archive_keys[:5] + (["..."] if len(archive_keys) > 5 else []),
         })
         logger.info(
@@ -144,7 +164,8 @@ def run_nrlcom_match_centre(
         summary_text=(
             f"nrl.com match-centre: comp={competition} season={season} round={round} "
             f"archived={matches_archived} fetch_failures={len(fetch_failures)} "
-            f"archive_failures={len(archive_failures)}"
+            f"archive_failures={len(archive_failures)} "
+            f"validation_failures={len(validation_failures)}"
         ),
         model=MODEL, detail=detail,
     )
@@ -158,8 +179,11 @@ def run_nrlcom_match_centre(
 def nrlcom_match_centre_endpoint(
     competition: int = Query(default=111, description="NRL=111"),
     season: int = Query(..., description="Season year"),
-    round: int = Query(..., description="Round number"),
+    round: int | None = Query(default=None, description="Round number (omit for current round)"),
     db: Session = Depends(get_db),
 ):
-    """Walk draw → fetch each match-centre → archive each to S3."""
+    """Walk draw → fetch each match-centre → archive each to S3.
+
+    `round` omitted → resolves the current round from the draw's `selectedRoundId`.
+    """
     return run_nrlcom_match_centre(db, competition=competition, season=season, round=round)

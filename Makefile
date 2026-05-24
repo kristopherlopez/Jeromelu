@@ -387,15 +387,13 @@ endif
 		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
 
 # nrl.com match-centre — walks the round's fixtures, fetches each match's full JSON.
-# Usage: make scout-nrlcom-match-centre ADMIN_KEY=xxx SEASON=2026 ROUND=N [COMPETITION=111]
+# ROUND optional: omit it and the endpoint resolves the current round from the draw.
+# Usage: make scout-nrlcom-match-centre ADMIN_KEY=xxx SEASON=2026 [ROUND=N] [COMPETITION=111]
 scout-nrlcom-match-centre:
 ifndef SEASON
 	$(error SEASON= required)
 endif
-ifndef ROUND
-	$(error ROUND= required)
-endif
-	curl -s -X POST "$(API)/api/admin/scout/nrlcom-match-centre?competition=$(or $(COMPETITION),111)&season=$(SEASON)&round=$(ROUND)" \
+	curl -s -X POST "$(API)/api/admin/scout/nrlcom-match-centre?competition=$(or $(COMPETITION),111)&season=$(SEASON)$(if $(ROUND),&round=$(ROUND))" \
 		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
 
 # nrl.com casualty ward — daily injury snapshot, timestamped key.
