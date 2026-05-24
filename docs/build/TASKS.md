@@ -23,9 +23,15 @@ Prefix the title with optional tags in square brackets:
 
 ## Open tasks
 
-### TASK-06: One-time S3 seed + DB verification + roadmap/charter status flip + S3 profile docs refresh
+### [BLOCKED: ADMIN_KEY not available in implementer environment] TASK-06: One-time S3 seed + DB verification + roadmap/charter status flip + S3 profile docs refresh
 
 Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "One-time S3 seed run" + "Documentation updates". This is the closure task — only run after TASK-01 through TASK-05 are merged and the cron is deployed.
+
+> **[BLOCKED 2026-05-24]** Step 1 is gated on `ADMIN_KEY` being present in the implementer environment; per the spec, the implementer blocks (does not improvise) when it is absent. Checked: `$ADMIN_KEY` unset; repo-root `.env` has no `ADMIN_KEY` (only LLM/API keys); `/opt/jeromelu/.env` does not exist (this is the local Windows dev box, not the Lightsail prod host). TASK-01→05 are all merged to `master`, so the code/cron/test prerequisites are done — the only blockers are operator-side:
+> 1. **`ADMIN_KEY`** must be supplied to the session (or the seed run from the prod box where `/opt/jeromelu/.env` lives).
+> 2. **Cron deploy** — the new `cron.d/jeromelu` lines only reach `/etc/cron.d/jeromelu` after the operator runs `scripts/lightsail-deploy.sh`. The final verification bullet (first-Tuesday cron-fire log line) also depends on that deploy + a calendar week passing.
+>
+> To unblock: provide `ADMIN_KEY` (and confirm the deploy has run), then remove this tag and re-queue.
 
 **What**
 1. **Trigger the seed against prod yourself.** `ADMIN_KEY` must be available in your environment — on Lightsail it lives at `/opt/jeromelu/.env`; locally, source it from the same place the operator's shell would (e.g. a `.env` you load before starting the session). If `ADMIN_KEY` is not set, tag this task `[BLOCKED: ADMIN_KEY not available in implementer environment]` and pick the next task — do not improvise.
