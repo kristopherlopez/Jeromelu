@@ -93,24 +93,6 @@ Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "One-time S3 seed run" + "D
 _(implementer fills in: three curl responses, three aws s3 ls outputs, two SQL query results, doc diff summary, first-cron-fire log line)_
 
 
-### TASK-08: Wire strict-parse into the `nrlcom_draw` route + live integration drift test
-
-Implements PLAN.md § 2026-05-24 Scout Phase 3 / Interface / route changes (draw) + verification.
-
-**What**
-1. Edit `services/api/app/scout/nrlcom_draw/routes.py`: import `NrlcomDraw` from `.models` and `ValidationError` from `pydantic`. **After** the `archive_response(...)` call (raw archived first, for drift forensics), add `NrlcomDraw.model_validate(data)`. On `ValidationError`: set `detail["error"] = f"ValidationError: {e}"`, `record_agent_ended(... status="failed" ...)`, then `raise HTTPException(status_code=500, detail=...)`. On success set `detail["validated"] = True`. Leave the existing `NrlcomDrawFetchError` → 502 path intact.
-2. Create `tests/integration/scout/test_nrlcom_draw_response_shape.py` templated on `tests/integration/scout/test_supercoach_settings_response_shape.py`. `test_live_nrlcom_draw_shape`, gated on `SCOUT_DRIFT_LIVE=1`: `fetch_draw(competition=111, season=date.today().year)` → `NrlcomDraw.model_validate(raw)`; wrap in `try/except (NrlcomDrawFetchError, ValidationError)` → `pytest.fail(...)` with a fix-path message naming `app.scout.nrlcom_draw.models` and the fixture path. Sanity: `len(parsed.fixtures) >= 1`, every fixture has `matchCentreUrl`.
-
-**How to verify**
-- Skip mode: `pytest tests/integration/scout/test_nrlcom_draw_response_shape.py -v` → 1 skipped.
-- Live: `SCOUT_DRIFT_LIVE=1 pytest ... -v` → 1 passed.
-- Wiring: with the API running, `make scout-nrlcom-draw COMPETITION=111 SEASON=<yr> API=http://localhost:8000 ADMIN_KEY=...` returns `ok:true` + `validated:true`; temporarily add an unmodeled required field to `NrlcomDraw` → the call 500s and the live test fails naming it; revert.
-- `git status`: one modified (`routes.py`) + one new (integration test).
-
-**Proof notes**
-_(implementer fills in)_
-
-
 ### TASK-09: D8 envelope model + fixture + unit drift tests for `scout/nrlcom_match_centre/`
 
 Implements PLAN.md § 2026-05-24 Scout Phase 3 / Interface / nrlcom_match_centre model + tests.
