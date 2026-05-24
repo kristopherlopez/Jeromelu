@@ -13,11 +13,11 @@ The highest-leverage pipeline. One call per match yields the full per-match reco
 | Field | Value |
 |---|---|
 | Source | `nrl.com/draw/{league}/{season}/round-{N}/{slug}/data/` per match |
-| Cadence | Per-match post-FullTime (immutable after game ends) |
+| Cadence | Daily cron (current round, 18:15 UTC); per-match immutable post-FullTime |
 | Historical reach | 1990 thin / 2000+ full (60-91KB per match) |
 | Pipeline label | `nrlcom-match-centre` |
-| Endpoint | `POST /api/admin/scout/nrlcom-match-centre?competition=N&season=Y&round=N` |
-| Make target | `make scout-nrlcom-match-centre COMPETITION=111 SEASON=2026 ROUND=N` |
+| Endpoint | `POST /api/admin/scout/nrlcom-match-centre?competition=N&season=Y[&round=N]` (round omitted → current round, resolved from the draw's `selectedRoundId`) |
+| Make target | `make scout-nrlcom-match-centre COMPETITION=111 SEASON=2026 [ROUND=N]` |
 | S3 archive | `scout/nrlcom/match-centre/{comp}/{season}/round-{NN}/{slug}.json` |
 | DB extraction | **Deferred** — Phase 3.5: writes match_team_lists, player_match_stats, match_timeline, match_officials |
 
@@ -39,3 +39,12 @@ roundNumber, roundTitle, segmentCount, segmentDuration, showPlayerPositions,
 showTeamPositions, startTime, stats, timeline, updated, url, venue, venueCity, weather`
 
 Inside `stats`: per-player 58-field stat lines + match-level team aggregates + top-performers leaderboards.
+
+## D8 envelope is match-state-dependent
+
+The top-level key set differs by `matchState` (verified live): a **FullTime** match carries `attendance`, `officials`, `positionGroups`, `timeline`, `weather`, `groundConditions`, `imageUrl`; an **Upcoming** match omits those and instead carries `broadcastChannels`, `videoProviders`; 22 keys are shared. `NrlcomMatchCentre` (envelope-only, `extra="forbid"`) is therefore a **union** — 22 shared keys required, the state-dependent keys optional — so both states validate while a genuinely new top-level section still trips the guard. Deep internals (stats/timeline/lineups) stay opaque; the DB extractors (Phase 3.5) read them.
+
+## Tests
+
+- `tests/unit/api/scout/test_nrlcom_match_centre_models.py` — always-on D8 drift unit tests against two fixtures (`canonical_response.json` = FullTime, `canonical_response_upcoming.json` = Upcoming): both states parse, unknown-top-level + missing-`matchId` negatives raise. The route strict-parses each archived match through `NrlcomMatchCentre`; a `ValidationError` is logged to `validation_failures` **without aborting** the round walk.
+- `tests/integration/scout/test_nrlcom_match_centre_response_shape.py` — env-flagged (`SCOUT_DRIFT_LIVE=1`) live drift test against a real match resolved from the draw. Skipped in CI by default. Per D8 the agent does not auto-adapt.

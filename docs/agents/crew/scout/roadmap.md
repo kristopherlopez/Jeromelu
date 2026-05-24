@@ -63,15 +63,15 @@ The **bronze/S3-first retrofit is done** — `scout/supercoach_roster/` and `sco
 - ✅ Shipped: `scout/supercoach_settings/` — captures SC game rules (lockouts, scoring config, captains/emergencies/dual-position rules) per season; weekly cron (Mon 23:35 UTC, classic mode), S3 archive at `scout/supercoach/{mode}/settings/{season}/{YYYYMMDD}.json`, DB snapshots into `sc_settings`. Draft mode stays on-demand. D8 fixture + unit + live (classic + draft) drift tests.
 - ✅ Done: one-time S3 seed for season 2026 (classic teams + classic/draft settings) — S3 archives and `sc_settings` rows verified 2026-05-24.
 
-### Phase 3 — NRL.com draw + match-centre (the big unlock) — In design
+### Phase 3 — NRL.com draw + match-centre ingest ✅ Shipped (extractors → Phase 3.5)
 
-The two pipelines that turn the wiki from "stubs" to "rich" for every player who's ever played a match in the last 25 years.
+The two capture pipelines that feed the wiki's match data. **Ingest shipped 2026-05-24** — D8-hardened, scheduled, seeded. The pre-existing fetch+archive code was retrofitted to charter discipline (the same pattern as Phase 2.5). The DB extractors that actually light up wiki pages are Phase 3.5.
 
-- New `scout/nrlcom_draw/` — fetches `/draw/data` per (competition, season, round); writes S3. Discovers the list of matches with their `matchCentreUrl` slugs.
-- New `scout/nrlcom_match_centre/` — fetches `/draw/.../{slug}/data/` per match; writes S3. **Highest-leverage single pipeline** — one call per match yields lineups, per-player 58-field stat lines, timeline of 100+ typed events, officials, scoring narrative.
-- DB extractors (Phase 3.5 or concurrent): `extract_matches` (writes `matches`, `match_team_lists`, `player_match_stats`, `match_timeline`, `match_officials`). The `player_round_stats` extractor that runs against both nrlcom + nrlsupercoachstats with D11 trust-hierarchy merge.
+- ✅ Shipped: `scout/nrlcom_draw/` — `/draw/data` per (competition, season, round) → S3; `NrlcomDraw`+`DrawFixture` D8 models, strict-parse wired into the route (drift → 500), daily cron (current round, 18:00 UTC). Discovers each match's `matchCentreUrl`.
+- ✅ Shipped: `scout/nrlcom_match_centre/` — walks the round's fixtures, fetches `/.../{slug}/data/` per match → S3. **Highest-leverage capture** (lineups, per-player 58-field stats, 100+ timeline events, officials). D8 union envelope (FullTime/Upcoming state-dependent), non-aborting per-match validation, round-optional (resolves the current round), daily cron (18:15 UTC). Seeded R12/2026 — 5/5 matches, 0 validation failures.
+- ⏳ Phase 3.5: DB extractors — `extract_matches` (writes `matches`, `match_team_lists`, `player_match_stats`, `match_timeline`, `match_officials`) + the `player_round_stats` extractor against nrlcom + nrlsupercoachstats with D11 trust-hierarchy merge.
 
-This phase unblocks: every team page's `## Recent Results`, every round page's `## Team Lists` + `## Results`, and every player page's per-match history including timeline events (try at 53', sin bin, etc.).
+Phase 3.5 unblocks: every team page's `## Recent Results`, every round page's `## Team Lists` + `## Results`, and every player page's per-match history including timeline events (try at 53', sin bin, etc.). Phase 3 (ingest) is the S3-archived, drift-protected foundation those extractors read.
 
 ### Phase 4 — NRL.com casualty ward + ladder (~half a day each) — In design
 
