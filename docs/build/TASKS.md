@@ -23,29 +23,6 @@ Prefix the title with optional tags in square brackets:
 
 ## Open tasks
 
-### TASK-01: Add D8 fixture + unit drift tests for `scout/supercoach_teams/`
-
-Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "Files created" / supercoach_teams items 1-2.
-
-**What**
-1. Capture the canonical response and write it to `tests/fixtures/scout/supercoach_teams/canonical_response.json`. Use the current calendar year as the season. Command (from any shell with network access): `curl -s "https://www.supercoach.com.au/$(date +%Y)/api/nrl/classic/v1/teams" | python -m json.tool > tests/fixtures/scout/supercoach_teams/canonical_response.json`. Confirm the file contains a JSON list of 17 objects, each with `id`, `abbrev`, `feed_name`, `name`, `competition`.
-2. Create `tests/unit/api/scout/test_supercoach_teams_models.py` templated **exactly** on `tests/unit/api/scout/test_supercoach_roster_models.py`. Read that file end-to-end first; mirror its structure, docstrings, and `fixture_teams` fixture pattern. Import `SuperCoachTeam` from `app.scout.supercoach_teams.models`. Four test functions, in this order:
-   - `test_canonical_fixture_parses(fixture_teams)` — parses every team through `SuperCoachTeam`; asserts `len(parsed) == 17`; asserts `len({t.abbrev for t in parsed}) == 17` (no duplicate abbrevs); asserts every `competition.id == 2`; asserts every `competition.name == "NRL"`.
-   - `test_unknown_field_on_team_raises(fixture_teams)` — `deepcopy(fixture_teams[0])`, set `bad["is_new_franchise"] = True`, expect `ValidationError` whose message contains `"is_new_franchise"`.
-   - `test_unknown_field_on_nested_competition_raises(fixture_teams)` — same shape, but `bad["competition"]["is_super_league"] = False`; assert `"is_super_league"` in error.
-   - `test_missing_required_field_raises(fixture_teams)` — `del bad["abbrev"]`; assert `"abbrev"` in error.
-3. Use the existing top-level `fixtures_dir` pytest fixture from `tests/conftest.py` (do not recompute the path).
-
-**How to verify**
-- Run `cd services/api && source .venv/Scripts/activate && cd ../.. && pytest tests/unit/api/scout/test_supercoach_teams_models.py -v` from the repo root (matches the project's pytest.ini pythonpath). All four tests pass.
-- Run `pytest tests/unit/api/scout/ -v` — every existing scout unit test still passes (no regression).
-- `git status` shows exactly two new files: the fixture JSON and the test module. No other modifications.
-- The fixture file is **pretty-printed** (newlines after each top-level object) — diff `wc -l canonical_response.json` should show ≫ 17, not a single line.
-
-**Proof notes**
-_(implementer fills in after run: command outputs, file sizes, commit SHA)_
-
-
 ### TASK-02: Add D8 live integration drift test for `scout/supercoach_teams/`
 
 Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "Files created" / supercoach_teams item 3.
@@ -207,4 +184,15 @@ _(implementer fills in: three curl responses, three aws s3 ls outputs, two SQL q
 
 ## Completed tasks
 
-_(none yet)_
+### [x] TASK-01: Add D8 fixture + unit drift tests for `scout/supercoach_teams/`
+
+Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "Files created" / supercoach_teams items 1-2.
+
+**Proof notes**
+- **Fixture captured** via `curl -s "https://www.supercoach.com.au/$(date +%Y)/api/nrl/classic/v1/teams" | python -m json.tool > tests/fixtures/scout/supercoach_teams/canonical_response.json` (season=2026, current calendar year). File is **pretty-printed**: 223 lines / 5442 bytes (≫ 17). Validated programmatically: JSON `list` of **17** objects, each carrying `id`/`abbrev`/`feed_name`/`name`/`competition`; **17** unique abbrevs; every `competition.id == 2`; every `competition.name == "NRL"`. (The nested `competition.season` is `null` in the live payload — faithful capture; the model permits `season: int | None`.)
+- **Test module** `tests/unit/api/scout/test_supercoach_teams_models.py` created, templated on `test_supercoach_roster_models.py` — same `@pytest.fixture(scope="module")` + `fixtures_dir` pattern, imports `SuperCoachTeam` from `app.scout.supercoach_teams.models`. Four functions in spec order: `test_canonical_fixture_parses`, `test_unknown_field_on_team_raises` (`is_new_franchise`), `test_unknown_field_on_nested_competition_raises` (`is_super_league`), `test_missing_required_field_raises` (`del abbrev`).
+- `pytest tests/unit/api/scout/test_supercoach_teams_models.py -v` → **4 passed** in 1.87s.
+- `pytest tests/unit/api/scout/ -v` → **28 passed** in 1.34s (24 pre-existing + 4 new; no regression).
+- `git status` after staging showed exactly the two task artifacts. Pre-existing concurrent-session changes (`services/api/app/analyst/identify_voice.py` modified, `services/web/.claude/` untracked) were left untouched and unstaged.
+- **adversarial-reviewer verdict: PASS** — no Blockers, no Concerns (one awareness note re `season: null`, non-blocking).
+- **Commit:** `fa0cc8f` — `test(scout): add D8 fixture + unit drift tests for supercoach_teams [skip-simplify]`. Pushed to `master`.
