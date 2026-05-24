@@ -20,9 +20,13 @@ dist/
 .idea/
 .obsidian/
 
-# Claude Code — ignore everything under .claude/ except project-scoped agent charters
+# Claude Code — ignore everything under .claude/ except project-scoped agent
+# charters and the team-of-agents skills (see docs/build/PLAN.md, META.md).
 .claude/*
 !.claude/agents/
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/run-implement/
 
 # Assets (large binaries)
 assets/
