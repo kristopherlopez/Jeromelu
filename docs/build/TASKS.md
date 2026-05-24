@@ -8,9 +8,11 @@ Each task is a level-3 heading with three labelled blocks:
 
 - **What** — exactly what to do. References a section of `PLAN.md`.
 - **How to verify** — concrete checks. Commands, files, expected output. Bar: "if satisfied exactly as written, the result is trustworthy."
-- **Proof notes** — filled in by the implementer after completion. Commands run, output observed, files changed, commit SHA. Empty until done.
+- **Proof notes** — an optional in-flight scratchpad only. The **authoritative** proof record is the task's entry in the active run report under [`docs/build/runs/`](./runs/), written **at checkoff (after the review passes)**.
 
-Mark as `[x]` only after `adversarial-reviewer` passes. Once checked off, record what the task delivered in the active run report under [`docs/build/runs/`](./runs/) and **remove it from this file** — TASKS.md holds only the live queue, not a completed-task graveyard (see the run-report ritual in [META.md](./META.md)).
+**Proof timing (important for reviewers):** under the run-report ritual, proof is recorded into the run report *at checkoff*, which is downstream of the review. So an **empty Proof-notes block at review time is expected and is NOT a blocker** — the reviewer verifies the diff against the spec and runs the **How to verify** checks itself; proof recording is a post-pass step.
+
+Mark as `[x]` only after `adversarial-reviewer` passes. Once it passes, record what the task delivered in the active run report under [`docs/build/runs/`](./runs/) and **remove it from this file** — TASKS.md holds only the live queue, not a completed-task graveyard (see the run-report ritual in [META.md](./META.md)).
 
 ### Tags
 
@@ -91,36 +93,6 @@ Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "One-time S3 seed run" + "D
 
 **Proof notes**
 _(implementer fills in: three curl responses, three aws s3 ls outputs, two SQL query results, doc diff summary, first-cron-fire log line)_
-
-
-### TASK-11: Cron — extend `scripts/scout-refresh.sh` + add daily cron lines for nrlcom draw + match-centre
-
-Implements PLAN.md § 2026-05-24 Scout Phase 3 / Interface / Cron.
-
-**What**
-1. Edit `scripts/scout-refresh.sh` `case "$JOB"` block: add
-   - `nrlcom-draw)         ENDPOINT="nrlcom-draw?competition=111&season=$(date -u +%Y)" ;;`
-   - `nrlcom-match-centre) ENDPOINT="nrlcom-match-centre?competition=111&season=$(date -u +%Y)" ;;`
-   Update the `echo "usage: ..."` message and the file-header `# Usage:` comment to include the two new jobs. The URL template appends `${ENDPOINT}` verbatim, so the query string rides along; round is omitted → resolved server-side. No other changes (curl block / `--resolve` / `--max-time` / log-line format untouched).
-2. Edit `scripts/cron.d/jeromelu`: add two daily lines after the SC settings block, preserving the comment style:
-   ```cron
-   # Daily nrl.com draw refresh — 18:00 UTC = 04:00 AEST. Current-round fixtures for
-   # NRL (111), current season. Archives scout/nrlcom/draw/111/{season}/round-NN.json.
-   0 18 * * *      ubuntu  /opt/jeromelu/scripts/scout-refresh.sh nrlcom-draw
-
-   # Daily nrl.com match-centre walk — 18:15 UTC = 04:15 AEST. Walks the current
-   # round's fixtures, archives each match's full JSON. Round resolved server-side.
-   15 18 * * *     ubuntu  /opt/jeromelu/scripts/scout-refresh.sh nrlcom-match-centre
-   ```
-
-**How to verify**
-- `bash -n scripts/scout-refresh.sh` — clean.
-- Dry-run: `JOB=nrlcom-draw ADMIN_KEY=test bash -x scripts/scout-refresh.sh nrlcom-draw 2>&1 | head` shows `ENDPOINT=nrlcom-draw?competition=111&season=<yr>` and `API_URL=.../api/admin/scout/nrlcom-draw?competition=111&season=<yr>`, curl reached. Same for `nrlcom-match-centre`.
-- Cron lines: 5 timing fields, user `ubuntu`, absolute path each. `grep -n cron.d/jeromelu scripts/lightsail-deploy.sh` confirms the deploy sync.
-- `git status`: two modified (wrapper + crontab).
-
-**Proof notes**
-_(implementer fills in)_
 
 
 ### TASK-12: One-time prod seed + S3 verification + docs + run report (Phase 3 closure)

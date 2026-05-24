@@ -1,6 +1,6 @@
 # Scout Phase 3 — nrl.com draw + match-centre ingest hardening
 
-**Date:** 2026-05-24 · **Status:** 🟡 In progress (TASK-07–10 of TASK-07→12 done; cron + seed remain) · **Plan:** Scout Phase 3 (PLAN.md)
+**Date:** 2026-05-24 · **Status:** 🟡 In progress (TASK-07–11 of TASK-07→12 done; only the prod seed/closure remains) · **Plan:** Scout Phase 3 (PLAN.md)
 
 **TL;DR** — The draw + match-centre ingest pipelines already existed (fetch → S3 archive → audit) but lacked charter discipline. Phase 3 hardens them: D8 envelope models, strict-parse wired into the routes, fixtures + unit/live drift tests, daily-during-round cron, seed. NRL only (comp 111), forward-only; DB extractors deferred to Phase 3.5.
 
@@ -30,6 +30,10 @@ Wired the D8 contract into the route + made the daily cron viable:
 - Added `tests/integration/scout/test_nrlcom_match_centre_response_shape.py` (env-flagged live drift test).
 **Proof:** route imports clean; `make -n scout-nrlcom-match-centre SEASON=2026` (no ROUND) → URL with no `&round=`, no error; skip → 1 skipped; live → 1 passed; deliberate model-break (`is_replay`) → live test failed naming it, reverted (`models.py` no diff). The end-to-end run (`resolved_round` set, `matches_archived ≥ 1`, `validation_failures` populated) is verified **by construction** (route calls the identical, live-exercised `model_validate`; round resolution is straight-line) and will be exercised at TASK-12's prod seed (round omitted). Reviewer **PASS WITH CONCERNS** — proof level ruled acceptable (same split as TASK-08); non-blocking: 502-message superset + `str(e)[:300]` truncation (defensive, audit-row size); doc update scheduled to TASK-12.
 
+### TASK-11 — daily cron for nrlcom draw + match-centre (`bfb63b8`)
+Added `nrlcom-draw` and `nrlcom-match-centre` cases to `scripts/scout-refresh.sh` — the ENDPOINT carries `?competition=111&season=$(date -u +%Y)` (round omitted → server resolves the current round), and the existing quoted URL template / `--resolve` loopback / `--max-time` / log-line format are untouched. Added two daily cron lines to `scripts/cron.d/jeromelu`: draw `0 18 * * *` (04:00 AEST), match-centre `15 18 * * *` (04:15 AEST) — daily-during-the-round, capturing the prior day's completed games off-peak; no collision with the existing daily jobs. Usage string + file-header `# Usage:` synced.
+**Proof:** `bash -n` clean; dry-runs → `API_URL=.../nrlcom-draw?competition=111&season=2026` and `.../nrlcom-match-centre?competition=111&season=2026` (no unquoted-`&` backgrounding — single quoted arg); cron lines have 5 timing fields + `ubuntu` + absolute path; `grep -n cron.d/jeromelu scripts/lightsail-deploy.sh` → install sync at lines 58-60. **Reviewer initially BLOCKed** on the empty TASKS.md Proof-notes block; re-review **PASS WITH CONCERNS** after confirming the block was a stale-format-note artifact — under the run-report ritual, proof is recorded here at checkoff (post-review), so an empty per-task block at review time is expected. Fixed the TASKS.md Format section to state this explicitly (meta-loop fix, prevents recurrence). Non-blocking concern: the recurring-cron first-fire log check is deferred to TASK-12 closure (can't observe until 18:00/18:15 UTC fires post-deploy).
+
 ---
 
 ## How we know it's done (running)
@@ -39,8 +43,8 @@ Wired the D8 contract into the route + made the daily cron viable:
 - `callToAction`/`secondaryCallToAction` typed `dict[str, Any] | None` (CTAs vary by match state across rounds); `disclaimer` `str | None`. Load-bearing `matchCentreUrl` is strictly required.
 
 ## Outstanding
-- ☐ TASK-11 — daily cron (scout-refresh.sh + cron.d).
-- ☐ TASK-12 — prod seed + S3 verify + docs; finalise this report + clear the plan.
+- ☐ TASK-12 — prod seed (draw + match-centre, current round) + S3 verify + docs (READMEs/roadmap/charter/S3 profiles); finalise this report + remove the plan from PLAN.md Active.
+- ☐ Recurring-cron first fire — `/var/log/jeromelu/scout-refresh.log` shows `nrlcom-draw` + `nrlcom-match-centre` clean after the first 18:00/18:15 UTC run post-deploy (deferred, recorded at/after TASK-12).
 
 ## Commits
-`f02a678` (TASK-07) · `a0ecbd7` (TASK-08) · `45fd6fe` (TASK-09) · `f92d4bd` (TASK-10).
+`f02a678` (TASK-07) · `a0ecbd7` (TASK-08) · `45fd6fe` (TASK-09) · `f92d4bd` (TASK-10) · `bfb63b8` (TASK-11).
