@@ -23,27 +23,6 @@ Prefix the title with optional tags in square brackets:
 
 ## Open tasks
 
-### TASK-03: Add D8 fixture + unit drift tests for `scout/supercoach_settings/`
-
-Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "Files created" / supercoach_settings items 1-2.
-
-**What**
-1. Capture canonical response: `curl -s "https://www.supercoach.com.au/$(date +%Y)/api/nrl/classic/v1/settings" | python -m json.tool > tests/fixtures/scout/supercoach_settings/canonical_response.json`. Confirm the file is a JSON object with top-level keys `competition`, `content`, `game`, `system` (and nothing else). File size will be ~15–20KB; that is expected — do not trim. Rationale: the strict model only enforces 4 top-level keys, but the full payload is the diff target when drift surfaces inside nested branches (e.g. `game.experts`).
-2. Create `tests/unit/api/scout/test_supercoach_settings_models.py` templated on `tests/unit/api/scout/test_supercoach_roster_models.py`. Three test functions:
-   - `test_canonical_fixture_parses(fixture_settings)` — `SuperCoachSettings.model_validate(fixture_settings)` returns without error. Sanity asserts on the parsed object: `parsed.system["currency"] == "AUD"`; `parsed.system["timezone"] == "Australia/Sydney"`; `"current_round" in parsed.competition`; `"player_stats" in parsed.game`.
-   - `test_unknown_top_level_field_raises(fixture_settings)` — `deepcopy`, set `bad["loot_boxes"] = {}`, expect `ValidationError` whose message contains `"loot_boxes"`. This is the load-bearing D8 envelope guard test.
-   - `test_missing_required_top_level_raises(fixture_settings)` — `del bad["game"]`, expect `ValidationError` containing `"game"`.
-3. Use the existing `fixtures_dir` fixture from `tests/conftest.py`. The `fixture_settings` is a single dict (not a list — settings is an object envelope), so the fixture function returns `json.loads(path.read_text(encoding="utf-8"))` directly.
-
-**How to verify**
-- `pytest tests/unit/api/scout/test_supercoach_settings_models.py -v` — all three tests pass.
-- `pytest tests/unit/api/scout/ -v` — full scout unit suite stays green.
-- `git status` shows exactly two new files. The fixture is pretty-printed.
-
-**Proof notes**
-_(implementer fills in)_
-
-
 ### TASK-04: Add D8 live integration drift tests (classic + draft) for `scout/supercoach_settings/`
 
 Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "Files created" / supercoach_settings item 3.
@@ -187,3 +166,16 @@ Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "Files created" / supercoac
 - `git status` showed exactly one new file (plus untouched concurrent-session changes).
 - **adversarial-reviewer verdict: PASS** — no Blockers, no Concerns.
 - **Commit:** `023716b` — `test(scout): add D8 live integration drift test for supercoach_teams [skip-simplify]`. Pushed to `master`.
+
+### [x] TASK-03: Add D8 fixture + unit drift tests for `scout/supercoach_settings/`
+
+Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "Files created" / supercoach_settings items 1-2.
+
+**Proof notes**
+- **Fixture captured** via `curl -s "https://www.supercoach.com.au/$(date +%Y)/api/nrl/classic/v1/settings" | python -m json.tool > tests/fixtures/scout/supercoach_settings/canonical_response.json` (season=2026). **Pretty-printed: 1189 lines / 38900 bytes (~38KB)** — note this is ~2× the planner's "~15–20KB" estimate; kept untrimmed per the spec. Validated: JSON `dict` whose top-level keys are **exactly** `{competition, content, game, system}` (nothing else, so the `extra="forbid"` envelope parses); `system.currency == "AUD"`; `system.timezone == "Australia/Sydney"`; `current_round` ∈ `competition`; `player_stats` ∈ `game`; `game` has **69** sub-keys.
+- **Test module** `tests/unit/api/scout/test_supercoach_settings_models.py` created, templated on `test_supercoach_roster_models.py`, imports `SuperCoachSettings` from `app.scout.supercoach_settings.models`. `fixture_settings` returns a single dict via `json.loads(...)` (not a list); uses the `fixtures_dir` conftest fixture. Three functions: `test_canonical_fixture_parses` (with the four smoke asserts), `test_unknown_top_level_field_raises` (envelope guard, `loot_boxes`), `test_missing_required_top_level_raises` (`del game`).
+- `pytest tests/unit/api/scout/test_supercoach_settings_models.py -v` → **3 passed** in 1.27s.
+- `pytest tests/unit/api/scout/ -q` → **31 passed** in 1.40s (28 prior + 3 new; no regression).
+- `git status` showed exactly the two task artifacts staged (plus untouched concurrent-session changes).
+- **adversarial-reviewer verdict: PASS WITH CONCERNS** — both concerns non-blocking and required no code change: (1) fixture ~38KB vs estimate — recorded above; (2) proof notes empty at review time — filled here before checkoff.
+- **Commit:** `b602e88` — `test(scout): add D8 fixture + unit drift tests for supercoach_settings [skip-simplify]`. Pushed to `master`.
