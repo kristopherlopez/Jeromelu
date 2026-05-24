@@ -1,12 +1,12 @@
 ---
 tags: [area/architecture, subarea/agents]
 ---
-
+	
 # Scout Charter
 
 > Last reviewed: 2026-05-24. **Decisions D8–D13 locked 2026-05-12; D1–D7 locked 2026-05-24.** Phase 0 doc reconciliation shipped; Phase 1 (SuperCoach roster) shipped; Phase 2 (SuperCoach stats) shipped. See [roadmap.md](roadmap.md) for the full phasing and status.
 >
-> The decision record for Scout's scope. Formalises the proposal in [`docs/pages/wiki/data-feeds.md`](../../../pages/wiki/data-feeds.md) §"Scout's expanded charter": Scout's scope grows from *media inventory* to *all external data acquisition* — making Scout the project's **bronze layer** (raw capture for every external source). The full surface area — verified by direct endpoint exploration on 2026-05-12 — spans **nrl.com** (6 endpoints, history back to 1908 for fixtures and 2000 for full match-centre detail), **supercoach.com.au** (6 endpoints across classic + draft modes, current + prior season only), and **nrlsupercoachstats.com** (1 jqGrid endpoint, 9 seasons of history). Cleaning, parsing, diarisation, and claim extraction stay with the Analyst.
+> The decision record for Scout's scope. Formalises the proposal in [`docs/pages/wiki/data-feeds.md`](../../../pages/wiki/data-feeds.md) §"Scout's expanded charter": Scout's scope grows from *media inventory* to *all external data acquisition* — making Scout the project's **bronze layer** (raw capture for every external source). The full surface area — verified by direct endpoint exploration on 2026-05-12 — spans **nrl.com** (6 endpoints, history back to 1908 for fixtures and 2000 for full match-centre detail), **supercoach.com.au** (6 endpoints across classic + draft modes, current + prior season only), **nrlsupercoachstats.com** (1 jqGrid endpoint, 9 seasons of history), and — added 2026-05-24 — **rugbyleagueproject.org** (HTML pages, no API: 130+ years of match-by-match lineups, scorers, results, and player/coach/referee/venue histories back to 1908; era-dependent trust, see [D11](#d11-trust-hierarchy--which-source-wins-per-field)). Cleaning, parsing, diarisation, and claim extraction stay with the Analyst.
 
 ---
 
@@ -170,6 +170,8 @@ s3://jeromelu-clean-documents/scout/
 
 Rationale: nrl.com is the league's own publication of structural truth (fixtures, results, lineups, officials, injuries). SuperCoach is the official second-degree source (their own product reflecting NRL data + their fantasy overlay). `nrlsupercoachstats.com` is a third-party aggregator — useful precisely because it exposes derivations SC doesn't publish (the SC scoring breakdown: base/attack/playmaking/power/negative).
 
+`rugbyleagueproject.org` is a community historical aggregator: third-party, so it sits **below** nrl.com for anything nrl.com publishes — but it is the **primary (often only) source for pre-2000 history** (match-by-match lineups, scorers, results, and player/coach/referee careers nrl.com's match-centre doesn't reach). Trust here is therefore **era-dependent**: nrl.com canonical from 2000 on; rugbyleagueproject primary before that.
+
 **Field-resolution matrix (the rules the DB extractor follows):**
 
 | Concern | Primary | Fallback | Reason |
@@ -190,6 +192,9 @@ Rationale: nrl.com is the league's own publication of structural truth (fixtures
 | Editorial commentary on player | SC `notes[]` | — | Only SC; feeds `claims`/`quotes` |
 | SC game rules (lockouts, scoring config, captains, emergencies, dual-position) | SC `/settings` | — | Only source for fantasy mechanics |
 | Statistical leaderboards (Most Tries, Most Tackles, etc.) | nrl.com `/stats` | nrlsupercoachstats derives equivalents from jqGrid | nrl.com is pre-computed canonical |
+| **Historical lineups / results / scorers (pre-2000)** | **rugbyleagueproject.org** | — | nrl.com match-centre is thin/absent before 2000 |
+| Player career history (debut, clubs, rep span, appearances) | rugbyleagueproject.org | nrl.com profile (current only) | only consolidated long-career source |
+| Referees / coaches / venues as historical entities | rugbyleagueproject.org | nrl.com match-centre (current matches only) | historical depth + cross-competition |
 
 D11 applies at **DB extraction time**, not at S3 capture time. We capture *everything* from every source; the extractor picks the winner when projecting to DB rows.
 
@@ -293,6 +298,17 @@ Pipeline inventory after full source enumeration (2026-05-12). Each row is a fol
 | Pipeline folder | Endpoint | S3 path | DB extraction target | Status |
 |---|---|---|---|---|
 | `scout/supercoach_stats/` | `nrlsupercoachstats.com/stats.php` (jqGrid) | `nrlsupercoachstats/stats/{season}/round-{NN}.json` | `player_rounds` (SC scoring breakdown columns) | ✅ shipped (Phase 2) — now S3-first per D10 |
+
+**Data — rugbyleagueproject.org (community historical archive — HTML, no API; added 2026-05-24):**
+
+The deep-history source. HTML pages, not JSON, so the fetch shape differs from the feeds above: fetch HTML → archive the raw page to S3 (still bronze, D10) → parse to typed rows. The projection stays strict (D8), but the parser reads HTML structure and the drift fixture is a saved HTML page, not a JSON sample. Be a polite client — it's a volunteer-run community site: conservative rate-limit (≤1 req/sec), cache-friendly, no hammering.
+
+| Pipeline folder | Source | S3 path | DB extraction target | Status |
+|---|---|---|---|---|
+| `scout/rugbyleagueproject_matches/` | season + match pages | `rugbyleagueproject/matches/{comp}/{season}/{slug}.html` | Pre-2000 `matches` + `match_team_lists` (historical lineups, scorers, results) | 🟡 future — HTML scrape; fills the pre-2000 gap nrl.com can't |
+| `scout/rugbyleagueproject_players/` | player career pages | `rugbyleagueproject/players/{slug}.html` | Player career history → enriches `people` / `people_roles` (debut, clubs, rep span) | 🟡 future |
+
+**Why it's worth it / the trade-off:** match-by-match lineups, scorers, and results back to **1908** (plus coach/referee/venue histories and cross-competition coverage) — the data that turns historical wiki pages from stubs into real careers, which no JSON source can supply. But HTML scraping is more brittle than the JSON feeds, so these are **future/optional** pipelines — sequence them after the nrl.com pipelines (Phases 3–4) land.
 
 **Future (multi-platform expansion):** podcasts (RSS), Twitter/X, blogs/news, Reddit — same pattern, each gets a folder per D9.
 
