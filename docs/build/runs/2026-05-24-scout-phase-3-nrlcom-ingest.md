@@ -1,6 +1,6 @@
 # Scout Phase 3 — nrl.com draw + match-centre ingest hardening
 
-**Date:** 2026-05-24 · **Status:** 🟡 In progress (TASK-07–11 of TASK-07→12 done; only the prod seed/closure remains) · **Plan:** Scout Phase 3 (PLAN.md)
+**Date:** 2026-05-24 · **Status:** 🟢 Shipped (1 verification pending: first cron fire post-deploy) · **Plan:** Scout Phase 3
 
 **TL;DR** — The draw + match-centre ingest pipelines already existed (fetch → S3 archive → audit) but lacked charter discipline. Phase 3 hardens them: D8 envelope models, strict-parse wired into the routes, fixtures + unit/live drift tests, daily-during-round cron, seed. NRL only (comp 111), forward-only; DB extractors deferred to Phase 3.5.
 
@@ -34,6 +34,14 @@ Wired the D8 contract into the route + made the daily cron viable:
 Added `nrlcom-draw` and `nrlcom-match-centre` cases to `scripts/scout-refresh.sh` — the ENDPOINT carries `?competition=111&season=$(date -u +%Y)` (round omitted → server resolves the current round), and the existing quoted URL template / `--resolve` loopback / `--max-time` / log-line format are untouched. Added two daily cron lines to `scripts/cron.d/jeromelu`: draw `0 18 * * *` (04:00 AEST), match-centre `15 18 * * *` (04:15 AEST) — daily-during-the-round, capturing the prior day's completed games off-peak; no collision with the existing daily jobs. Usage string + file-header `# Usage:` synced.
 **Proof:** `bash -n` clean; dry-runs → `API_URL=.../nrlcom-draw?competition=111&season=2026` and `.../nrlcom-match-centre?competition=111&season=2026` (no unquoted-`&` backgrounding — single quoted arg); cron lines have 5 timing fields + `ubuntu` + absolute path; `grep -n cron.d/jeromelu scripts/lightsail-deploy.sh` → install sync at lines 58-60. **Reviewer initially BLOCKed** on the empty TASKS.md Proof-notes block; re-review **PASS WITH CONCERNS** after confirming the block was a stale-format-note artifact — under the run-report ritual, proof is recorded here at checkoff (post-review), so an empty per-task block at review time is expected. Fixed the TASKS.md Format section to state this explicitly (meta-loop fix, prevents recurrence). Non-blocking concern: the recurring-cron first-fire log check is deferred to TASK-12 closure (can't observe until 18:00/18:15 UTC fires post-deploy).
 
+### TASK-12 — prod seed + S3 verification + docs (Phase 3 closure) (`5f57c65`)
+Seeded prod for season 2026, current round (12), on the box via loopback (`--resolve`; ADMIN_KEY from `/opt/jeromelu/.env`). Confirmed first the running `jeromelu-api` container (image `:latest`) already carries the Phase 3 route code, so the new behaviour ran live:
+- **draw**: `{ok:true, fixtures:5, s3_archive_key:"scout/nrlcom/draw/111/2026/round-12.json", selected_round:12, validated:true}` — TASK-08 strict-parse confirmed live (`validated:true`).
+- **match-centre**: `{ok:true, resolved_round:12, fixtures_in_round:5, matches_archived:5, fetch_failures:[], archive_failures:[], validation_failures:[]}` — TASK-10 confirmed live: round-optional resolution (`resolved_round:12`) and the union envelope accepted all 5 real matches with **0 validation_failures**.
+- **S3 (reviewer independently reproduced):** `draw/111/2026/round-12.json` (31308 B) + 5 `match-centre/111/2026/round-12/*.json` (97-102KB), all dated 2026-05-24.
+- **Docs:** flipped charter (both nrl.com Status cells → ingest shipped, extraction → 3.5) + roadmap (Phase 3 → ✅ Shipped, extractors ⏳ 3.5); added `## Tests` sections + cadence/endpoint updates to both pipeline READMEs. **S3 profile docs:** regenerated `nrlcom/{draw,match-centre}.md` → draw no diff; match-centre diff was markdown-padding whitespace only (profiles sample rounds 18-27 / round-07, not the seeded round-12; shape unchanged — independently evidenced by the 0 validation_failures). Reverted both to avoid whitespace-only churn unrelated to the seed.
+**Reviewer PASS WITH CONCERNS** — S3 reproduced; the profile-revert decision verified correct (reviewer read `profile_s3_json.py`, confirmed deterministic last-N sampling on pinned prefixes that exclude round-12). Non-blocking: profiles don't visually corroborate round-12 (pre-existing pinning, not in scope); cron first-fire deferred (below).
+
 ---
 
 ## How we know it's done (running)
@@ -42,9 +50,8 @@ Added `nrlcom-draw` and `nrlcom-match-centre` cases to `scripts/scout-refresh.sh
 ## Decisions & deviations
 - `callToAction`/`secondaryCallToAction` typed `dict[str, Any] | None` (CTAs vary by match state across rounds); `disclaimer` `str | None`. Load-bearing `matchCentreUrl` is strictly required.
 
-## Outstanding
-- ☐ TASK-12 — prod seed (draw + match-centre, current round) + S3 verify + docs (READMEs/roadmap/charter/S3 profiles); finalise this report + remove the plan from PLAN.md Active.
-- ☐ Recurring-cron first fire — `/var/log/jeromelu/scout-refresh.log` shows `nrlcom-draw` + `nrlcom-match-centre` clean after the first 18:00/18:15 UTC run post-deploy (deferred, recorded at/after TASK-12).
+## Outstanding (deferred — operator/time-gated)
+- ☐ **Recurring-cron first fire.** The TASK-11 cron lines (commit `bfb63b8`) are not yet on the box — at closure the box `git HEAD` was `77fe85b` and `/etc/cron.d/jeromelu` had 0 nrlcom lines. Once the box pulls past `bfb63b8` (auto-pull lag or next `lightsail-deploy.sh`), confirm `/var/log/jeromelu/scout-refresh.log` shows `nrlcom-draw` + `nrlcom-match-centre` ran clean after the first 18:00/18:15 UTC fire. (Mirrors the Phase 2.5 TASK-06 deferral. The one-time seed already proved the endpoints + S3 path end-to-end; this only confirms the *scheduled* invocation.)
 
 ## Commits
-`f02a678` (TASK-07) · `a0ecbd7` (TASK-08) · `45fd6fe` (TASK-09) · `f92d4bd` (TASK-10) · `bfb63b8` (TASK-11).
+`f02a678` (TASK-07) · `a0ecbd7` (TASK-08) · `45fd6fe` (TASK-09) · `f92d4bd` (TASK-10) · `bfb63b8` (TASK-11) · `5f57c65` (TASK-12 docs). Plus the per-task run-report/queue commits.

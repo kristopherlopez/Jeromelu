@@ -136,52 +136,6 @@ make db-shell
 
 ---
 
-## 2026-05-24: Scout Phase 3 — nrl.com draw + match-centre ingest hardening
-
-**Goal:** Take the already-built `scout/nrlcom_draw/` and `scout/nrlcom_match_centre/` capture pipelines from "fetch + S3 archive, but no strict-parse, no tests, no schedule" to **charter-compliant, drift-tested, scheduled, seeded** — the same D8 / cron / seed discipline applied in Phases 1/2/2.5. **Ingest only**; the DB extractors (`matches`, `match_team_lists`, `player_match_stats`, `match_timeline`, `match_officials`) are deferred to Phase 3.5.
-
-**Context (verified 2026-05-24):** Both pipelines already have `fetcher.py` + `routes.py` (mounted at `/api/admin/scout/nrlcom-draw` and `/nrlcom-match-centre`) + Makefile targets + S3 archive + agent_audit. **Missing:** `models.py` (no D8 strict model), strict-parse wired into the routes (they archive raw and never validate — drift passes silently), fixtures + unit + live drift tests, and cron scheduling.
-
-**Constraints:**
-- Charter D8: each pipeline ships `tests/fixtures/scout/<pipeline>/canonical_response.json`, strict Pydantic models (`extra='forbid'`), a fixture-mode unit test, and an env-flagged (`SCOUT_DRIFT_LIVE=1`) live-mode integration test. The route must **wire the strict parse in** so drift surfaces in prod, not just in CI.
-- Match-centre payload is ~100KB / 29 top-level keys, deeply nested → **envelope-guard model only** (top-level keys as opaque, like `supercoach_settings`). Draw is small → model the envelope **and** each fixture (the pipeline depends on `fixtures[].matchCentreUrl`).
-- NRL men's only (competition 111). NRLW / state cups are a later config follow-on.
-- Forward-only, daily-during-the-round cron. Historical backfill stays Phase 5 (D12).
-- Scout scrapers don't auto-adapt to drift (D8 / META) — tests fail loudly; the human decides the fix.
-- META: cron lives in `scripts/cron.d/jeromelu` + `scripts/scout-refresh.sh`, deployed via `lightsail-deploy.sh`; never hand-edit the prod crontab. On-box admin calls need `--resolve` (hairpin-NAT). Session-scoped staging.
-
-**Interface (top-level keys verified against live capture 2026-05-24, comp 111 / season 2026 / round 12 — the implementer re-captures the fixture and enumerates the exact key set + types):**
-- New `services/api/app/scout/nrlcom_draw/models.py`:
-  - `NrlcomDraw(BaseModel)` — `model_config = ConfigDict(extra="forbid")`. Top-level keys observed: `fixtures: list[DrawFixture]`, `byes: list[dict[str, Any]]`, `calendarUrl: str`, `disclaimer: str | None`, `downloadUrl: str`, `filterCompetitions/filterRounds/filterSeasons/filterTeams: list[dict[str, Any]]`, `selectedCompetitionId/selectedRoundId/selectedSeasonId: int`, `showOdds: bool`, `showTeamPositions: bool`.
-  - `DrawFixture(BaseModel)` — `extra="forbid"`. Keys observed: `matchCentreUrl: str` (**load-bearing**), `homeTeam/awayTeam: dict[str, Any]`, `clock: dict[str, Any]`, `callToAction/secondaryCallToAction: dict[str, Any] | None`, `isCurrentRound: bool`, `matchMode: str`, `matchState: str`, `roundTitle: str`, `type: str`, `venue: str`, `venueCity: str`.
-- New `services/api/app/scout/nrlcom_match_centre/models.py`:
-  - `NrlcomMatchCentre(BaseModel)` — `extra="forbid"`, **envelope only**. The 29 top-level keys as opaque/typed: `matchId` (str|int), `homeTeam/awayTeam/competition/officials/stats/weather/groundConditions/venue?: dict[str, Any]`, `positionGroups/timeline: list[Any]`, int scalars (`attendance`, `gameSeconds`, `roundNumber`, `segmentCount`, `segmentDuration`), str scalars (`matchMode/matchState/roundTitle/startTime/updated/url/venue/venueCity/imageUrl`), bool scalars (`animateMatchClock/hasExtraTime/hasOnFieldTracking/showPlayerPositions/showTeamPositions`). Enumerate exactly from the fixture (some may be nullable).
-- Route changes:
-  - `nrlcom_draw/routes.py` — after `archive_response(...)`, `NrlcomDraw.model_validate(data)`; on `ValidationError` record failed audit + `raise HTTPException(500, ...)` so drift surfaces. Add `"validated": True` to detail on success. (Archive **before** validate so the raw is captured for drift forensics even when validation fails.)
-  - `nrlcom_match_centre/routes.py` — make `round` optional (`round: int | None = Query(default=None)`); when `None`, resolve current via the draw's `selectedRoundId`. After archiving each match, `NrlcomMatchCentre.model_validate(match_data)`; collect `validation_failures: list[{slug, error}]` (do **not** abort the walk); surface the count in detail + summary so the cron-health email flags drift.
-- Cron:
-  - `scripts/scout-refresh.sh` — two new cases mapping to query-string ENDPOINTs: `nrlcom-draw) ENDPOINT="nrlcom-draw?competition=111&season=$(date -u +%Y)"` and `nrlcom-match-centre) ENDPOINT="nrlcom-match-centre?competition=111&season=$(date -u +%Y)"` (round omitted → current, resolved server-side); update usage string.
-  - `scripts/cron.d/jeromelu` — two daily lines, proposed `0 18 * * *` (draw) and `15 18 * * *` (match-centre) = 04:00 / 04:15 AEST, capturing the prior day's completed games off-peak; tunable.
-- S3 keys (already produced by the routes, unchanged): `scout/nrlcom/draw/{comp}/{season}/round-{NN}.json`, `scout/nrlcom/match-centre/{comp}/{season}/round-{NN}/{slug}.json`.
-- New env vars: none.
-
-**Verification strategy:**
-- End-to-end: `make scout-nrlcom-draw COMPETITION=111 SEASON=2026` and `make scout-nrlcom-match-centre COMPETITION=111 SEASON=2026` against prod return `ok:true` with `s3_archive_key`(s); `aws s3 ls scout/nrlcom/draw/111/2026/` and `.../match-centre/111/2026/round-NN/` show today-dated keys.
-- Tests: unit drift tests (fixtures parse; unknown/missing fields raise) always-on in CI; live drift tests env-flagged (`SCOUT_DRIFT_LIVE=1`) hit real nrl.com; deliberate model-break makes them fail naming the field.
-- Route wiring: deliberately pollute the model → the draw endpoint 500s; the match-centre endpoint reports `validation_failures`.
-- Cron: `bash -n`, dry-run case match (URL carries `?competition=111&season=YYYY`), 5-field cron lines + `lightsail-deploy.sh` sync grep.
-
-**Documentation updates:**
-- `services/api/app/scout/nrlcom_draw/README.md` + `nrlcom_match_centre/README.md` — add `## Tests` sections; update cadence to "daily cron (current round)".
-- `docs/agents/crew/scout/roadmap.md` — Phase 3 ingest → ✅ Shipped (explicitly note extractors deferred to Phase 3.5).
-- `docs/agents/crew/scout/charter.md` — flip the nrl.com draw + match-centre Status cells (if present in the nrl.com data table).
-- `docs/operations/data-sources/...` — generate S3 profile docs for `scout/nrlcom/draw/` and `scout/nrlcom/match-centre/` via `scripts/profile_s3_json.py`.
-- `docs/build/runs/2026-05-24-scout-phase-3-nrlcom-ingest.md` — run report (created when the first task lands; finalised at closure).
-
-**Tasks:** TASK-07 → TASK-12 (in TASKS.md).
-
----
-
 ## Completed work
 
 Completed plans are **not** archived in this file. When a plan's tasks are all done, its durable record is a run report under [`docs/build/runs/`](./runs/) (see the [index](./runs/README.md)) and the plan is removed from "Active plan" above. This document holds only active/future plans; the run reports are the system of record for what shipped.

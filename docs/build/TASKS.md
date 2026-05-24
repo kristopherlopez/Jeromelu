@@ -95,31 +95,6 @@ Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "One-time S3 seed run" + "D
 _(implementer fills in: three curl responses, three aws s3 ls outputs, two SQL query results, doc diff summary, first-cron-fire log line)_
 
 
-### TASK-12: One-time prod seed + S3 verification + docs + run report (Phase 3 closure)
-
-Implements PLAN.md § 2026-05-24 Scout Phase 3 / Verification + Documentation updates. **Only run after TASK-07 → TASK-11 are merged.** Mirrors the Phase 2.5 closure (TASK-06). `ADMIN_KEY` comes from the prod box (SSM denies `GetParameter` to the human user, per META); on-box admin calls need `--resolve api.jeromelu.ai:443:127.0.0.1`.
-
-**What**
-1. Seed current season / current round against prod (on the box, loopback). Round omitted → resolved server-side:
-   - `POST /api/admin/scout/nrlcom-draw?competition=111&season=2026`
-   - `POST /api/admin/scout/nrlcom-match-centre?competition=111&season=2026`
-   Capture both responses — draw `ok:true` + `s3_archive_key` + `validated:true`; match-centre `ok:true` + `resolved_round` + `matches_archived` + `validation_failures` (expect empty).
-2. Verify S3: `aws s3 ls s3://jeromelu-clean-documents/scout/nrlcom/draw/111/2026/` shows `round-NN.json` today-dated; `aws s3 ls s3://jeromelu-clean-documents/scout/nrlcom/match-centre/111/2026/round-NN/` shows per-match keys today-dated.
-3. Docs: add `## Tests` sections to both pipeline READMEs + update cadence to "daily cron (current round)"; flip `docs/agents/crew/scout/roadmap.md` Phase 3 ingest → ✅ Shipped (note extractors deferred to Phase 3.5); flip the nrl.com draw + match-centre Status cells in `docs/agents/crew/scout/charter.md` (if present); generate S3 profile docs for `scout/nrlcom/draw/` and `scout/nrlcom/match-centre/` via `scripts/profile_s3_json.py`.
-4. Create + finalise the run report `docs/build/runs/2026-05-24-scout-phase-3-nrlcom-ingest.md` (per-task account + verification + decisions + lessons), add its index row, then **remove the Phase 3 plan from PLAN.md "Active plan" and clear TASK-07 → TASK-12 from TASKS.md** (run-report ritual).
-5. The recurring-cron first-fire check (daily 18:00 / 18:15 UTC) — record in the run report once observed; defer like Phase 2.5 if not yet fired.
-
-**How to verify**
-- Two seed calls return `ok:true` with archive keys / counts. Two `aws s3 ls` show today-dated keys.
-- Doc diffs are status-flips + generated profiles only.
-- Run report exists + indexed; PLAN Active no longer lists Phase 3; TASKS.md has no TASK-07 → TASK-12.
-
-**Proof notes**
-_(implementer fills in)_
-
-
----
-
 ## Completed work
 
 Completed tasks are not kept here. When a task passes review and is checked off, what it delivered is recorded in the active run report under [`docs/build/runs/`](./runs/) and the task is removed from this file. This queue holds only open/in-flight work.
