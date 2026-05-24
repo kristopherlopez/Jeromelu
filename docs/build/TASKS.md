@@ -95,28 +95,6 @@ Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "One-time S3 seed run" + "D
 _(implementer fills in: three curl responses, three aws s3 ls outputs, two SQL query results, doc diff summary, first-cron-fire log line)_
 
 
-### TASK-15: Refactor `phase_stats` to a pure `_extract_stat_rows` + unit tests
-
-Implements PLAN.md § 2026-05-24 Scout Phase 3.5 / Interface / pure extract (stats). Depends on TASK-13.
-
-**What**
-1. **Behavior-preserving refactor** of `scripts/data/populate/phase_stats.py`: extract the inlined per-player row-building (currently inside the `for side_key ... for s in stats_block` loop in `populate_player_match_stats`) into a pure module-level function `_extract_stat_rows(payload, key, match_id, team_map, player_map) -> list[dict]`. It must return the same `row` dicts the loop currently builds (match_id, nrlcom_match_id, nrlcom_player_id, person_id, team_id, nrlcom_team_id, is_home, jersey_number, position, is_on_field, all `_FIELD_MAP` columns, raw_payload, s3_archive_key). `populate_player_match_stats` then calls `_extract_stat_rows(...)` and only does the UPSERT loop over the returned rows. No change to the UPSERT SQL, the maps, or the return summary.
-2. Create `tests/unit/scripts/data/populate/test_phase_stats.py`. Import `_extract_stat_rows`, `_build_player_meta_map`, `_FIELD_MAP`. Load the FullTime fixture; fake maps from the fixture's teamIds/playerIds.
-3. Tests:
-   - `test_build_player_meta_map` — `_build_player_meta_map(payload)` returns playerId → {jersey_number, position, is_on_field, is_home, nrlcom_team_id} for every player in both squads; spot-check one known player.
-   - `test_extract_stat_rows_field_mapping` — for a known player, the returned row maps `tacklesMade→tackles_made`, `allRunMetres→all_run_metres`, `tries→tries` etc. per `_FIELD_MAP`; `jersey_number`/`position`/`is_on_field` come from player_meta; `is_home` correct; `match_id` is the passed-in value; `s3_archive_key==key`.
-   - `test_person_and_team_resolution` — with player_map/team_map populated, `person_id`/`team_id` resolve; with empty maps they are `None` (row still emitted — person_id is nullable).
-   - `test_row_count_equals_stat_players` — `len(_extract_stat_rows(...))` == total players across `stats.players.homeTeam` + `.awayTeam`.
-
-**How to verify**
-- `pytest tests/unit/scripts/data/populate/test_phase_stats.py -v` — all pass.
-- The refactor is behavior-preserving: `grep` confirms `populate_player_match_stats` still UPSERTs via the same `upsert_sql` and returns the same summary keys. `pytest tests/unit/ -q` green.
-- `git status`: modified `phase_stats.py` + one new test file.
-
-**Proof notes**
-_(implementer fills in)_
-
-
 ### TASK-16: Refactor `phase_team_lists` to a pure `_extract_player_list_rows` + unit tests
 
 Implements PLAN.md § 2026-05-24 Scout Phase 3.5 / Interface / pure extract (team_lists). Depends on TASK-13.
