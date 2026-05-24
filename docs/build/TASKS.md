@@ -23,43 +23,6 @@ Prefix the title with optional tags in square brackets:
 
 ## Open tasks
 
-### TASK-05: Extend `scripts/scout-refresh.sh` + add cron lines for SC teams + settings
-
-Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "Cron schedule".
-
-**What**
-1. Edit `scripts/scout-refresh.sh`: extend the `case "$JOB"` block (currently lines 31–35, `channel-stats|videos`) to add two more cases:
-   - `supercoach-teams)    ENDPOINT="supercoach-teams" ;;`
-   - `supercoach-settings) ENDPOINT="supercoach-settings" ;;`
-   The script's existing URL template at line 41 (`https://${API_HOST}/api/admin/scout/${ENDPOINT}`) prepends `/api/admin/scout/` automatically — the ENDPOINT value must NOT include a leading `scout/`. The two new admin routes live at `/api/admin/scout/supercoach-teams` and `/api/admin/scout/supercoach-settings`, so `ENDPOINT="supercoach-teams"` is correct (verified against script line 41 and Makefile lines 371, 377).
-   Also update the usage message on line 34 from `usage: $0 {channel-stats|videos}` to `usage: $0 {channel-stats|videos|supercoach-teams|supercoach-settings}`.
-   **No other changes** — the curl block, `--resolve` loopback, `--max-time 3600`, and log line format are reused as-is so the existing `cron_report.py` parsing keeps working.
-2. Edit `scripts/cron.d/jeromelu`: insert two new cron lines after the existing `15 23 * * *` videos refresh entry (currently line 31). Use this exact block, preserving the file's existing comment style:
-
-   ```cron
-   # Weekly SuperCoach teams refresh — Mondays 23:30 UTC = Tuesday 09:30 AEST.
-   # Tiny payload (17 rows, ~3KB). Refreshes teams.metadata_json.supercoach
-   # via /api/admin/scout/supercoach-teams. Audit row under agent_id='scout'.
-   30 23 * * 1     ubuntu  /opt/jeromelu/scripts/scout-refresh.sh supercoach-teams
-
-   # Weekly SuperCoach settings snapshot — Mondays 23:35 UTC = Tuesday 09:35 AEST.
-   # ~15KB payload. Captures game rules per season into sc_settings (classic
-   # mode only — draft is on-demand via make scout-supercoach-settings MODE=draft).
-   35 23 * * 1     ubuntu  /opt/jeromelu/scripts/scout-refresh.sh supercoach-settings
-   ```
-3. Do **not** touch `/etc/cron.d/jeromelu` on the prod box directly. The deploy step (`scripts/lightsail-deploy.sh`) syncs the file from the repo on next deploy. Confirm that's the case by grepping the deploy script for `cron.d/jeromelu` and noting the copy step in the proof notes.
-
-**How to verify**
-- `bash -n scripts/scout-refresh.sh` — no syntax errors.
-- Run the wrapper locally with the new arg pointed at a non-existent host to prove the case clause matches: `JOB=supercoach-teams ADMIN_KEY=test API_HOST=invalid.local bash -x scripts/scout-refresh.sh supercoach-teams 2>&1 | head -20` — should show the script reaching the curl call (curl will fail at DNS; that proves the case matched). Repeat for `supercoach-settings`.
-- `crontab -T scripts/cron.d/jeromelu` (if a `cron` package is locally available) or visual diff vs the existing entries — each new line has 5 timing fields, user `ubuntu`, absolute path to the wrapper.
-- `grep -n cron.d/jeromelu scripts/lightsail-deploy.sh` returns a sync line, proving deploy will publish the change. Quote the relevant lines in proof notes.
-- `git status` shows exactly two modified files: the wrapper and the crontab. No new files.
-
-**Proof notes**
-_(implementer fills in: bash -n output, dry-run output, lightsail-deploy.sh grep, commit SHA)_
-
-
 ### TASK-06: One-time S3 seed + DB verification + roadmap/charter status flip + S3 profile docs refresh
 
 Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "One-time S3 seed run" + "Documentation updates". This is the closure task — only run after TASK-01 through TASK-05 are merged and the cron is deployed.
@@ -171,3 +134,18 @@ Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "Files created" / supercoac
 - `git status` showed exactly one new file (plus untouched concurrent-session changes).
 - **adversarial-reviewer verdict: PASS WITH CONCERNS** — both non-blocking (proof notes pending at review time → filled here; thin draft margin → recorded).
 - **Commit:** `fa16afa` — `test(scout): add D8 live integration drift tests (classic+draft) for supercoach_settings [skip-simplify]`. Pushed to `master`.
+
+### [x] TASK-05: Extend `scripts/scout-refresh.sh` + add cron lines for SC teams + settings
+
+Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "Cron schedule".
+
+**Proof notes**
+- **`scripts/scout-refresh.sh`:** added two case clauses (`supercoach-teams) ENDPOINT="supercoach-teams"`, `supercoach-settings) ENDPOINT="supercoach-settings"` — no leading `scout/`, so the URL template yields `/api/admin/scout/supercoach-{teams,settings}`). Updated the `echo "usage: ..."` message and the file-header `# Usage:` comment to list the two new args (header sync = documentation discipline; reviewer explicitly approved as in-spirit, not out-of-spec). Curl block / `--resolve` / `--max-time 3600` / log-line format untouched.
+- **`scripts/cron.d/jeromelu`:** inserted the spec's exact two-block (weekly `30 23 * * 1` teams + `35 23 * * 1` settings, user `ubuntu`, absolute wrapper paths) immediately after the `15 23 * * *` videos entry.
+- `bash -n scripts/scout-refresh.sh` → clean (no syntax errors).
+- Dry-run `JOB=supercoach-teams ... bash -x ... supercoach-teams` → trace shows `case` matched, `ENDPOINT=supercoach-teams`, `API_URL=https://api.jeromelu.ai/api/admin/scout/supercoach-teams`, reached curl (CURL_RC=7 at connect — proves the clause matched). Same for `supercoach-settings` → `API_URL=.../supercoach-settings`.
+- Cron lines verified: 5 timing fields + `ubuntu` + absolute path each.
+- `grep -n cron.d/jeromelu scripts/lightsail-deploy.sh` → lines 59–60; the sync is `sudo -n install -m 0644 -o root -g root /opt/jeromelu/scripts/cron.d/jeromelu /etc/cron.d/jeromelu` (lines 58–60), and line 64 `chmod +x /opt/jeromelu/scripts/*.sh`. So the wrapper arg + cron lines publish to `/etc/cron.d/jeromelu` on next deploy; prod crontab is never hand-edited.
+- `git status` showed exactly two modified files (the wrapper + crontab), no new files (plus untouched concurrent-session changes).
+- **adversarial-reviewer verdict: PASS** — no Blockers, no Concerns; header-comment sync explicitly approved.
+- **Commit:** `b031fff` — `feat(scout): wire SC teams + settings into scout-refresh.sh + cron [skip-simplify]`. Pushed to `master`.
