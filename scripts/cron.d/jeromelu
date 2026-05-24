@@ -40,6 +40,14 @@ MAILTO=""
 # mode only — draft is on-demand via make scout-supercoach-settings MODE=draft).
 35 23 * * 1     ubuntu  /opt/jeromelu/scripts/scout-refresh.sh supercoach-settings
 
+# Daily nrl.com draw refresh — 18:00 UTC = 04:00 AEST. Current-round fixtures for
+# NRL (111), current season. Archives scout/nrlcom/draw/111/{season}/round-NN.json.
+0 18 * * *      ubuntu  /opt/jeromelu/scripts/scout-refresh.sh nrlcom-draw
+
+# Daily nrl.com match-centre walk — 18:15 UTC = 04:15 AEST. Walks the current
+# round's fixtures, archives each match's full JSON. Round resolved server-side.
+15 18 * * *     ubuntu  /opt/jeromelu/scripts/scout-refresh.sh nrlcom-match-centre
+
 # Nightly Postgres backup — 16:30 UTC = 02:30 AEST / 03:30 AEDT.
 # Streams pg_dump from the postgres container to s3://jeromelu-public-assets/
 # backups/postgres/. Retention via S3 lifecycle (14d). The wrapper writes its
