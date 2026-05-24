@@ -23,15 +23,23 @@ Prefix the title with optional tags in square brackets:
 
 ## Open tasks
 
-### [BLOCKED: ADMIN_KEY not available in implementer environment] TASK-06: One-time S3 seed + DB verification + roadmap/charter status flip + S3 profile docs refresh
+### [BLOCKED: awaiting first cron fire — verify scout-refresh.log on/after 2026-05-25 23:35 UTC] TASK-06: One-time S3 seed + DB verification + roadmap/charter status flip + S3 profile docs refresh
 
 Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "One-time S3 seed run" + "Documentation updates". This is the closure task — only run after TASK-01 through TASK-05 are merged and the cron is deployed.
 
-> **[BLOCKED 2026-05-24]** Step 1 is gated on `ADMIN_KEY` being present in the implementer environment; per the spec, the implementer blocks (does not improvise) when it is absent. Checked: `$ADMIN_KEY` unset; repo-root `.env` has no `ADMIN_KEY` (only LLM/API keys); `/opt/jeromelu/.env` does not exist (this is the local Windows dev box, not the Lightsail prod host). TASK-01→05 are all merged to `master`, so the code/cron/test prerequisites are done — the only blockers are operator-side:
-> 1. **`ADMIN_KEY`** must be supplied to the session (or the seed run from the prod box where `/opt/jeromelu/.env` lives).
-> 2. **Cron deploy** — the new `cron.d/jeromelu` lines only reach `/etc/cron.d/jeromelu` after the operator runs `scripts/lightsail-deploy.sh`. The final verification bullet (first-Tuesday cron-fire log line) also depends on that deploy + a calendar week passing.
->
-> To unblock: provide `ADMIN_KEY` (and confirm the deploy has run), then remove this tag and re-queue.
+> **Steps 1–7 DONE 2026-05-24** (commit `8ed6e37`, adversarial-reviewer PASS WITH CONCERNS — both non-blocking). The ADMIN_KEY gate was resolved by the operator authorising key retrieval; the seed ran on the prod box. **Only the final verification bullet remains** and cannot be observed yet:
+> - The recurring cron fires **Mon 2026-05-25 23:30 UTC** (teams) / **23:35 UTC** (settings). To close: confirm `/var/log/jeromelu/scout-refresh.log` shows both `supercoach-teams` and `supercoach-settings` jobs ran clean (status=2xx), or that the Tuesday cron-health email reports them green. Then mark `[x]` and move to Completed.
+> - Box state confirmed during seed: git HEAD `b031fff`, `/etc/cron.d/jeromelu` already carries the two SC lines, SC make targets present — so the cron deploy precondition is already met.
+
+**Proof notes (steps 1–7, 2026-05-24)**
+- **Seed (prod box via SSH, curl with `--resolve api.jeromelu.ai:443:127.0.0.1`; ADMIN_KEY from `/opt/jeromelu/.env`, never printed):**
+  - teams: `{"ok": true, "season": 2026, "fetched": 17, "matched": 17, "unknown_abbrev": [], "missing_team_row": []}`
+  - settings classic: `{"ok": true, "mode": "classic", "upserted_id": "8cb12dca-c65d-4c92-a740-0caf924d6981"}`
+  - settings draft: `{"ok": true, "mode": "draft", "upserted_id": "f48996b6-9f4e-452b-83ce-4ef78a0142f9"}`
+  - Note: responses carry `matched`/`upserted_id`, **not** `s3_archive_key` (spec expectation didn't match the route's actual return shape — `s3_archive_key` is recorded in the audit detail + `sc_settings`, not the HTTP body). Reviewer confirmed via `routes.py` this is correct; direct `aws s3 ls` used as authoritative S3 proof.
+- **S3 (`aws s3 ls`, ap-southeast-2; reviewer independently reproduced):** `classic/teams/2026.json` (3176 B), `classic/settings/2026/20260524.json` (16994 B), `draft/settings/2026/20260524.json` (15760 B) — all dated 2026-05-24.
+- **DB (box, `docker exec jeromelu-postgres psql -U jeromelu_admin -d jeromelu`):** `sc_settings` → 2 rows season 2026 captured_date 2026-05-24 (classic 16994 B, draft 15760 B). `teams` → 17 rows with `metadata_json ? 'supercoach'`, all distinct abbrevs.
+- **Docs (commit `8ed6e37`):** regenerated `classic-settings.md` (2→3 samples) + `draft-settings.md` (1→2 samples); `classic-teams.md` no diff (byte-identical overwrite). Flipped roadmap Phase 2.5 heading + bullets to Shipped; flipped charter `supercoach_teams/` + `supercoach_settings/` Status to `✅ shipped (Phase 2.5)`. Added `## Tests` sections to both pipeline READMEs.
 
 **What**
 1. **Trigger the seed against prod yourself.** `ADMIN_KEY` must be available in your environment — on Lightsail it lives at `/opt/jeromelu/.env`; locally, source it from the same place the operator's shell would (e.g. a `.env` you load before starting the session). If `ADMIN_KEY` is not set, tag this task `[BLOCKED: ADMIN_KEY not available in implementer environment]` and pick the next task — do not improvise.
