@@ -108,6 +108,46 @@ def _ensure_coach_person(
     return None
 
 
+def _extract_player_list_rows(
+    payload: dict[str, Any],
+    match_id: str,
+    team_map: dict[int, str],
+    player_map: dict[int, str],
+) -> list[dict[str, Any]]:
+    """Pure projection of one match-centre archive into match_team_lists PLAYER rows.
+
+    One row per resolvable player (team in `team_map`, player in `player_map`)
+    with jersey_number / named_position / is_captain. Players on an unresolved
+    team, or without a resolved person_id, are skipped — matching the original
+    `populate_team_lists` behaviour. Coaches are NOT handled here (they require
+    a DB upsert via `_ensure_coach_person`). No S3, no DB.
+    """
+    rows: list[dict[str, Any]] = []
+    for side in ("homeTeam", "awayTeam"):
+        team_block = payload.get(side) or {}
+        nrl_team_id = team_block.get("teamId")
+        team_id = team_map.get(int(nrl_team_id)) if nrl_team_id else None
+        if not team_id:
+            continue
+        captain_id = team_block.get("captainPlayerId")
+        for p in team_block.get("players") or []:
+            nrlcom_player_id = p.get("playerId")
+            if not nrlcom_player_id:
+                continue
+            person_id = player_map.get(int(nrlcom_player_id))
+            if not person_id:
+                continue
+            rows.append({
+                "match_id": match_id,
+                "team_id": team_id,
+                "player_id": person_id,
+                "jersey_number": p.get("number"),
+                "named_position": p.get("position"),
+                "is_captain": bool(captain_id and int(captain_id) == int(nrlcom_player_id)),
+            })
+    return rows
+
+
 def populate_team_lists(
     db: Session,
     *,
@@ -148,57 +188,58 @@ def populate_team_lists(
             continue
         match_id = match_map[match_ext]
 
+        # Players — pure projection, then the canonical-capture existence pre-check + INSERT.
+        player_rows = _extract_player_list_rows(payload, match_id, team_map, player_map)
+        # Diagnostic: players on a resolved team that didn't resolve to a person.
+        resolvable = sum(
+            1
+            for side in ("homeTeam", "awayTeam")
+            if team_map.get(int((payload.get(side) or {}).get("teamId") or 0))
+            for p in (payload.get(side) or {}).get("players") or []
+            if p.get("playerId")
+        )
+        players_no_match += resolvable - len(player_rows)
+
+        for r in player_rows:
+            existing = db.execute(
+                text("""
+                    SELECT 1 FROM match_team_lists
+                    WHERE match_id = :match_id
+                      AND team_id = :team_id
+                      AND player_id = :player_id
+                      AND list_version = 1
+                """),
+                {"match_id": r["match_id"], "team_id": r["team_id"], "player_id": r["player_id"]},
+            ).first()
+            if existing:
+                rows_already_present += 1
+                continue
+            db.execute(
+                text("""
+                    INSERT INTO match_team_lists (
+                        match_id, team_id, player_id, jersey_number,
+                        named_position, list_version, status, source, is_captain
+                    )
+                    VALUES (
+                        :match_id, :team_id, :player_id, :jersey,
+                        :position, 1, 'named', 'nrl_com', :is_captain
+                    )
+                """),
+                {
+                    "match_id": r["match_id"], "team_id": r["team_id"], "player_id": r["player_id"],
+                    "jersey": r["jersey_number"], "position": r["named_position"],
+                    "is_captain": r["is_captain"],
+                },
+            )
+            rows_inserted += 1
+
+        # Coaches — DB upsert via _ensure_coach_person (unchanged; not in the pure extractor).
         for side in ("homeTeam", "awayTeam"):
             team_block = payload.get(side) or {}
             nrl_team_id = team_block.get("teamId")
             team_id = team_map.get(int(nrl_team_id)) if nrl_team_id else None
             if not team_id:
                 continue
-            captain_id = team_block.get("captainPlayerId")
-
-            for p in team_block.get("players") or []:
-                nrlcom_player_id = p.get("playerId")
-                if not nrlcom_player_id:
-                    continue
-                person_id = player_map.get(int(nrlcom_player_id))
-                if not person_id:
-                    players_no_match += 1
-                    continue
-                jersey = p.get("number")
-                position = p.get("position")
-                is_captain = bool(captain_id and int(captain_id) == int(nrlcom_player_id))
-
-                existing = db.execute(
-                    text("""
-                        SELECT 1 FROM match_team_lists
-                        WHERE match_id = :match_id
-                          AND team_id = :team_id
-                          AND player_id = :player_id
-                          AND list_version = 1
-                    """),
-                    {"match_id": match_id, "team_id": team_id, "player_id": person_id},
-                ).first()
-                if existing:
-                    rows_already_present += 1
-                    continue
-                db.execute(
-                    text("""
-                        INSERT INTO match_team_lists (
-                            match_id, team_id, player_id, jersey_number,
-                            named_position, list_version, status, source, is_captain
-                        )
-                        VALUES (
-                            :match_id, :team_id, :player_id, :jersey,
-                            :position, 1, 'named', 'nrl_com', :is_captain
-                        )
-                    """),
-                    {
-                        "match_id": match_id, "team_id": team_id, "player_id": person_id,
-                        "jersey": jersey, "position": position, "is_captain": is_captain,
-                    },
-                )
-                rows_inserted += 1
-
             for c in team_block.get("coaches") or []:
                 person_id = _ensure_coach_person(db, coach=c, player_id_map=player_map)
                 if not person_id:
