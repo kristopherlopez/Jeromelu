@@ -95,25 +95,6 @@ Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "One-time S3 seed run" + "D
 _(implementer fills in: three curl responses, three aws s3 ls outputs, two SQL query results, doc diff summary, first-cron-fire log line)_
 
 
-### TASK-13: Make `scripts.data.populate.*` importable under pytest
-
-Implements PLAN.md § 2026-05-24 Scout Phase 3.5 / Interface / Import path. **Prerequisite for TASK-14→17.**
-
-**What**
-1. Edit `pytest.ini`: change `pythonpath = services/api packages/shared` to `pythonpath = . services/api packages/shared` (add repo root).
-2. Add empty package markers so the populate package resolves as a regular import chain: create `scripts/__init__.py` and `scripts/data/__init__.py` (both empty, or a one-line module docstring). `scripts/data/populate/__init__.py` already exists.
-3. Confirm `python -m scripts.data.populate_db_from_s3 --help` still works (regular packages don't break `-m`).
-
-**How to verify**
-- From repo root with the api venv active: `python -c "from scripts.data.populate.phase_matches import _extract_one; print('ok')"` prints `ok`.
-- `pytest tests/unit/ -q` — the existing suite still collects + passes (no import regressions from adding repo root to pythonpath).
-- `python -m scripts.data.populate_db_from_s3 --help` exits 0 and prints usage.
-- `git status` shows: modified `pytest.ini`, new `scripts/__init__.py`, new `scripts/data/__init__.py`.
-
-**Proof notes**
-_(implementer fills in)_
-
-
 ### TASK-14: Unit tests for `phase_matches._extract_one` (no refactor needed)
 
 Implements PLAN.md § 2026-05-24 Scout Phase 3.5 / Interface / pure extract (matches). Depends on TASK-13.
