@@ -108,7 +108,7 @@ This phase isn't blocked by anything earlier; could ship in parallel with Phases
 
 ### Phase 7 (future) — Multi-platform expansion — Backlog
 
-The multi-platform roadmap items below (podcasts, Twitter/X, blogs, Reddit) instantiate the same shape: each becomes a `scout/<platform>_<thing>/` folder with an admin endpoint. Out of scope for the charter proper; tracked for visibility.
+The multi-platform roadmap items below (podcasts, radio, Twitter/X, Instagram, blogs, Reddit) instantiate the same shape: each becomes a `scout/<platform>_<thing>/` folder with an admin endpoint. Out of scope for the charter proper; tracked for visibility.
 
 ---
 
@@ -139,7 +139,9 @@ Schema (`platform` field on `scout_candidates` / `sources`) is already platform-
 | Platform | Discovery surface | Content extraction | Notes |
 |---|---|---|---|
 | **Podcasts** (Apple Podcasts / Spotify) | RSS catalogue search + `find_related` from tracked feeds | RSS feed enumeration → episode mp3 → transcribe (Deepgram?) | Closest analogue to YouTube. RSS makes `filter_known` trivial. |
-| **Twitter / X** (NRL personalities) | Manual seed list + agentic for adjacent accounts | API or scrape; tweets become `source_chunks` directly (no transcription) | Quote-extraction value high, signal-to-noise low. |
+| **Radio** (Triple M, SEN, ABC Grandstand) | Find the show's podcast feed first; live stream only if no feed | Mostly **folds into Podcasts** (audio → transcribe); live-stream capture = scheduled recording, separate and harder | Most NRL radio publishes podcast feeds of its segments — prefer those. Live capture is low-priority. |
+| **Twitter / X** (NRL personalities) | Manual seed list + agentic for adjacent accounts | API or scrape; tweets become `source_chunks` directly (no transcription) | Quote-extraction value high, signal-to-noise low. API now paid/restricted; scraping is ToS-fraught. |
+| **Instagram** (clubs / players / NRL accounts) | Manual seed list + agentic for adjacent accounts | Captions → `source_chunks`; Reels audio → transcribe (like YouTube) | **Hardest acquisition** — auth-gated, anti-scraping, ToS-restrictive. Official club / injury news but brittle; lowest priority. |
 | **Blogs / news** (Roar, NRL.com features, club sites) | RSS where available + agentic web search for new outlets | RSS enumerate → article HTML → readability extract | Off-platform discovery already works for these via §3.2; missing piece is structured ingestion. |
 | **Reddit** (r/nrl, club subs) | API search for high-engagement threads, weekly | Thread + top comments to `source_chunks` | Community signal; complements expert-driven sources. |
 
