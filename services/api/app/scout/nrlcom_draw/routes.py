@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from jeromelu_shared.agent_audit import (
@@ -19,6 +20,7 @@ from ...deps import get_db
 from ...routers.admin import require_admin
 from .._s3_archive import archive_response
 from .fetcher import NrlcomDrawFetchError, fetch_draw
+from .models import NrlcomDraw
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +84,11 @@ def run_nrlcom_draw(
         })
         if archive_key is None:
             detail["s3_archive_failed"] = True
+        # D8: strict-parse the archived response so upstream shape drift
+        # surfaces as a failed run. The raw payload is already in S3 above,
+        # so a validation failure never loses the capture.
+        NrlcomDraw.model_validate(data)
+        detail["validated"] = True
         logger.info(
             "scout/nrlcom-draw: comp=%s season=%s round=%s fixtures=%d s3=%s",
             competition, season, round_for_path, n_fixtures, archive_key,
@@ -93,6 +100,14 @@ def run_nrlcom_draw(
             summary_text=f"Upstream fetch failed: {e}", model=MODEL, detail=detail,
         )
         raise HTTPException(status_code=502, detail=f"nrl.com draw fetch failed: {e}")
+    except ValidationError as e:
+        detail["error"] = f"ValidationError: {e}"
+        record_agent_ended(
+            db, run_id=run_id, status="failed",
+            summary_text=f"Draw response failed strict validation (drift): {e}",
+            model=MODEL, detail=detail,
+        )
+        raise HTTPException(status_code=500, detail=f"nrl.com draw drift: {e}")
     except Exception as e:
         detail["error"] = f"{type(e).__name__}: {e}"
         record_agent_ended(
