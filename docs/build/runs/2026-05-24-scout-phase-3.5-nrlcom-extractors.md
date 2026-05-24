@@ -40,8 +40,13 @@ Closed the META known-bug (phases committed internally before the outer rollback
 ## Decisions & deviations
 - Used regular package markers (`__init__.py`) over relying on namespace packages, for an explicit, stable import chain. `-m` invocation unaffected.
 
+## Box deploy (2026-05-24, operator-authorised)
+Deployed the Phase 3.5 code + cron to the box (zero-downtime — skipped the image pull/restart since Phase 3.5 changes no container code):
+- Fast-forwarded the box git working tree `cf1cddb → 7319e50` (`git -c core.fileMode=false pull --ff-only`; the only local changes were benign chmod mode-bits + an untracked `.venv-ops/`). `_extract_stat_rows` + the `commit` guards are now present on the box.
+- Synced the crontab: `/etc/cron.d/jeromelu` now carries the **3 nrlcom** (Phase 3) + **5 supercoach** (Phase 2.5) lines (nrlcom was 0 before) → also unblocks the Phase 2.5 (TASK-06) and Phase 3 cron-fire verifications.
+
 ## Outstanding
-- ☐ **TASK-19 — `[BLOCKED: box not deployed with Phase 3.5 code]`.** Checked 2026-05-24: box `git HEAD = cf1cddb` (Phase 3 closure), behind the Phase 3.5 commits (`922b591`…`68e121e`) — the working tree lacks `_extract_stat_rows` + the `commit` guards. The populate runs from the box's git tree and the prod DB is `127.0.0.1`-only, so it can't run correctly anywhere until the box pulls master past `68e121e` (deploy lag) or `lightsail-deploy.sh` runs. Then: on-box `--dry-run`-then-count delta (confirms the TASK-18 fix end-to-end — META claims FIXED), `--phase all --seasons 2026`, the 5 row-count verifications, README + data-catalogue docs, finalise this report, remove the Phase 3.5 plan from PLAN.md Active. S3 has 2026 match-centre rounds 1-18+ ready to project.
+- ☐ **TASK-19 — `[BLOCKED: no ops Python runtime on the box]`.** Deploy done (above), so the code is live — but the populate **can't run**: system `python3` + the stub `.venv-ops` lack the deps (`import sqlalchemy` → ModuleNotFoundError); the `jeromelu-api` container has the deps + DB + S3 + `jeromelu_shared` but **not the scripts** (api image is `services/api`-only; no `/opt/jeromelu` mount); prod DB is `127.0.0.1`-only. An ops runtime must be established first (infra decision — recommend baking `scripts/` + `packages/shared` into the api image; see TASK-19 block note for options). Then: on-box `--dry-run`-then-count delta, `--phase all --seasons 2026`, the 5 row-count verifications, docs, finalise this report + remove the plan. (My `identity` attempt failed at import before any write — no partial DB state.)
 
 ## Commits
 `922b591` (TASK-13) · `bb32a84` (TASK-14) · `093de70` (TASK-15) · `a9bea13` (TASK-16) · `2082e2c` (TASK-17) · `429f4a1` (TASK-18).
