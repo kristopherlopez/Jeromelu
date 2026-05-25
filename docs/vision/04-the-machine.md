@@ -4,198 +4,176 @@ tags: [area/architecture]
 
 # The Machine
 
-> Created: 2026-05-25.
+> Created: 2026-05-25. Restructured around a two-tier reusable-component model.
 
-[Knowledge Asset](03-knowledge-asset.md) argued that the *shape* of what Jaromelu builds is domain-agnostic — ingest a domain's sources, attribute claims to speakers, grade them against reality, remember. This doc takes the next step and cuts **the machine that builds the asset** into discrete modules.
+[Knowledge Asset](03-knowledge-asset.md) argued that the *shape* of what Jaromelu builds is domain-agnostic. This doc decomposes the machine that builds it into **reusable components** — units defined by a contract (what goes in, what comes out), not by the product they happen to serve.
 
-Each module is defined by a **contract** (what goes in, what comes out), not by the product it happens to serve today. A module is reusable exactly when its interface doesn't leak the domain it was born in. NRL is not wired into the engines — it's a **data pack injected into them**. Get that one boundary right and "extends to any sport, likely any topic" stops being a slogan: the only thing rebuilt per domain is the pack, not the machine.
+This is a *component* decomposition, deliberately not a product catalogue. Whether any component is worth selling is a separate question this doc ignores on purpose. The only questions here are: what is the reusable unit, what is its contract, what is generic versus domain-specific, and what is the seam already cut or still to cut.
 
-Most of what looks like "a different product" in conversation is one of three things here: a **module** (a reusable engine with a stable contract), a **composition** (a product assembled from modules), or a **data pack** (the domain knowledge a module consumes). Sorting them is the whole point of this doc.
+The components sort into **two tiers that differ by radius of reuse**:
 
----
+- **Tier 1 — Domain-blind infrastructure.** Reusable across *entirely different products*. These don't know what the NRL or a "claim" is; they'd drop into a support-agent or a legal-research tool unchanged. The deeper reuse — they travel furthest.
+- **Tier 2 — Domain-pipeline components.** Reusable across *topics*, not products. Each is a generic engine plus an injected **domain pack** (lexicon, claim schema, resolution oracle, ontology). Swap the pack — NRL → AFL → AI — and the engine is untouched. The more valuable reuse — this is where the specific work lives.
 
-## The Principle: Domain as Data
-
-The failure mode is treating each capability as its own startup and forking the code per domain. The discipline that prevents it is simple to state and hard to hold:
-
-> Every module takes its domain knowledge as **injected data** — a lexicon, a claim schema, a resolution oracle, an ontology — never as branching code.
-
-When this holds, the NRL build is the *first caller* of a generic stack, not the stack itself. Standing up "the same thing for AFL" or "the same thing for AI-tech predictions" becomes the work of authoring a new pack and pointing the modules at it. When this breaks — when `if sport == "nrl"` creeps into an engine — every module quietly becomes a fork, and the platform thesis dies one conditional at a time.
-
-The single contract that makes this real is the [domain pack](#the-domain-pack--the-contract-that-unlocks-reuse), specified at the end.
+The tiers also sit at opposite ends of "already extracted." Tier 1 is mostly **already factored** as shared code; making it reusable is mostly *lifting and naming*. Tier 2 is still **entangled** with NRL inside the skills; making it reusable is a real *refactor*. The [state table](#state-today--lift-vs-refactor) at the end is honest about which is which.
 
 ---
 
 ## The Stack at a Glance
 
-Each layer consumes the one below it. Plumbing at the bottom, products at the top.
-
 ```
-  COMPOSITIONS   Accountability aggregator · Prediction agent (Jaromelu) · Generative media*
-                 ───────────────────────────────────────────────────────────────────────
-  ANALYTICS      Knowledge Base ·  Track-Record Scoring
-                 Claim Verification ·  Claim Extraction
-                 ───────────────────────────────────────────────────────────────────────
-  IDENTITY       Identity Registry  (the shared spine — everything keys off it)
-                 ───────────────────────────────────────────────────────────────────────
-  CAPTURE        Attribution ·  Normalisation ·  Embeddings
+  COMPOSITIONS         Accountability aggregator · Prediction agent · Generative media*
+  (assembled from      ───────────────────────────────────────────────────────────────
+   components)
+  ───────────────────────────────────────────────────────────────────────────────────
+  TIER 2               Knowledge/Wiki · Scoring · Consensus · Verification
+  domain-pipeline      Claim Extraction · Identity · Attribution · Normalisation · Embeddings
+  (engine + pack)      Assumption-Invalidation
+  ───────────────────────────────────────────────────────────────────────────────────
+  TIER 1               Agent Event Model  ← the spine
+  domain-blind         Audit Harness · Streamed-Trace Transport · Agentic Discovery
+  infrastructure       Forensic Re-derivable Capture
   * quarantined — see Compositions
 ```
 
-| # | Module | Contract (in → out) | Domain knowledge, injected as data |
-|---|--------|---------------------|-------------------------------------|
-| 1 | **Attribution** | media (+ voiceprint registry) → speaker-tagged transcript + review queue | none — generic |
-| 2 | **Normalisation** | raw transcript + lexicon → cleaned transcript | lexicon: terms, name aliases, phonetic confusions |
-| 3 | **Embeddings** | media → voice / face vectors | none |
-| 4 | **Identity Registry** | vectors + observations → resolved person IDs; enroll / match | none — people are rows, not code |
-| 5 | **Claim Extraction** | cleaned + attributed transcript + claim schema → structured claims | claim taxonomy, entity types |
-| 6 | **Claim Verification** | claim + resolution oracle → verdict + evidence | the oracle (match results, benchmark dates…) |
-| 7 | **Track-Record Scoring** | verdicts keyed by identity → accuracy profiles | none |
-| 8 | **Knowledge Base** | claims + entities → organised, queryable, rendered store | light topic ontology |
+Tier 1 is the substrate everything runs *on*; Tier 2 is the pipeline that runs *on it*; Compositions are products *assembled from* both.
 
 ---
 
-## The Modules
+## Tier 1 — Domain-Blind Infrastructure
 
-Each module below is scoped the same way: its contract, what it does, **what it is as its own product**, **how other products reuse it**, where it lives in Jaromelu today, and the **boundary to hold** to keep it reusable.
+No domain pack. Generic by construction. The reuse radius is "any agent-built system."
 
-### 1. Attribution (Speaker-ID)
+| Component | Contract (in → out) | State today |
+|---|---|---|
+| **Agent event model** | agent activity → a typed event stream (`run_started`, `turn_started`, `tool_use`, `tool_result`, `text`, `server_block`, `turn_complete`, `bound_hit`, `error`, `run_ended`) | Live, but embedded inside the audit module rather than standing alone |
+| **Audit harness** | wrap an agent loop → run summary + per-event trace + cost + enforced bounds | **Factored** — `jeromelu_shared.agent_audit`. The exemplar. |
+| **Streamed-trace transport** | agent events → live step-stream to a client (NDJSON; no SSE / WebSocket / job queue) | Pattern in use for slow mutating endpoints |
+| **Agentic discovery** | discovery brief + source adapters → scored, deduped candidate sources | Live for Scout (`scout_candidates`) |
+| **Forensic re-derivable capture** | external source → idempotent durable archive (L2) → re-derivable projection (L3) | Live — the L1→L4 model |
 
-- **Contract** — `media (+ voiceprint registry) → speaker-tagged transcript + a review queue of low-confidence segments`
-- **Scope** — Diarise audio/video, then *resolve* anonymous speakers to known identities using voiceprints. Emits confidence per segment and routes only the uncertain ones to a human — the "minimal HITL" loop. The product is not diarisation (commoditised); it's **diarisation + identity resolution + a calibrated review queue** that gets a usably-attributed transcript out the door with bounded human effort.
-- **As its own product** — A "who-said-what" API for anyone with multi-speaker audio: podcast tooling, qualitative research, legal/medical transcription, media monitoring. Sold on *attribution accuracy per minute of human review*, not raw WER.
-- **Reused by other products** — Any product needing speaker-attributed text: Claim Extraction is its primary consumer here; outside Jaromelu, a meeting-notes tool or a compliance-monitoring tool would consume the same contract unchanged.
-- **In Jaromelu today** — The load-bearing dependency. Already being drawn as a **separate service**, end state an API that returns a speaker-attributed transcript (see [Knowledge Asset → What It Costs](03-knowledge-asset.md)). Speaker state lives in `source_speakers` with a `cluster_label` layer.
-- **Boundary to hold** — Attribution *reads* the Identity Registry; it must not own its own private person store. It proposes enrollments back to the registry but never becomes a second source of truth for "who exists." (See [the cycle](#2-identity-is-the-shared-spine-not-a-per-product-leaf).)
+**Agent event model** — the typed taxonomy of what an agent does, turn by turn. Not really code; a *contract*. It is the most leverage-dense thing in Tier 1 because of what hangs off it (next section). Defined today inside [agent-audit](../agents/system/agent-audit.md); should be lifted into its own shared contract.
 
-### 2. Normalisation (Domain-Term Cleaning)
+**Audit harness** — one row per run (`agent_runs`), one row per event (`agent_events`), a forensic JSONL bundle in S3, cost derived from token + server-tool counts, and `AgentBounds` (turns / tool-calls / wall-clock / budget) enforced uniformly. This is what a reusable component looks like done right: every agent imports it, no per-agent reinvention. Zero domain knowledge. Full contract in [agent-audit](../agents/system/agent-audit.md).
 
-- **Contract** — `raw transcript + domain lexicon → cleaned transcript`
-- **Scope** — Repair ASR output using a domain lexicon: real spellings of names, known aliases/nicknames, and the phonetic confusions auto-captions reliably produce. The reusable asset is **not** "NRL cleaning" — it's a generic corrector *plus* a method for mining a lexicon from a corpus. NRL is one lexicon; AI-tech is another; finance is another.
-- **As its own product** — A domain-aware transcript-cleanup layer that sits on top of any ASR vendor. Most ASR is generic and mangles in-domain jargon and names — that gap is the product.
-- **Reused by other products** — Drops in ahead of Claim Extraction for any domain; equally usable as a standalone "clean my industry transcripts" step for teams who never touch claims.
-- **In Jaromelu today** — The [`clean-transcript`](../agents/skills/README.md) skill and [sources/cleaning](../sources/cleaning.md) patterns, driven by the player registry + NRL domain knowledge.
-- **Boundary to hold** — The engine and the lexicon must be separate artifacts. Today the skill fuses corrector logic with NRL specifics; the refactor target is **generic corrector + pluggable lexicon** so a new domain is a data drop, not a code change.
+**Streamed-trace transport** — streamed step events for endpoints too slow to block on, without standing up SSE/WebSocket/job infrastructure. It is the *live twin* of the audit log: the same events, streamed to a UI instead of persisted to a table.
 
-### 3. Embeddings
+**Agentic discovery** — find the content ecosystem for a topic via an agent with web tools, then score and dedup candidates against what's already ingested. Generic: the loop, the triage rubric, the dedup. Domain-ish: the brief, the per-source adapters, the relevance rubric. Depends on the audit harness (bounds + cost) and a candidate store. Today this is [Scout](../agents/crew/scout/README.md).
 
-- **Contract** — `media → voice and/or face vectors`
-- **Scope** — Pure feature extraction: turn audio into voiceprints (pyannote/Deepgram) and faces into face vectors. Stateless and entirely domain-free.
-- **As its own product** — The least defensible standalone (vendors exist); best treated as a thin, swappable adapter rather than a product to sell.
-- **Reused by other products** — Feeds both Attribution (voiceprints) and the Identity Registry (the vectors it resolves on). Any biometric or media-search product reuses it.
-- **In Jaromelu today** — Implicit inside the speaker-ID work; face embeddings are the planned addition that lets one identity be confirmed across voice *and* face.
-- **Boundary to hold** — Keep it stateless and vendor-swappable. Embeddings are an input to the registry, never a store of identity themselves.
+**Forensic re-derivable capture** — archive every external source durably and idempotently (the archive is forensic and never deleted), then project it into a queryable store that is *fully re-derivable from the archive*. "Capture everything now, compose richer later." A storage discipline, domain-blind. Full model in [data-lineage](../architecture/data-lineage.md).
 
-### 4. Identity Registry
+### The event model collapses three components
 
-- **Contract** — `vectors + observations → resolved person IDs; enroll / match / merge`
-- **Scope** — The system of record for *people*: known persons, their accumulated voice/face embeddings, and the resolution logic that decides "this anonymous speaker is that known person" — across sources and across media types. This is where one person becomes traceable across many appearances.
-- **As its own product** — A cross-media identity-resolution service: "is this the same person, here and here?" Valuable to media archives, rights management, and content discovery. (Note the privacy/consent surface — this is the module where it's sharpest.)
-- **Reused by other products** — The **shared spine**. Attribution resolves against it; Scoring keys track records to it; the aggregator promotes people out of it; generative media draws its collected per-person media from it. Almost everything above touches it.
-- **In Jaromelu today** — `people`, the [entity-roles SCD-2 model](../concepts/entity-roles.md) (one person, many roles over time), and the `cluster_label` layer that already points toward a single resolved identity store.
-- **Boundary to hold** — One registry, everything reads it. The temptation is to let each product grow its own person table; resist it. Registry **owns** identities and embeddings; consumers **propose** enrollments. This resolves the one dependency cycle in the stack (Attribution needs voiceprints from the registry; the registry is fed by Attribution) by declaring ownership rather than duplicating state.
+The agent event model isn't just for audit. The *same* typed stream is:
 
-### 5. Claim Extraction
+- **persisted** → the audit harness writes it to `agent_events` + S3,
+- **streamed** → the trace transport pushes it live to a UI,
+- **emitted** → every agent (discovery included) produces it.
 
-- **Contract** — `cleaned + attributed transcript + claim schema → structured claims (typed, time-stamped, entity-linked, speaker-attributed)`
-- **Scope** — Mine unstructured commentary for claims, classify each by type, link it to the entities it's about, and stamp who said it and when. Multi-pass and verified before anything is trusted as load-bearing — garbage claims poison everything downstream.
-- **As its own product** — A "claims API" over any opinion corpus: turn talk into a structured, queryable ledger of assertions. Useful well beyond prediction — market research, narrative tracking, discourse analysis.
-- **Reused by other products** — Feeds Verification, Scoring, and the Knowledge Base. The claim schema is the injected domain knowledge: SuperCoach claim types for NRL, a different taxonomy for AI-tech.
-- **In Jaromelu today** — The [`process-transcript`](../agents/skills/README.md) multi-pass pipeline; lands in `claims` / `quotes` / `source_chunks`.
-- **Boundary to hold** — The taxonomy of "what counts as a claim" is data (part of the pack), not hard-coded extraction logic.
+**One contract, three consumers.** Stabilise the event taxonomy once and the harness, the transport, and discovery's instrumentation all hang off it. That makes the event model the highest-leverage Tier-1 component — it's the seam the others attach to, not a leaf.
 
-### 6. Claim Verification (Grading)
-
-- **Contract** — `claim + resolution oracle → verdict (right / wrong / partial) + evidence link`
-- **Scope** — Resolve predictions against reality when reality arrives. This is the **asynchronous** module — "claim now, verdict later" — and that temporal decoupling is a property to design for, not bolt on. Tracks a prediction lifecycle (open → locked → resolved) and grades only when the outcome is unambiguous, on an honest rubric.
-- **As its own product** — The scarce, defensible piece. Anyone can collect predictions; *grading them rigorously and at scale, over time* is what almost nobody does. A "did this prediction come true?" engine is the heart of the moat.
-- **Reused by other products** — Produces the verdicts Scoring aggregates. The **resolution oracle** is the injected domain knowledge: match results from the factual spine for NRL; benchmark scores / ship-dates for AI; price feeds for markets.
-- **In Jaromelu today** — Grading against the nrl.com / SuperCoach factual spine; `predictions` / `outcomes` lifecycle, surfaced via [data-lineage](../architecture/data-lineage.md).
-- **Boundary to hold** — Build it durable and trigger-driven from day one (pending claims awaiting resolution + a per-domain oracle), not as a synchronous transform. And never soft-grade — "well, technically" rots the authority of everything above it.
-
-### 7. Track-Record Scoring (Alignment Index)
-
-- **Contract** — `verdicts keyed by identity → accuracy profiles (overall + conditional)`
-- **Scope** — Aggregate graded verdicts into per-person track records, sliced by *what they're good at* (tipping vs form reads vs injuries vs finals). Pure statistics over the layers below — calibration, hit-rate, conditional accuracy. Entirely domain-free.
-- **As its own product** — A credibility-scoring layer for pundits/forecasters in any field. Answers the question no aggregator answers cleanly: **"who actually reads this well?"** Natural research adjacency to prediction and betting markets *(heavily regulated — an adjacency to approach carefully, not a casual feature)*.
-- **Reused by other products** — Powers the aggregator's ranking and gives the prediction agent its own honest scorecard on the same rubric.
-- **In Jaromelu today** — The Alignment Index in [the Ledger](../pages/ledger/overview.md); `alignment_scores`.
-- **Boundary to hold** — Scoring consumes only `(identity, verdict)` pairs. It must stay ignorant of domain specifics — the moment it knows about NRL, it stops being reusable.
-
-### 8. Knowledge Base
-
-- **Contract** — `claims + entities → an organised, queryable, human-readable store`
-- **Scope** — Organise everything captured into per-entity, navigable knowledge — and *render* it so the asset becomes something you can stand inside rather than a hidden database. Audit and trust are the same transparency seen from two sides.
-- **As its own product** — An auto-maintained, source-linked knowledge base for any topic — distinct from generic LLM wikis because every statement is attributed and graded.
-- **Reused by other products** — The presentation/retrieval surface any composition reads from; also the audit surface that keeps the upstream modules honest.
-- **In Jaromelu today** — [The Wiki](../pages/wiki/overview.md), maintained by the Archivist; `wiki_pages`.
-- **Boundary to hold** — The topic ontology is light and injected. The renderer is generic; what's rendered is data.
+A note this resolves: "visible labour" — the design choice to show the crew's reasoning as the spectacle — is **not a component**. It's a *consumer* of this stream. The reusable thing underneath the philosophy is the event model + the transport; the theatre is a styling of their output.
 
 ---
 
-## Compositions, Not Modules
+## Tier 2 — Domain-Pipeline Components
 
-These are *products assembled from the modules above* — not reusable engines themselves. Naming them as compositions keeps them from being mistaken for more plumbing.
+Each is a generic engine + an injected domain pack. The reuse radius is "any topic that can supply a pack."
 
-- **Accountability-ranked aggregator** — Identity Registry + Scoring + Knowledge Base + a presentation layer. The differentiated aggregator: it doesn't just collect voices, it **ranks them by graded accuracy**. That ranking is the hook that makes it non-generic — and it falls straight out of the modules, requiring no new engine.
-- **The prediction agent (Jaromelu himself)** — A consumer of every module *plus* a generator that makes its own calls. The endgame, not the start: you earn the right to make predictions by first proving you can grade others'. He runs passively from day one and gets foregrounded only once his calls demonstrably rival the humans' on the same rubric.
-- **Generative media — *quarantined*** — Voice clones today, digital clones later, built from the per-person media the Identity Registry accumulates. Kept behind its own boundary for two reasons: (1) consent/legal/reputational risk — cloning real public figures without consent could poison the credibility of the analytical product; (2) architectural hygiene — clone-generation code must never reach into the modules the credible analytics depend on. It is a *downstream consumer* of registry media, gated, never a peer of the analytical stack.
+| Component | Contract (in → out) | Pack supplies | State today |
+|---|---|---|---|
+| **Attribution** | media (+ voiceprint registry) → speaker-tagged transcript + review queue | — | Live (`source_speakers`); being externalised as a service |
+| **Normalisation** | raw transcript + lexicon → cleaned transcript | lexicon: terms, aliases, phonetic confusions | Entangled in the `clean-transcript` skill |
+| **Embeddings** | media → voice / face vectors | — | Voice live (Deepgram/pyannote); face planned |
+| **Identity registry** | vectors + observations → resolved person IDs; enroll / match | (identity seed) | Partial (`people`, `cluster_label`, entity-roles) |
+| **Claim extraction** | cleaned + attributed transcript + claim schema → structured claims | claim taxonomy, entity types | Entangled in the `process-transcript` skill |
+| **Consensus** | typed opinions (entity, stance, time) → consensus + contrarian scores + drift | stance taxonomy | Specced (todo) |
+| **Verification** | claim + resolution oracle → verdict + evidence | the oracle | Partial (`predictions` / `outcomes`) |
+| **Scoring** | verdicts keyed by identity → accuracy profiles | — | Live (Alignment Index, `alignment_scores`) |
+| **Knowledge / self-maintaining wiki** | source + wiki + schema → maintained wiki (pages, cross-refs, contradiction flags) | wiki schema / ontology | Live-ish (the Wiki, `wiki_pages`) |
+| **Assumption-invalidation detector** | a plan + the premises it rests on → fire when a premise changes | constraint model | Specced (inside the Decision Worker) |
+
+Three of these deserve a note beyond the table:
+
+- **Consensus** is *not* Scoring. Scoring asks "is this individual right?" Consensus asks "what does the crowd collectively think, where is the divergence, how is sentiment shifting?" — buy/sell/hold snapshots, `contrarian_score`, `consensus_score`, drift over time. The two compose into the sharpest signal in the stack: *who goes against consensus and is right* (Consensus × Scoring). Specced in [consensus-engine](../todo/consensus-engine.md).
+
+- **Self-maintaining wiki** — the reusable unit is not "render entity pages," it's the **maintenance loop**: ingest a source, integrate it into existing pages, update cross-references, flag contradictions, log. The novelty is *near-zero-cost continuous maintenance* — the bookkeeping humans abandon wikis over. Domain-agnostic by construction; the pack is just the schema. Pattern in [llm-wiki](../pages/wiki/llm-wiki-pattern.md), realised as [the Wiki](../pages/wiki/overview.md).
+
+- **Assumption-invalidation detector** — extracted deliberately from the (NRL-specific) Decision Worker. The move-generator and constraint model are domain-shaped, but *"watch a plan's premises and signal when they go stale"* is a clean, rare, reusable primitive. Specced inside [decision-worker](../todo/decision-worker.md).
+
+---
+
+## Compositions, Not Components
+
+Products *assembled from* the components above. Named here so they aren't mistaken for more plumbing.
+
+- **Accountability-ranked aggregator** — Identity + Scoring + Consensus + Knowledge/Wiki + a presentation layer. Differentiated because it ranks voices by *graded accuracy*, not just collects them.
+- **The prediction agent (Jaromelu)** — a consumer of every component plus a generator of its own calls. Graded on the same rubric (Scoring) as everyone it ingests; foregrounded only once it demonstrably rivals the humans.
+- **Generative media — *quarantined*** — voice/digital clones built from the per-person media the Identity registry accumulates. Kept behind its own boundary for consent/legal reasons *and* architectural hygiene (clone code must never reach into the analytical components). A downstream consumer of registry media, gated, never a peer. The [content-production pipeline](../content-production-pipeline.md) doc already tags this work "not required for launch / future / legal review needed" — treat it accordingly.
+
+---
+
+## The Domain Pack — the Tier-2 Contract
+
+Tier 2 reuse hinges on one artifact. A **domain pack** is the complete set of data a new topic supplies so the unchanged engines run on it:
+
+| Pack component | Consumed by | NRL instance | Example: AI-tech |
+|---|---|---|---|
+| **Lexicon** — terms, aliases, phonetic confusions | Normalisation | player names, club nicknames, name garbles | model names, lab names, jargon |
+| **Claim schema** — claim + entity types | Claim Extraction | SuperCoach claim types; player/team/round | capability & ship-date claims; model/lab/benchmark |
+| **Resolution oracle** — ground truth + how to query it | Verification | nrl.com / SuperCoach results | benchmark leaderboards, release dates |
+| **Stance taxonomy** — opinion poles | Consensus | buy / sell / hold | bullish / bearish / neutral |
+| **Ontology** — the topic's entity graph | Knowledge / Wiki | teams, players, rounds, comps | labs, models, research areas |
+| **Identity seed** *(optional)* — known persons | Identity registry | known NRL commentators | known AI commentators |
+
+If a domain can supply these, Tier 2 runs on it without code change. **That is the test of whether the decomposition is real.** A caveat surfaced in the validity review: verification only works where claims *resolve cleanly* — sport supplies that almost uniquely; AI supplies it only for the gradeable slice. The pack shape is the same; the *quality* of the oracle is not.
 
 ---
 
 ## The Seams That Decide Reusability
 
-Listing modules is easy. These four boundaries are where reusability is actually won or lost.
-
-1. **Domain knowledge is data, never code.** The whole thesis. Each module takes its pack (lexicon / claim schema / oracle / ontology) as injected data. The current skills (`clean`, `process`) fuse engine + NRL — the standing refactor target is *engine + pluggable pack*.
-2. **Identity is a shared spine, not a per-product leaf.** One registry; Attribution, Scoring, the aggregator, and generative media all read it. Don't let each product grow its own person table.
-3. **There is exactly one dependency cycle — Attribution ⇄ Registry — resolve it by ownership.** Registry owns identities/embeddings; Attribution is a consumer that *proposes* enrollments back. Otherwise two embedding stores drift apart.
-4. **Verification is asynchronous by nature — design for it up front.** Every other module is a synchronous transform; Verification is "claim now, verdict later." Durable pending-claim state + a per-domain trigger/oracle from day one.
-
-A fifth, practical seam: **module contracts belong in `packages/shared`** (the same separation-of-concerns rule the codebase already applies to generators). The interface is the shared artifact; each module depends on the contract, not on its siblings.
-
----
-
-## What's Already Modular
-
-The template already exists. **Speaker-ID (Attribution) is being drawn as a separate service** whose end state is an API returning a speaker-attributed transcript, with NRL as merely its first caller. That is exactly the pattern every other module should follow: a typed contract, domain knowledge injected, the current product just one consumer.
-
-Replicate that template for Normalisation, Verification, and Scoring and the reusable spine is in place. NRL becomes one domain pack among future ones — not the thing the machine is made of.
+1. **Two tiers, two radii — don't flatten them.** Tier 1 is reusable across products (domain-blind); Tier 2 across topics (pack-driven). Treating them as one flat "modules" list hides that they need different work and travel different distances.
+2. **The event model is the Tier-1 spine.** One contract, three consumers (persist / stream / emit). Stabilise it and three components fall out of it.
+3. **Domain-as-data is the Tier-2 spine.** Every Tier-2 engine takes its pack as injected data, never as branching code. The day `if sport == "nrl"` enters an engine, that component becomes a fork.
+4. **Identity is the shared spine within Tier 2.** One registry; Attribution, Scoring, Consensus, and the aggregator all read it. Don't let each grow its own person table.
+5. **The one cycle — Attribution ⇄ Registry — resolve by ownership.** Registry owns identities/embeddings; Attribution *proposes* enrollments back. Otherwise two embedding stores drift.
+6. **Verification is asynchronous by nature.** "Claim now, verdict later" — durable pending-claim state + a per-domain trigger/oracle, designed up front, not bolted on.
+7. **Contracts live in `packages/shared`.** The same separation-of-concerns rule the codebase already applies to generators: each component depends on the shared contract, not on its siblings. `agent_audit` already lives there — it's the template for where the rest of the contracts belong.
 
 ---
 
-## The Domain Pack — the Contract That Unlocks Reuse
+## State Today — Lift vs Refactor
 
-Everything above hinges on one artifact. A **domain pack** is the complete set of data a new topic must supply for the unchanged machine to run on it:
+For a component lens, the question that matters is "is the seam already cut?" Honest answer per component:
 
-| Pack component | Consumed by | NRL instance | Example: AI-tech |
-|----------------|-------------|--------------|------------------|
-| **Lexicon** — terms, name aliases, phonetic confusions | Normalisation | player names, club nicknames, Polynesian-name garbles | model names, lab names, jargon |
-| **Claim schema** — claim types + entity types | Claim Extraction | SuperCoach claim types; player/team/round entities | capability claims, ship-date claims; model/lab/benchmark entities |
-| **Resolution oracle** — the source of ground truth + how to query it | Verification | nrl.com / SuperCoach results feed | benchmark leaderboards, release dates, funding announcements |
-| **Ontology** — the topic's entity graph for organising | Knowledge Base | NRL structure (teams, players, rounds, comps) | labs, models, research areas |
-| **Identity seed** *(optional)* — known persons to bootstrap | Identity Registry | known NRL commentators | known AI commentators/forecasters |
+| Component | Tier | State | Work to make it reusable |
+|---|---|---|---|
+| Audit harness | 1 | Factored (shared) | None — it's the exemplar |
+| Event model | 1 | Live, embedded in audit | **Lift** into its own shared contract |
+| Streamed-trace transport | 1 | Pattern in use | **Lift** / generalise into shared |
+| Agentic discovery | 1 | Live (Scout) | Generalise brief + adapters |
+| Forensic capture | 1 | Live (L1→L4) | None — already a discipline |
+| Attribution | 2 | Live, externalising | Hold the registry boundary |
+| Scoring | 2 | Live | Keep it domain-blind |
+| Knowledge / wiki | 2 | Live-ish | Extract the schema-driven loop |
+| Identity registry | 2 | Partial | **Declare ownership** before a 2nd person table appears |
+| Verification | 2 | Partial | Build async substrate + oracle interface |
+| Normalisation | 2 | Entangled in skill | **Refactor** engine ⊥ lexicon |
+| Claim extraction | 2 | Entangled in skill | **Refactor** engine ⊥ schema |
+| Consensus | 2 | Specced | Build generic aggregator |
+| Assumption-invalidation | 2 | Specced | Isolate from the move-generator |
 
-If a new domain can supply these five, the eight modules run on it without code change. That is the test of whether the decomposition is real. The gating decision — and the thing to protect before more NRL leaks into the engines — is committing to this pack shape now, and refactoring the existing skills to consume it.
-
----
-
-## What This Costs / Open Decisions
-
-- **The skills need splitting.** `clean-transcript` and `process-transcript` are NRL-shaped today. Extracting engine-from-pack is real work and the prerequisite for everything here.
-- **Identity store ownership** must be declared before a second person-table appears. It's cheap now, expensive after drift.
-- **Verification's async substrate** is a design choice to make deliberately ([Temporal is not in prod](../temporal-notes.md); the simpler durable-queue + per-domain-oracle pattern is likely the right call).
-- **The generative-media quarantine** is a decision to make explicit, not a default to drift into.
-- **Media vs intelligence.** The deeper strategic fork — is the business the *audience* (aggregator, voices, attention) or the *verified track-record dataset* (intelligence, applications)? — is upstream of this doc and shapes which modules get hardened first. Worth resolving against [goals.yaml](../../README.md) before committing build order.
+Tier 1 is mostly *lift* (cheap — the seams are cut). Tier 2 is the real *refactor* — and the two skills (`clean`, `process`) are the load-bearing first step, since everything downstream depends on a clean engine/pack split.
 
 ---
 
 ## Related
 
-- [Knowledge Asset](03-knowledge-asset.md) — the asset these modules build; this doc is its engineering decomposition
+- [Knowledge Asset](03-knowledge-asset.md) — the asset these components build; this doc is its engineering decomposition
 - [Venture Thesis](01-venture-thesis.md) — why NRL is the proving ground, not the product
-- [The Show](02-the-show.md) — the crew that operates the machine, made watchable
-- [The Ledger](../pages/ledger/overview.md) — Track-Record Scoring in practice
-- [The Wiki](../pages/wiki/overview.md) — the Knowledge Base, made visible
+- [Agent Audit](../agents/system/agent-audit.md) — the Tier-1 audit harness + event model contract
+- [Scout](../agents/crew/scout/README.md) — agentic discovery in practice
+- [LLM Wiki](../pages/wiki/llm-wiki-pattern.md) — the self-maintaining knowledge component
+- [The Ledger](../pages/ledger/overview.md) — Scoring (the Alignment Index) in practice
 - [Entity Roles](../concepts/entity-roles.md) — the identity model the registry rests on
-- [Data Lineage](../architecture/data-lineage.md) — the concrete L1→L4 capture model
+- [Data Lineage](../architecture/data-lineage.md) — the forensic L1→L4 capture component
