@@ -23,6 +23,7 @@ The strategy spine — what Jaromelu is and why. Start here.
 1. [Venture Thesis](vision/01-venture-thesis.md)
 2. [The Show](vision/02-the-show.md)
 3. [Knowledge Asset](vision/03-knowledge-asset.md)
+4. [The Machine](vision/04-the-machine.md)
 
 ## Architecture
 

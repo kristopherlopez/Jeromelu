@@ -80,6 +80,7 @@ NRL is where it gets proven (see [01 — Why NRL](01-venture-thesis.md)). The as
 
 - [Venture Thesis](01-venture-thesis.md) — "What Compounds" is the seed this doc grows from
 - [The Show](02-the-show.md) — the asset, made watchable; the crew that builds it
+- [The Machine](04-the-machine.md) — this asset's engineering decomposition into reusable modules
 - [Data Lineage](../architecture/data-lineage.md) — the concrete L1→L4 model and the operations trinity
 - [The Ledger](../pages/ledger/overview.md) — the Alignment Index in practice
 - [The Wiki](../pages/wiki/overview.md) — the asset made visible and auditable
