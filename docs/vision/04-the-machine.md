@@ -4,176 +4,576 @@ tags: [area/architecture]
 
 # The Machine
 
-> Created: 2026-05-25. Restructured around a two-tier reusable-component model.
+> Created: 2026-05-25. Restructured as a layer-by-layer walkthrough of the system, from source discovery to presentation.
 
-[Knowledge Asset](03-knowledge-asset.md) argued that the *shape* of what Jaromelu builds is domain-agnostic. This doc decomposes the machine that builds it into **reusable components** — units defined by a contract (what goes in, what comes out), not by the product they happen to serve.
+## Core thesis
 
-This is a *component* decomposition, deliberately not a product catalogue. Whether any component is worth selling is a separate question this doc ignores on purpose. The only questions here are: what is the reusable unit, what is its contract, what is generic versus domain-specific, and what is the seam already cut or still to cut.
+You are building a system that turns messy public commentary into structured intelligence:
 
-The components sort into **two tiers that differ by radius of reuse**:
+> Who said what, what does the crowd believe, who was right, who was early, and what should we pay attention to now?
 
-- **Tier 1 — Domain-blind infrastructure.** Reusable across *entirely different products*. These don't know what the NRL or a "claim" is; they'd drop into a support-agent or a legal-research tool unchanged. The deeper reuse — they travel furthest.
-- **Tier 2 — Domain-pipeline components.** Reusable across *topics*, not products. Each is a generic engine plus an injected **domain pack** (lexicon, claim schema, resolution oracle, ontology). Swap the pack — NRL → AFL → AI — and the engine is untouched. The more valuable reuse — this is where the specific work lives.
+NRL is the first domain. The reusable platform can later apply to AI, sport more broadly, finance, politics, entertainment, or any area where public claims and predictions matter.
 
-The tiers also sit at opposite ends of "already extracted." Tier 1 is mostly **already factored** as shared code; making it reusable is mostly *lifting and naming*. Tier 2 is still **entangled** with NRL inside the skills; making it reusable is a real *refactor*. The [state table](#state-today--lift-vs-refactor) at the end is honest about which is which.
-
----
-
-## The Stack at a Glance
-
-```
-  COMPOSITIONS         Accountability aggregator · Prediction agent · Generative media*
-  (assembled from      ───────────────────────────────────────────────────────────────
-   components)
-  ───────────────────────────────────────────────────────────────────────────────────
-  TIER 2               Knowledge/Wiki · Scoring · Consensus · Verification
-  domain-pipeline      Claim Extraction · Identity · Attribution · Normalisation · Embeddings
-  (engine + pack)      Assumption-Invalidation
-  ───────────────────────────────────────────────────────────────────────────────────
-  TIER 1               Agent Event Model  ← the spine
-  domain-blind         Audit Harness · Streamed-Trace Transport · Agentic Discovery
-  infrastructure       Forensic Re-derivable Capture
-  * quarantined — see Compositions
-```
-
-Tier 1 is the substrate everything runs *on*; Tier 2 is the pipeline that runs *on it*; Compositions are products *assembled from* both.
+What follows is the machine, layer by layer. Each layer is a component defined by what goes in and what comes out, how reusable it is across domains, and where it sits strategically — build now, build carefully, or park.
 
 ---
 
-## Tier 1 — Domain-Blind Infrastructure
+## 1. Source Discovery Layer
 
-No domain pack. Generic by construction. The reuse radius is "any agent-built system."
+**Component:** Scout
 
-| Component | Contract (in → out) | State today |
+**Purpose:** Find the relevant voices, sources, and content worth ingesting.
+
+**Inputs**
+
+- YouTube channels
+- podcasts
+- social media accounts
+- newsletters
+- articles
+- press conferences
+- interviews
+- forums / fan communities
+- official club or league sources
+
+**Outputs**
+
+- source registry
+- creator / pundit registry
+- source quality score
+- ingestion priority
+- topic relevance
+- content freshness
+- emerging voices
+- new content to ingest
+
+**Reusability**
+
+High. You can point Scout at NRL, AI, SuperCoach, cricket, markets, or any other topic.
+
+**Strategic status**
+
+Useful internal infrastructure. Probably not a standalone product, because research-agent / source-discovery tooling is crowded. The defensible part is domain tuning, source scoring, and integration into the rest of the system.
+
+See [Scout](../agents/crew/scout/README.md).
+
+---
+
+## 2. Media Ingestion Layer
+
+**Component:** Ingestion Pipeline
+
+**Purpose:** Pull raw content into the system.
+
+**Inputs**
+
+- videos
+- audio
+- posts
+- articles
+- captions
+- comments
+- thumbnails
+- metadata
+- links
+
+**Outputs**
+
+- raw media files
+- transcripts
+- source metadata
+- timestamps
+- provenance records
+- content IDs
+- content type classification
+
+**Reusability**
+
+Very high. This is a generic "topic media ingestion" layer.
+
+**Strategic status**
+
+Necessary foundation, but not the main differentiator. The durability discipline behind it — archive everything, make every projection re-derivable from the archive — is documented in [data-lineage](../architecture/data-lineage.md).
+
+---
+
+## 3. Identity and Attribution Layer
+
+**Component:** Lineup
+
+**Purpose:** Identify who is speaking, appearing, or being referenced.
+
+**Subcomponents**
+
+- speaker diarisation
+- speaker attribution
+- face embeddings
+- voice embeddings
+- person registry
+- alias registry
+- nickname mapping
+- known-person database
+- human-in-the-loop correction
+- confidence scoring
+
+**NRL examples**
+
+- "Critta" → Stephen Crichton
+- "Turbo" → Tom Trbojevic
+- "Madge" → Michael Maguire
+- Polynesian player names handled correctly
+- journalists, ex-players, coaches and podcasters recognised across appearances
+
+**Outputs**
+
+- speaker-attributed transcript
+- person profiles
+- aliases
+- known faces
+- known voices
+- attribution confidence
+- reviewed / unreviewed status
+
+**Reusability**
+
+High. This generalises to any domain with recurring public figures.
+
+**Strategic status**
+
+Very important. This becomes one of the compounding data assets — the registry only gets richer with every source ingested. See [entity-roles](../concepts/entity-roles.md) for the identity model it rests on.
+
+---
+
+## 4. Transcript Quality Layer
+
+**Component:** Domain-Aware Transcript Cleaning
+
+**Purpose:** Clean transcripts using domain-specific vocabulary and context.
+
+**Handles**
+
+- names
+- nicknames
+- clubs
+- stadiums
+- positions
+- injuries
+- suspensions
+- competitions
+- media personalities
+- slang
+- common phrases
+- acronyms
+- tactical terms
+
+**Outputs**
+
+- cleaned transcript
+- corrected entities
+- normalised names
+- uncertain terms flagged
+- transcript quality score
+
+**Reusability**
+
+High. The same pattern works for AI, finance, medicine, law, sport, etc. The vocabulary changes, but the method generalises.
+
+**Strategic status**
+
+Important quality multiplier. Better transcripts improve everything downstream.
+
+---
+
+## 5. Maintained Knowledge Layer
+
+**Component:** Self-Maintaining Wiki / Domain Memory
+
+**Purpose:** Maintain durable structured knowledge instead of re-deriving it from scratch every query.
+
+**Entities tracked**
+
+- people
+- teams
+- organisations
+- shows
+- topics
+- narratives
+- injuries
+- contracts
+- predictions
+- claims
+- events
+- unresolved issues
+
+**Outputs**
+
+- living entity pages
+- structured profiles
+- current state summaries
+- historical state changes
+- evidence-backed updates
+- unresolved questions
+- stale information flags
+
+**Reusability**
+
+Very high. This can power NRL, AI, personal research, business intelligence, or any domain where knowledge rots quickly.
+
+**Strategic status**
+
+Core platform layer. The value is not "a wiki" — it's *maintained domain memory*. The novelty is not the wiki itself, but the maintenance discipline: near-zero-cost continuous upkeep, the bookkeeping humans abandon wikis over. See the [LLM Wiki pattern](../pages/wiki/llm-wiki-pattern.md).
+
+---
+
+## 6. Claim Extraction Layer
+
+**Component:** Claims Engine
+
+**Purpose:** Extract meaningful claims, predictions, rumours, and assertions from attributed content.
+
+**Claim types**
+
+| Claim type | Example | Trackability |
 |---|---|---|
-| **Agent event model** | agent activity → a typed event stream (`run_started`, `turn_started`, `tool_use`, `tool_result`, `text`, `server_block`, `turn_complete`, `bound_hit`, `error`, `run_ended`) | Live, but embedded inside the audit module rather than standing alone |
-| **Audit harness** | wrap an agent loop → run summary + per-event trace + cost + enforced bounds | **Factored** — `jeromelu_shared.agent_audit`. The exemplar. |
-| **Streamed-trace transport** | agent events → live step-stream to a client (NDJSON; no SSE / WebSocket / job queue) | Pattern in use for slow mutating endpoints |
-| **Agentic discovery** | discovery brief + source adapters → scored, deduped candidate sources | Live for Scout (`scout_candidates`) |
-| **Forensic re-derivable capture** | external source → idempotent durable archive (L2) → re-derivable projection (L3) | Live — the L1→L4 model |
+| Prediction | "Broncos will make the grand final" | High |
+| Selection claim | "They'll pick him at fullback" | High |
+| Injury timeline | "He'll miss six weeks" | High |
+| Signing rumour | "He is going to the Roosters" | Medium/High |
+| Evaluation | "He is a top-five halfback" | Medium |
+| Tactical claim | "Their edge defence is the issue" | Medium |
+| Vibe claim | "They don't look hungry" | Low |
+| Historical fact | "They haven't won there since 2018" | High |
 
-**Agent event model** — the typed taxonomy of what an agent does, turn by turn. Not really code; a *contract*. It is the most leverage-dense thing in Tier 1 because of what hangs off it (next section). Defined today inside [agent-audit](../agents/system/agent-audit.md); should be lifted into its own shared contract.
+**Outputs**
 
-**Audit harness** — one row per run (`agent_runs`), one row per event (`agent_events`), a forensic JSONL bundle in S3, cost derived from token + server-tool counts, and `AgentBounds` (turns / tool-calls / wall-clock / budget) enforced uniformly. This is what a reusable component looks like done right: every agent imports it, no per-agent reinvention. Zero domain knowledge. Full contract in [agent-audit](../agents/system/agent-audit.md).
+- claim text
+- speaker
+- source
+- timestamp
+- claim type
+- topic
+- entity links
+- confidence score
+- specificity score
+- verifiability score
+- resolution criteria
+- expected resolution date
 
-**Streamed-trace transport** — streamed step events for endpoints too slow to block on, without standing up SSE/WebSocket/job infrastructure. It is the *live twin* of the audit log: the same events, streamed to a UI instead of persisted to a table.
+**Reusability**
 
-**Agentic discovery** — find the content ecosystem for a topic via an agent with web tools, then score and dedup candidates against what's already ingested. Generic: the loop, the triage rubric, the dedup. Domain-ish: the brief, the per-source adapters, the relevance rubric. Depends on the audit harness (bounds + cost) and a candidate store. Today this is [Scout](../agents/crew/scout/README.md).
+Very high. This is one of the true core capabilities.
 
-**Forensic re-derivable capture** — archive every external source durably and idempotently (the archive is forensic and never deleted), then project it into a queryable store that is *fully re-derivable from the archive*. "Capture everything now, compose richer later." A storage discipline, domain-blind. Full model in [data-lineage](../architecture/data-lineage.md).
+**Strategic status**
 
-### The event model collapses three components
-
-The agent event model isn't just for audit. The *same* typed stream is:
-
-- **persisted** → the audit harness writes it to `agent_events` + S3,
-- **streamed** → the trace transport pushes it live to a UI,
-- **emitted** → every agent (discovery included) produces it.
-
-**One contract, three consumers.** Stabilise the event taxonomy once and the harness, the transport, and discovery's instrumentation all hang off it. That makes the event model the highest-leverage Tier-1 component — it's the seam the others attach to, not a leaf.
-
-A note this resolves: "visible labour" — the design choice to show the crew's reasoning as the spectacle — is **not a component**. It's a *consumer* of this stream. The reusable thing underneath the philosophy is the event model + the transport; the theatre is a styling of their output.
-
----
-
-## Tier 2 — Domain-Pipeline Components
-
-Each is a generic engine + an injected domain pack. The reuse radius is "any topic that can supply a pack."
-
-| Component | Contract (in → out) | Pack supplies | State today |
-|---|---|---|---|
-| **Attribution** | media (+ voiceprint registry) → speaker-tagged transcript + review queue | — | Live (`source_speakers`); being externalised as a service |
-| **Normalisation** | raw transcript + lexicon → cleaned transcript | lexicon: terms, aliases, phonetic confusions | Entangled in the `clean-transcript` skill |
-| **Embeddings** | media → voice / face vectors | — | Voice live (Deepgram/pyannote); face planned |
-| **Identity registry** | vectors + observations → resolved person IDs; enroll / match | (identity seed) | Partial (`people`, `cluster_label`, entity-roles) |
-| **Claim extraction** | cleaned + attributed transcript + claim schema → structured claims | claim taxonomy, entity types | Entangled in the `process-transcript` skill |
-| **Consensus** | typed opinions (entity, stance, time) → consensus + contrarian scores + drift | stance taxonomy | Specced (todo) |
-| **Verification** | claim + resolution oracle → verdict + evidence | the oracle | Partial (`predictions` / `outcomes`) |
-| **Scoring** | verdicts keyed by identity → accuracy profiles | — | Live (Alignment Index, `alignment_scores`) |
-| **Knowledge / self-maintaining wiki** | source + wiki + schema → maintained wiki (pages, cross-refs, contradiction flags) | wiki schema / ontology | Live-ish (the Wiki, `wiki_pages`) |
-| **Assumption-invalidation detector** | a plan + the premises it rests on → fire when a premise changes | constraint model | Specced (inside the Decision Worker) |
-
-Three of these deserve a note beyond the table:
-
-- **Consensus** is *not* Scoring. Scoring asks "is this individual right?" Consensus asks "what does the crowd collectively think, where is the divergence, how is sentiment shifting?" — buy/sell/hold snapshots, `contrarian_score`, `consensus_score`, drift over time. The two compose into the sharpest signal in the stack: *who goes against consensus and is right* (Consensus × Scoring). Specced in [consensus-engine](../todo/consensus-engine.md).
-
-- **Self-maintaining wiki** — the reusable unit is not "render entity pages," it's the **maintenance loop**: ingest a source, integrate it into existing pages, update cross-references, flag contradictions, log. The novelty is *near-zero-cost continuous maintenance* — the bookkeeping humans abandon wikis over. Domain-agnostic by construction; the pack is just the schema. Pattern in [llm-wiki](../pages/wiki/llm-wiki-pattern.md), realised as [the Wiki](../pages/wiki/overview.md).
-
-- **Assumption-invalidation detector** — extracted deliberately from the (NRL-specific) Decision Worker. The move-generator and constraint model are domain-shaped, but *"watch a plan's premises and signal when they go stale"* is a clean, rare, reusable primitive. Specced inside [decision-worker](../todo/decision-worker.md).
+Core intelligence layer. Without this, the system is just a media aggregator.
 
 ---
 
-## Compositions, Not Components
+## 7. Consensus Layer
 
-Products *assembled from* the components above. Named here so they aren't mistaken for more plumbing.
+**Component:** Consensus Engine
 
-- **Accountability-ranked aggregator** — Identity + Scoring + Consensus + Knowledge/Wiki + a presentation layer. Differentiated because it ranks voices by *graded accuracy*, not just collects them.
-- **The prediction agent (Jaromelu)** — a consumer of every component plus a generator of its own calls. Graded on the same rubric (Scoring) as everyone it ingests; foregrounded only once it demonstrably rivals the humans.
-- **Generative media — *quarantined*** — voice/digital clones built from the per-person media the Identity registry accumulates. Kept behind its own boundary for consent/legal reasons *and* architectural hygiene (clone code must never reach into the analytical components). A downstream consumer of registry media, gated, never a peer. The [content-production pipeline](../content-production-pipeline.md) doc already tags this work "not required for launch / future / legal review needed" — treat it accordingly.
+**Purpose:** Track what the crowd collectively believes.
 
----
+**Tracks**
 
-## The Domain Pack — the Tier-2 Contract
+- consensus view
+- minority view
+- contrarian view
+- consensus drift
+- sentiment shift
+- topic heat
+- narrative emergence
+- narrative decay
+- expert-vs-public divergence
+- media-vs-market divergence
 
-Tier 2 reuse hinges on one artifact. A **domain pack** is the complete set of data a new topic supplies so the unchanged engines run on it:
+**Example outputs**
 
-| Pack component | Consumed by | NRL instance | Example: AI-tech |
-|---|---|---|---|
-| **Lexicon** — terms, aliases, phonetic confusions | Normalisation | player names, club nicknames, name garbles | model names, lab names, jargon |
-| **Claim schema** — claim + entity types | Claim Extraction | SuperCoach claim types; player/team/round | capability & ship-date claims; model/lab/benchmark |
-| **Resolution oracle** — ground truth + how to query it | Verification | nrl.com / SuperCoach results | benchmark leaderboards, release dates |
-| **Stance taxonomy** — opinion poles | Consensus | buy / sell / hold | bullish / bearish / neutral |
-| **Ontology** — the topic's entity graph | Knowledge / Wiki | teams, players, rounds, comps | labs, models, research areas |
-| **Identity seed** *(optional)* — known persons | Identity registry | known NRL commentators | known AI commentators |
+- "Most pundits are down on Souths."
+- "Consensus is shifting towards the Warriors as a finals threat."
+- "A small group of historically accurate analysts disagree with the mainstream view."
+- "The market is more bullish than the media."
 
-If a domain can supply these, Tier 2 runs on it without code change. **That is the test of whether the decomposition is real.** A caveat surfaced in the validity review: verification only works where claims *resolve cleanly* — sport supplies that almost uniquely; AI supplies it only for the gradeable slice. The pack shape is the same; the *quality* of the oracle is not.
+**Reusability**
 
----
+Extremely high. Works anywhere with many public opinions.
 
-## The Seams That Decide Reusability
+**Strategic status**
 
-1. **Two tiers, two radii — don't flatten them.** Tier 1 is reusable across products (domain-blind); Tier 2 across topics (pack-driven). Treating them as one flat "modules" list hides that they need different work and travel different distances.
-2. **The event model is the Tier-1 spine.** One contract, three consumers (persist / stream / emit). Stabilise it and three components fall out of it.
-3. **Domain-as-data is the Tier-2 spine.** Every Tier-2 engine takes its pack as injected data, never as branching code. The day `if sport == "nrl"` enters an engine, that component becomes a fork.
-4. **Identity is the shared spine within Tier 2.** One registry; Attribution, Scoring, Consensus, and the aggregator all read it. Don't let each grow its own person table.
-5. **The one cycle — Attribution ⇄ Registry — resolve by ownership.** Registry owns identities/embeddings; Attribution *proposes* enrollments back. Otherwise two embedding stores drift.
-6. **Verification is asynchronous by nature.** "Claim now, verdict later" — durable pending-claim state + a per-domain trigger/oracle, designed up front, not bolted on.
-7. **Contracts live in `packages/shared`.** The same separation-of-concerns rule the codebase already applies to generators: each component depends on the shared contract, not on its siblings. `agent_audit` already lives there — it's the template for where the rest of the contracts belong.
+Core differentiator. This is different from track record. Track record asks, *"Who was right?"* Consensus asks, *"What does the ecosystem believe?"* The powerful intersection is finding people who go *against* consensus and are *right*. Specced in [consensus-engine](../todo/consensus-engine.md).
 
 ---
 
-## State Today — Lift vs Refactor
+## 8. Verification Layer
 
-For a component lens, the question that matters is "is the seam already cut?" Honest answer per component:
+**Component:** Referee
 
-| Component | Tier | State | Work to make it reusable |
-|---|---|---|---|
-| Audit harness | 1 | Factored (shared) | None — it's the exemplar |
-| Event model | 1 | Live, embedded in audit | **Lift** into its own shared contract |
-| Streamed-trace transport | 1 | Pattern in use | **Lift** / generalise into shared |
-| Agentic discovery | 1 | Live (Scout) | Generalise brief + adapters |
-| Forensic capture | 1 | Live (L1→L4) | None — already a discipline |
-| Attribution | 2 | Live, externalising | Hold the registry boundary |
-| Scoring | 2 | Live | Keep it domain-blind |
-| Knowledge / wiki | 2 | Live-ish | Extract the schema-driven loop |
-| Identity registry | 2 | Partial | **Declare ownership** before a 2nd person table appears |
-| Verification | 2 | Partial | Build async substrate + oracle interface |
-| Normalisation | 2 | Entangled in skill | **Refactor** engine ⊥ lexicon |
-| Claim extraction | 2 | Entangled in skill | **Refactor** engine ⊥ schema |
-| Consensus | 2 | Specced | Build generic aggregator |
-| Assumption-invalidation | 2 | Specced | Isolate from the move-generator |
+**Purpose:** Determine whether claims resolved as true, false, partially true, unresolved, or unverifiable.
 
-Tier 1 is mostly *lift* (cheap — the seams are cut). Tier 2 is the real *refactor* — and the two skills (`clean`, `process`) are the load-bearing first step, since everything downstream depends on a clean engine/pack split.
+**Data sources**
+
+- match results
+- player stats
+- team lists
+- injury reports
+- judiciary reports
+- contract announcements
+- ladder positions
+- betting markets
+- official statements
+- media reports
+- historical databases
+
+**Outputs**
+
+- claim outcome
+- evidence
+- resolution date
+- confidence score
+- dispute status
+- manual review flag
+- impact on speaker record
+
+**Claim statuses**
+
+| Status | Meaning |
+|---|---|
+| True | Clearly resolved as correct |
+| False | Clearly resolved as incorrect |
+| Partially true | Directionally right but not exact |
+| Unresolved | Not enough time has passed |
+| Unverifiable | Too vague or subjective |
+| Disputed | Conflicting evidence |
+| Cancelled | Premise changed before resolution |
+
+**Reusability**
+
+High, but domain-specific data integrations are required.
+
+**Strategic status**
+
+Essential. This is where credibility is won or lost. Verification only works where claims *resolve cleanly* — sport supplies that almost uniquely; AI supplies it only for the gradeable slice.
+
+---
+
+## 9. Reputation Layer
+
+**Component:** Scorecard
+
+**Purpose:** Track the performance of claim-makers over time.
+
+**Tracks**
+
+- accuracy
+- calibration
+- specificity
+- originality
+- difficulty
+- topic expertise
+- contrarian correctness
+- recency-weighted performance
+- claim volume
+- confidence-adjusted score
+- domain-specific strengths
+
+**Example profiles**
+
+- "Strong on team selection."
+- "Good on injuries, weak on match predictions."
+- "Often early on young talent."
+- "High-volume, low-specificity commentator."
+- "Excellent when disagreeing with consensus."
+
+**Reusability**
+
+Very high. This is useful in sport, AI, finance, politics, technology, and media.
+
+**Strategic status**
+
+Core differentiator. But it should be built carefully — a crude accuracy leaderboard will be misleading. Realised today as the Alignment Index; see [The Ledger](../pages/ledger/overview.md).
+
+---
+
+## 10. Decision Layer
+
+**Component:** Decision Worker
+
+**Purpose:** Turn intelligence into recommended actions.
+
+**Inputs**
+
+- claims
+- consensus
+- track records
+- market data
+- constraints
+- user goals
+- risk tolerance
+- current assumptions
+
+**Outputs**
+
+- ranked actions
+- rationale
+- assumptions
+- confidence
+- invalidation triggers
+- alternative options
+
+**NRL / SuperCoach examples**
+
+- "Trade Player A to Player B."
+- "Avoid this popular move."
+- "Captain this player."
+- "This recommendation breaks if team lists change."
+- "This analyst's view matters because they are strong on team selection."
+
+**Reusability**
+
+High, but later-stage.
+
+**Strategic status**
+
+Park it for now. This is the "act on it" layer. It should come after the data, claims, consensus, and reputation layers are reliable. Specced in [decision-worker](../todo/decision-worker.md).
+
+---
+
+## 11. Agent Layer
+
+**Component:** Analyst
+
+**Purpose:** Provide an intelligent interface over the whole system.
+
+**Capabilities**
+
+- answer user questions
+- summarise the current state
+- explain consensus
+- identify sharp voices
+- compare claims
+- make predictions
+- challenge weak narratives
+- highlight unresolved claims
+- generate reports
+- suggest what to watch next
+
+**Example outputs**
+
+- "The media consensus is too negative on this team."
+- "This claim is spreading, but mostly from low-reliability sources."
+- "Three historically accurate people disagree with the dominant view."
+- "This player's injury timeline is uncertain; the public narrative is ahead of the evidence."
+- "The betting market and pundit consensus are diverging."
+
+**Reusability**
+
+Very high.
+
+**Strategic status**
+
+Important, but not the foundation. The agent is only useful once the underlying data is good.
+
+---
+
+## 12. Observability and Governance Layer
+
+**Component:** Agent Audit / Workbench
+
+**Purpose:** Track what the system did, why it did it, what it cost, and where it failed.
+
+**Tracks**
+
+- runs
+- prompts
+- tools
+- costs
+- latency
+- errors
+- source decisions
+- extraction decisions
+- verification decisions
+- human corrections
+- replay logs
+- budget limits
+- system bounds
+
+**Reusability**
+
+Very high.
+
+**Strategic status**
+
+High-value internal infrastructure. Probably not worth making a standalone product, because LLM observability is already crowded. But for your own system, it is essential — every agent runs on it. See [agent-audit](../agents/system/agent-audit.md).
+
+---
+
+## 13. Presentation Layer
+
+**Component:** Visible Labour UX
+
+**Purpose:** Show the system's work, not just the final answer.
+
+**What users see**
+
+- sources ingested
+- claims extracted
+- evidence trails
+- speaker attribution
+- consensus shifts
+- confidence levels
+- unresolved claims
+- why a recommendation changed
+- where humans reviewed outputs
+- how the system reached its conclusion
+
+**Reusability**
+
+High as a design principle.
+
+**Strategic status**
+
+Not a module — a product philosophy. This matters because trust is central. The product should not feel like a black-box chatbot.
+
+---
+
+## 14. Synthetic Media Layer
+
+**Component:** Voice / Face / Digital Clone Capability
+
+**Purpose:** Eventually support generative media using collected voice, face, and identity assets.
+
+**Potential uses**
+
+- synthetic host
+- digital analyst
+- avatar presenter
+- generated explainer clips
+- personalised media summaries
+
+**Strategic status**
+
+Future only. Do not make this a core pillar yet. It creates legal, ethical, and reputational risk, especially with public figures. The [content-production pipeline](../content-production-pipeline.md) already frames cloning as future, not required for launch — treat it accordingly.
+
+---
+
+## The simplified architecture
+
+The cleanest high-level model is:
+
+```
+DISCOVER → INGEST → ATTRIBUTE → CLEAN → REMEMBER → EXTRACT → CONSENSUS → VERIFY → SCORE → ANALYSE → PRESENT
+```
 
 ---
 
 ## Related
 
-- [Knowledge Asset](03-knowledge-asset.md) — the asset these components build; this doc is its engineering decomposition
+- [Knowledge Asset](03-knowledge-asset.md) — the asset these layers build
 - [Venture Thesis](01-venture-thesis.md) — why NRL is the proving ground, not the product
-- [Agent Audit](../agents/system/agent-audit.md) — the Tier-1 audit harness + event model contract
-- [Scout](../agents/crew/scout/README.md) — agentic discovery in practice
-- [LLM Wiki](../pages/wiki/llm-wiki-pattern.md) — the self-maintaining knowledge component
-- [The Ledger](../pages/ledger/overview.md) — Scoring (the Alignment Index) in practice
+- [Scout](../agents/crew/scout/README.md) — source discovery in practice
+- [Agent Audit](../agents/system/agent-audit.md) — the observability layer + event model contract
+- [LLM Wiki](../pages/wiki/llm-wiki-pattern.md) — the self-maintaining knowledge layer
+- [The Ledger](../pages/ledger/overview.md) — the reputation layer (Alignment Index) in practice
 - [Entity Roles](../concepts/entity-roles.md) — the identity model the registry rests on
-- [Data Lineage](../architecture/data-lineage.md) — the forensic L1→L4 capture component
+- [Data Lineage](../architecture/data-lineage.md) — the forensic capture discipline behind ingestion
