@@ -1,8 +1,8 @@
 # Change-only storage for video_metrics + channel_metrics
 
-**Date:** 2026-05-27 · **Status:** 🟡 In progress (TASK-07 shipped; TASK-08, TASK-09 open) · **Plan:** [PLAN.md § 2026-05-27](../PLAN.md) · **Tasks:** TASK-07 → TASK-09
+**Date:** 2026-05-27 · **Status:** 🟢 Shipped (prod deduped + reclaimed; write-path payoff confirmed by tonight's cron) · **Plan:** PLAN.md § 2026-05-27 (removed from Active on completion) · **Tasks:** TASK-07 → TASK-09
 
-**TL;DR** — Stop appending unchanged daily snapshots to the metrics time-series. Prod evidence (2026-05-27): 70.2% of the 2.13M `video_metrics` rows are byte-identical to the prior snapshot; steady-state only ~24% of daily samples change. The fix: skip-if-unchanged in the daily refresh (TASK-07, done), a one-time dedup migration (TASK-08), and a `VACUUM FULL` reclaim runbook (TASK-09). Target: `video_metrics` ~641 MB → ~191 MB, daily growth ~37 MB → ~9 MB.
+**TL;DR** — Stop appending unchanged daily snapshots to the metrics time-series. Prod evidence (2026-05-27): 70.2% of the 2.13M `video_metrics` rows are byte-identical to the prior snapshot; steady-state only ~24% of daily samples change. The fix: skip-if-unchanged in the daily refresh (TASK-07), a one-time dedup migration (TASK-08), and a `VACUUM FULL` reclaim runbook (TASK-09). **Shipped to prod 2026-05-27: `video_metrics` 641 MB → 171 MB** (2,135,406 → 637,353 rows; ~470 MB reclaimed), daily growth ~37 MB → ~9 MB. Write-path skip is live; the steady-state ~76 %-unchanged ratio confirms on the next daily refresh.
 
 ---
 
@@ -38,15 +38,19 @@ Wrote `docs/operations/metrics-dedup-runbook.md` (frontmatter-consistent with `i
 
 **Verified:** adversarial-reviewer **PASS WITH CONCERNS** — independently cross-checked the commands, the `pg_total_relation_size` query, the cron/backup windows against `scripts/cron.d/jeromelu` (exact match), the connection method against `docker-compose.yml`, the precondition SQL against `migrate.sh`, and the relative link path (resolves). Concerns: the "58 GB" disk total isn't sourced in the inventory doc (but the runbook cites live `df -h /`, the authoritative source; headroom conclusion sound) and a pre-existing stale RDS row in `aws-resource-inventory.md` (out of scope — flagged, not fixed).
 
-**Deferred (gates final checkoff):** a human runs the prod `VACUUM (FULL, ANALYZE)` per the runbook **after migration 070 is applied on prod**, then pastes the before/after `pg_total_relation_size` (≈641 MB → ≈191 MB) here. Prod still shows 641 MB / 2.13M rows as of 2026-05-27 (070 not yet deployed there).
+**Executed on prod 2026-05-27** (with human go-ahead). Context: the prod deploy had been stuck behind a GitHub Actions billing block since 05-24 (resolved by making the repo public), which is why the box sat 19 commits behind master. Once CI ran, the box was brought to current master (`83ad808 chore(deploy): rebuild api+web from master`, api+web images rebuilt) and migration 070 was applied via `migrate.sh` — so the dedup `DELETE` had already run when this session checked. The implementer then ran the `VACUUM (FULL, ANALYZE)` (the runbook's reclaim step):
+
+- **Code live:** the running `jeromelu-api` container (rebuilt, 58 min old) contains `_metrics_changed` — skip-if-unchanged is in effect, so the dedup sticks.
+- **Dedup verified before VACUUM:** `video_metrics` 2,135,406 → **637,353** rows — *exactly* the predicted survivor count (120,025 first-snapshots + 517,328 changes). `video_latest_metrics` still returns **120,025** rows (no video dropped) and `channel_latest_metrics` **180** (all channels retained). Residual consecutive-dupe probe **0/0**.
+- **VACUUM (FULL, ANALYZE)** on both tables completed in **~4 s** (13:36:07→13:36:11 UTC, off-peak): **`video_metrics` 641 MB → 171 MB** (heap 98 MB + idx 73 MB; ~470 MB / ~73 % returned to the OS), `channel_metrics` 2016 kB → 1488 kB.
+- **Post-VACUUM integrity:** `video_latest_md5` `b2e926781d0f69dae4d32f123dd1ab2c` and `channel_latest_md5` `6309feeacab2c5233526142264e552f7` — byte-identical before/after the VACUUM; counts unchanged. No data altered.
 
 ---
 
 ## Outstanding
-- ☐ **TASK-09 final checkoff** — human runs the prod `VACUUM (FULL, ANALYZE)` (after 070 deploys to prod), pastes before/after sizes here; then the plan is Shipped and removed from PLAN.md. Runbook: `docs/operations/metrics-dedup-runbook.md`. **Do not run without human go-ahead.**
-- ☐ **Deferred TASK-07 verification** — post-deploy `videos_unchanged` ratio (~75% of `videos_total`) in the daily refresh response / `scout-refresh.log`.
-- ☐ **Deferred: migration 070 + dedup on prod.** Local is proven; the prod dedup runs when 070 deploys via the normal migration path. Data-only (no schema change) — a large delete on the 2.13M-row prod table, inside the BEGIN/COMMIT txn.
-- ⚠️ **PLAN.md staleness (minor):** the plan's Constraints describe `scout/refresh.py` as a live 4-line shim, but the concurrent Scout refactor has since *removed* it. Harmless to TASK-07/08/09 (all target the canonical path); the plan section is removed when the plan completes.
+- ☐ **Write-path payoff confirmation (passive, automatic).** Skip-if-unchanged is live; tonight's 23:15 UTC video refresh (and the Tuesday cron-report email) will show `videos_refreshed` ≈ 24 % of `videos_total` and `videos_unchanged` the remaining ~76 % in `/var/log/jeromelu/scout-refresh.log`. Not blocking — closes itself on the next cron run. No manual trigger run (would duplicate the cron at ~720 quota units for no extra signal).
+- ✅ **Resolved — migration 070 + dedup + VACUUM on prod** (see above).
+- ⚠️ **PLAN.md staleness (now moot):** the plan's Constraints described `scout/refresh.py` as a live shim; the Scout refactor removed it. The plan is removed from Active on this completion, so the staleness is retired.
 
 ## Commits
-`fd8e0a3` (TASK-07) · `61fa974` (TASK-08) · `a8c9ebf` (TASK-09 doc deliverable). On `master`.
+`fd8e0a3` (TASK-07) · `61fa974` (TASK-08) · `a8c9ebf` (TASK-09 doc deliverable). Prod deploy `83ad808` (code + migration 070); VACUUM run via `docker exec` per the runbook (maintenance, not a commit). All code on `master`.

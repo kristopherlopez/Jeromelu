@@ -25,39 +25,6 @@ Prefix the title with optional tags in square brackets:
 
 ## Open tasks
 
-### [BLOCKED: awaiting human VACUUM FULL on prod] TASK-09: Prod reclaim runbook + deferred VACUUM FULL size verification
-
-Implements PLAN.md § 2026-05-27 "Change-only storage" — the reclaim half. Authors the one-time prod maintenance runbook and closes out the initiative once the space is returned. The actual `VACUUM (FULL)` is a **human-run prod step** (brief table lock) — this task delivers the runbook + records the size drop when observed.
-
-> **Doc deliverable DONE 2026-05-27** (commit `a8c9ebf`, adversarial-reviewer PASS WITH CONCERNS — both non-blocking doc-traceability nits). `docs/operations/metrics-dedup-runbook.md` written + linked from the video_metrics catalogue page. **Only the deferred verification remains:** a human runs `VACUUM (FULL, ANALYZE) video_metrics; VACUUM (FULL, ANALYZE) channel_metrics;` on prod (per the runbook) **after migration 070 has been applied on prod**, then pastes the before/after `pg_total_relation_size` output (≈641 MB → ≈191 MB) into the run report. Then mark `[x]`, finalise the run report to Shipped, and remove the plan from PLAN.md's Active section. Do NOT run the prod VACUUM without explicit human go-ahead.
-
-> **PRECONDITION NOW SATISFIED — migration 070 APPLIED on prod 2026-05-27** (via `make migrate`/`migrate.sh` on the box; `schema_migrations` records `070_dedup_metrics_snapshots.sql`). Also on this date: the change-only write-path code (`fd8e0a3`) + scout refactors were finally deployed to prod (api+web images rebuilt from master — they'd been stuck behind the GitHub Actions billing block since 05-24; resolved by making the repo public). Dedup result: `video_metrics` 2,135,406 → 637,353 rows (−70.2%, matches the documented rate); `channel_metrics` 4,487 → 3,786. **Sizes unchanged** (641 MB / 2016 kB) — dead tuples, as expected. **The ONLY remaining step is the human-run `VACUUM (FULL, ANALYZE)`** to reclaim 641 MB → ~191 MB, then capture before/after sizes and check off.
-
-**What**
-
-1. Create `docs/operations/metrics-dedup-runbook.md`: purpose (one-time reclaim after migration 070), preconditions (070 applied on prod; run off-hours; 40 GB free disk confirms headroom), the exact commands:
-   ```sql
-   VACUUM (FULL, ANALYZE) video_metrics;
-   VACUUM (FULL, ANALYZE) channel_metrics;
-   ```
-   the `ACCESS EXCLUSIVE` lock warning (table unavailable for the rewrite duration — seconds to low minutes for the ~191 MB result), the before/after size query:
-   ```sql
-   SELECT pg_size_pretty(pg_total_relation_size('video_metrics')) AS video,
-          pg_size_pretty(pg_total_relation_size('channel_metrics')) AS channel;
-   ```
-   expected `video_metrics` 641 MB → ~191 MB, and a "no rollback needed — `VACUUM` is non-destructive" note. Link it from `docs/operations/data-catalogue/video_metrics.md`.
-2. Add a row/pointer to whatever ops-doc index covers `docs/operations/` runbooks if one exists (check `docs/operations/` for an index; if none, the catalogue link suffices).
-
-**How to verify**
-
-- `docs/operations/metrics-dedup-runbook.md` exists with the commands, lock warning, before/after query, and expected sizes exactly as above. The catalogue page links to it.
-- `git diff --cached --stat` shows only the runbook + the catalogue link edit.
-- **Deferred (gates checkoff):** after the human runs the `VACUUM (FULL, ANALYZE)` on prod, capture the before/after `pg_total_relation_size` output showing `video_metrics` dropped to ~191 MB (±). Tag `[BLOCKED: awaiting human VACUUM FULL on prod]` until then — mirror the TASK-06 deferred-verification pattern; do not run `VACUUM FULL` on prod without explicit human go-ahead.
-
-**Proof notes**
-_(implementer fills in: runbook path, deferred before/after prod size output once the human runs the VACUUM)_
-
-
 ### [P2] TASK-20: Bump CI actions off deprecated Node 20 runtime
 
 Standalone CI-maintenance chore (no PLAN.md initiative). Surfaced 2026-05-27 from a live GitHub Actions annotation once the repo went public and runs started executing again:
