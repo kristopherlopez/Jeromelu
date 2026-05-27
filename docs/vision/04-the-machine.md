@@ -361,6 +361,8 @@ High, but domain-specific data integrations are required.
 
 Essential. This is where credibility is won or lost. Verification only works where claims *resolve cleanly* — sport supplies that almost uniquely; AI supplies it only for the gradeable slice.
 
+> **"Verification" here means outcome resolution** — did the prediction come true. Distinct from the Analyst `verify` pass ([charter §A7](../agents/crew/analyst/charter.md)), which is extraction-faithfulness QA — did we capture the claim correctly from the transcript. Two jobs that share a word: this layer grades *reality*; the Analyst pass grades the *extraction*.
+
 ---
 
 ## 9. Reputation Layer
@@ -447,7 +449,7 @@ Park it for now. This is the "act on it" layer. It should come after the data, c
 
 ## 11. Agent Layer
 
-**Component:** Analyst
+**Component:** Jaromelu
 
 **Purpose:** Provide an intelligent interface over the whole system.
 
@@ -479,6 +481,8 @@ Very high.
 **Strategic status**
 
 Important, but not the foundation. The agent is only useful once the underlying data is good.
+
+> **Not to be confused with the Analyst crew member.** This layer is [Jaromelu](../agents/crew/jaromelu/README.md)'s integrated voice — the conversational [ask-me](../pages/ask-me/overview.md) surface. The *Analyst* crew member is the silver / interpretive layer (cleaning, extraction, semantic consensus) at layers 4, 6, and 7; it makes meaning but does not voice the final call ([Analyst charter §A1](../agents/crew/analyst/charter.md)).
 
 ---
 
@@ -568,7 +572,7 @@ Future only. Do not make this a core pillar yet. It creates legal, ethical, and 
 The cleanest high-level model is:
 
 ```
-DISCOVER → INGEST → ATTRIBUTE → CLEAN → REMEMBER → EXTRACT → CONSENSUS → VERIFY → SCORE → ANALYSE → PRESENT
+DISCOVER → INGEST → ATTRIBUTE → CLEAN → REMEMBER → EXTRACT → CONSENSUS → VERIFY → SCORE → ASK → PRESENT
 ```
 
 ---
@@ -584,19 +588,19 @@ Build state is *not* duplicated here. Worker status lives in the [system index](
 | 1 | Source Discovery | [Scout](../agents/crew/scout/README.md) | [source-discovery](../agents/system/source-discovery.md) |
 | 2 | Data Ingestion | [Scout](../agents/crew/scout/README.md) | [ingestion](../agents/system/ingestion.md) |
 | 3 | Identity & Attribution | — | [speaker-identification](../agents/system/speaker-identification.md) |
-| 4 | Transcript Quality | — | [transcription-pipeline](../agents/system/transcription-pipeline.md) |
+| 4 | Transcript Quality | [Analyst](../agents/crew/analyst/README.md) | [transcription-pipeline](../agents/system/transcription-pipeline.md) |
 | 5 | Maintained Knowledge | [Archivist](../agents/crew/archivist/README.md) | [publishing](../agents/system/publishing.md) |
 | 6 | Claim Extraction | [Analyst](../agents/crew/analyst/README.md) | [extraction](../agents/system/extraction.md) |
 | 7 | Consensus | [Analyst](../agents/crew/analyst/README.md) | [publishing](../agents/system/publishing.md) |
 | 8 | Verification | [Critic](../agents/crew/critic/README.md) | [decision](../agents/system/decision.md) |
 | 9 | Reputation / Scoring | [Bookkeeper](../agents/crew/bookkeeper/README.md) | [decision](../agents/system/decision.md) |
 | 10 | Decision Worker | [Jaromelu](../agents/crew/jaromelu/README.md) · [Critic](../agents/crew/critic/README.md) | [decision](../agents/system/decision.md) |
-| 11 | Agent / Analyst | [Jaromelu](../agents/crew/jaromelu/README.md) | [ask-me](../pages/ask-me/overview.md) |
+| 11 | Agent | [Jaromelu](../agents/crew/jaromelu/README.md) | [ask-me](../pages/ask-me/overview.md) |
 | 12 | Observability | — | [agent-audit](../agents/system/agent-audit.md) |
 | 13 | Presentation / UX | [Jaromelu](../agents/crew/jaromelu/README.md) | [the Feed](../pages/feed/layout.md) |
 | 14 | Synthetic Media | — | [avatar](../avatar/system.md) |
 
-What the crosswalk makes visible: the five crew modes fan out across all 14 layers and several layers (Identity, Transcript Quality, Observability, Synthetic Media) have *no* crew owner because they're plumbing, not thinking. The crew is the lens for *how Jaromelu reasons*; The Machine is the lens for *what the pipeline does*. Neither replaces the other.
+What the crosswalk makes visible: the five crew modes fan out across all 14 layers and several layers (Identity, Observability, Synthetic Media) have *no* crew owner because they're plumbing, not thinking. The crew is the lens for *how Jaromelu reasons*; The Machine is the lens for *what the pipeline does*. Neither replaces the other.
 
 **Medallion cross-reference.** Scout's charter cuts the same system a third way — by *data maturity*. In medallion terms: **bronze** is raw external capture, owned by Scout — layers 1–2 plus the structured feeds behind layers 8–9; **silver** is the interpretive transform owned by the Analyst — cleaning and claim extraction (layers 4, 6), plus the speaker→Person attribution slice of layer 3; **gold** is the curated and derived tier owned by the Bookkeeper and Archivist — consensus, scoring, the wiki (layers 5, 7, 9). The charter's medallion model names only those four crew; Critic (verification) and Jaromelu (decision, agent, presentation) are later crew that consume *across* all three tiers rather than owning one. See [Scout charter §D1](../agents/crew/scout/charter.md#d1-the-boundary-principle--scout-owns-the-bronze-layer).
 
