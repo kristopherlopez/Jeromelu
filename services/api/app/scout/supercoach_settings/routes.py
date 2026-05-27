@@ -11,16 +11,10 @@ from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from jeromelu_shared.agent_audit import (
-    AgentBounds,
-    make_run_id,
-    record_agent_ended,
-    record_agent_started,
-)
-
 from ...deps import get_db
 from ...routers.admin import require_admin
 from .._s3_archive import archive_response
+from ..common.pipeline_run import set_archive_detail, start_deterministic_run
 from .fetcher import SuperCoachSettingsFetchError, fetch_supercoach_settings
 from .models import SuperCoachSettings
 
@@ -30,9 +24,6 @@ router = APIRouter()
 
 
 PIPELINE = "supercoach-settings"
-AGENT_ID = "scout"
-AGENT_NAME = "Scout"
-MODEL = "deterministic"
 
 
 def _upsert_sc_settings(
@@ -66,35 +57,18 @@ def run_supercoach_settings(
     mode: str = "classic",
 ) -> dict[str, Any]:
     """Fetch SC settings + archive to S3 + upsert into sc_settings."""
-    run_id = make_run_id(AGENT_ID)
-    bounds = AgentBounds(
-        max_turns=0, max_tool_calls=0, max_wall_seconds=60, max_budget_usd=0.0,
-    )
     effective_season = season or date.today().year
     brief = f"SuperCoach settings snapshot (season={effective_season}, mode={mode})"
-    record_agent_started(
+    run = start_deterministic_run(
         db,
-        agent_id=AGENT_ID,
-        agent_name=AGENT_NAME,
-        run_id=run_id,
-        model=MODEL,
+        pipeline=PIPELINE,
         brief=brief,
-        bounds={
-            "max_turns": bounds.max_turns,
-            "max_tool_calls": bounds.max_tool_calls,
-            "max_wall_seconds": bounds.max_wall_seconds,
-            "max_budget_usd": bounds.max_budget_usd,
-            "pipeline": PIPELINE,
+        detail={
             "season": effective_season,
             "mode": mode,
         },
     )
-
-    detail: dict[str, Any] = {
-        "pipeline": PIPELINE,
-        "season": effective_season,
-        "mode": mode,
-    }
+    detail = run.detail
     upsert_result: dict[str, Any] = {}
 
     try:
@@ -109,9 +83,7 @@ def run_supercoach_settings(
             ),
             payload=raw_settings,
         )
-        detail["s3_archive_key"] = archive_key
-        if archive_key is None:
-            detail["s3_archive_failed"] = True
+        set_archive_detail(detail, archive_key)
 
         # Strict-parse per D8 — validates the four top-level groups exist.
         SuperCoachSettings.model_validate(raw_settings)
@@ -122,30 +94,21 @@ def run_supercoach_settings(
         )
         detail.update(upsert_result)
     except SuperCoachSettingsFetchError as e:
-        detail["error"] = f"SuperCoachSettingsFetchError: {e}"
-        record_agent_ended(
-            db, run_id=run_id, status="failed",
-            summary_text=f"Upstream fetch failed: {e}",
-            model=MODEL, detail=detail,
-        )
+        run.fail(e, summary_text=f"Upstream fetch failed: {e}")
         raise HTTPException(status_code=502, detail=f"SC settings fetch failed: {e}")
     except Exception as e:
-        detail["error"] = f"{type(e).__name__}: {e}"
-        record_agent_ended(
-            db, run_id=run_id, status="failed",
-            summary_text=f"Pipeline failed: {e}",
-            model=MODEL, detail=detail,
-        )
+        run.fail(e, summary_text=f"Pipeline failed: {e}")
         raise
 
-    record_agent_ended(
-        db, run_id=run_id, status="completed",
-        summary_text=f"SuperCoach settings snapshot: season={effective_season} mode={mode}",
-        model=MODEL, detail=detail,
+    run.complete(
+        summary_text=(
+            f"SuperCoach settings snapshot: season={effective_season} "
+            f"mode={mode}"
+        )
     )
 
     return {
-        "run_id": run_id,
+        "run_id": run.run_id,
         "ok": True,
         "pipeline": PIPELINE,
         "season": effective_season,

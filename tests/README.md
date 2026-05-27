@@ -17,6 +17,8 @@ tests/
         test_admin_helpers.py # _stitch_segments, _chunk_segments, _normalize
       scout/
         test_refresh_helpers.py  # _video_id_from_url, _parse_published_at
+        <pipeline>/
+          test_models.py         # strict Scout fixture/model contracts
       analyst/
         test_transcribe_helpers.py  # imports from transcribe_helpers.py —
                                     # NEVER import transcribe.py directly
@@ -25,6 +27,8 @@ tests/
       test_deploy_helpers.py  # ECR URI, model/config name constructors
     scripts/         # placeholder — scripts/data/* helpers
   integration/       # needs a real DB / S3 / external infra
+    scout/<pipeline>/
+      test_response_shape.py     # env-flagged live drift checks
   evals/             # LLM-graded RAG evals via DeepEval (costs $$)
 ```
 

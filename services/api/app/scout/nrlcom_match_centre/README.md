@@ -46,5 +46,5 @@ The top-level key set differs by `matchState` (verified live): a **FullTime** ma
 
 ## Tests
 
-- `tests/unit/api/scout/test_nrlcom_match_centre_models.py` — always-on D8 drift unit tests against two fixtures (`canonical_response.json` = FullTime, `canonical_response_upcoming.json` = Upcoming): both states parse, unknown-top-level + missing-`matchId` negatives raise. The route strict-parses each archived match through `NrlcomMatchCentre`; a `ValidationError` is logged to `validation_failures` **without aborting** the round walk.
-- `tests/integration/scout/test_nrlcom_match_centre_response_shape.py` — env-flagged (`SCOUT_DRIFT_LIVE=1`) live drift test against a real match resolved from the draw. Skipped in CI by default. Per D8 the agent does not auto-adapt.
+- `tests/unit/api/scout/nrlcom_match_centre/test_models.py` — always-on D8 drift unit tests against two fixtures (`canonical_response.json` = FullTime, `canonical_response_upcoming.json` = Upcoming): both states parse, unknown-top-level + missing-`matchId` negatives raise. The route strict-parses each archived match through `NrlcomMatchCentre`; a `ValidationError` is logged to `validation_failures` **without aborting** the round walk.
+- `tests/integration/scout/nrlcom_match_centre/test_response_shape.py` — env-flagged (`SCOUT_DRIFT_LIVE=1`) live drift test against a real match resolved from the draw. Skipped in CI by default. Per D8 the agent does not auto-adapt.

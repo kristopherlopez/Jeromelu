@@ -19,12 +19,6 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from jeromelu_shared.agent_audit import (
-    AgentBounds,
-    make_run_id,
-    record_agent_ended,
-    record_agent_started,
-)
 from jeromelu_shared.players.roster import (
     RosterPreconditionError,
     refresh_roster,
@@ -37,6 +31,7 @@ from jeromelu_shared.players.supercoach import (
 from ...deps import get_db
 from ...routers.admin import require_admin
 from .._s3_archive import archive_response
+from ..common.pipeline_run import set_archive_detail, start_deterministic_run
 from .models import SuperCoachPlayer
 from .notes_extractor import extract_notes_as_claims
 
@@ -46,34 +41,6 @@ router = APIRouter()
 
 
 PIPELINE = "supercoach-roster"
-AGENT_ID = "scout"
-AGENT_NAME = "Scout"
-# Deterministic pipeline — no LLM. agent_audit still requires a model field;
-# the pricing fallback in estimate_token_cost ensures cost = $0.00 since
-# no tokens are reported.
-MODEL = "deterministic"
-
-
-def _record_failure(
-    db: Session,
-    *,
-    run_id: str,
-    exc: Exception,
-    detail: dict[str, Any],
-    fetched: int,
-    summary_text: str,
-) -> None:
-    """Stamp a failure on the agent_runs row.
-
-    Caller is responsible for raising the appropriate HTTPException (or
-    re-raising) after this returns.
-    """
-    detail["error"] = f"{type(exc).__name__}: {exc}"
-    detail["fetched"] = fetched
-    record_agent_ended(
-        db, run_id=run_id, status="failed", summary_text=summary_text,
-        model=MODEL, detail=detail,
-    )
 
 
 def run_supercoach_roster(
@@ -87,34 +54,18 @@ def run_supercoach_roster(
     Returns the run summary including run_id, ok flag, fetched count, and
     the refresh_roster counts (players_seen, transitions, etc.).
     """
-    run_id = make_run_id(AGENT_ID)
-    bounds = AgentBounds(
-        max_turns=0,
-        max_tool_calls=0,
-        max_wall_seconds=120,
-        max_budget_usd=0.0,
-    )
     brief = (
         f"SuperCoach roster fetch + SCD-2 refresh (season={season or 'current'}, "
         f"source={source})"
     )
-    record_agent_started(
+    run = start_deterministic_run(
         db,
-        agent_id=AGENT_ID,
-        agent_name=AGENT_NAME,
-        run_id=run_id,
-        model=MODEL,
+        pipeline=PIPELINE,
         brief=brief,
-        bounds={
-            "max_turns": bounds.max_turns,
-            "max_tool_calls": bounds.max_tool_calls,
-            "max_wall_seconds": bounds.max_wall_seconds,
-            "max_budget_usd": bounds.max_budget_usd,
-            "pipeline": PIPELINE,
-        },
+        detail={"mode": "fetch-and-refresh"},
+        max_wall_seconds=120,
     )
-
-    detail: dict[str, Any] = {"pipeline": PIPELINE, "mode": "fetch-and-refresh"}
+    detail = run.detail
     refresh_result: dict[str, Any] = {}
     fetched = 0
     effective_season = season or date.today().year
@@ -133,9 +84,7 @@ def run_supercoach_roster(
             ),
             payload=raw_players,
         )
-        detail["s3_archive_key"] = archive_key
-        if archive_key is None:
-            detail["s3_archive_failed"] = True
+        set_archive_detail(detail, archive_key)
 
         # Strict-parse per D8 (any drift here raises ValidationError).
         players = [SuperCoachPlayer.model_validate(p) for p in raw_players]
@@ -144,7 +93,7 @@ def run_supercoach_roster(
         sc_players_dicts = [p.model_dump() for p in players]
         logger.info(
             "scout/supercoach-roster: fetched %d players (season=%s, source=%s, run_id=%s, s3=%s)",
-            fetched, season, source, run_id, archive_key,
+            fetched, season, source, run.run_id, archive_key,
         )
         refresh_result = refresh_roster(db, sc_players_dicts, source=source)
         detail.update({"fetched": fetched, **refresh_result})
@@ -155,33 +104,25 @@ def run_supercoach_roster(
         notes_result = extract_notes_as_claims(db, sc_players=raw_players)
         detail.update(notes_result)
     except SuperCoachFetchError as e:
-        _record_failure(
-            db, run_id=run_id, exc=e, detail=detail,
-            fetched=fetched, summary_text=f"Upstream fetch failed: {e}",
-        )
+        detail["fetched"] = fetched
+        run.fail(e, summary_text=f"Upstream fetch failed: {e}")
         # 502: upstream looked wrong; don't run the diff against a bad payload.
         raise HTTPException(status_code=502, detail=f"SC fetch failed: {e}")
     except RosterPreconditionError as e:
-        _record_failure(
-            db, run_id=run_id, exc=e, detail=detail,
-            fetched=fetched, summary_text=f"Roster precondition failed: {e}",
-        )
+        detail["fetched"] = fetched
+        run.fail(e, summary_text=f"Roster precondition failed: {e}")
         raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
-        _record_failure(
-            db, run_id=run_id, exc=e, detail=detail,
-            fetched=fetched, summary_text=f"Pipeline failed: {e}",
-        )
+        detail["fetched"] = fetched
+        run.fail(e, summary_text=f"Pipeline failed: {e}")
         raise
 
-    record_agent_ended(
-        db, run_id=run_id, status="completed",
+    run.complete(
         summary_text=f"SuperCoach roster refresh: fetched={fetched}",
-        model=MODEL, detail=detail,
     )
 
     return {
-        "run_id": run_id,
+        "run_id": run.run_id,
         "ok": True,
         "pipeline": PIPELINE,
         "fetched": fetched,

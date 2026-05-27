@@ -34,5 +34,5 @@ upsert. New day → new row → preserves daily history.
 
 ## Tests
 
-- `tests/unit/api/scout/test_supercoach_settings_models.py` — always-on D8 drift unit tests against the checked-in canonical fixture (`tests/fixtures/scout/supercoach_settings/canonical_response.json`): canonical parse plus the load-bearing top-level envelope-guard negatives (unknown top-level key, missing required group).
-- `tests/integration/scout/test_supercoach_settings_response_shape.py` — env-flagged live drift test (`SCOUT_DRIFT_LIVE=1`), parameterised over `classic` and `draft` modes; hits the real `/settings` endpoint and strict-parses the top-level envelope. Skipped in CI by default. Draft mode is the only guardrail against silent draft breakage (prod cron runs `classic` only). Per D8 the agent does not auto-adapt.
+- `tests/unit/api/scout/supercoach_settings/test_models.py` — always-on D8 drift unit tests against the checked-in canonical fixture (`tests/fixtures/scout/supercoach_settings/canonical_response.json`): canonical parse plus the load-bearing top-level envelope-guard negatives (unknown top-level key, missing required group).
+- `tests/integration/scout/supercoach_settings/test_response_shape.py` — env-flagged live drift test (`SCOUT_DRIFT_LIVE=1`), parameterised over `classic` and `draft` modes; hits the real `/settings` endpoint and strict-parses the top-level envelope. Skipped in CI by default. Draft mode is the only guardrail against silent draft breakage (prod cron runs `classic` only). Per D8 the agent does not auto-adapt.

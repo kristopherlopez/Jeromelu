@@ -27,5 +27,5 @@ Per D7: re-running rewrites the same JSONB block. No new rows; no schema change.
 
 ## Tests
 
-- `tests/unit/api/scout/test_supercoach_teams_models.py` — always-on D8 drift unit tests against the checked-in canonical fixture (`tests/fixtures/scout/supercoach_teams/canonical_response.json`): canonical parse (17 teams, NRL competition) plus strict `extra="forbid"` negatives on the team envelope and the nested competition object.
-- `tests/integration/scout/test_supercoach_teams_response_shape.py` — env-flagged live drift test (`SCOUT_DRIFT_LIVE=1`); hits the real `/teams` endpoint and strict-parses every team. Skipped in CI by default. Per D8 the agent does not auto-adapt — a live shape change fails the test and routes to the operator.
+- `tests/unit/api/scout/supercoach_teams/test_models.py` — always-on D8 drift unit tests against the checked-in canonical fixture (`tests/fixtures/scout/supercoach_teams/canonical_response.json`): canonical parse (17 teams, NRL competition) plus strict `extra="forbid"` negatives on the team envelope and the nested competition object.
+- `tests/integration/scout/supercoach_teams/test_response_shape.py` — env-flagged live drift test (`SCOUT_DRIFT_LIVE=1`); hits the real `/teams` endpoint and strict-parses every team. Skipped in CI by default. Per D8 the agent does not auto-adapt — a live shape change fails the test and routes to the operator.

@@ -20,18 +20,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from jeromelu_shared.agent_audit import (
-    AgentBounds,
-    make_run_id,
-    record_agent_ended,
-    record_agent_started,
-)
 from jeromelu_shared.db.models import PlayerRound
 from jeromelu_shared.scraping.nrl import STAT_DB_COLUMNS
 
 from ...deps import get_db
 from ...routers.admin import require_admin
 from .._s3_archive import archive_response
+from ..common.pipeline_run import set_archive_detail, start_deterministic_run
 from .fetcher import (
     SuperCoachStatsFetchError,
     extract_rows,
@@ -45,9 +40,6 @@ router = APIRouter()
 
 
 PIPELINE = "supercoach-stats"
-AGENT_ID = "scout"
-AGENT_NAME = "Scout"
-MODEL = "deterministic"  # no LLM; agent_audit needs a model field, pricing fallback gives $0
 
 # Identity + base columns always present on each upsert row
 _IDENTITY = ("player_id", "player_name", "team", "position", "round", "season")
@@ -58,24 +50,6 @@ _UPDATE_COLUMNS = (
     *_BASE,
     *STAT_DB_COLUMNS,
 )
-
-
-def _record_failure(
-    db: Session,
-    *,
-    run_id: str,
-    exc: Exception,
-    detail: dict[str, Any],
-    fetched: int,
-    summary_text: str,
-) -> None:
-    """Stamp a failure on the agent_runs row. Caller raises HTTPException."""
-    detail["error"] = f"{type(exc).__name__}: {exc}"
-    detail["fetched"] = fetched
-    record_agent_ended(
-        db, run_id=run_id, status="failed", summary_text=summary_text,
-        model=MODEL, detail=detail,
-    )
 
 
 def _upsert_player_rounds(
@@ -121,37 +95,18 @@ def run_supercoach_stats(
     Returns the run summary including run_id, ok, season, round, fetched,
     upserted.
     """
-    run_id = make_run_id(AGENT_ID)
-    bounds = AgentBounds(
-        max_turns=0,
-        max_tool_calls=0,
-        max_wall_seconds=300,  # full jqGrid walk + bulk upsert
-        max_budget_usd=0.0,
-    )
     brief = f"SuperCoach stats fetch + upsert (season={season}, round={round})"
-    record_agent_started(
+    run = start_deterministic_run(
         db,
-        agent_id=AGENT_ID,
-        agent_name=AGENT_NAME,
-        run_id=run_id,
-        model=MODEL,
+        pipeline=PIPELINE,
         brief=brief,
-        bounds={
-            "max_turns": bounds.max_turns,
-            "max_tool_calls": bounds.max_tool_calls,
-            "max_wall_seconds": bounds.max_wall_seconds,
-            "max_budget_usd": bounds.max_budget_usd,
-            "pipeline": PIPELINE,
+        detail={
             "season": season,
             "round": round,
         },
+        max_wall_seconds=300,
     )
-
-    detail: dict[str, Any] = {
-        "pipeline": PIPELINE,
-        "season": season,
-        "round": round,
-    }
+    detail = run.detail
     fetched = 0
     upserted = 0
 
@@ -169,9 +124,7 @@ def run_supercoach_stats(
             identity_path=f"{season}/round-{round:02d}.json",
             payload={"season": season, "round": round, "rows": raw_rows},
         )
-        detail["s3_archive_key"] = archive_key
-        if archive_key is None:
-            detail["s3_archive_failed"] = True
+        set_archive_detail(detail, archive_key)
 
         extracted = extract_rows(raw_rows)
         if not extracted:
@@ -187,26 +140,23 @@ def run_supercoach_stats(
         )
         detail.update({"fetched": fetched, "upserted": upserted})
     except SuperCoachStatsFetchError as e:
-        _record_failure(
-            db, run_id=run_id, exc=e, detail=detail,
-            fetched=fetched, summary_text=f"Upstream fetch failed: {e}",
-        )
+        detail["fetched"] = fetched
+        run.fail(e, summary_text=f"Upstream fetch failed: {e}")
         raise HTTPException(status_code=502, detail=f"SC stats fetch failed: {e}")
     except Exception as e:
-        _record_failure(
-            db, run_id=run_id, exc=e, detail=detail,
-            fetched=fetched, summary_text=f"Pipeline failed: {e}",
-        )
+        detail["fetched"] = fetched
+        run.fail(e, summary_text=f"Pipeline failed: {e}")
         raise
 
-    record_agent_ended(
-        db, run_id=run_id, status="completed",
-        summary_text=f"SuperCoach stats refresh: season={season} round={round} fetched={fetched} upserted={upserted}",
-        model=MODEL, detail=detail,
+    run.complete(
+        summary_text=(
+            f"SuperCoach stats refresh: season={season} round={round} "
+            f"fetched={fetched} upserted={upserted}"
+        )
     )
 
     return {
-        "run_id": run_id,
+        "run_id": run.run_id,
         "ok": True,
         "pipeline": PIPELINE,
         "season": season,

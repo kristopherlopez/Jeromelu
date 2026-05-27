@@ -23,7 +23,6 @@ Not Temporal-driven — sync, in-process. Matches the rest of Scout.
 from __future__ import annotations
 
 import logging
-import re
 from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
@@ -41,6 +40,7 @@ from jeromelu_shared.db import (
     SourceDocument,
     VideoMetric,
 )
+from jeromelu_shared.youtube import extract_video_id
 
 from . import youtube_api
 
@@ -53,15 +53,7 @@ logger = logging.getLogger(__name__)
 _METRIC_FIELDS = ("views", "likes", "comments")
 
 
-_VIDEO_ID_RE = re.compile(r"(?:v=|/watch\?v=|youtu\.be/)([A-Za-z0-9_-]{11})")
-
-
-def _video_id_from_url(url: str | None) -> str | None:
-    """Pull the 11-char YouTube video id out of a watch URL. None if not present."""
-    if not url:
-        return None
-    m = _VIDEO_ID_RE.search(url)
-    return m.group(1) if m else None
+_video_id_from_url = extract_video_id
 
 
 def _most_recent_known_video_id(session: Session, channel_id: UUID) -> str | None:

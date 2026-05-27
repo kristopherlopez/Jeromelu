@@ -16,7 +16,6 @@ No fallback to YouTube auto-captions.
 from __future__ import annotations
 
 import logging
-import re
 import tempfile
 from dataclasses import dataclass
 
@@ -27,6 +26,7 @@ from youtube_utils.exceptions import DownloadError
 from jeromelu_shared.config import settings
 from jeromelu_shared.db import Source
 from jeromelu_shared.s3 import audio_object_exists, upload_audio
+from jeromelu_shared.youtube import extract_video_id
 
 logger = logging.getLogger(__name__)
 
@@ -51,14 +51,7 @@ class AudioError(Exception):
 # Helpers
 # ---------------------------------------------------------------------------
 
-_VIDEO_ID_RE = re.compile(r"(?:v=|/watch\?v=|youtu\.be/)([A-Za-z0-9_-]{11})")
-
-
-def _video_id_from_url(url: str | None) -> str | None:
-    if not url:
-        return None
-    m = _VIDEO_ID_RE.search(url)
-    return m.group(1) if m else None
+_video_id_from_url = extract_video_id
 
 
 def _audio_s3_key(channel_external_id: str, video_id: str) -> str:

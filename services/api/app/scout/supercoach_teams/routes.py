@@ -10,18 +10,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from jeromelu_shared.agent_audit import (
-    AgentBounds,
-    make_run_id,
-    record_agent_ended,
-    record_agent_started,
-)
 from jeromelu_shared.db.models import Team
 from jeromelu_shared.players.roster import SC_ABBREV_TO_TEAM_SLUG
 
 from ...deps import get_db
 from ...routers.admin import require_admin
 from .._s3_archive import archive_response
+from ..common.pipeline_run import set_archive_detail, start_deterministic_run
 from .fetcher import SuperCoachTeamsFetchError, fetch_supercoach_teams
 from .models import SuperCoachTeam
 
@@ -31,9 +26,6 @@ router = APIRouter()
 
 
 PIPELINE = "supercoach-teams"
-AGENT_ID = "scout"
-AGENT_NAME = "Scout"
-MODEL = "deterministic"
 
 
 def _upsert_team_supercoach_ids(
@@ -84,33 +76,15 @@ def run_supercoach_teams(
     season: int | None = None,
 ) -> dict[str, Any]:
     """Fetch SC teams + archive to S3 + cross-reference into teams.metadata_json."""
-    run_id = make_run_id(AGENT_ID)
-    bounds = AgentBounds(
-        max_turns=0,
-        max_tool_calls=0,
-        max_wall_seconds=60,
-        max_budget_usd=0.0,
-    )
     effective_season = season or date.today().year
     brief = f"SuperCoach teams refresh (season={effective_season})"
-    record_agent_started(
+    run = start_deterministic_run(
         db,
-        agent_id=AGENT_ID,
-        agent_name=AGENT_NAME,
-        run_id=run_id,
-        model=MODEL,
+        pipeline=PIPELINE,
         brief=brief,
-        bounds={
-            "max_turns": bounds.max_turns,
-            "max_tool_calls": bounds.max_tool_calls,
-            "max_wall_seconds": bounds.max_wall_seconds,
-            "max_budget_usd": bounds.max_budget_usd,
-            "pipeline": PIPELINE,
-            "season": effective_season,
-        },
+        detail={"season": effective_season},
     )
-
-    detail: dict[str, Any] = {"pipeline": PIPELINE, "season": effective_season}
+    detail = run.detail
     upsert_result: dict[str, Any] = {}
     fetched = 0
 
@@ -124,46 +98,32 @@ def run_supercoach_teams(
             identity_path=f"{effective_season}.json",
             payload=raw_teams,
         )
-        detail["s3_archive_key"] = archive_key
-        if archive_key is None:
-            detail["s3_archive_failed"] = True
+        set_archive_detail(detail, archive_key)
 
         # Strict-parse per D8.
         parsed = [SuperCoachTeam.model_validate(t) for t in raw_teams]
         logger.info(
             "scout/supercoach-teams: fetched %d teams (season=%s, run_id=%s)",
-            fetched, effective_season, run_id,
+            fetched, effective_season, run.run_id,
         )
         upsert_result = _upsert_team_supercoach_ids(db, parsed)
         detail.update({"fetched": fetched, **upsert_result})
     except SuperCoachTeamsFetchError as e:
-        detail["error"] = f"SuperCoachTeamsFetchError: {e}"
-        record_agent_ended(
-            db, run_id=run_id, status="failed",
-            summary_text=f"Upstream fetch failed: {e}",
-            model=MODEL, detail=detail,
-        )
+        run.fail(e, summary_text=f"Upstream fetch failed: {e}")
         raise HTTPException(status_code=502, detail=f"SC teams fetch failed: {e}")
     except Exception as e:
-        detail["error"] = f"{type(e).__name__}: {e}"
-        record_agent_ended(
-            db, run_id=run_id, status="failed",
-            summary_text=f"Pipeline failed: {e}",
-            model=MODEL, detail=detail,
-        )
+        run.fail(e, summary_text=f"Pipeline failed: {e}")
         raise
 
-    record_agent_ended(
-        db, run_id=run_id, status="completed",
+    run.complete(
         summary_text=(
             f"SuperCoach teams refresh: fetched={fetched}, "
             f"matched={upsert_result.get('matched', 0)}"
         ),
-        model=MODEL, detail=detail,
     )
 
     return {
-        "run_id": run_id,
+        "run_id": run.run_id,
         "ok": True,
         "pipeline": PIPELINE,
         "season": effective_season,

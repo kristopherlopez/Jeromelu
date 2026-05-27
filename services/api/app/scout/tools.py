@@ -11,15 +11,14 @@ re-discover them.
 from __future__ import annotations
 
 import logging
-import re
 from typing import Any
-from urllib.parse import parse_qs, urlparse
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from jeromelu_shared.db import Channel, ScoutCandidate, Source
+from jeromelu_shared.youtube import extract_youtube_id
 
 logger = logging.getLogger(__name__)
 
@@ -344,47 +343,6 @@ def all_tools() -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 # Custom tool handlers (Python implementations)
 # ---------------------------------------------------------------------------
-
-_YT_VIDEO_PATTERNS = [
-    re.compile(r"youtube\.com/watch\?.*?v=([A-Za-z0-9_-]{11})"),
-    re.compile(r"youtu\.be/([A-Za-z0-9_-]{11})"),
-    re.compile(r"youtube\.com/shorts/([A-Za-z0-9_-]{11})"),
-]
-
-_YT_CHANNEL_ID_PATTERN = re.compile(r"youtube\.com/channel/(UC[A-Za-z0-9_-]{22})")
-_YT_HANDLE_PATTERN = re.compile(r"youtube\.com/@([A-Za-z0-9_.-]+)")
-
-
-def extract_youtube_id(kind: str, url: str) -> str | None:
-    """Extract the canonical YouTube external_id from a URL.
-
-    Channels: returns the UC... id if present, otherwise the @handle.
-    Videos: returns the 11-char video id.
-    """
-    if kind == "video":
-        for pat in _YT_VIDEO_PATTERNS:
-            m = pat.search(url)
-            if m:
-                return m.group(1)
-        # Try parsing query string as last resort
-        try:
-            qs = parse_qs(urlparse(url).query)
-            if "v" in qs and qs["v"]:
-                return qs["v"][0]
-        except Exception:
-            pass
-        return None
-
-    if kind == "channel":
-        m = _YT_CHANNEL_ID_PATTERN.search(url)
-        if m:
-            return m.group(1)
-        m = _YT_HANDLE_PATTERN.search(url)
-        if m:
-            return f"@{m.group(1)}"
-        return None
-
-    return None
 
 
 def handle_dedupe_check(session: Session, *, kind: str, url: str) -> dict[str, Any]:

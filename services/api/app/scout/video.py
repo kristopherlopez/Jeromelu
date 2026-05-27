@@ -17,7 +17,6 @@ Failure mode: ``VideoError`` raised, sources row left as-is.
 from __future__ import annotations
 
 import logging
-import re
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,6 +28,7 @@ from youtube_utils.exceptions import DownloadError
 from jeromelu_shared.config import settings
 from jeromelu_shared.db import Source
 from jeromelu_shared.s3 import get_s3_client
+from jeromelu_shared.youtube import extract_video_id
 
 logger = logging.getLogger(__name__)
 
@@ -52,19 +52,13 @@ class VideoError(Exception):
 # Helpers
 # ---------------------------------------------------------------------------
 
-_VIDEO_ID_RE = re.compile(r"(?:v=|/watch\?v=|youtu\.be/)([A-Za-z0-9_-]{11})")
-
 #: Default quality for face-detection downloads. 240p is enough for
 #: detection of front-facing podcast faces but degrades on side angles
 #: and small/distant faces. 360p is the balance.
 DEFAULT_QUALITY = "360"
 
 
-def _video_id_from_url(url: str | None) -> str | None:
-    if not url:
-        return None
-    m = _VIDEO_ID_RE.search(url)
-    return m.group(1) if m else None
+_video_id_from_url = extract_video_id
 
 
 def _video_s3_key(channel_external_id: str, video_id: str) -> str:

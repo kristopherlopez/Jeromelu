@@ -19,5 +19,5 @@ If `round` is omitted, the response contains the *current* round's fixtures + al
 
 ## Tests
 
-- `tests/unit/api/scout/test_nrlcom_draw_models.py` — always-on D8 drift unit tests against the checked-in fixture (`tests/fixtures/scout/nrlcom_draw/canonical_response.json`): canonical parse + unknown-top-level / unknown-fixture-field / missing-`matchCentreUrl` negatives. The route strict-parses the response through `NrlcomDraw` (drift → 500 + failed audit).
-- `tests/integration/scout/test_nrlcom_draw_response_shape.py` — env-flagged (`SCOUT_DRIFT_LIVE=1`) live drift test against the real `/draw/data` endpoint. Skipped in CI by default. Per D8 the agent does not auto-adapt — a live shape change fails loudly and routes to the operator.
+- `tests/unit/api/scout/nrlcom_draw/test_models.py` — always-on D8 drift unit tests against the checked-in fixture (`tests/fixtures/scout/nrlcom_draw/canonical_response.json`): canonical parse + unknown-top-level / unknown-fixture-field / missing-`matchCentreUrl` negatives. The route strict-parses the response through `NrlcomDraw` (drift → 500 + failed audit).
+- `tests/integration/scout/nrlcom_draw/test_response_shape.py` — env-flagged (`SCOUT_DRIFT_LIVE=1`) live drift test against the real `/draw/data` endpoint. Skipped in CI by default. Per D8 the agent does not auto-adapt — a live shape change fails loudly and routes to the operator.
