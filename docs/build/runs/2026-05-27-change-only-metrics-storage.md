@@ -24,13 +24,22 @@ Added `class TestMetricsChanged` to `tests/unit/api/scout/test_refresh_helpers.p
 
 **Deferred (post-deploy):** the next daily refresh response / `scout-refresh.log` should show `videos_unchanged` ≈ 75% of `videos_total` and `videos_refreshed` an order of magnitude below the old ~119k. Record when observable.
 
+### TASK-08 — Migration 070: one-time dedup of existing snapshots (`61fa974`)
+Added `packages/db/migrations/070_dedup_metrics_snapshots.sql` — two `BEGIN`/`COMMIT`-wrapped LAG-window deletes (one per table) that keep every entity's first snapshot + every change and drop runs of byte-identical consecutive rows (`o.prev IS NOT NULL AND o.metrics = o.prev`, jsonb equality). House-style header explaining the 70.2% finding, idempotency, and the deferral of disk reclaim to the runbook (no `VACUUM` — can't run in a txn). Both `video_metrics` and `channel_metrics` covered.
+
+**Verified (local, `make migrate` → applied 070):**
+- Before: `video_metrics` 5485 / `channel_metrics` 26. After: **4189 / 26** (the local seed's within-day re-snapshots collapsed; the small channel set had no consecutive dupes).
+- **Latest-state preserved:** `video_latest_metrics` md5 `98a633438397972b53911b7d048ae745` and `channel_latest_metrics` md5 `26e8ef0eed3b7ac57e7c1c75d07f877b` — **byte-identical before and after**.
+- **Idempotent:** residual consecutive-duplicate probe = **0** for both tables; `070_dedup_metrics_snapshots.sql` tracked in `schema_migrations`, so re-run is a no-op.
+- adversarial-reviewer: **PASS WITH CONCERNS** (concerns were the pending commit + this proof recording; reviewer independently re-ran the residual probe → 0/0 and confirmed the latest views return one row per entity: 2094 video / 14 channel).
+
 ---
 
 ## Outstanding
-- ☐ **TASK-08** — migration `070_dedup_metrics_snapshots.sql` (one-time dedup of existing rows, both tables) + local before/after proof.
 - ☐ **TASK-09** — `docs/operations/metrics-dedup-runbook.md` + deferred prod `VACUUM (FULL, ANALYZE)` size verification (641 MB → ~191 MB).
 - ☐ **Deferred TASK-07 verification** — post-deploy `videos_unchanged` ratio in the daily refresh.
+- ☐ **Deferred: apply migration 070 + dedup on prod.** Local is proven; the prod dedup happens when 070 deploys via the normal migration path. Migration is data-only (no schema change) — large delete on the 2.13M-row prod table; runs inside the BEGIN/COMMIT txn.
 - ⚠️ **PLAN.md staleness (minor):** the plan's Constraints describe `scout/refresh.py` as a live 4-line shim, but the concurrent Scout refactor has since *removed* it. Harmless to TASK-07/08/09 (all target the canonical path); the plan section is removed when the plan completes.
 
 ## Commits
-`fd8e0a3` (TASK-07). On `master`.
+`fd8e0a3` (TASK-07) · `61fa974` (TASK-08). On `master`.

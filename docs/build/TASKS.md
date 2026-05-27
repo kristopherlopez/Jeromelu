@@ -95,48 +95,6 @@ Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "One-time S3 seed run" + "D
 _(implementer fills in: three curl responses, three aws s3 ls outputs, two SQL query results, doc diff summary, first-cron-fire log line)_
 
 
-### TASK-08: Migration 070 — one-time dedup of existing video_metrics + channel_metrics snapshots
-
-Implements PLAN.md § 2026-05-27 "Change-only storage" — the backfill half. Removes the ~70% of `video_metrics` rows (and the channel equivalent) that are byte-identical to the prior snapshot, keeping every first snapshot and every change. Depends on nothing in TASK-07 (independent), but ship after or alongside it.
-
-**What**
-
-1. Create `packages/db/migrations/070_dedup_metrics_snapshots.sql` with a house-style header comment (match `024_video_metrics.sql`'s tone): explain the 70%-redundant finding, that it keeps first-snapshot + every change, that it is idempotent, and that **space reclaim is a separate manual `VACUUM (FULL)` step — see `docs/operations/metrics-dedup-runbook.md`** (TASK-09). The file must contain **no `VACUUM`** (cannot run in a transaction).
-2. Two statements (video first, then channel):
-   ```sql
-   WITH ordered AS (
-       SELECT metric_id, metrics,
-              lag(metrics) OVER (PARTITION BY source_id ORDER BY sampled_at) AS prev
-       FROM video_metrics
-   )
-   DELETE FROM video_metrics vm
-   USING ordered o
-   WHERE vm.metric_id = o.metric_id
-     AND o.prev IS NOT NULL
-     AND o.metrics = o.prev;
-   -- then the identical statement over channel_metrics partitioned by channel_id
-   ```
-
-**How to verify** (local, via `make migrate`)
-
-1. **Before** applying: capture `SELECT count(*) FROM video_metrics;`, `SELECT count(*) FROM channel_metrics;`, and the latest-state checksums:
-   ```sql
-   SELECT md5(string_agg(source_id::text || metrics::text, '' ORDER BY source_id)) FROM video_latest_metrics;
-   SELECT md5(string_agg(channel_id::text || metrics::text, '' ORDER BY channel_id)) FROM channel_latest_metrics;
-   ```
-2. `make migrate` (confirm 070 applies; `make migrate-status` shows it tracked).
-3. **After:** the two checksums are **byte-identical to before** (dedup preserved every entity's current value); row counts dropped; and re-running the dedup probe returns 0:
-   ```sql
-   WITH ordered AS (SELECT metric_id, metrics, lag(metrics) OVER (PARTITION BY source_id ORDER BY sampled_at) AS prev FROM video_metrics)
-   SELECT count(*) FROM ordered WHERE prev IS NOT NULL AND metrics = prev;   -- expect 0
-   ```
-   (same probe for `channel_metrics`). Paste before/after counts + the two matching checksums + the two zero-probes into proof notes.
-4. `git diff --cached --stat` shows only `packages/db/migrations/070_dedup_metrics_snapshots.sql` staged.
-
-**Proof notes**
-_(implementer fills in: before/after row counts, matching latest-state checksums, zero dedup-probe results, migrate-status line)_
-
-
 ### TASK-09: Prod reclaim runbook + deferred VACUUM FULL size verification
 
 Implements PLAN.md § 2026-05-27 "Change-only storage" — the reclaim half. Authors the one-time prod maintenance runbook and closes out the initiative once the space is returned. The actual `VACUUM (FULL)` is a **human-run prod step** (brief table lock) — this task delivers the runbook + records the size drop when observed.
