@@ -14,6 +14,8 @@ Time-series popularity per video (a [sources](sources.md) row). Same shape as [c
 - The `video_latest_metrics` view still returns the current value — the last change *is* the current state.
 - Velocity reads must use **as-of-cutoff** semantics (most-recent row ≤ a cutoff date), never "the row at exactly N days ago" — gaps between rows are expected and meaningful (no row = no change).
 
+One-time disk reclaim of the pre-migration bloat is a manual `VACUUM (FULL)` — see the [metrics dedup runbook](../metrics-dedup-runbook.md).
+
 | Column | Type | Nullable | Default | Notes |
 |--------|------|----------|---------|-------|
 | metric_id | UUID | PK | uuid4 | |
