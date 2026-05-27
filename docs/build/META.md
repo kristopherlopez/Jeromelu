@@ -63,6 +63,9 @@ Ritual:
 
 Always apply migrations via `make migrate`. Never hand-apply SQL with `psql` shortcuts — tracking goes stale and creates hidden drift. Tests run against migrated schemas, not snapshots.
 
+**Running migrations on prod manually.** `deploy.yml` documents `ssh jeromelu-prod 'cd /opt/jeromelu && bash packages/db/migrate.sh'`, but run bare it defaults to `localhost:5440` (dev) and fails `connection refused`. The box's `.env` has no `DATABASE_URL` (it's set in `docker-compose.prod.yml` to the container host `postgres:5432`, unreachable from the host shell). Postgres is published to host loopback at `127.0.0.1:5432`. So the working invocation is:
+`ssh jeromelu-prod 'cd /opt/jeromelu && set -a && . ./.env && set +a && DATABASE_URL="postgresql://jeromelu_admin:${POSTGRES_PASSWORD}@127.0.0.1:5432/jeromelu" bash packages/db/migrate.sh'`. Read-only checks against prod can also use `docker exec jeromelu-postgres psql -U jeromelu_admin -d jeromelu`. `VACUUM (FULL)` is maintenance, not a migration — run it via `docker exec` per `docs/operations/metrics-dedup-runbook.md`, not `migrate.sh`.
+
 ### Infrastructure (AWS)
 
 New AWS resources go through Terraform in `infra/terraform/`. Never `aws` CLI to provision as a shortcut. The agent writes the Terraform; the human runs `apply`.
