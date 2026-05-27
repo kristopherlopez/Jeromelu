@@ -15,3 +15,6 @@ COPY services/api/ .
 EXPOSE 8000
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# redeploy 2026-05-27: ship change-only metrics storage (fd8e0a3) + scout refactors
+# stuck behind the GitHub Actions billing block; first deploy since 05-24.
