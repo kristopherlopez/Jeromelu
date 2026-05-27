@@ -567,10 +567,38 @@ DISCOVER → INGEST → ATTRIBUTE → CLEAN → REMEMBER → EXTRACT → CONSENS
 
 ---
 
+## The crew / worker crosswalk
+
+The Machine cuts the system by **pipeline stage**. The [crew](../agents/crew/README.md) cuts the *same* system by **cognitive mode** (research, analysis, skepticism, math, memory); the [system workers](../agents/system/README.md) cut it by **runtime process**. These are orthogonal cuts — you can't derive one from another — so this table reconciles them. A blank crew cell marks an infrastructural layer with no cognitive-mode owner.
+
+Build state is *not* duplicated here. Worker status lives in the [system index](../agents/system/README.md); task-level state lives in [docs/build](../build/TASKS.md).
+
+| # | Layer | Crew mode | Runtime (worker / surface) |
+|---|---|---|---|
+| 1 | Source Discovery | [Scout](../agents/crew/scout/README.md) | [source-discovery](../agents/system/source-discovery.md) |
+| 2 | Media Ingestion | [Scout](../agents/crew/scout/README.md) | [ingestion](../agents/system/ingestion.md) |
+| 3 | Identity & Attribution | — | [speaker-identification](../agents/system/speaker-identification.md) |
+| 4 | Transcript Quality | — | [transcription-pipeline](../agents/system/transcription-pipeline.md) |
+| 5 | Maintained Knowledge | [Archivist](../agents/crew/archivist/README.md) | [publishing](../agents/system/publishing.md) |
+| 6 | Claim Extraction | [Analyst](../agents/crew/analyst/README.md) | [extraction](../agents/system/extraction.md) |
+| 7 | Consensus | [Analyst](../agents/crew/analyst/README.md) | [publishing](../agents/system/publishing.md) |
+| 8 | Verification | [Critic](../agents/crew/critic/README.md) | [decision](../agents/system/decision.md) |
+| 9 | Reputation / Scoring | [Bookkeeper](../agents/crew/bookkeeper/README.md) | [decision](../agents/system/decision.md) |
+| 10 | Decision Worker | [Jaromelu](../agents/crew/jaromelu/README.md) · [Critic](../agents/crew/critic/README.md) | [decision](../agents/system/decision.md) |
+| 11 | Agent / Analyst | [Jaromelu](../agents/crew/jaromelu/README.md) | [ask-me](../pages/ask-me/overview.md) |
+| 12 | Observability | — | [agent-audit](../agents/system/agent-audit.md) |
+| 13 | Presentation / UX | [Jaromelu](../agents/crew/jaromelu/README.md) | [the Feed](../pages/feed/layout.md) |
+| 14 | Synthetic Media | — | [avatar](../avatar/system.md) |
+
+What the crosswalk makes visible: the five crew modes fan out across all 14 layers and several layers (Identity, Transcript Quality, Observability, Synthetic Media) have *no* crew owner because they're plumbing, not thinking. The crew is the lens for *how Jaromelu reasons*; The Machine is the lens for *what the pipeline does*. Neither replaces the other.
+
+---
+
 ## Related
 
 - [Knowledge Asset](03-knowledge-asset.md) — the asset these layers build
 - [Venture Thesis](01-venture-thesis.md) — why NRL is the proving ground, not the product
+- [Agents](../agents/README.md) — the crew / system / skills taxonomy the crosswalk maps onto
 - [Scout](../agents/crew/scout/README.md) — source discovery in practice
 - [Agent Audit](../agents/system/agent-audit.md) — the observability layer + event model contract
 - [LLM Wiki](../pages/wiki/llm-wiki-pattern.md) — the self-maintaining knowledge layer
