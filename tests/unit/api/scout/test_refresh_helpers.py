@@ -1,14 +1,19 @@
 """Unit tests for app.scout.youtube.refresh pure helpers.
 
-Covers YouTube URL → video-id parsing and the RFC 3339 timestamp parser.
-The DB-backed cursor + enumeration logic belongs in integration/.
+Covers YouTube URL → video-id parsing, the RFC 3339 timestamp parser, and the
+change-only-storage change-detection predicate. The DB-backed cursor +
+enumeration + latest-metrics-loader logic belongs in integration/.
 """
 
 from datetime import datetime, timezone
 
 import pytest
 
-from app.scout.youtube.refresh import _parse_published_at, _video_id_from_url
+from app.scout.youtube.refresh import (
+    _metrics_changed,
+    _parse_published_at,
+    _video_id_from_url,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -80,3 +85,41 @@ class TestParsePublishedAt:
         # Defensive: API drift shouldn't crash the cursor.
         assert _parse_published_at("not a date") is None
         assert _parse_published_at("2026/04/29") is None
+
+
+# ---------------------------------------------------------------------------
+# _metrics_changed — change-only storage predicate
+# ---------------------------------------------------------------------------
+
+class TestMetricsChanged:
+    def test_no_prior_snapshot_records(self):
+        # First-ever sample for a video/channel — always record.
+        assert _metrics_changed(None, {"views": 100, "likes": 5, "comments": 2}) is True
+
+    def test_identical_payload_skips(self):
+        prev = {"views": 100, "likes": 5, "comments": 2}
+        curr = {"views": 100, "likes": 5, "comments": 2}
+        assert _metrics_changed(prev, curr) is False
+
+    def test_changed_value_records(self):
+        prev = {"views": 100, "likes": 5, "comments": 2}
+        curr = {"views": 101, "likes": 5, "comments": 2}
+        assert _metrics_changed(prev, curr) is True
+
+    def test_different_key_set_records(self):
+        # e.g. comments get disabled and the field drops out of the payload.
+        prev = {"views": 100, "likes": 5, "comments": 0}
+        curr = {"views": 100, "likes": 5}
+        assert _metrics_changed(prev, curr) is True
+
+    def test_reordered_keys_same_content_skips(self):
+        # JSONB round-trips key order; dict equality is order-independent.
+        prev = {"comments": 2, "likes": 5, "views": 100}
+        curr = {"views": 100, "likes": 5, "comments": 2}
+        assert _metrics_changed(prev, curr) is False
+
+    def test_channel_payload_shape_supported(self):
+        # The predicate is shape-agnostic — works for the channel payload too.
+        prev = {"subscribers": 1000, "videos": 50, "views": 9999, "country": "AU"}
+        assert _metrics_changed(prev, dict(prev)) is False
+        assert _metrics_changed(prev, {**prev, "subscribers": 1001}) is True

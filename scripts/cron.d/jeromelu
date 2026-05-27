@@ -25,7 +25,9 @@ MAILTO=""
 
 # Daily video refresh — 23:15 UTC = 09:15 AEST / 10:15 AEDT.
 # ~750 quota units (~180 channels × ~200 videos). Enumerates new videos per
-# channel + snapshots video_metrics. Offset 15 min from channel-stats so the
+# channel + snapshots video_metrics (change-only: records a row only when a
+# video's views/likes/comments changed since the last snapshot; ~70% of daily
+# samples are unchanged and skipped). Offset 15 min from channel-stats so the
 # two don't compete for DB connections. Daily so velocity / breakout detection
 # has 1-day resolution; comfortably under the 10k daily quota even at peak.
 15 23 * * *     ubuntu  /opt/jeromelu/scripts/scout-refresh.sh videos

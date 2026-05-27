@@ -8,8 +8,11 @@ Two deterministic jobs that bolt on to Scout's discovery flow:
    endpoint (incremental: stops at the most-recent known video_id).
 
 2. `refresh_all_video_stats(session)` — batch-fetch view/like/comment counts
-   for every YouTube source and append a row to `video_metrics`. Called
-   daily so we can see view velocity / detect breakouts at 1-day resolution.
+   for every YouTube source and append a row to `video_metrics` only when the
+   payload changed vs the latest snapshot (change-only storage — see
+   `_metrics_changed`). Called daily so we can see view velocity / detect
+   breakouts at 1-day resolution. `refresh_all_channel_stats` does the same
+   for `channel_metrics`.
 
 Both jobs are idempotent and safe to re-run. Quota cost:
   - Per-channel enumerate: ~4 quota units for full backfill (200 videos),
@@ -81,6 +84,58 @@ def _parse_published_at(raw: str | None) -> datetime | None:
         return datetime.fromisoformat(raw.replace("Z", "+00:00"))
     except ValueError:
         return None
+
+
+# ---------------------------------------------------------------------------
+# Change-only storage
+#
+# The metrics tables are time-series, but most daily samples are byte-identical
+# to the day before (a long tail of old videos whose views/likes/comments never
+# move). We record a new row only when the payload *changed* vs the latest
+# snapshot, so storage tracks activity rather than corpus size. Consequences:
+#   - The latest row's `sampled_at` means "last CHANGED", not "last CHECKED".
+#     Freshness ("was this re-confirmed today?") derives from the last
+#     successful refresh run (cron-report / the refresh job's agent_runs row),
+#     NOT from this table.
+#   - The `*_latest_metrics` views still return the current value — the last
+#     change IS the current state.
+#   - Velocity reads must use as-of-cutoff semantics (most-recent row ≤ a
+#     cutoff), never "the row at exactly N days ago"; gaps are expected.
+# ---------------------------------------------------------------------------
+
+def _metrics_changed(previous: dict | None, current: dict) -> bool:
+    """True when `current` should be recorded — i.e. there is no prior snapshot,
+    or the payload differs from the most recent stored one.
+
+    `current` is the already-sliced payload (videos: `_METRIC_FIELDS`;
+    channels: the subscribers/videos/views/country/channel_published_at dict).
+    Comparison is plain dict equality, so JSONB key order and int/str
+    round-tripping don't matter."""
+    return previous is None or previous != current
+
+
+def _latest_video_metrics(session: Session) -> dict[UUID, dict]:
+    """source_id → its most-recent recorded metrics payload (the set the
+    `video_latest_metrics` view exposes). Loaded once per refresh so the write
+    loop can skip re-recording an unchanged snapshot. `metrics` is JSONB-typed,
+    so rows come back as `dict`."""
+    stmt = (
+        select(VideoMetric.source_id, VideoMetric.metrics)
+        .distinct(VideoMetric.source_id)
+        .order_by(VideoMetric.source_id, VideoMetric.sampled_at.desc())
+    )
+    return {row.source_id: row.metrics for row in session.execute(stmt)}
+
+
+def _latest_channel_metrics(session: Session) -> dict[UUID, dict]:
+    """channel_id → its most-recent recorded metrics payload (the set the
+    `channel_latest_metrics` view exposes). Twin of `_latest_video_metrics`."""
+    stmt = (
+        select(ChannelMetric.channel_id, ChannelMetric.metrics)
+        .distinct(ChannelMetric.channel_id)
+        .order_by(ChannelMetric.channel_id, ChannelMetric.sampled_at.desc())
+    )
+    return {row.channel_id: row.metrics for row in session.execute(stmt)}
 
 
 # ---------------------------------------------------------------------------
@@ -212,12 +267,20 @@ def refresh_all_video_stats(session: Session) -> dict[str, Any]:
 
     Two outcomes per video, both paid for in the same `videos.list` call:
       1. A new row in `video_metrics` carrying just the time-varying fields
-         (views/likes/comments). Use `video_latest_metrics` for current
+         (views/likes/comments) — but **only when the payload changed** vs the
+         video's latest snapshot (change-only storage; see `_metrics_changed`).
+         Unchanged samples are skipped. Use `video_latest_metrics` for current
          state and the table itself for history.
       2. The `sources` row is updated to mirror YouTube's current identity
          fields. These can change (creators edit descriptions to add
          chapter timestamps, thumbnails get refreshed) so always-overwrite
-         keeps the DB in sync rather than letting it drift.
+         keeps the DB in sync rather than letting it drift. This is independent
+         of the metric skip — identity always syncs.
+
+    The skip applies only here. The first-snapshot writers — `refresh_channel_videos`
+    (new-video discovery), the channel-approval snapshot in `routers/recon.py`,
+    and the `canonicalise_handles` backfill — have no prior row, so a skip
+    would be a no-op; they're intentionally left unconditional.
 
     Quota: ~1 unit per 50 videos. ~180 channels × ~200 videos = ~720 units.
     """
@@ -237,10 +300,15 @@ def refresh_all_video_stats(session: Session) -> dict[str, Any]:
             video_to_source[vid] = source_id
 
     if not video_to_source:
-        return {"videos_refreshed": 0, "sources_synced": 0, "batches": 0}
+        return {"videos_refreshed": 0, "videos_unchanged": 0, "sources_synced": 0, "batches": 0}
+
+    # Latest recorded metrics per source — loaded once so the loop can skip
+    # re-recording an unchanged snapshot (change-only storage).
+    latest = _latest_video_metrics(session)
 
     sampled_at = datetime.now(timezone.utc)
     refreshed = 0
+    unchanged = 0
     sources_synced = 0
     batches = 0
     video_ids = list(video_to_source.keys())
@@ -275,21 +343,25 @@ def refresh_all_video_stats(session: Session) -> dict[str, Any]:
 
             metric_payload = {k: entry[k] for k in _METRIC_FIELDS if k in entry}
             if metric_payload:
-                session.add(
-                    VideoMetric(
-                        source_id=source_id,
-                        sampled_at=sampled_at,
-                        source="youtube_api",
-                        metrics=metric_payload,
+                if _metrics_changed(latest.get(source_id), metric_payload):
+                    session.add(
+                        VideoMetric(
+                            source_id=source_id,
+                            sampled_at=sampled_at,
+                            source="youtube_api",
+                            metrics=metric_payload,
+                        )
                     )
-                )
-                refreshed += 1
+                    refreshed += 1
+                else:
+                    unchanged += 1
 
     session.commit()
     logger.info(
-        "Refreshed video stats: %d videos in %d API batches, "
+        "Refreshed video stats: %d recorded, %d unchanged in %d API batches, "
         "%d sources synced with identity fields",
         refreshed,
+        unchanged,
         batches,
         sources_synced,
     )
@@ -297,6 +369,7 @@ def refresh_all_video_stats(session: Session) -> dict[str, Any]:
     return {
         "videos_total": len(video_to_source),
         "videos_refreshed": refreshed,
+        "videos_unchanged": unchanged,
         "sources_synced": sources_synced,
         "batches": batches,
     }
@@ -315,11 +388,14 @@ def refresh_all_channel_stats(session: Session) -> dict[str, Any]:
 
     Two outcomes per channel, both paid for in the same channels.list call:
       1. New row in `channel_metrics` with the time-varying popularity
-         fields (subscribers, videos, views). Use `channel_latest_metrics`
-         for current state and the table itself for trend analysis.
+         fields (subscribers, videos, views) — but **only when the payload
+         changed** vs the channel's latest snapshot (change-only storage; see
+         `_metrics_changed`). Unchanged samples are skipped. Use
+         `channel_latest_metrics` for current state and the table itself for
+         trend analysis.
       2. Identity fields (handle, avatar_url) synced onto the `channels`
          row when the API returns them — keeps the wiki UI in sync without
-         a separate fetch.
+         a separate fetch. Independent of the metric skip — identity always syncs.
     """
     channels = list(session.scalars(
         select(Channel)
@@ -331,15 +407,20 @@ def refresh_all_channel_stats(session: Session) -> dict[str, Any]:
         return {
             "channels_total": 0,
             "metrics_recorded": 0,
+            "channels_unchanged": 0,
             "channels_synced": 0,
             "batches": 0,
         }
+
+    # Latest recorded metrics per channel — loaded once for change-only skip.
+    latest = _latest_channel_metrics(session)
 
     by_external_id = {c.external_id: c for c in channels}
     external_ids = list(by_external_id.keys())
     sampled_at = datetime.now(timezone.utc)
 
     metrics_recorded = 0
+    unchanged = 0
     channels_synced = 0
     batches = 0
     for i in range(0, len(external_ids), 50):
@@ -387,22 +468,26 @@ def refresh_all_channel_stats(session: Session) -> dict[str, Any]:
                 metric_payload["channel_published_at"] = entry["published_at"]
 
             if metric_payload:
-                session.add(
-                    ChannelMetric(
-                        channel_id=channel.channel_id,
-                        platform="youtube",
-                        sampled_at=sampled_at,
-                        source="youtube_api",
-                        metrics=metric_payload,
+                if _metrics_changed(latest.get(channel.channel_id), metric_payload):
+                    session.add(
+                        ChannelMetric(
+                            channel_id=channel.channel_id,
+                            platform="youtube",
+                            sampled_at=sampled_at,
+                            source="youtube_api",
+                            metrics=metric_payload,
+                        )
                     )
-                )
-                metrics_recorded += 1
+                    metrics_recorded += 1
+                else:
+                    unchanged += 1
 
     session.commit()
     logger.info(
-        "Refreshed channel stats: %d channels in %d API batches, "
+        "Refreshed channel stats: %d recorded, %d unchanged in %d API batches, "
         "%d identity-synced",
         metrics_recorded,
+        unchanged,
         batches,
         channels_synced,
     )
@@ -410,6 +495,7 @@ def refresh_all_channel_stats(session: Session) -> dict[str, Any]:
     return {
         "channels_total": len(channels),
         "metrics_recorded": metrics_recorded,
+        "channels_unchanged": unchanged,
         "channels_synced": channels_synced,
         "batches": batches,
     }

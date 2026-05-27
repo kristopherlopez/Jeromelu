@@ -14,7 +14,7 @@ tags: [area/operations, data-lineage]
 
 ## Writer
 
-- `services/api/app/scout/youtube/client.py` — sampled at video discovery time and daily thereafter via the admin refresh endpoint; INSERTs one row per video per sample
+- `services/api/app/scout/youtube/client.py` (called by `services/api/app/scout/youtube/refresh.py`) — sampled at video discovery time and daily thereafter via the admin refresh endpoint; INSERTs a row **only when views/likes/comments change** vs the latest snapshot (change-only storage, migration 070). First-snapshot writers (`refresh_channel_videos`, the channel-approval snapshot in `routers/recon.py`) always write — no prior row to compare.
 
 ## Field mapping
 
@@ -28,7 +28,7 @@ tags: [area/operations, data-lineage]
 
 ## Read pattern
 
-For "current state" queries, prefer the `video_latest_metrics` view.
+For "current state" queries, prefer the `video_latest_metrics` view. Velocity/breakout reads must use **as-of-cutoff** semantics (the most-recent row ≤ a cutoff date), never assume a row exists at an exact prior date — under change-only storage, gaps between rows are expected (a gap means "unchanged").
 
 ## Notes
 

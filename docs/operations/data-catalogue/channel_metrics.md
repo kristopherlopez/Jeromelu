@@ -21,3 +21,5 @@ Time-series popularity per channel. Multi-platform via the JSONB `metrics` colum
 **Indexes:** (channel_id, sampled_at DESC), (platform, sampled_at DESC), sampled_at DESC
 
 For "current state" queries (wiki cards, ranking) prefer the `channel_latest_metrics` view over scanning the table.
+
+**Change-only storage (migration 070).** Like [video_metrics](video_metrics.md), the daily refresh records a row **only when the payload changed** vs the channel's latest snapshot. The latest row's `sampled_at` means last *changed*, not last *checked* (freshness derives from the last successful refresh run, not this table); `channel_latest_metrics` still returns the current value; velocity reads must use as-of-cutoff semantics, not an exact prior date.

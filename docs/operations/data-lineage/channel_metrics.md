@@ -15,7 +15,7 @@ tags: [area/operations, data-lineage]
 
 ## Writer
 
-- `services/api/app/scout/youtube/client.py` (called by `services/api/app/scout/youtube/refresh.py`) — periodic refresh against YouTube Data API; INSERTs one row per channel per sample with the platform-specific JSONB `metrics` blob
+- `services/api/app/scout/youtube/client.py` (called by `services/api/app/scout/youtube/refresh.py`) — periodic refresh against YouTube Data API; INSERTs a row **only when the metrics payload changes** vs the latest snapshot (change-only storage, migration 070). First-snapshot writers (channel-approval snapshot in `routers/recon.py`, `canonicalise_handles` backfill) always write — no prior row to compare.
 
 ## Field mapping
 
@@ -30,4 +30,4 @@ tags: [area/operations, data-lineage]
 
 ## Read pattern
 
-For "current state" queries (wiki cards, ranking, etc.), prefer the `channel_latest_metrics` view rather than scanning the full table.
+For "current state" queries (wiki cards, ranking, etc.), prefer the `channel_latest_metrics` view rather than scanning the full table. Velocity reads must use as-of-cutoff semantics (most-recent row ≤ a cutoff), not an exact prior date — gaps are expected under change-only storage.
