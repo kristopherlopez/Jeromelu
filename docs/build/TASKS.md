@@ -95,6 +95,126 @@ Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "One-time S3 seed run" + "D
 _(implementer fills in: three curl responses, three aws s3 ls outputs, two SQL query results, doc diff summary, first-cron-fire log line)_
 
 
+### TASK-07: Skip-if-unchanged in the refresh write path (both tables) + helper unit tests + behaviour docs
+
+Implements PLAN.md § 2026-05-27 "Change-only storage" — the write-path half. After this, the daily refresh records a `video_metrics` / `channel_metrics` row **only when the payload changed** vs that entity's latest snapshot.
+
+**What**
+
+1. **Add the pure helper** to `services/api/app/scout/youtube/refresh.py` (the canonical file post-refactor — `scout/refresh.py` is now a re-export shim):
+   ```python
+   def _metrics_changed(previous: dict | None, current: dict) -> bool:
+       """True when `current` should be recorded — no prior snapshot, or the
+       payload differs from the most recent stored one. Plain dict equality;
+       JSONB key order / int round-tripping don't matter."""
+       return previous is None or previous != current
+   ```
+2. **Add two loaders** in the same file, each returning `{id: metrics_dict}` via Postgres `DISTINCT ON` over the ORM model (equivalent to the `*_latest_metrics` views; `metrics` is JSONB-typed so rows come back as `dict`):
+   - `_latest_video_metrics(session) -> dict[UUID, dict]` — `select(VideoMetric.source_id, VideoMetric.metrics).distinct(VideoMetric.source_id).order_by(VideoMetric.source_id, VideoMetric.sampled_at.desc())`.
+   - `_latest_channel_metrics(session) -> dict[UUID, dict]` — twin over `ChannelMetric.channel_id`.
+3. **Wire into `refresh_all_video_stats`:** load `latest = _latest_video_metrics(session)` once before the batch loop. Replace the existing unconditional `if metric_payload: session.add(VideoMetric(...)); refreshed += 1` with:
+   ```python
+   if metric_payload:
+       if _metrics_changed(latest.get(source_id), metric_payload):
+           session.add(VideoMetric(... metrics=metric_payload ...))
+           refreshed += 1
+       else:
+           unchanged += 1
+   ```
+   Add `unchanged = 0` init and `"videos_unchanged": unchanged` to the return dict. **Do not touch** the `sources` identity-field sync — it always runs.
+4. **Wire into `refresh_all_channel_stats`** symmetrically with `_latest_channel_metrics`; add `"channels_unchanged": unchanged` to its return dict. The channel payload (`subscribers/videos/views/country/channel_published_at`) is already built before insert — compare that dict.
+5. **Leave the first-snapshot writers unchanged** (no prior row → skip is a no-op): `refresh_channel_videos`, `recon.py` ~line 306, `scripts/canonicalise_handles.py` ~line 83. Note them in the `refresh_all_video_stats` docstring so a reader knows they were considered.
+6. **Confirm velocity reads need no change:** read `scripts/content_report.py`. Verify `fetch_channel_velocity` / `fetch_headline` use the `JOIN LATERAL (... sampled_at < now() - interval '6 days' ORDER BY sampled_at DESC LIMIT 1)` as-of-cutoff pattern and `fetch_top_new_videos` reads `video_latest_metrics`. Record the confirmation in proof notes. **If any query assumes a row exists at an exact prior date (consecutive-row `LAG` velocity), STOP and file a new task — do not rewrite it here.**
+7. **Unit tests** — add `class TestMetricsChanged` to `tests/unit/api/scout/test_refresh_helpers.py`, importing from the canonical path: `from app.scout.youtube.refresh import _metrics_changed`. Cases: `previous is None` → `True`; identical dict → `False`; one value differs → `True`; key set differs (`{"views":1,"likes":2}` vs `{"views":1,"likes":2,"comments":0}`) → `True`; reordered keys, same content → `False`.
+8. **Docs (same changeset):**
+   - `youtube/refresh.py` module + both function docstrings: "append a row" → "append a row only when the payload differs from the latest snapshot; unchanged samples are skipped."
+   - `docs/operations/data-catalogue/video_metrics.md` + `channel_metrics.md`: document change-only semantics + the "freshness derives from the last successful daily refresh run (cron-report / the refresh job's `agent_runs` row), not the latest row's `sampled_at`" note.
+   - `docs/operations/data-lineage/video_metrics.md` + `channel_metrics.md`: Writer line → "INSERTs a row only when metrics change vs the latest snapshot"; add the as-of read-pattern note for velocity consumers.
+   - `scripts/cron.d/jeromelu`: daily video-refresh comment → note only changed rows are snapshotted.
+
+**How to verify**
+
+- `make test` passes, including the new `TestMetricsChanged` (run `pytest tests/unit/api/scout/test_refresh_helpers.py -q` and paste the summary).
+- `python -c "from app.scout.youtube.refresh import _metrics_changed, _latest_video_metrics, _latest_channel_metrics"` succeeds (imports resolve from the canonical path).
+- `git diff services/api/app/scout/youtube/refresh.py` shows the two helpers, the two loaders, the two gated `session.add` sites, the two new return keys, and docstring edits — **and nothing else** (no accidental capture of the other session's Scout-refactor diff; run `git diff --cached --stat` before commit).
+- Proof notes record the `content_report.py` read-confirmation (which functions, which pattern).
+- **Deferred (post-deploy, record when observable):** next daily refresh response / `scout-refresh.log` shows `videos_unchanged` ≈ 75% of `videos_total` and `videos_refreshed` an order of magnitude below the old ~119k.
+
+**Proof notes**
+_(implementer fills in: pytest summary, import check, diff summary, content_report confirmation, deferred post-deploy refresh counts)_
+
+
+### TASK-08: Migration 070 — one-time dedup of existing video_metrics + channel_metrics snapshots
+
+Implements PLAN.md § 2026-05-27 "Change-only storage" — the backfill half. Removes the ~70% of `video_metrics` rows (and the channel equivalent) that are byte-identical to the prior snapshot, keeping every first snapshot and every change. Depends on nothing in TASK-07 (independent), but ship after or alongside it.
+
+**What**
+
+1. Create `packages/db/migrations/070_dedup_metrics_snapshots.sql` with a house-style header comment (match `024_video_metrics.sql`'s tone): explain the 70%-redundant finding, that it keeps first-snapshot + every change, that it is idempotent, and that **space reclaim is a separate manual `VACUUM (FULL)` step — see `docs/operations/metrics-dedup-runbook.md`** (TASK-09). The file must contain **no `VACUUM`** (cannot run in a transaction).
+2. Two statements (video first, then channel):
+   ```sql
+   WITH ordered AS (
+       SELECT metric_id, metrics,
+              lag(metrics) OVER (PARTITION BY source_id ORDER BY sampled_at) AS prev
+       FROM video_metrics
+   )
+   DELETE FROM video_metrics vm
+   USING ordered o
+   WHERE vm.metric_id = o.metric_id
+     AND o.prev IS NOT NULL
+     AND o.metrics = o.prev;
+   -- then the identical statement over channel_metrics partitioned by channel_id
+   ```
+
+**How to verify** (local, via `make migrate`)
+
+1. **Before** applying: capture `SELECT count(*) FROM video_metrics;`, `SELECT count(*) FROM channel_metrics;`, and the latest-state checksums:
+   ```sql
+   SELECT md5(string_agg(source_id::text || metrics::text, '' ORDER BY source_id)) FROM video_latest_metrics;
+   SELECT md5(string_agg(channel_id::text || metrics::text, '' ORDER BY channel_id)) FROM channel_latest_metrics;
+   ```
+2. `make migrate` (confirm 070 applies; `make migrate-status` shows it tracked).
+3. **After:** the two checksums are **byte-identical to before** (dedup preserved every entity's current value); row counts dropped; and re-running the dedup probe returns 0:
+   ```sql
+   WITH ordered AS (SELECT metric_id, metrics, lag(metrics) OVER (PARTITION BY source_id ORDER BY sampled_at) AS prev FROM video_metrics)
+   SELECT count(*) FROM ordered WHERE prev IS NOT NULL AND metrics = prev;   -- expect 0
+   ```
+   (same probe for `channel_metrics`). Paste before/after counts + the two matching checksums + the two zero-probes into proof notes.
+4. `git diff --cached --stat` shows only `packages/db/migrations/070_dedup_metrics_snapshots.sql` staged.
+
+**Proof notes**
+_(implementer fills in: before/after row counts, matching latest-state checksums, zero dedup-probe results, migrate-status line)_
+
+
+### TASK-09: Prod reclaim runbook + deferred VACUUM FULL size verification
+
+Implements PLAN.md § 2026-05-27 "Change-only storage" — the reclaim half. Authors the one-time prod maintenance runbook and closes out the initiative once the space is returned. The actual `VACUUM (FULL)` is a **human-run prod step** (brief table lock) — this task delivers the runbook + records the size drop when observed.
+
+**What**
+
+1. Create `docs/operations/metrics-dedup-runbook.md`: purpose (one-time reclaim after migration 070), preconditions (070 applied on prod; run off-hours; 40 GB free disk confirms headroom), the exact commands:
+   ```sql
+   VACUUM (FULL, ANALYZE) video_metrics;
+   VACUUM (FULL, ANALYZE) channel_metrics;
+   ```
+   the `ACCESS EXCLUSIVE` lock warning (table unavailable for the rewrite duration — seconds to low minutes for the ~191 MB result), the before/after size query:
+   ```sql
+   SELECT pg_size_pretty(pg_total_relation_size('video_metrics')) AS video,
+          pg_size_pretty(pg_total_relation_size('channel_metrics')) AS channel;
+   ```
+   expected `video_metrics` 641 MB → ~191 MB, and a "no rollback needed — `VACUUM` is non-destructive" note. Link it from `docs/operations/data-catalogue/video_metrics.md`.
+2. Add a row/pointer to whatever ops-doc index covers `docs/operations/` runbooks if one exists (check `docs/operations/` for an index; if none, the catalogue link suffices).
+
+**How to verify**
+
+- `docs/operations/metrics-dedup-runbook.md` exists with the commands, lock warning, before/after query, and expected sizes exactly as above. The catalogue page links to it.
+- `git diff --cached --stat` shows only the runbook + the catalogue link edit.
+- **Deferred (gates checkoff):** after the human runs the `VACUUM (FULL, ANALYZE)` on prod, capture the before/after `pg_total_relation_size` output showing `video_metrics` dropped to ~191 MB (±). Tag `[BLOCKED: awaiting human VACUUM FULL on prod]` until then — mirror the TASK-06 deferred-verification pattern; do not run `VACUUM FULL` on prod without explicit human go-ahead.
+
+**Proof notes**
+_(implementer fills in: runbook path, deferred before/after prod size output once the human runs the VACUUM)_
+
+
 ## Completed work
 
 Completed tasks are not kept here. When a task passes review and is checked off, what it delivered is recorded in the active run report under [`docs/build/runs/`](./runs/) and the task is removed from this file. This queue holds only open/in-flight work.
