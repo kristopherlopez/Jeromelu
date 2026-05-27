@@ -1,6 +1,6 @@
 # Scout Phase 2.5 closure — SC teams + settings
 
-**Date:** 2026-05-24 · **Status:** 🟢 Shipped (1 verification pending) · **Plan:** Scout Phase 2.5 closure · **Tasks:** TASK-01 → TASK-06
+**Date:** 2026-05-24 · **Status:** 🟢 Shipped · **Plan:** Scout Phase 2.5 closure · **Tasks:** TASK-01 → TASK-06
 
 **TL;DR** — Took `scout/supercoach_teams/` and `scout/supercoach_settings/` from "code shipped but untested, unscheduled, ad-hoc-seeded" to charter-compliant and Shipped — matching the discipline already in place for `supercoach_roster/` (Phase 1) and `supercoach_stats/` (Phase 2). Drift tests, weekly cron, a verified prod seed for season 2026, and docs flipped to Shipped. One bullet outstanding: confirming the first cron fire next Monday.
 
@@ -45,7 +45,11 @@ Seeded prod for season 2026 (run on the box via loopback — see deviations): te
 - Endpoints return `matched`/`upserted_id`, **not** the spec-anticipated `s3_archive_key`; used `aws s3 ls` as the authoritative S3 proof. Reviewer confirmed harmless (the key is recorded in the audit detail + `sc_settings`, not the HTTP body).
 
 ## Outstanding
-- ☐ **Confirm first cron fire** — `/var/log/jeromelu/scout-refresh.log` (or the Tuesday cron-health email) shows both `supercoach-teams` and `supercoach-settings` jobs ran clean (status 2xx) on/after **Mon 2026-05-25 23:35 UTC**. Tick this, set status to fully Shipped, then remove the plan from PLAN.md's Active section.
+- ☑ **First cron fire confirmed (2026-05-27, verified by the implementer session).** `/var/log/jeromelu/scout-refresh.log` on prod shows both jobs ran clean on **Mon 2026-05-25**:
+  - `[2026-05-25T23:30:01Z] supercoach-teams status=200 … "ok":true … "fetched":17,"matched":17,"unknown_abbrev":[],"missing_team_row":[]`
+  - `[2026-05-25T23:35:01Z] supercoach-settings status=200 … "ok":true … "mode":"classic","upserted_id":"b4744204-fe34-4aab-ad35-e1b139d913a3"`
+
+  Status set to fully Shipped; plan removed from PLAN.md's Active section.
 
 ## Lessons → promoted to META
 - On-box admin API calls need `--resolve` (hairpin-NAT). → META "On-box admin API calls need `--resolve`".
