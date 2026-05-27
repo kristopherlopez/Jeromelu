@@ -8,6 +8,7 @@ Newest first.
 
 | Date | Run | Status |
 |---|---|---|
+| 2026-05-27 | [Change-only storage for video_metrics + channel_metrics](./2026-05-27-change-only-metrics-storage.md) | 🟡 In progress (TASK-07 shipped) |
 | 2026-05-24 | [Scout Phase 3.5 — nrl.com match-centre DB extractors](./2026-05-24-scout-phase-3.5-nrlcom-extractors.md) | 🟢 Shipped (runtime follow-up noted) |
 | 2026-05-24 | [Scout Phase 3 — nrl.com draw + match-centre ingest hardening](./2026-05-24-scout-phase-3-nrlcom-ingest.md) | 🟢 Shipped (cron first-fire pending) |
 | 2026-05-24 | [Scout Phase 2.5 closure — SC teams + settings](./2026-05-24-scout-phase-2.5-closure.md) | 🟢 Shipped (1 verification pending) |

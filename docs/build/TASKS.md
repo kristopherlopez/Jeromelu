@@ -95,55 +95,6 @@ Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "One-time S3 seed run" + "D
 _(implementer fills in: three curl responses, three aws s3 ls outputs, two SQL query results, doc diff summary, first-cron-fire log line)_
 
 
-### TASK-07: Skip-if-unchanged in the refresh write path (both tables) + helper unit tests + behaviour docs
-
-Implements PLAN.md § 2026-05-27 "Change-only storage" — the write-path half. After this, the daily refresh records a `video_metrics` / `channel_metrics` row **only when the payload changed** vs that entity's latest snapshot.
-
-**What**
-
-1. **Add the pure helper** to `services/api/app/scout/youtube/refresh.py` (the canonical file post-refactor — `scout/refresh.py` is now a re-export shim):
-   ```python
-   def _metrics_changed(previous: dict | None, current: dict) -> bool:
-       """True when `current` should be recorded — no prior snapshot, or the
-       payload differs from the most recent stored one. Plain dict equality;
-       JSONB key order / int round-tripping don't matter."""
-       return previous is None or previous != current
-   ```
-2. **Add two loaders** in the same file, each returning `{id: metrics_dict}` via Postgres `DISTINCT ON` over the ORM model (equivalent to the `*_latest_metrics` views; `metrics` is JSONB-typed so rows come back as `dict`):
-   - `_latest_video_metrics(session) -> dict[UUID, dict]` — `select(VideoMetric.source_id, VideoMetric.metrics).distinct(VideoMetric.source_id).order_by(VideoMetric.source_id, VideoMetric.sampled_at.desc())`.
-   - `_latest_channel_metrics(session) -> dict[UUID, dict]` — twin over `ChannelMetric.channel_id`.
-3. **Wire into `refresh_all_video_stats`:** load `latest = _latest_video_metrics(session)` once before the batch loop. Replace the existing unconditional `if metric_payload: session.add(VideoMetric(...)); refreshed += 1` with:
-   ```python
-   if metric_payload:
-       if _metrics_changed(latest.get(source_id), metric_payload):
-           session.add(VideoMetric(... metrics=metric_payload ...))
-           refreshed += 1
-       else:
-           unchanged += 1
-   ```
-   Add `unchanged = 0` init and `"videos_unchanged": unchanged` to the return dict. **Do not touch** the `sources` identity-field sync — it always runs.
-4. **Wire into `refresh_all_channel_stats`** symmetrically with `_latest_channel_metrics`; add `"channels_unchanged": unchanged` to its return dict. The channel payload (`subscribers/videos/views/country/channel_published_at`) is already built before insert — compare that dict.
-5. **Leave the first-snapshot writers unchanged** (no prior row → skip is a no-op): `refresh_channel_videos`, `recon.py` ~line 306, `scripts/canonicalise_handles.py` ~line 83. Note them in the `refresh_all_video_stats` docstring so a reader knows they were considered.
-6. **Confirm velocity reads need no change:** read `scripts/content_report.py`. Verify `fetch_channel_velocity` / `fetch_headline` use the `JOIN LATERAL (... sampled_at < now() - interval '6 days' ORDER BY sampled_at DESC LIMIT 1)` as-of-cutoff pattern and `fetch_top_new_videos` reads `video_latest_metrics`. Record the confirmation in proof notes. **If any query assumes a row exists at an exact prior date (consecutive-row `LAG` velocity), STOP and file a new task — do not rewrite it here.**
-7. **Unit tests** — add `class TestMetricsChanged` to `tests/unit/api/scout/test_refresh_helpers.py`, importing from the canonical path: `from app.scout.youtube.refresh import _metrics_changed`. Cases: `previous is None` → `True`; identical dict → `False`; one value differs → `True`; key set differs (`{"views":1,"likes":2}` vs `{"views":1,"likes":2,"comments":0}`) → `True`; reordered keys, same content → `False`.
-8. **Docs (same changeset):**
-   - `youtube/refresh.py` module + both function docstrings: "append a row" → "append a row only when the payload differs from the latest snapshot; unchanged samples are skipped."
-   - `docs/operations/data-catalogue/video_metrics.md` + `channel_metrics.md`: document change-only semantics + the "freshness derives from the last successful daily refresh run (cron-report / the refresh job's `agent_runs` row), not the latest row's `sampled_at`" note.
-   - `docs/operations/data-lineage/video_metrics.md` + `channel_metrics.md`: Writer line → "INSERTs a row only when metrics change vs the latest snapshot"; add the as-of read-pattern note for velocity consumers.
-   - `scripts/cron.d/jeromelu`: daily video-refresh comment → note only changed rows are snapshotted.
-
-**How to verify**
-
-- `make test` passes, including the new `TestMetricsChanged` (run `pytest tests/unit/api/scout/test_refresh_helpers.py -q` and paste the summary).
-- `python -c "from app.scout.youtube.refresh import _metrics_changed, _latest_video_metrics, _latest_channel_metrics"` succeeds (imports resolve from the canonical path).
-- `git diff services/api/app/scout/youtube/refresh.py` shows the two helpers, the two loaders, the two gated `session.add` sites, the two new return keys, and docstring edits — **and nothing else** (no accidental capture of the other session's Scout-refactor diff; run `git diff --cached --stat` before commit).
-- Proof notes record the `content_report.py` read-confirmation (which functions, which pattern).
-- **Deferred (post-deploy, record when observable):** next daily refresh response / `scout-refresh.log` shows `videos_unchanged` ≈ 75% of `videos_total` and `videos_refreshed` an order of magnitude below the old ~119k.
-
-**Proof notes**
-_(implementer fills in: pytest summary, import check, diff summary, content_report confirmation, deferred post-deploy refresh counts)_
-
-
 ### TASK-08: Migration 070 — one-time dedup of existing video_metrics + channel_metrics snapshots
 
 Implements PLAN.md § 2026-05-27 "Change-only storage" — the backfill half. Removes the ~70% of `video_metrics` rows (and the channel equivalent) that are byte-identical to the prior snapshot, keeping every first snapshot and every change. Depends on nothing in TASK-07 (independent), but ship after or alongside it.
