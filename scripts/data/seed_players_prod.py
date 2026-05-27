@@ -1,7 +1,7 @@
 """Seed local Postgres from a SuperCoach roster JSON dump.
 
-Reads ``scripts/data/scraped_players_api_raw.json`` (produced by the
-``scrape-supercoach`` skill) and idempotently populates entities + teams +
+Reads ``scripts/data/scraped_players_api_raw.json`` (produced by
+``make fetch-players``) and idempotently populates entities + teams +
 player_attributes via the shared :mod:`jeromelu_shared.players.roster`
 module.
 
@@ -49,7 +49,7 @@ def main() -> None:
     roster_path = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_ROSTER
     if not roster_path.exists():
         print(f"ERROR: roster file not found: {roster_path}")
-        print("Run /scrape-supercoach first to produce scraped_players_api_raw.json.")
+        print("Run `make fetch-players` first to produce scraped_players_api_raw.json.")
         sys.exit(1)
 
     with open(roster_path, encoding="utf-8") as f:

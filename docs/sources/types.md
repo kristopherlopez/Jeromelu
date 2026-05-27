@@ -127,7 +127,7 @@ Stats feed the [Bookkeeper](../agents/crew/bookkeeper/README.md) domain.
 | Property | Value |
 |----------|-------|
 | **Origin** | supercoach.com.au (scraped via Playwright) |
-| **Cadence** | On-demand (`/scrape-supercoach`), typically pre-season and after trade periods |
+| **Cadence** | On-demand (`make fetch-players`), typically pre-season and after trade periods |
 | **Raw format** | Player names, teams, SuperCoach positions, IDs |
 | **Cleaning** | None — authoritative source |
 | **Storage** | `data/players.yaml` → `entities` table |

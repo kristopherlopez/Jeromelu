@@ -268,7 +268,7 @@ For a page to leave `status='stub'` and become a meaningfully readable `status='
 
 The unblock order, ranked by leverage (most pages affected per unit of work):
 
-1. **L2 — SuperCoach scraper.** Run `fetch_supercoach_players.py` + `fetch_player_stats.py` on a regular cadence (the `scrape-supercoach` skill already does the player roster part). Unblocks `## Current Form` and `## Price Analysis` for every player page in one go. **Highest leverage.**
+1. **L2 — SuperCoach scraper.** Run `fetch_supercoach_players.py` + `fetch_player_stats.py` on a regular cadence (`make fetch-players` does the player roster part). Unblocks `## Current Form` and `## Price Analysis` for every player page in one go. **Highest leverage.**
 2. **L2 — NRL.com fetchers.** `fetch_match_stats.py` + `fetch_teamlists.py` need to be run; injury and round fetchers need to be built. Unblocks every team page's `## Recent Results` / `## Key Players` and every round page's `## Team Lists` / `## Results`.
 3. **L3 cleanup — get the existing 88 transcripts cleaned.** None of the 2,470 chunks have `clean_text`. The cleaning pass is one skill (`clean-transcript`) per document. Unblocks Layer 4 for whichever players the existing transcripts discuss.
 4. **L4 — claim extraction over the cleaned chunks.** `process-transcript` → `verify-claims` → `upload-transcript`. Unblocks `## Expert Opinions` for the players that come up in the corpus. *Note: Apisai Koroisau is not in the current corpus.*

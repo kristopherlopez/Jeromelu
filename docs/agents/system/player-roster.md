@@ -326,15 +326,13 @@ needed. Suggested crontab line (Tuesday 09:00 AEST):
 
 **Manual / legacy paths:**
 
-- `/scrape-supercoach` skill + `make prod-refresh-players ADMIN_KEY=...`
-  — older pre-endpoint flow, still works when you want the YAML
-  regenerated locally for transcript-cleaning. The skill itself runs an
-  interactive Playwright + Google OAuth flow; the modern unauthenticated
-  fetcher (`scripts/data/fetchers/fetch_supercoach_players.py`) is a
-  drop-in replacement that doesn't need it.
-- `make fetch-players` — local-dev helper that fetches the JSON and
+- `make fetch-players` — local-dev helper that fetches the JSON
+  (`fetch_supercoach_players.py`, unauthenticated single GET) and
   regenerates `data/players.yaml` (used by transcript cleaning). No
-  production side-effects.
+  production side-effects. Follow with `make prod-refresh-players
+  ADMIN_KEY=...` if you also want to push the roster to prod. (This
+  replaced the retired `scrape-supercoach` skill, which was just a
+  wrapper around the same target.)
 
 A daily diff job that polls `nrl.com/news` for transfer announcements
 between weekly refreshes is a v2 candidate — see [v2 expansion](#sources-today-vs-tomorrow)
@@ -375,4 +373,5 @@ represented yet.
 - `packages/shared/jeromelu_shared/players/nrlcom_refresh.py` — enrichment loop
 - `scripts/data/fetchers/fetch_supercoach_players.py` — local CLI fetch
 - `services/api/app/routers/players.py` — admin endpoints
-- `.claude/skills/scrape-supercoach/skill.md` — legacy local-only scraper
+- `make fetch-players` — local roster fetch + `data/players.yaml`
+  regeneration (replaced the retired `scrape-supercoach` skill)

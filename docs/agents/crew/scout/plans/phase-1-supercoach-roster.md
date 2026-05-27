@@ -30,7 +30,7 @@ Phase 1 is **smaller than expected** because most of the SuperCoach roster path 
 | Prod refresh endpoint | `POST /api/admin/players/refresh` (accepts JSON payload) | ✅ shipped |
 | Server-side fetch + refresh | `POST /api/admin/players/fetch-and-refresh` (one call) | ✅ shipped (per fetcher docstring) |
 | Make targets | `fetch-players`, `seed-players`, `prod-seed-players`, `prod-refresh-players` | ✅ shipped |
-| Skill | `.claude/skills/scrape-supercoach/skill.md` | ✅ shipped (to be retired) |
+| Skill | ~~`.claude/skills/scrape-supercoach/skill.md`~~ | ✅ retired 2026-05-27 (was a wrapper around `make fetch-players`) |
 | `agent_id='scout'` CHECK constraint allows it | `agent_runs.ck_agent_runs_agent_id` confirmed via DB query | ✅ ready |
 
 **`agent_id='stats'` and `agent_id='fixtures'` also exist** in the constraint as historical reservations from the now-retired scraper.md plans. Per D6 of the charter, all new pipelines use `agent_id='scout'` with `detail_json.pipeline=<name>`. The orphan IDs are left in place for back-compat; cleanup is a separate housekeeping pass.
@@ -159,13 +159,13 @@ Charter D5 says ad-hoc operator runs use the endpoint or a make target — not a
 - Optionally: a `LOCAL` variant for local testing using `$(LOCAL_API)`.
 - **Verify:** `make scout-supercoach-roster ADMIN_KEY=$ADMIN_KEY` works against local and prod.
 
-### Step 13 — Retire the `scrape-supercoach` skill
+### Step 13 — Retire the `scrape-supercoach` skill ✅ done 2026-05-27
 
 Per D5.
 
-- **Delete:** `.claude/skills/scrape-supercoach/skill.md` (and the directory if empty).
-- **Update any docs that reference the skill** — likely `docs/agents/system/player-roster.md` (mentioned in the skill body), MEMORY.md if relevant.
-- **Verify:** `grep -r scrape-supercoach docs/ .claude/` returns no hits (other than expected historical references in the [charter](../charter.md) itself).
+- ✅ **Deleted:** `.claude/skills/scrape-supercoach/` (the whole directory). The skill was a thin wrapper around `make fetch-players` and owned no logic — deleting it removed no capability.
+- ✅ **Updated docs that referenced the skill** — `docs/agents/system/player-roster.md`, `docs/sources/types.md`, `docs/pages/wiki/data-feeds.md`, the operational breadcrumbs in `scripts/data/seed_players_prod.py` + `Makefile`, and the Analyst roadmap/charter coupling notes. The [charter](../charter.md) keeps its historical reference (the locked D5 decision record).
+- **Note:** the "blocked on rehoming `data/players.yaml`" caveat (plan Open Q4) was a misdiagnosis — the regeneration lives in `make fetch-players`, not the skill, so retirement never depended on it. Rehoming cleaning to read the roster from the DB remains a separate Analyst open loop.
 
 ### Step 14 — Schedule daily cron
 

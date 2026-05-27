@@ -323,7 +323,7 @@ prod-seed-players:
 
 # Weekly prod player refresh — POSTs a fresh SC roster, applies SCD-2
 # transitions for team / position changes and adds rows for new players.
-# Run after `/scrape-supercoach` produces a fresh roster file.
+# Run after `make fetch-players` produces a fresh roster file.
 # Usage: make prod-refresh-players ADMIN_KEY=xxx [ROSTER_FILE=path/to/roster.json]
 prod-refresh-players:
 	curl -s -X POST $(PROD_API)/api/admin/players/refresh \

@@ -33,17 +33,17 @@ The expanded charter ([charter.md](charter.md)) stages the migration of all exte
 - Update [`dynamics.md`](../dynamics.md) Cadence row: Bookkeeper trigger becomes "Scout scrape complete" instead of "scraper sweep complete".
 - Update [crew `README.md`](../README.md) Bookkeeper one-liner.
 
-### Phase 1 — One pipeline migrated end-to-end (the proof slice) ✅ *(one loose end)*
+### Phase 1 — One pipeline migrated end-to-end (the proof slice) ✅
 
 Pick the smallest pipeline: **SuperCoach player roster**. Full step-by-step plan in [plans/phase-1-supercoach-roster.md](plans/phase-1-supercoach-roster.md).
 
-> **Loose end:** functionally shipped and bronze-compliant (S3-first per D10, strict-parse per D8), but the `scrape-supercoach` Claude Code skill is **not yet retired** (Step 13 / acceptance #8 — the skill still exists on disk). It's blocked on rehoming the `data/players.yaml` regeneration that skill does for transcript-cleaning (plan Open Q4): delete the skill once the cleaning pipeline reads the roster from the DB instead.
+> **Skill retired 2026-05-27.** The `scrape-supercoach` Claude Code skill was a thin wrapper around `make fetch-players` (which runs `fetch_supercoach_players.py` + `generate_players_yaml.js`) — it owned no logic, so deleting it removed no capability. Operators now run `make fetch-players` (local roster + `data/players.yaml` regen) or the `scout-supercoach-roster` endpoint/`make` target. The transcript-cleaning pipeline still reads `data/players.yaml`; rehoming that to read the roster from the DB is a **separate** open loop (it never actually gated this retirement — see [Analyst roadmap](../analyst/roadmap.md)).
 
 - Move `scripts/data/fetchers/fetch_supercoach_players.py` → `services/api/app/scout/supercoach_roster/` (folder per D9) as a callable function (no behavioural changes).
 - **Add the D8 drift fixture and test:** `tests/fixtures/scout/supercoach_roster/canonical_response.json` + `tests/integration/scout/supercoach_roster/test_response_shape.py` (Pydantic-strict, live-mode env-flagged). This is the pattern every subsequent pipeline copies — getting it right on Phase 1 means it's cheap to apply for Phases 2-4.
 - Add `POST /api/admin/scout/supercoach-roster` endpoint that wraps the function in the agent audit pattern.
 - Add a `make scout-supercoach-roster` target for ad-hoc operator runs that hits the endpoint with admin auth.
-- Retire the `scrape-supercoach` Claude Code skill — operators use the endpoint or the `make` target.
+- ✅ Retire the `scrape-supercoach` Claude Code skill (done 2026-05-27) — operators use the endpoint or the `make` target.
 - Schedule via external cron — daily.
 - Phase 1 done = the SuperCoach roster refreshes daily, an audit row lands per run, the drift test runs in CI (fixture-mode) and on a schedule (live-mode), the `make` target works for ad-hoc operator use, the skill is retired, and `people`/`player_attributes` row counts move when the upstream data does.
 
