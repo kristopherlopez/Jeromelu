@@ -59,11 +59,11 @@ See [Scout](../agents/crew/scout/README.md).
 
 ---
 
-## 2. Media Ingestion Layer
+## 2. Data Ingestion Layer
 
 **Component:** Ingestion Pipeline
 
-**Purpose:** Pull raw content into the system.
+**Purpose:** Pull raw content into the system — media *and* structured data feeds.
 
 **Inputs**
 
@@ -76,11 +76,15 @@ See [Scout](../agents/crew/scout/README.md).
 - thumbnails
 - metadata
 - links
+- JSON data feeds (fixtures, stats, ladders, injuries)
+- scraped HTML pages (historical archives)
 
 **Outputs**
 
 - raw media files
 - transcripts
+- raw structured captures (JSON / HTML)
+- typed projections into structured tables
 - source metadata
 - timestamps
 - provenance records
@@ -89,11 +93,11 @@ See [Scout](../agents/crew/scout/README.md).
 
 **Reusability**
 
-Very high. This is a generic "topic media ingestion" layer.
+Very high. This is a generic "topic data ingestion" layer.
 
 **Strategic status**
 
-Necessary foundation, but not the main differentiator. The durability discipline behind it — archive everything, make every projection re-derivable from the archive — is documented in [data-lineage](../architecture/data-lineage.md).
+Necessary foundation, but not the main differentiator. The durability discipline behind it — archive everything, make every projection re-derivable from the archive — is documented in [data-lineage](../architecture/data-lineage.md). This is Scout's **bronze layer**: raw capture for every external source, media and structured alike, landed faithfully before any interpretation — see [Scout charter §D1](../agents/crew/scout/charter.md#d1-the-boundary-principle--scout-owns-the-bronze-layer).
 
 ---
 
@@ -324,6 +328,8 @@ Core differentiator. This is different from track record. Track record asks, *"W
 - official statements
 - media reports
 - historical databases
+
+> These all arrive through Scout's bronze layer — nrl.com match-centre, casualty-ward, ladder, and rugbyleagueproject feeds are Scout-acquired and trust-resolved per [Scout charter §D11](../agents/crew/scout/charter.md#d11-trust-hierarchy--which-source-wins-per-field). The Referee *reads* them; it does not fetch them.
 
 **Outputs**
 
@@ -576,7 +582,7 @@ Build state is *not* duplicated here. Worker status lives in the [system index](
 | # | Layer | Crew mode | Runtime (worker / surface) |
 |---|---|---|---|
 | 1 | Source Discovery | [Scout](../agents/crew/scout/README.md) | [source-discovery](../agents/system/source-discovery.md) |
-| 2 | Media Ingestion | [Scout](../agents/crew/scout/README.md) | [ingestion](../agents/system/ingestion.md) |
+| 2 | Data Ingestion | [Scout](../agents/crew/scout/README.md) | [ingestion](../agents/system/ingestion.md) |
 | 3 | Identity & Attribution | — | [speaker-identification](../agents/system/speaker-identification.md) |
 | 4 | Transcript Quality | — | [transcription-pipeline](../agents/system/transcription-pipeline.md) |
 | 5 | Maintained Knowledge | [Archivist](../agents/crew/archivist/README.md) | [publishing](../agents/system/publishing.md) |
@@ -591,6 +597,8 @@ Build state is *not* duplicated here. Worker status lives in the [system index](
 | 14 | Synthetic Media | — | [avatar](../avatar/system.md) |
 
 What the crosswalk makes visible: the five crew modes fan out across all 14 layers and several layers (Identity, Transcript Quality, Observability, Synthetic Media) have *no* crew owner because they're plumbing, not thinking. The crew is the lens for *how Jaromelu reasons*; The Machine is the lens for *what the pipeline does*. Neither replaces the other.
+
+**Medallion cross-reference.** Scout's charter cuts the same system a third way — by *data maturity*. In medallion terms: **bronze** is raw external capture, owned by Scout — layers 1–2 plus the structured feeds behind layers 8–9; **silver** is the interpretive transform owned by the Analyst — cleaning and claim extraction (layers 4, 6), plus the speaker→Person attribution slice of layer 3; **gold** is the curated and derived tier owned by the Bookkeeper and Archivist — consensus, scoring, the wiki (layers 5, 7, 9). The charter's medallion model names only those four crew; Critic (verification) and Jaromelu (decision, agent, presentation) are later crew that consume *across* all three tiers rather than owning one. See [Scout charter §D1](../agents/crew/scout/charter.md#d1-the-boundary-principle--scout-owns-the-bronze-layer).
 
 ---
 
