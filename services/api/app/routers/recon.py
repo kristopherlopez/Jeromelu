@@ -29,7 +29,7 @@ from sqlalchemy.orm import Session
 from jeromelu_shared.db import Channel, ChannelMetric, ScoutCandidate, Source, WikiPage
 
 from ..deps import get_db
-from ..scout.refresh import (
+from ..scout.youtube.refresh import (
     audit_channel_coverage,
     refresh_all_channel_stats,
     refresh_all_channels_incremental,

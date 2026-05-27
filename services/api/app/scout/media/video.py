@@ -28,7 +28,8 @@ from youtube_utils.exceptions import DownloadError
 from jeromelu_shared.config import settings
 from jeromelu_shared.db import Source
 from jeromelu_shared.s3 import get_s3_client
-from jeromelu_shared.youtube import extract_video_id
+
+from .source import resolve_youtube_media_source, youtube_media_key
 
 logger = logging.getLogger(__name__)
 
@@ -57,15 +58,7 @@ class VideoError(Exception):
 #: and small/distant faces. 360p is the balance.
 DEFAULT_QUALITY = "360"
 
-
-_video_id_from_url = extract_video_id
-
-
-def _video_s3_key(channel_external_id: str, video_id: str) -> str:
-    return f"youtube/{channel_external_id}/{video_id}.video.mp4"
-
-
-def _audio_object_exists(key: str) -> bool:
+def _video_object_exists(key: str) -> bool:
     """Same bucket as audio. Inlined here to avoid importing from
     s3.py just for the head_object pattern."""
     client = get_s3_client()
@@ -143,31 +136,11 @@ def acquire_video(
     or any other state — video acquisition is independent of Scout's
     main audio-first lifecycle.
     """
-    if source.source_type != "youtube":
-        raise VideoError(
-            f"acquire_video only supports source_type='youtube', got "
-            f"{source.source_type!r}"
-        )
-
-    video_id = _video_id_from_url(source.canonical_url)
-    if not video_id:
-        raise VideoError(f"could not parse video_id from {source.canonical_url!r}")
-
-    if not source.channel_id:
-        raise VideoError(
-            f"source {source.source_id} has no channel_id; cannot derive S3 path"
-        )
-
-    channel_external_id = source.channel.external_id if source.channel else None
-    if not channel_external_id:
-        raise VideoError(
-            f"channel {source.channel_id} has no external_id; cannot derive S3 path"
-        )
-
-    video_key = _video_s3_key(channel_external_id, video_id)
+    media = resolve_youtube_media_source(source, error_cls=VideoError)
+    video_key = youtube_media_key(media, ".video.mp4")
 
     bytes_uploaded: int | None = None
-    if _audio_object_exists(video_key):
+    if _video_object_exists(video_key):
         logger.info(
             "Video already in S3: s3://%s/%s",
             settings.s3_audio_bucket, video_key,
@@ -175,10 +148,10 @@ def acquire_video(
     else:
         with tempfile.TemporaryDirectory(prefix="jeromelu-video-") as tmp:
             try:
-                local_path = _yt_dlp_low_res_video(video_id, Path(tmp), quality)
+                local_path = _yt_dlp_low_res_video(media.video_id, Path(tmp), quality)
             except DownloadError as exc:
                 raise VideoError(
-                    f"yt-dlp video download failed for {video_id}: {exc}"
+                    f"yt-dlp video download failed for {media.video_id}: {exc}"
                 ) from exc
 
             bytes_uploaded = local_path.stat().st_size
@@ -197,7 +170,7 @@ def acquire_video(
     session.commit()
 
     return VideoResult(
-        source_id=str(source.source_id),
+        source_id=media.source_id,
         video_s3_key=video_key,
         bytes_uploaded=bytes_uploaded,
     )

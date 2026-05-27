@@ -72,7 +72,7 @@ def archive_response(
         # configured (the audit_audit module already does this).
         from jeromelu_shared.s3 import get_s3_client
     except Exception:
-        logger.exception("scout._s3_archive: failed to import get_s3_client")
+        logger.exception("scout.common.archive: failed to import get_s3_client")
         return None
 
     if isinstance(payload, (dict, list)):
@@ -92,13 +92,13 @@ def archive_response(
         )
     except Exception:
         logger.exception(
-            "scout._s3_archive: put_object failed bucket=%s key=%s",
+            "scout.common.archive: put_object failed bucket=%s key=%s",
             bucket, key,
         )
         return None
 
     logger.info(
-        "scout._s3_archive: wrote %d bytes to s3://%s/%s",
+        "scout.common.archive: wrote %d bytes to s3://%s/%s",
         len(body), bucket, key,
     )
     return key

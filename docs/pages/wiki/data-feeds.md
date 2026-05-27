@@ -131,8 +131,8 @@ This is the inventory: every input table the wiki depends on, what populates it,
 | **L2** | `match_team_lists` | NRL.com team list fetcher | ❌ 0 rows | `scripts/data/fetchers/fetch_teamlists.py`, `services/worker-scraper/app/activities/teamlists.py` | **Yes** (currently scraper) |
 | **L2** | `injuries` | NRL.com casualty ward fetcher | ❌ 0 rows | *Code does not exist yet* | **Yes** (new pipeline to build) |
 | **L2** | `rounds` | NRL.com draw fetcher | ❌ 0 rows | *Code does not exist yet* | **Yes** (new pipeline to build) |
-| **L3** | `sources` | Scout discovery | ✅ 2,235 rows | `services/api/app/scout/loop.py`, `refresh.py` | **Yes** — already in scope |
-| **L3** | `source_documents` | Scout audio acquisition + Analyst transcription | ⚠️ 88 rows; only 4 have chunk text | `services/api/app/scout/audio.py`, `services/api/app/analyst/transcribe.py` | Acquisition: yes (Scout). Transcription: no (Analyst). |
+| **L3** | `sources` | Scout discovery | ✅ 2,235 rows | `services/api/app/scout/source_discovery/agent.py`, `youtube/refresh.py` | **Yes** — already in scope |
+| **L3** | `source_documents` | Scout audio acquisition + Analyst transcription | ⚠️ 88 rows; only 4 have chunk text | `services/api/app/scout/media/audio.py`, `services/api/app/analyst/transcribe.py` | Acquisition: yes (Scout). Transcription: no (Analyst). |
 | **L3** | `source_chunks` | Analyst transcription | ⚠️ 2,470 rows; **0 cleaned** | `services/api/app/analyst/transcribe.py` + cleaning skill | Analyst |
 | **L3** | `source_speakers` | Analyst diarisation | ✅ 4,401 rows; person attribution unknown | `services/api/app/analyst/transcribe.py` (pyannote) | Analyst |
 | **L4** | `quotes` | Analyst extraction | ❌ 0 rows | `clean-transcript` + `process-transcript` skills | Analyst |

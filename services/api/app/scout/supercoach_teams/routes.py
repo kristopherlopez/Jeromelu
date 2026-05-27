@@ -15,7 +15,7 @@ from jeromelu_shared.players.roster import SC_ABBREV_TO_TEAM_SLUG
 
 from ...deps import get_db
 from ...routers.admin import require_admin
-from .._s3_archive import archive_response
+from ..common.archive import archive_response
 from ..common.pipeline_run import set_archive_detail, start_deterministic_run
 from .fetcher import SuperCoachTeamsFetchError, fetch_supercoach_teams
 from .models import SuperCoachTeam

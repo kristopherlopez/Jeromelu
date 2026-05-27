@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from ...deps import get_db
 from ...routers.admin import require_admin
-from .._s3_archive import archive_response
+from ..common.archive import archive_response
 from ..common.pipeline_run import set_archive_detail, start_deterministic_run
 from .fetcher import NrlcomPlayersFetchError, fetch_players_roster
 

@@ -151,7 +151,7 @@ export default function PresentersPanel() {
     setRunResult(null);
     try {
       const r = await fetch(
-        `${base}/api/admin/presenters/scout/${channelId}`,
+        `${base}/api/admin/presenters/research/${channelId}`,
         { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" },
       );
       if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
@@ -252,7 +252,7 @@ export default function PresentersPanel() {
             disabled={!channelId || running}
             className="rounded bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-500 disabled:opacity-50"
           >
-            {running ? "Researching…" : "Run Presenter Scout"}
+            {running ? "Researching…" : "Run Presenter Research"}
           </button>
         </div>
         {channelId && data && (

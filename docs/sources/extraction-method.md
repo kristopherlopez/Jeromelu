@@ -127,7 +127,7 @@ There is **no** `agent_runs` row for this work today. Audio extraction is determ
 | S3 raw transcript JSON | < $0.001 / video / month | negligible |
 | yt-dlp / compute | free | free |
 
-Backfill of the 215 prod sources currently in `source_chunks_v1` is deferred — re-run cost is real. A targeted backfill of *high-leverage* channels (top-5 by view-velocity per `scout/refresh.py`) would be ~$50 and is the natural first step.
+Backfill of the 215 prod sources currently in `source_chunks_v1` is deferred — re-run cost is real. A targeted backfill of *high-leverage* channels (top-5 by view-velocity per `scout/youtube/refresh.py`) would be ~$50 and is the natural first step.
 
 ---
 

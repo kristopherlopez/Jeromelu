@@ -15,7 +15,7 @@ tags: [area/operations, data-lineage]
 
 ## Writer
 
-- `services/api/app/scout/youtube_api.py` (called by `services/api/app/scout/refresh.py`) — periodic refresh against YouTube Data API; INSERTs one row per channel per sample with the platform-specific JSONB `metrics` blob
+- `services/api/app/scout/youtube/client.py` (called by `services/api/app/scout/youtube/refresh.py`) — periodic refresh against YouTube Data API; INSERTs one row per channel per sample with the platform-specific JSONB `metrics` blob
 
 ## Field mapping
 

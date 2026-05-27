@@ -14,7 +14,7 @@ tags: [area/operations, data-lineage]
 
 ## Writer
 
-- `services/api/app/scout/youtube_api.py` — sampled at video discovery time and daily thereafter via the admin refresh endpoint; INSERTs one row per video per sample
+- `services/api/app/scout/youtube/client.py` — sampled at video discovery time and daily thereafter via the admin refresh endpoint; INSERTs one row per video per sample
 
 ## Field mapping
 

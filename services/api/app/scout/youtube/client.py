@@ -7,7 +7,7 @@ filtering — all of which require the official Data API.
 
 Requires `YOUTUBE_API_KEY` (free tier: 10,000 units/day; search.list = 100
 units, channels.list / channelSections.list / playlistItems.list / videos.list
-= 1 unit). A typical Scout run with 6 channel searches + 20 channel-stats
+= 1 unit). A typical Source Discovery run with 6 channel searches + 20 channel-stats
 lookups consumes ~620 units. A daily video-stats refresh across ~180 channels
 consumes ~750 units.
 

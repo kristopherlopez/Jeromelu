@@ -1,10 +1,10 @@
-"""Manual CLI for Scout. Usage from services/api with venv active:
+"""Manual CLI for Source Discovery. Usage from services/api with venv active:
 
-    python -m app.scout.cli                       # default brief, sonnet 4.6
-    python -m app.scout.cli --dry-run             # don't persist; just print
-    python -m app.scout.cli --model claude-opus-4-7
-    python -m app.scout.cli --max-turns 5 --budget 0.50
-    python -m app.scout.cli --brief "Find injury-focused NRL podcasts only"
+    python -m app.scout.source_discovery.cli                       # default brief, sonnet 4.6
+    python -m app.scout.source_discovery.cli --dry-run             # don't persist; just print
+    python -m app.scout.source_discovery.cli --model claude-opus-4-7
+    python -m app.scout.source_discovery.cli --max-turns 5 --budget 0.50
+    python -m app.scout.source_discovery.cli --brief "Find injury-focused NRL podcasts only"
 """
 
 from __future__ import annotations
@@ -14,12 +14,13 @@ import logging
 import sys
 
 from jeromelu_shared.db import SessionLocal
+from jeromelu_shared.agent_audit import AgentBounds
 
-from app.scout.loop import ScoutBounds, run_scout
+from .agent import run_source_discovery
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run a Scout source-discovery sweep")
+    parser = argparse.ArgumentParser(description="Run a Source Discovery sweep")
     parser.add_argument("--brief", help="Override the default user brief")
     parser.add_argument(
         "--model",
@@ -43,7 +44,7 @@ def main(argv: list[str] | None = None) -> int:
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
-    bounds = ScoutBounds(
+    bounds = AgentBounds(
         max_turns=args.max_turns,
         max_tool_calls=args.max_tool_calls,
         max_wall_seconds=args.max_wall_seconds,
@@ -52,7 +53,7 @@ def main(argv: list[str] | None = None) -> int:
 
     session = SessionLocal()
     try:
-        result = run_scout(
+        result = run_source_discovery(
             session,
             brief=args.brief,
             model=args.model,

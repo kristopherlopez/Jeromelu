@@ -26,7 +26,8 @@ from youtube_utils.exceptions import DownloadError
 from jeromelu_shared.config import settings
 from jeromelu_shared.db import Source
 from jeromelu_shared.s3 import audio_object_exists, upload_audio
-from jeromelu_shared.youtube import extract_video_id
+
+from .source import resolve_youtube_media_source, youtube_media_key
 
 logger = logging.getLogger(__name__)
 
@@ -48,17 +49,6 @@ class AudioError(Exception):
 
 
 # ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-_video_id_from_url = extract_video_id
-
-
-def _audio_s3_key(channel_external_id: str, video_id: str) -> str:
-    return f"youtube/{channel_external_id}/{video_id}.m4a"
-
-
-# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -70,28 +60,8 @@ def acquire_audio(session: Session, source: Source) -> AudioResult:
 
     On failure: ``ingestion_status='failed'``, ``AudioError`` raised.
     """
-    if source.source_type != "youtube":
-        raise AudioError(
-            f"acquire_audio only supports source_type='youtube', got "
-            f"{source.source_type!r}"
-        )
-
-    video_id = _video_id_from_url(source.canonical_url)
-    if not video_id:
-        raise AudioError(f"could not parse video_id from {source.canonical_url!r}")
-
-    if not source.channel_id:
-        raise AudioError(
-            f"source {source.source_id} has no channel_id; cannot derive S3 path"
-        )
-
-    channel_external_id = source.channel.external_id if source.channel else None
-    if not channel_external_id:
-        raise AudioError(
-            f"channel {source.channel_id} has no external_id; cannot derive S3 path"
-        )
-
-    audio_key = _audio_s3_key(channel_external_id, video_id)
+    media = resolve_youtube_media_source(source, error_cls=AudioError)
+    audio_key = youtube_media_key(media, ".m4a")
 
     try:
         bytes_uploaded: int | None = None
@@ -103,10 +73,14 @@ def acquire_audio(session: Session, source: Source) -> AudioResult:
         else:
             with tempfile.TemporaryDirectory(prefix="jeromelu-audio-") as tmp:
                 try:
-                    local_path = download_audio(video_id, output_dir=tmp, format="m4a")
+                    local_path = download_audio(
+                        media.video_id,
+                        output_dir=tmp,
+                        format="m4a",
+                    )
                 except DownloadError as exc:
                     raise AudioError(
-                        f"yt-dlp download failed for {video_id}: {exc}"
+                        f"yt-dlp download failed for {media.video_id}: {exc}"
                     ) from exc
 
                 bytes_uploaded = local_path.stat().st_size
@@ -123,7 +97,7 @@ def acquire_audio(session: Session, source: Source) -> AudioResult:
         session.commit()
 
         return AudioResult(
-            source_id=str(source.source_id),
+            source_id=media.source_id,
             audio_s3_key=audio_key,
             bytes_uploaded=bytes_uploaded,
         )

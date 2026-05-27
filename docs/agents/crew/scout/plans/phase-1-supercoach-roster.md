@@ -75,7 +75,7 @@ Understanding what the endpoint actually does before wrapping it.
 The Scout media-discovery loop already uses this. Confirm the API.
 
 - **Read:** `packages/shared/jeromelu_shared/agent_audit.py`. Note the public surface — likely `record_agent_started(...)` and `record_agent_ended(...)` returning a `run_id`.
-- **Read:** how `services/api/app/scout/loop.py` calls it — that's the canonical usage pattern.
+- **Read:** how `services/api/app/scout/source_discovery/agent.py` calls it — that's the canonical usage pattern.
 - **Verify:** confirm `detail_json` is a free-form JSONB the wrapper writes to (per D6, this is where `pipeline='supercoach-roster'` goes).
 
 ### Step 4 — Create the `scout/supercoach_roster/` folder + audit wrapper

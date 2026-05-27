@@ -1,7 +1,7 @@
 """CLI driver for Phase 4 video acquisition.
 
 Usage:
-    python -m app.scout.video_cli <source_id> [--quality 240|360|...]
+    python -m app.scout.media.video_cli <source_id> [--quality 240|360|...]
 
 Idempotent on the S3 object. Sets ``sources.video_s3_key``.
 """
@@ -17,7 +17,7 @@ from sqlalchemy.orm import joinedload
 
 from jeromelu_shared.db import SessionLocal, Source
 
-from app.scout.video import DEFAULT_QUALITY, VideoError, acquire_video
+from .video import DEFAULT_QUALITY, VideoError, acquire_video
 
 
 def main() -> int:

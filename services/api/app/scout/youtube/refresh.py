@@ -42,7 +42,7 @@ from jeromelu_shared.db import (
 )
 from jeromelu_shared.youtube import extract_video_id
 
-from . import youtube_api
+from . import client as youtube_api
 
 logger = logging.getLogger(__name__)
 

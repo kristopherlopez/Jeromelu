@@ -1,7 +1,7 @@
-"""Admin endpoints for the Presenter Scout review queue.
+"""Admin endpoints for the Presenter Research review queue.
 
 Workflow:
-  POST /admin/presenters/scout/{channel_id}        — run the agent
+  POST /admin/presenters/research/{channel_id}     — run the agent
   GET  /admin/presenters/candidates?channel_id=…   — list filed candidates
   POST /admin/presenters/candidates/{id}/confirm   — promote into people +
                                                      source_presenters
@@ -37,7 +37,7 @@ from jeromelu_shared.db import (
 )
 
 from ..deps import get_db
-from ..scout.presenters import run_presenter_scout
+from ..scout.presenter_research.agent import run_presenter_research
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -106,28 +106,30 @@ def _confirmed_to_dict(
 
 
 # ---------------------------------------------------------------------------
-# POST /admin/presenters/scout/{channel_id} — run the agent
+# POST /admin/presenters/research/{channel_id} — run the agent
 # ---------------------------------------------------------------------------
 
-class ScoutTriggerBody(BaseModel):
+class PresenterResearchTriggerBody(BaseModel):
     model: str | None = None
     dry_run: bool = False
 
 
-@router.post("/admin/presenters/scout/{channel_id}")
-def trigger_presenter_scout(
+@router.post("/admin/presenters/research/{channel_id}")
+def trigger_presenter_research(
     channel_id: UUID,
-    body: ScoutTriggerBody = Body(default_factory=ScoutTriggerBody),
+    body: PresenterResearchTriggerBody = Body(
+        default_factory=PresenterResearchTriggerBody
+    ),
     db: Session = Depends(get_db),
 ):
-    """Run the Presenter Scout for one channel. Synchronous — typical
+    """Run Presenter Research for one channel. Synchronous — typical
     runtime ~20–60s. Returns the run summary."""
     channel = db.get(Channel, channel_id)
     if channel is None:
         raise HTTPException(status_code=404, detail="channel not found")
 
     try:
-        result = run_presenter_scout(
+        result = run_presenter_research(
             db,
             channel_id,
             model=body.model or "claude-sonnet-4-6",
@@ -308,7 +310,7 @@ def confirm_candidate(
             canonical_name=candidate.name,
             aliases=[],
             slug=slug,
-            metadata_json={"created_by": "presenter_scout_confirm"},
+            metadata_json={"created_by": "presenter_research_confirm"},
         )
         db.add(new_person)
         db.flush()  # populate person_id

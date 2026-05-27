@@ -1,4 +1,4 @@
-"""Unit tests for app.scout.refresh pure helpers.
+"""Unit tests for app.scout.youtube.refresh pure helpers.
 
 Covers YouTube URL → video-id parsing and the RFC 3339 timestamp parser.
 The DB-backed cursor + enumeration logic belongs in integration/.
@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from app.scout.refresh import _parse_published_at, _video_id_from_url
+from app.scout.youtube.refresh import _parse_published_at, _video_id_from_url
 
 
 # ---------------------------------------------------------------------------

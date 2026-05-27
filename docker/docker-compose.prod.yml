@@ -88,7 +88,7 @@ services:
       AWS_DEFAULT_REGION: ap-southeast-2
       # Persistent .video.mp4 files live in jeromelu-raw-audio (matches
       # packages/shared/jeromelu_shared/config.py:s3_audio_bucket and the
-      # upload path in services/api/app/scout/video.py). Pointing this at
+      # upload path in services/api/app/scout/media/video.py). Pointing this at
       # raw-transcripts causes HeadObject 404 on click-to-reassign.
       S3_AUDIO_BUCKET: jeromelu-raw-audio
     volumes:

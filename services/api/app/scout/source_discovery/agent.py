@@ -1,4 +1,4 @@
-"""Scout's multi-turn streaming agent loop.
+"""Source Discovery's multi-turn streaming agent loop.
 
 Manual implementation — no high-level helper exists for autonomous agent
 loops with streaming + custom tools in the Anthropic SDK today. We:
@@ -33,24 +33,19 @@ from jeromelu_shared.agent_audit import (
 )
 from jeromelu_shared.config import settings
 
-from app.scout.prompt import SCOUT_SYSTEM_PROMPT, build_user_brief
-from app.scout.tools import CUSTOM_TOOL_HANDLERS, all_tools, summarise_known_sources
+from .prompt import SOURCE_DISCOVERY_SYSTEM_PROMPT, build_user_brief
+from .tools import CUSTOM_TOOL_HANDLERS, all_tools, summarise_known_sources
 
-# Scout's identity for the standard agent_audit machinery
+# Persisted DB/audit identity. Keep this value until the agent_runs CHECK
+# constraint is migrated; use Source Discovery for new code-facing names.
 AGENT_ID = "scout"
-AGENT_NAME = "Scout"
+AGENT_NAME = "Source Discovery"
 
 logger = logging.getLogger(__name__)
 
 
-# Bounds + cost estimation come from the shared agent_audit module so all
-# agents share the same bounds shape and pricing table. Back-compat alias for
-# anything importing ScoutBounds from this module (notably cli.py).
-ScoutBounds = AgentBounds
-
-
 @dataclass
-class ScoutRunResult:
+class SourceDiscoveryResult:
     run_id: str
     model: str
     started_at: datetime
@@ -115,15 +110,15 @@ def _summarise_tool_input(name: str, payload: dict[str, Any]) -> str:
     return f"{name}({list(payload.keys())})"
 
 
-def run_scout(
+def run_source_discovery(
     session: Session,
     *,
     brief: str | None = None,
     model: str = "claude-sonnet-4-6",
     bounds: AgentBounds | None = None,
     dry_run: bool = False,
-) -> ScoutRunResult:
-    """Run one Scout sweep. Synchronous — call from a CLI or background task."""
+) -> SourceDiscoveryResult:
+    """Run one Source Discovery sweep. Synchronous for CLI/background use."""
     bounds = bounds or AgentBounds()
     run_id = make_run_id(AGENT_ID)
     start_ts = time.time()
@@ -147,7 +142,7 @@ def run_scout(
     system = [
         {
             "type": "text",
-            "text": SCOUT_SYSTEM_PROMPT,
+            "text": SOURCE_DISCOVERY_SYSTEM_PROMPT,
             "cache_control": {"type": "ephemeral"},
         }
     ]
@@ -173,7 +168,7 @@ def run_scout(
     status = "completed"
     notes: list[str] = []
 
-    print(f"\n=== Scout run {run_id} (model={model}, dry_run={dry_run}) ===\n")
+    print(f"\n=== Source Discovery run {run_id} (model={model}, dry_run={dry_run}) ===\n")
     print(f"[brief]\n{user_brief}\n")
 
     # Run-level audit start: agent_runs DB row + JSONL log header.
@@ -217,7 +212,7 @@ def run_scout(
             status = "failed"
             notes.append(f"turn {turns} api error: {e}")
             audit.error(where=f"turn {turns} api", message=str(e))
-            logger.exception("Scout API error")
+            logger.exception("Source Discovery API error")
             break
         turn_latency_ms = int((time.time() - turn_start_ts) * 1000)
         total_api_latency_ms += turn_latency_ms
@@ -396,7 +391,7 @@ def run_scout(
     )
     final_cost = token_cost + search_cost
 
-    result = ScoutRunResult(
+    result = SourceDiscoveryResult(
         run_id=run_id,
         model=model,
         started_at=started_at,
@@ -431,7 +426,7 @@ def run_scout(
     s3_log_key = audit.flush_to_s3()
 
     summary_text = (
-        f"Scout run {status} — {candidates_filed} filed, {duplicates_skipped} dupes, "
+        f"Source Discovery {status} — {candidates_filed} filed, {duplicates_skipped} dupes, "
         f"{turns} turns, {tool_calls} tool calls, ${final_cost:.3f}"
     )
     record_agent_ended(
@@ -455,7 +450,7 @@ def run_scout(
         detail=summary_dict,
     )
 
-    print(f"\n=== Scout run done ===")
+    print(f"\n=== Source Discovery run done ===")
     print(f"  status: {status}")
     print(f"  turns: {turns}, tool_calls: {tool_calls}")
     print(f"  filed: {candidates_filed}, duplicates: {duplicates_skipped}")

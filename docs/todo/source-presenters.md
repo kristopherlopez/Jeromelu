@@ -8,7 +8,7 @@ tags: [area/todo, status/in-progress]
 
 **Phase:** Scout extension / identification feeder
 **Priority:** Compounds with speaker-identification — confirmed presenters become strong priors for the voice/face fusion matchers, so each new channel goes from "cold start" to "first turn auto-resolved" much faster.
-**Service:** new `services/api/app/scout/presenters.py` (+ CLI), new admin panel.
+**Service:** `services/api/app/scout/presenter_research/agent.py` (+ CLI), admin panel.
 
 ## Problem
 
@@ -125,7 +125,7 @@ Existing: `('scout', 'scribe', 'analyst', 'stats', 'fixtures')`. Add `'presenter
 
 ## Agent shape
 
-`services/api/app/scout/presenters.py` — mirrors `loop.py` with a tighter tool palette and a per-channel brief.
+`services/api/app/scout/presenter_research/agent.py` — mirrors Source Discovery with a tighter tool palette and a per-channel brief.
 
 **Tools:**
 - `web_search` (Anthropic-hosted, capped 3/run)
@@ -145,7 +145,7 @@ Existing: `('scout', 'scribe', 'analyst', 'stats', 'fixtures')`. Add `'presenter
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/api/admin/presenters/scout/{channel_id}` | Trigger a run for one channel. Sync — returns the run summary. |
+| `POST` | `/api/admin/presenters/research/{channel_id}` | Trigger a run for one channel. Sync — returns the run summary. |
 | `GET`  | `/api/admin/presenters/candidates?channel_id=…&status=…` | List candidates. |
 | `POST` | `/api/admin/presenters/candidates/{id}/confirm` | Body: `{ existing_person_id?: uuid }`. If supplied, links to that Person. Otherwise, creates a new `people` row from `name`, then writes `source_presenters`. |
 | `POST` | `/api/admin/presenters/candidates/{id}/reject` | Body: `{ note?: string }`. Sets status. |
@@ -158,7 +158,7 @@ Mounted under the existing admin auth scope (whatever `routers/sources.py` and f
 New tab on the existing admin client: **"Presenters"**. Mirrors the ChannelCoveragePanel layout.
 
 - Channel picker (top) — defaults to the most-recently-onboarded channel.
-- "Run Presenter Scout" button — triggers `POST /api/admin/presenters/scout/{id}`, streams nothing yet (sync API; spinner while it runs).
+- "Run Presenter Research" button — triggers `POST /api/admin/presenters/research/{id}`, streams nothing yet (sync API; spinner while it runs).
 - Two columns:
   - **Pending candidates** — name, role, confidence, evidence URLs (clickable). Buttons: `Confirm` (opens dropdown to pick existing Person OR confirm-as-new), `Reject`.
   - **Confirmed presenters** — name, role, since, link to Person detail (future — for now just `person_id` as text).
@@ -171,8 +171,8 @@ No streaming UI in v1. The agent run is fast (~30s); a spinner is fine.
 
 1. Migration `052_source_presenters.sql` (the two tables + CHECK extension).
 2. SQLAlchemy models + re-exports.
-3. `presenters.py` agent loop (copy `loop.py`, swap prompt + tools).
-4. `presenters_cli.py` + `make scout-presenters CHANNEL_ID=…`.
+3. `presenter_research/agent.py` agent loop (same shape as Source Discovery, swap prompt + tools).
+4. `presenter_research/cli.py` + `make scout-presenters CHANNEL_ID=…`.
 5. End-to-end test on one channel (the "Bloke In A Bar" Apple/Spotify entry once it's onboarded as a `channels` row, or a YouTube channel like `bloke.shop`).
 
 ### Phase 2 — Review API + admin UI

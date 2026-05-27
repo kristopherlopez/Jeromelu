@@ -16,7 +16,7 @@ Presenter Scout uses web search tools (per `docs/agents/system/presenter-scout.m
 
 ## Writers
 
-- `services/api/app/scout/presenters.py` — Presenter Scout agent; INSERTs candidates with `status='pending'`
+- `services/api/app/scout/presenter_research/agent.py` — Presenter Research agent; INSERTs candidates with `status='pending'`
 - **Admin "Presenters" review tab** — humans confirm/reject; confirmation triggers a [people](people.md) row (created or linked) and a [source_presenters](source_presenters.md) row
 
 ## Field mapping

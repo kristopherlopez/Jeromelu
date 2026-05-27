@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 
-from app.scout.youtube_api import validate_channel
+from app.scout.youtube.client import validate_channel
 from jeromelu_shared.db import Channel, ChannelMetric, SessionLocal
 
 

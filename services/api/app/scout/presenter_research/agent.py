@@ -1,13 +1,13 @@
-"""Presenter Scout — finds the regular presenters of a single channel.
+"""Presenter Research — finds the regular presenters of a single channel.
 
 Given a `channel_id`, the agent uses web_search + web_fetch to research who
 hosts the show, files findings into `scout_presenter_candidates` for human
 review, and stops. Every run wraps the standard `agent_audit` machinery so
-agent_runs / agent_events / S3 forensics work the same as the main Scout.
+agent_runs / agent_events / S3 forensics work the same as source discovery.
 
-Mirrors `scout/loop.py` deliberately — same streaming pattern, same content-
-block handling, same bound-checking. Diverges only in: tool palette, system
-prompt, brief shape, and tighter bounds.
+Mirrors Source Discovery deliberately: same streaming pattern, same
+content-block handling, same bound-checking. Diverges only in: tool palette,
+system prompt, brief shape, and tighter bounds.
 
 See docs/todo/source-presenters.md for the design.
 """
@@ -47,14 +47,16 @@ from jeromelu_shared.db import (
     SourcePresenter,
 )
 
+# Persisted DB/audit identity. Keep this value until the agent_runs CHECK
+# constraint is migrated; use Presenter Research for new code-facing names.
 AGENT_ID = "presenter_scout"
-AGENT_NAME = "Presenter Scout"
+AGENT_NAME = "Presenter Research"
 
 logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Bounds — tighter than the discovery Scout. One channel, one focused task.
+# Bounds — tighter than Source Discovery. One channel, one focused task.
 # ---------------------------------------------------------------------------
 
 DEFAULT_BOUNDS = AgentBounds(
@@ -365,7 +367,7 @@ CUSTOM_TOOL_HANDLERS = {
 # Prompt + brief builder
 # ---------------------------------------------------------------------------
 
-PRESENTER_SCOUT_SYSTEM_PROMPT = """You are Presenter Scout — Jaromelu's mode for figuring out who actually presents an NRL show.
+PRESENTER_RESEARCH_SYSTEM_PROMPT = """You are Presenter Research — Jaromelu's mode for figuring out who actually presents an NRL show.
 
 You receive ONE channel (a YouTube channel, podcast, or website) and your job is to file the regular presenters for human review.
 
@@ -408,14 +410,13 @@ Before filing any presenter, call lookup_existing_people with their name. If a c
 After filing, end with one short sentence: "Filed N presenters: [name (role), …]. Notable: [one line, optional]."
 """
 
-
 def build_brief(
     channel: Channel,
     *,
     already_confirmed: list[tuple[str, str]],
     pending: list[tuple[str, str]],
 ) -> str:
-    """User message that kicks off a Presenter Scout run.
+    """User message that kicks off a Presenter Research run.
 
     Includes the channel identity (name, URL, platform, description) plus
     any presenters already in source_presenters / scout_presenter_candidates
@@ -462,7 +463,7 @@ def build_brief(
 # ---------------------------------------------------------------------------
 
 @dataclass
-class PresenterScoutResult:
+class PresenterResearchResult:
     run_id: str
     channel_id: UUID
     model: str
@@ -483,7 +484,7 @@ class PresenterScoutResult:
 
 
 def _content_block_for_send(block: Any) -> dict[str, Any] | None:
-    """Same shape-fixup as scout/loop.py — strip stray `text` from non-text
+    """Same shape-fixup as Source Discovery: strip stray `text` from non-text
     blocks; drop code_execution server tools we never authorised."""
     payload = block.model_dump()
     btype = payload.get("type")
@@ -553,15 +554,15 @@ def _existing_presenters(
     )
 
 
-def run_presenter_scout(
+def run_presenter_research(
     session: Session,
     channel_id: UUID,
     *,
     model: str = "claude-sonnet-4-6",
     bounds: AgentBounds | None = None,
     dry_run: bool = False,
-) -> PresenterScoutResult:
-    """One Presenter Scout run for one channel."""
+) -> PresenterResearchResult:
+    """One Presenter Research run for one channel."""
     bounds = bounds or DEFAULT_BOUNDS
     run_id = make_run_id(AGENT_ID)
     start_ts = time.time()
@@ -585,7 +586,7 @@ def run_presenter_scout(
     system = [
         {
             "type": "text",
-            "text": PRESENTER_SCOUT_SYSTEM_PROMPT,
+            "text": PRESENTER_RESEARCH_SYSTEM_PROMPT,
             "cache_control": {"type": "ephemeral"},
         }
     ]
@@ -605,7 +606,7 @@ def run_presenter_scout(
     status = "completed"
     notes: list[str] = []
 
-    print(f"\n=== Presenter Scout run {run_id} (channel={channel.name}, dry_run={dry_run}) ===\n")
+    print(f"\n=== Presenter Research run {run_id} (channel={channel.name}, dry_run={dry_run}) ===\n")
     print(f"[brief]\n{user_brief}\n")
 
     bounds_dict = asdict(bounds)
@@ -645,7 +646,7 @@ def run_presenter_scout(
             status = "failed"
             notes.append(f"turn {turns} api error: {e}")
             audit.error(where=f"turn {turns} api", message=str(e))
-            logger.exception("Presenter Scout API error")
+            logger.exception("Presenter Research API error")
             break
         turn_latency_ms = int((time.time() - turn_start_ts) * 1000)
         total_api_latency_ms += turn_latency_ms
@@ -813,7 +814,7 @@ def run_presenter_scout(
         # Spec: zero filed is a failed run, even if the API returned cleanly.
         notes.append("zero candidates filed")
 
-    result = PresenterScoutResult(
+    result = PresenterResearchResult(
         run_id=run_id,
         channel_id=channel_id,
         model=model,
@@ -851,7 +852,7 @@ def run_presenter_scout(
     s3_log_key = audit.flush_to_s3()
 
     summary_text = (
-        f"Presenter Scout {status} for {channel.name} — "
+        f"Presenter Research {status} for {channel.name} — "
         f"{candidates_filed} filed, {duplicates_skipped} dupes, "
         f"{turns} turns, {tool_calls} tool calls, ${final_cost:.3f}"
     )
@@ -876,7 +877,7 @@ def run_presenter_scout(
         detail=summary_dict,
     )
 
-    print(f"\n=== Presenter Scout run done ===")
+    print(f"\n=== Presenter Research run done ===")
     print(f"  status: {status}")
     print(f"  filed: {candidates_filed}, dupes: {duplicates_skipped}")
     print(f"  turns: {turns}, tool_calls: {tool_calls}")

@@ -1,9 +1,9 @@
-"""CLI for the Presenter Scout. Run from services/api with venv active:
+"""CLI for Presenter Research. Run from services/api with venv active:
 
-    python -m app.scout.presenters_cli --channel-id <uuid>
-    python -m app.scout.presenters_cli --source-id <uuid>          # resolves to channel
-    python -m app.scout.presenters_cli --channel-id <uuid> --dry-run
-    python -m app.scout.presenters_cli --channel-id <uuid> --model claude-opus-4-7
+    python -m app.scout.presenter_research.cli --channel-id <uuid>
+    python -m app.scout.presenter_research.cli --source-id <uuid>          # resolves to channel
+    python -m app.scout.presenter_research.cli --channel-id <uuid> --dry-run
+    python -m app.scout.presenter_research.cli --channel-id <uuid> --model claude-opus-4-7
 """
 
 from __future__ import annotations
@@ -16,15 +16,15 @@ from uuid import UUID
 from jeromelu_shared.agent_audit import AgentBounds
 from jeromelu_shared.db import SessionLocal
 
-from app.scout.presenters import (
+from .agent import (
     DEFAULT_BOUNDS,
     resolve_channel_from_source,
-    run_presenter_scout,
+    run_presenter_research,
 )
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run a Presenter Scout sweep for one channel")
+    parser = argparse.ArgumentParser(description="Run Presenter Research for one channel")
     target = parser.add_mutually_exclusive_group(required=True)
     target.add_argument("--channel-id", help="UUID of the channel to research")
     target.add_argument(
@@ -74,7 +74,7 @@ def main(argv: list[str] | None = None) -> int:
             channel_id = resolve_channel_from_source(session, UUID(args.source_id))
             print(f"Resolved source {args.source_id} → channel {channel_id}")
 
-        result = run_presenter_scout(
+        result = run_presenter_research(
             session,
             channel_id,
             model=args.model,

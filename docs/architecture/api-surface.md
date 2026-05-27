@@ -122,7 +122,7 @@ Today these live across 8 routers and are inconsistently namespaced. Each row's 
 | GET | `/api/admin/presenters/candidates` | List all presenter candidates | **Analyst** |
 | POST | `/api/admin/presenters/candidates/{candidate_id}/confirm` | Confirm a presenter identification | **Analyst** |
 | POST | `/api/admin/presenters/candidates/{candidate_id}/reject` | Reject a presenter identification | **Analyst** |
-| POST | `/api/admin/presenters/scout/{channel_id}` | Trigger presenter scout for a channel | **Analyst** |
+| POST | `/api/admin/presenters/research/{channel_id}` | Trigger presenter research for a channel | **Analyst** |
 
 ### Currently in `routers/admin.py` (8)
 
@@ -225,7 +225,7 @@ Per-agent URL prefix for every admin endpoint. The shape:
 | `GET /api/admin/presenters/by-channel/{channel_id}` | `GET /api/admin/analyst/presenters/by-channel/{channel_id}` | Analyst | |
 | `POST /api/admin/presenters/candidates/{id}/confirm` | `POST /api/admin/analyst/presenters/candidates/{id}/confirm` | Analyst | |
 | `POST /api/admin/presenters/candidates/{id}/reject` | `POST /api/admin/analyst/presenters/candidates/{id}/reject` | Analyst | |
-| `POST /api/admin/presenters/scout/{channel_id}` | `POST /api/admin/analyst/presenters/discover/{channel_id}` | Analyst | Verb renamed `scout` → `discover` to avoid collision with the Scout crew member (Q1 resolved) |
+| `POST /api/admin/presenters/research/{channel_id}` | `POST /api/admin/analyst/presenters/discover/{channel_id}` | Analyst | Verb renamed to avoid collision with the Scout crew member (Q1 resolved) |
 | `GET /api/sources/{source_id}/face-runs` | `GET /api/admin/analyst/sources/{source_id}/face-runs` | Analyst | Face admin moves out of the public /api/sources/* namespace |
 | `POST /api/sources/{source_id}/face-runs/assign` | `POST /api/admin/analyst/sources/{source_id}/face-runs/assign` | Analyst | |
 | `POST /api/sources/{source_id}/face-runs/move-run` | `POST /api/admin/analyst/sources/{source_id}/face-runs/move-run` | Analyst | |
@@ -351,7 +351,7 @@ Frontend code that today bundles read + write under `/api/sources/{id}/*` will n
 ## Resolved questions (2026-05-12)
 
 1. **The "presenter scout" naming collision.**
-   *Question:* `POST /api/admin/presenters/scout/{channel_id}` uses "scout" as a verb, but it's an Analyst operation — confusing alongside the Scout crew member's endpoints.
+   *Question:* `POST /api/admin/presenters/research/{channel_id}` is presenter research, but it's currently mounted under the Presenter admin surface rather than Analyst.
    **Resolution: rename the verb.** New path is `POST /api/admin/analyst/presenters/discover/{channel_id}`. Migration map updated accordingly.
 
 2. **Public face/speaker endpoints.**

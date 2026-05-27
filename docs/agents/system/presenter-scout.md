@@ -6,8 +6,8 @@ tags: [area/agents, subarea/system, status/live]
 
 | | |
 |---|---|
-| **Package** | `services/api/app/scout/presenters.py` |
-| **Trigger** | `make scout-presenters CHANNEL_ID=…` (CLI) or `POST /api/admin/presenters/scout/{channel_id}` (admin UI) |
+| **Package** | `services/api/app/scout/presenter_research/agent.py` |
+| **Trigger** | `make scout-presenters CHANNEL_ID=…` (CLI) or `POST /api/admin/presenters/research/{channel_id}` (admin UI) |
 | **Crew counterpart** | [Scout](../crew/scout/README.md) — research/discovery mode, scoped to one channel |
 | **ETL role** | **Extract only.** Files candidates; promotion happens via human review. |
 | **Status** | Phase 1 ✅ + Phase 2 ✅ shipped 2026-05-05. Phase 3 (priors integration with Lineup) backlog. |
@@ -21,7 +21,7 @@ Given one channel (a YouTube channel, podcast, or website), Presenter Scout rese
 ## Architecture
 
 ```
-channel_id ──► run_presenter_scout()
+channel_id ──► run_presenter_research()
                     │
                     ▼
       Anthropic Messages API ◀── system prompt (cached, ~2.3k tokens)
@@ -31,7 +31,7 @@ channel_id ──► run_presenter_scout()
             │                ◀── user brief (channel name, url, platform,
             │                          description, already-confirmed list)
             ▼
-      Multi-turn streaming loop (presenters.py: run_presenter_scout)
+      Multi-turn streaming loop (presenter_research/agent.py: run_presenter_research)
             │
             ├── server-side tools (web_search ≤3, web_fetch ≤3 per run)
             │
@@ -46,7 +46,7 @@ channel_id ──► run_presenter_scout()
                                                 while pending
             │
             ▼
-      PresenterScoutResult (turns, tool_calls, candidates_filed, est. cost)
+      PresenterResearchResult (turns, tool_calls, candidates_filed, est. cost)
 ```
 
 `agent_audit` plumbing is identical to the main Scout — same `agent_runs` row, same per-event `agent_events`, same JSONL forensic upload to `s3://jeromelu-clean-documents/agent-logs/presenter_scout/…`.
@@ -57,8 +57,8 @@ channel_id ──► run_presenter_scout()
 
 | File | Purpose |
 |---|---|
-| `app/scout/presenters.py` | Tool definitions + handlers + system prompt + run loop |
-| `app/scout/presenters_cli.py` | `make scout-presenters` entry point; accepts `--channel-id` or `--source-id` |
+| `app/scout/presenter_research/agent.py` | Tool definitions + handlers + system prompt + run loop |
+| `app/scout/presenter_research/cli.py` | `make scout-presenters` entry point; accepts `--channel-id` or `--source-id` |
 | `app/routers/presenters.py` | `/api/admin/presenters/*` endpoints (trigger / list / confirm / reject) |
 | `services/web/src/app/admin/PresentersPanel.tsx` | Admin "Presenters" tab |
 
@@ -140,7 +140,7 @@ Admin UI: `/admin` → **Presenters** tab → pick channel → **Run Presenter S
 API:
 ```bash
 # Trigger
-curl -X POST http://localhost:8000/api/admin/presenters/scout/<channel-uuid>
+curl -X POST http://localhost:8000/api/admin/presenters/research/<channel-uuid>
 
 # List
 curl 'http://localhost:8000/api/admin/presenters/by-channel/<channel-uuid>'

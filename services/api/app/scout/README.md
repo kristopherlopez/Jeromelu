@@ -9,12 +9,11 @@ belongs to Analyst, Bookkeeper, Archivist, or feature routers.
 | Path | Purpose |
 |---|---|
 | `routes.py` | Aggregates all Scout admin pipeline routers for `app.main`. |
-| `common/` | Shared deterministic-pipeline plumbing: audit rows, archive detail flags. |
-| `loop.py`, `tools.py`, `prompt.py`, `cli.py` | Agentic YouTube source discovery. |
-| `presenters.py`, `presenters_cli.py` | Agentic presenter discovery for one channel. |
-| `refresh.py`, `youtube_api.py` | Deterministic YouTube API refresh and metrics helpers. |
-| `audio.py`, `video.py` plus `*_cli.py` | YouTube media acquisition helpers. |
-| `_s3_archive.py` | Shared raw-response S3 archive writer. |
+| `common/` | Shared deterministic-pipeline plumbing: audit rows, archive detail flags, raw-response S3 archive writer. |
+| `source_discovery/` | Agentic YouTube/web source discovery. |
+| `presenter_research/` | Agentic presenter/person research for one known channel. |
+| `youtube/` | YouTube Data API client plus refresh/metrics/coverage jobs. |
+| `media/` | YouTube audio/video acquisition helpers and CLIs. |
 
 ## Pipeline Folders
 
@@ -43,5 +42,5 @@ tests/integration/scout/<pipeline>/test_response_shape.py
 tests/fixtures/scout/<pipeline>/canonical_response.json
 ```
 
-Root-level Scout modules such as `refresh.py` keep root-level tests under
-`tests/unit/api/scout/`.
+Shared Scout tests live under `tests/unit/api/scout/`; package-specific tests
+should follow the package name when a folder grows enough to need it.

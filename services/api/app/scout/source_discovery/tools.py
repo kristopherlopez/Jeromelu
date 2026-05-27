@@ -440,7 +440,7 @@ def handle_persist_candidate(
 
     # Validate YouTube existence — defends against agent-fabricated handles
     # for podcasts that live on Apple/Spotify rather than YouTube.
-    from app.scout.youtube_api import (
+    from ..youtube.client import (
         YouTubeAPIError,
         validate_channel,
         validate_video,
@@ -471,7 +471,7 @@ def handle_persist_candidate(
                 f"YouTube has no {kind} matching '{external_id}'. If this is a "
                 "podcast that lives on Apple/Spotify rather than YouTube, do "
                 "NOT file it as a YouTube channel — that's a different platform "
-                "(podcast discovery is a separate Scout run)."
+                "(podcast discovery is a separate Source Discovery run)."
             ),
         }
 
@@ -694,7 +694,7 @@ def handle_youtube_search_channels(
     session: Session, *, query: str, max_results: int = 10
 ) -> dict[str, Any]:
     """Channel search via the YouTube Data API. Pre-filters known channels."""
-    from app.scout.youtube_api import YouTubeAPIError, search_channels
+    from ..youtube.client import YouTubeAPIError, search_channels
 
     known = _known_channel_external_ids(session)
     try:
@@ -720,7 +720,7 @@ def handle_youtube_search_videos(
     published_after: str | None = None,
 ) -> dict[str, Any]:
     """Video search via the YouTube Data API. Pre-filters known videos."""
-    from app.scout.youtube_api import YouTubeAPIError, search_videos
+    from ..youtube.client import YouTubeAPIError, search_videos
 
     known = _known_video_external_ids(session)
     try:
@@ -745,7 +745,7 @@ def handle_youtube_channel_stats(
     session: Session, *, channel_ids: list[str]
 ) -> dict[str, Any]:
     """Detailed metadata for one or more channels."""
-    from app.scout.youtube_api import YouTubeAPIError, get_channel_stats
+    from ..youtube.client import YouTubeAPIError, get_channel_stats
 
     try:
         results = get_channel_stats(channel_ids)
@@ -758,7 +758,7 @@ def handle_youtube_related_channels(
     session: Session, *, channel_id: str
 ) -> dict[str, Any]:
     """Channels that the given channel features in its 'channels' sections."""
-    from app.scout.youtube_api import YouTubeAPIError, get_channel_sections
+    from ..youtube.client import YouTubeAPIError, get_channel_sections
 
     try:
         related_ids = get_channel_sections(channel_id)
@@ -784,7 +784,7 @@ def handle_youtube_harvest_channels_from_videos(
     published_after: str | None = None,
 ) -> dict[str, Any]:
     """Search videos for `query`, return distinct unknown channels."""
-    from app.scout.youtube_api import YouTubeAPIError, harvest_channels_from_videos
+    from ..youtube.client import YouTubeAPIError, harvest_channels_from_videos
 
     known = _known_channel_external_ids(session)
     try:

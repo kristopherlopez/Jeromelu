@@ -49,7 +49,7 @@ seed-players:
 # Usage: make collect-audio SOURCE_ID=<uuid>
 collect-audio:
 	@test -n "$(SOURCE_ID)" || (echo "SOURCE_ID is required: make collect-audio SOURCE_ID=<uuid>" && exit 2)
-	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.scout.audio_cli $(SOURCE_ID)
+	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.scout.media.audio_cli $(SOURCE_ID)
 
 # Scout — acquire low-res video for one source (yt-dlp 360p by default →
 # s3://jeromelu-raw-audio with .video.mp4 suffix). Used by Phase 4 visual
@@ -57,7 +57,7 @@ collect-audio:
 # Usage: make collect-video SOURCE_ID=<uuid> [QUALITY=240|360|480|720]
 collect-video:
 	@test -n "$(SOURCE_ID)" || (echo "SOURCE_ID is required: make collect-video SOURCE_ID=<uuid>" && exit 2)
-	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.scout.video_cli $(SOURCE_ID) $(if $(QUALITY),--quality $(QUALITY))
+	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.scout.media.video_cli $(SOURCE_ID) $(if $(QUALITY),--quality $(QUALITY))
 
 # Analyst — transcribe a collected source via Deepgram (diarisation + keyterm).
 # Requires audio_s3_key to be set (run collect-audio first). Writes the
@@ -130,7 +130,7 @@ enroll-face:
 		echo "Need IMAGE=path OR (SOURCE_ID=<uuid> FRAME_TS=<sec>)" && exit 2; \
 	fi
 
-# Presenter Scout — research a channel's regular presenters via web search
+# Presenter Research — research a channel's regular presenters via web search
 # and file findings into scout_presenter_candidates for human review. Pass
 # either CHANNEL_ID directly or SOURCE_ID (resolved to its channel server-
 # side). DRY_RUN=1 streams the research without writing rows.
@@ -138,7 +138,7 @@ enroll-face:
 #        make scout-presenters SOURCE_ID=<uuid>
 scout-presenters:
 	@test -n "$(CHANNEL_ID)$(SOURCE_ID)" || (echo "Need CHANNEL_ID=<uuid> or SOURCE_ID=<uuid>" && exit 2)
-	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.scout.presenters_cli \
+	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.scout.presenter_research.cli \
 		$(if $(CHANNEL_ID),--channel-id $(CHANNEL_ID)) \
 		$(if $(SOURCE_ID),--source-id $(SOURCE_ID)) \
 		$(if $(MODEL),--model $(MODEL)) \

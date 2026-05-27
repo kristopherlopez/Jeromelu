@@ -18,7 +18,7 @@ forensic transcript.
 S3 key format:
   {settings.s3_agent_logs_bucket}/agent-logs/{agent_id}/{YYYY}/{MM}/{DD}/{run_id}.jsonl
 
-Usage skeleton (see services/api/app/scout/loop.py for the reference impl):
+Usage skeleton (see services/api/app/scout/source_discovery/agent.py for the reference impl):
 
     from jeromelu_shared.agent_audit import (
         AgentAuditLog, AgentBounds, MODEL_PRICING,

@@ -16,7 +16,7 @@ tags: [area/operations, data-lineage]
 
 ## Writers
 
-- `services/api/app/scout/refresh.py` — periodic channel polling discovers new videos; INSERTs `sources` rows with `ingestion_status='pending'`
+- `services/api/app/scout/youtube/refresh.py` — periodic channel polling discovers new videos; INSERTs `sources` rows with `ingestion_status='pending'`
 - **Admin approval** — when a [scout_candidates](scout_candidates.md) row with `kind='video'` is approved, it promotes into a `sources` row
 - `scripts/data/bulk_ingest_raw.py` / `scripts/data/reimport_from_s3.py` — bulk one-shot ingestion paths
 - Transcript pipeline — sets `ingestion_status` and `ingested_at` after document download

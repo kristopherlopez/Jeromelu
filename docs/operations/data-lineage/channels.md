@@ -16,7 +16,7 @@ tags: [area/operations, data-lineage]
 ## Writers
 
 - **Admin approval** — when a [scout_candidates](scout_candidates.md) row with `kind='channel'` is approved, it promotes into a `channels` row and `scout_candidates.promoted_channel_id` is set
-- `services/api/app/scout/refresh.py` — `last_polled_at` updates on each refresh sweep
+- `services/api/app/scout/youtube/refresh.py` — `last_polled_at` updates on each refresh sweep
 - Manual / admin endpoints — for editing slug, quality_rating, tags, active flag
 
 ## Field mapping

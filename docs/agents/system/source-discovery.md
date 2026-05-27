@@ -7,7 +7,7 @@ tags: [area/agents, subarea/system, status/live]
 | | |
 |---|---|
 | **Package** | `services/api/app/scout/` |
-| **Trigger** | Manual CLI for now (`python -m app.scout.cli`); admin endpoint + cron later |
+| **Trigger** | Manual CLI for now (`python -m app.scout.source_discovery.cli`); admin endpoint + cron later |
 | **Crew counterpart** | [Scout](../crew/scout/README.md) — this is Scout's source-discovery surface |
 | **ETL role** | **Extract only.** No Transform. (Cleaning, diarisation, parsing, embedding are downstream — see [crew/scout/architecture.md § Hand-off contract](../crew/scout/architecture.md#hand-off-contract).) |
 | **Status** | Discovery + admin recon API + post-approval video enumeration shipped |
@@ -38,7 +38,7 @@ ANTHROPIC_API_KEY
         │                  ◀── Tools: web_search, web_fetch, dedupe_check, persist_candidate
         │                  ◀── User brief (NRL scope; can be overridden per run)
         ▼
-  Multi-turn streaming loop  (services/api/app/scout/loop.py)
+  Multi-turn streaming loop  (services/api/app/scout/source_discovery/agent.py)
         │
         ├── text deltas → stdout (theatre)
         │
@@ -50,7 +50,7 @@ ANTHROPIC_API_KEY
                                    ON CONFLICT DO NOTHING
         │
         ▼
-  ScoutRunResult (turns, tool_calls, candidates_filed, tokens, est. cost)
+  SourceDiscoveryResult (turns, tool_calls, candidates_filed, tokens, est. cost)
 ```
 
 ## Files
@@ -58,11 +58,11 @@ ANTHROPIC_API_KEY
 | File | Purpose |
 |---|---|
 | `app/scout/prompt.py` | System prompt (Scout voice + scope + tagging taxonomy) and default user brief |
-| `app/scout/tools.py` | Anthropic tool definitions + Python handlers (`dedupe_check`, `persist_candidate`) |
-| `app/scout/loop.py` | Multi-turn streaming loop with bounds (turns, tool calls, wall-clock, USD budget) |
-| `app/scout/cli.py` | `python -m app.scout.cli` entry point |
-| `app/scout/youtube_api.py` | YouTube Data API v3 client (search, channel stats, playlist enumeration, video stats) |
-| `app/scout/refresh.py` | Post-approval video enumeration + daily stats refresh (deterministic, not agent-driven) |
+| `app/scout/source_discovery/tools.py` | Anthropic tool definitions + Python handlers (`dedupe_check`, `persist_candidate`) |
+| `app/scout/source_discovery/agent.py` | Multi-turn streaming loop with bounds (turns, tool calls, wall-clock, USD budget) |
+| `app/scout/source_discovery/cli.py` | `python -m app.scout.source_discovery.cli` entry point |
+| `app/scout/youtube/client.py` | YouTube Data API v3 client (search, channel stats, playlist enumeration, video stats) |
+| `app/scout/youtube/refresh.py` | Post-approval video enumeration + daily stats refresh (deterministic, not agent-driven) |
 | `app/routers/recon.py` | Admin recon endpoints (list/approve/reject candidates) + the daily refresh entry point |
 | `packages/db/migrations/017_discovered_sources.sql` | Candidate inbox table (renamed to `scout_candidates` in mig 035) |
 | `packages/db/migrations/023_channel_metrics.sql` | Time-series channel popularity (subs/views/videos) |
@@ -89,7 +89,7 @@ Together these turn dedupe from a *post-hoc filter* into a *front-door firewall*
 
 ## Bounds
 
-Defaults (override via CLI flags or `ScoutBounds`):
+Defaults (override via CLI flags or `AgentBounds`):
 
 - `max_turns=20`
 - `max_tool_calls=60`
@@ -261,16 +261,16 @@ From `services/api` with venv active and `ANTHROPIC_API_KEY` exported:
 
 ```bash
 # default — sonnet 4.6, 20 turns, $3 budget
-python -m app.scout.cli
+python -m app.scout.source_discovery.cli
 
 # safer first run
-python -m app.scout.cli --dry-run
+python -m app.scout.source_discovery.cli --dry-run
 
 # tighter run for cost-watching
-python -m app.scout.cli --max-turns 5 --budget 0.50
+python -m app.scout.source_discovery.cli --max-turns 5 --budget 0.50
 
 # narrow brief
-python -m app.scout.cli --brief "Find injury-focused NRL podcasts only"
+python -m app.scout.source_discovery.cli --brief "Find injury-focused NRL podcasts only"
 ```
 
 Console shows:
@@ -399,7 +399,7 @@ POST /api/admin/scout/refresh-channel-stats
 
 Or via Make: `make prod-refresh-channel-stats ADMIN_KEY=xxx`.
 
-Backed by `refresh_all_channel_stats()` in `app/scout/refresh.py`. Walks
+Backed by `refresh_all_channel_stats()` in `app/scout/youtube/refresh.py`. Walks
 every `channel` where `platform='youtube'` and `active=true`, batches the
 external_ids 50 at a time into `channels.list`, and writes one
 `channel_metrics` row per channel using the canonical shape from migration
@@ -461,7 +461,7 @@ GET /api/admin/scout/channel-coverage
 **Make target** (prod, with key):
 `make prod-channel-coverage ADMIN_KEY=xxx [ONLY_GAPS=1]`.
 
-Backed by `audit_channel_coverage()` in `app/scout/refresh.py`. Per-channel
+Backed by `audit_channel_coverage()` in `app/scout/youtube/refresh.py`. Per-channel
 funnel stages — same vocabulary as `/admin/pipeline`:
 
 | Column | Definition |

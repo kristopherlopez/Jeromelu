@@ -117,7 +117,7 @@ This gives one answer to *"who fetches X?"* for every X, including future expans
 
 **Decision (locked): one Scout identity, multiple execution modules.** All acquisition runs under `agent_id='scout'` in the audit table, with `detail_json.pipeline` discriminating which module ran (`media-discovery`, `supercoach-roster`, `supercoach-stats`, `nrlcom-matches`, `nrlcom-teamlists`, `nrlcom-injuries`, `nrlcom-rounds`, `youtube-refresh`, etc.). Each pipeline is its own module under `services/api/app/scout/`; they share utilities (audit, idempotency, rate-limiting) but execute independently.
 
-This mirrors how Scout's media work is already structured today — `scout/loop.py`, `scout/refresh.py`, `scout/audio.py` are already sibling modules under one agent identity. The expansion adds more siblings, not a new architecture.
+This mirrors how Scout's media work is already structured today — `source_discovery/`, `youtube/refresh.py`, and `media/audio.py` are sibling packages under one agent identity. The expansion adds more siblings, not a new architecture.
 
 ### D3. Cron orchestration
 

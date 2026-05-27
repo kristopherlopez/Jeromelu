@@ -209,7 +209,7 @@ Cheap, fast, reproducible YouTube-native discovery. Owns the bulk case (new uplo
 
 The web-hunting LLM loop. Files candidate channels and videos to `scout_candidates`. Today this is the *only* discovery surface; once the deterministic surface (§3.1) ships, it becomes the long-tail / off-platform surface.
 
-**Trigger** — Manual CLI: `python -m app.scout.cli` (flags: `--dry-run`, `--max-turns`, `--budget`, `--brief`). Scheduled runs are planned.
+**Trigger** — Manual CLI: `python -m app.scout.source_discovery.cli` (flags: `--dry-run`, `--max-turns`, `--budget`, `--brief`). Scheduled runs are planned.
 
 **Inputs**
 - System prompt (cacheable, ~1.1k tokens) — Scout voice + scope + tagging taxonomy
@@ -225,7 +225,7 @@ The web-hunting LLM loop. Files candidate channels and videos to `scout_candidat
 | `dedupe_check` | Custom | Single-item variant for one-off investigations |
 | `persist_candidate` | Custom | Idempotent INSERT into `scout_candidates` (`status='pending'`) |
 
-**Processing** — multi-turn streaming loop in `services/api/app/scout/loop.py`. Each turn: assistant emits text + tool calls; client-side handlers run dedupe / persist; server-side tools execute on Anthropic's side. Loop ends on `end_turn` or first bound hit.
+**Processing** — multi-turn streaming loop in `services/api/app/scout/source_discovery/agent.py`. Each turn: assistant emits text + tool calls; client-side handlers run dedupe / persist; server-side tools execute on Anthropic's side. Loop ends on `end_turn` or first bound hit.
 
 **Outputs** — rows in `scout_candidates` (kind, title, score, content_categories, score_reasons, run_id, `status='pending'`, `discovered_via='web_search'`). Console theatre: per-turn text streamed live, one line per tool call.
 
@@ -279,9 +279,9 @@ Keeps every tracked YouTube channel's video list and per-video popularity number
 
 Scout's last Extract step. Pulls audio from approved-but-pending YouTube sources and lands it in S3. **Extract only** — does not interpret the audio. Transcription / diarisation belongs to [Analyst](../analyst/README.md) (see [analyst/transcription](../../system/transcription-pipeline.md)).
 
-**Trigger** — Manual CLI: `python -m app.scout.audio_cli <source_id>` or `make collect-audio SOURCE_ID=<uuid>`. The recurring drain job (APScheduler / cron over `ingestion_status='pending'`) is on the backlog.
+**Trigger** — Manual CLI: `python -m app.scout.media.audio_cli <source_id>` or `make collect-audio SOURCE_ID=<uuid>`. The recurring drain job (APScheduler / cron over `ingestion_status='pending'`) is on the backlog.
 
-**Module** — `services/api/app/scout/audio.py` · `acquire_audio(session, source)`.
+**Module** — `services/api/app/scout/media/audio.py` · `acquire_audio(session, source)`.
 
 **Processing** — for one approved-but-pending video:
 1. `yt-dlp` audio download (m4a, audio-only) → `s3://jeromelu-raw-audio/youtube/{channel_id}/{video_id}.m4a`. Idempotent: skipped if the S3 object already exists.

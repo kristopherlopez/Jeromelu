@@ -5,7 +5,7 @@ Usage:
     python -m app.analyst.transcribe_cli <source_id> --force
 
 Refuses to run if Scout hasn't already collected the audio (audio_s3_key
-must be set). Use `python -m app.scout.audio_cli <source_id>` first.
+must be set). Use `python -m app.scout.media.audio_cli <source_id>` first.
 """
 
 from __future__ import annotations

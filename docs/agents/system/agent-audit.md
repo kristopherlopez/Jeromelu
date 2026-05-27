@@ -6,7 +6,7 @@ tags: [area/agents, subarea/system, status/live]
 
 **Module:** `packages/shared/jeromelu_shared/agent_audit.py`
 **Applies to:** every agent built on the Anthropic Messages API + custom-tool loop (Scout today; Analyst, Critic, Bookkeeper, Archivist when they arrive).
-**Reference implementation:** `services/api/app/scout/loop.py`.
+**Reference implementation:** `services/api/app/scout/source_discovery/agent.py`.
 
 This is the contract every Claude-Agent-SDK-based agent in the system MUST follow. Uniform audit trail = uniform observability + uniform debugging + uniform cost tracking, with no per-agent reinvention.
 

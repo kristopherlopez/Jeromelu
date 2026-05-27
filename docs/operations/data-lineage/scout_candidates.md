@@ -16,8 +16,8 @@ Scout uses YouTube API + web tools (per [[project_scout_architecture]]) to disco
 
 ## Writers
 
-- `services/api/app/scout/loop.py` — Scout discovery loop; INSERTs candidates with `status='pending'`
-- `services/api/app/scout/youtube_api.py` — YouTube API enrichment (subscribers, view counts)
+- `services/api/app/scout/source_discovery/agent.py` — Source Discovery loop; INSERTs candidates with `status='pending'`
+- `services/api/app/scout/youtube/client.py` — YouTube API enrichment (subscribers, view counts)
 - **Admin review queue** — humans approve/reject via the admin UI; approval triggers promotion to [channels](channels.md) (kind=channel) or [sources](sources.md) (kind=video) and sets `promoted_channel_id`
 
 ## Field mapping
