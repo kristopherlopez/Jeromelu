@@ -33,13 +33,20 @@ Added `packages/db/migrations/070_dedup_metrics_snapshots.sql` — two `BEGIN`/`
 - **Idempotent:** residual consecutive-duplicate probe = **0** for both tables; `070_dedup_metrics_snapshots.sql` tracked in `schema_migrations`, so re-run is a no-op.
 - adversarial-reviewer: **PASS WITH CONCERNS** (concerns were the pending commit + this proof recording; reviewer independently re-ran the residual probe → 0/0 and confirmed the latest views return one row per entity: 2094 video / 14 channel).
 
+### TASK-09 — Prod reclaim runbook (doc deliverable) (`a8c9ebf`) · prod VACUUM deferred
+Wrote `docs/operations/metrics-dedup-runbook.md` (frontmatter-consistent with `iac-runbook.md`): purpose, preconditions (070 applied on prod, off-hours, disk headroom), the exact `VACUUM (FULL, ANALYZE) video_metrics; … channel_metrics;` commands with a one-at-a-time / not-in-a-txn note, the `ACCESS EXCLUSIVE` lock warning, the `pg_total_relation_size` before/after query, expected sizes (641 MB → ~191 MB, ~450 MB returned), a no-rollback note, and the on-box `ssh jeromelu-prod` + `docker exec … psql` connection (the box isn't reachable externally). Linked it from `docs/operations/data-catalogue/video_metrics.md`.
+
+**Verified:** adversarial-reviewer **PASS WITH CONCERNS** — independently cross-checked the commands, the `pg_total_relation_size` query, the cron/backup windows against `scripts/cron.d/jeromelu` (exact match), the connection method against `docker-compose.yml`, the precondition SQL against `migrate.sh`, and the relative link path (resolves). Concerns: the "58 GB" disk total isn't sourced in the inventory doc (but the runbook cites live `df -h /`, the authoritative source; headroom conclusion sound) and a pre-existing stale RDS row in `aws-resource-inventory.md` (out of scope — flagged, not fixed).
+
+**Deferred (gates final checkoff):** a human runs the prod `VACUUM (FULL, ANALYZE)` per the runbook **after migration 070 is applied on prod**, then pastes the before/after `pg_total_relation_size` (≈641 MB → ≈191 MB) here. Prod still shows 641 MB / 2.13M rows as of 2026-05-27 (070 not yet deployed there).
+
 ---
 
 ## Outstanding
-- ☐ **TASK-09** — `docs/operations/metrics-dedup-runbook.md` + deferred prod `VACUUM (FULL, ANALYZE)` size verification (641 MB → ~191 MB).
-- ☐ **Deferred TASK-07 verification** — post-deploy `videos_unchanged` ratio in the daily refresh.
-- ☐ **Deferred: apply migration 070 + dedup on prod.** Local is proven; the prod dedup happens when 070 deploys via the normal migration path. Migration is data-only (no schema change) — large delete on the 2.13M-row prod table; runs inside the BEGIN/COMMIT txn.
+- ☐ **TASK-09 final checkoff** — human runs the prod `VACUUM (FULL, ANALYZE)` (after 070 deploys to prod), pastes before/after sizes here; then the plan is Shipped and removed from PLAN.md. Runbook: `docs/operations/metrics-dedup-runbook.md`. **Do not run without human go-ahead.**
+- ☐ **Deferred TASK-07 verification** — post-deploy `videos_unchanged` ratio (~75% of `videos_total`) in the daily refresh response / `scout-refresh.log`.
+- ☐ **Deferred: migration 070 + dedup on prod.** Local is proven; the prod dedup runs when 070 deploys via the normal migration path. Data-only (no schema change) — a large delete on the 2.13M-row prod table, inside the BEGIN/COMMIT txn.
 - ⚠️ **PLAN.md staleness (minor):** the plan's Constraints describe `scout/refresh.py` as a live 4-line shim, but the concurrent Scout refactor has since *removed* it. Harmless to TASK-07/08/09 (all target the canonical path); the plan section is removed when the plan completes.
 
 ## Commits
-`fd8e0a3` (TASK-07) · `61fa974` (TASK-08). On `master`.
+`fd8e0a3` (TASK-07) · `61fa974` (TASK-08) · `a8c9ebf` (TASK-09 doc deliverable). On `master`.

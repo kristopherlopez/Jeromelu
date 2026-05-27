@@ -95,9 +95,11 @@ Implements PLAN.md § 2026-05-24 Phase 2.5 closure / "One-time S3 seed run" + "D
 _(implementer fills in: three curl responses, three aws s3 ls outputs, two SQL query results, doc diff summary, first-cron-fire log line)_
 
 
-### TASK-09: Prod reclaim runbook + deferred VACUUM FULL size verification
+### [BLOCKED: awaiting human VACUUM FULL on prod] TASK-09: Prod reclaim runbook + deferred VACUUM FULL size verification
 
 Implements PLAN.md § 2026-05-27 "Change-only storage" — the reclaim half. Authors the one-time prod maintenance runbook and closes out the initiative once the space is returned. The actual `VACUUM (FULL)` is a **human-run prod step** (brief table lock) — this task delivers the runbook + records the size drop when observed.
+
+> **Doc deliverable DONE 2026-05-27** (commit `a8c9ebf`, adversarial-reviewer PASS WITH CONCERNS — both non-blocking doc-traceability nits). `docs/operations/metrics-dedup-runbook.md` written + linked from the video_metrics catalogue page. **Only the deferred verification remains:** a human runs `VACUUM (FULL, ANALYZE) video_metrics; VACUUM (FULL, ANALYZE) channel_metrics;` on prod (per the runbook) **after migration 070 has been applied on prod**, then pastes the before/after `pg_total_relation_size` output (≈641 MB → ≈191 MB) into the run report. Then mark `[x]`, finalise the run report to Shipped, and remove the plan from PLAN.md's Active section. Do NOT run the prod VACUUM without explicit human go-ahead.
 
 **What**
 
