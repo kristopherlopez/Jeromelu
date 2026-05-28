@@ -48,6 +48,11 @@ Added `tests/unit/scripts/data/populate/test_phase_aux.py` (9 tests): `_extract_
 
 **Proof:** `pytest …/test_phase_aux.py` → **9 passed**; `test_dry_run_flag.py` → **12 passed** (TASK-18 commit-guard contract holds); `python -m scripts.data.populate_db_from_s3 --help` → **exit 0** (orchestrator imports); full `pytest tests/unit/` → **341 passed** (no regression). **adversarial-reviewer: PASS** — verified behaviour preservation line-by-line (both functions byte-equivalent to the deleted inline code; UPSERT SQL/counters/commit guards untouched; `status` still caller-side); tests non-tautological. **/simplify: no findings.**
 
+### TASK-26 — schedule cron for casualty-ward + ladder (`0eba82e`)
+Added `nrlcom-casualty-ward` (`ENDPOINT="nrlcom-casualty-ward?competition=111"` — no season param, current-only) and `nrlcom-ladder` (`ENDPOINT="nrlcom-ladder?competition=111&season=$(date -u +%Y)"`) cases to `scripts/scout-refresh.sh` (mirrors the draw/match-centre cases; usage synced in both the file-header `# Usage:` and the `*)` catch-all). Added two daily lines to `scripts/cron.d/jeromelu`: casualty `30 18 * * *` (04:30 AEST), ladder `45 18 * * *` (04:45 AEST) — off-peak, no collision with the 18:00/18:15 draw/match-centre slots, positioned before the 00:30 cron-report digest so the trailing-24h report covers them.
+
+**Proof:** `bash -n scripts/scout-refresh.sh` → clean; case simulation → `.../nrlcom-casualty-ward?competition=111` and `.../nrlcom-ladder?competition=111&season=2026` (the `&` stays inside the double-quoted `ENDPOINT`; curl uses `-X POST "$API_URL"`, so no backgrounding); both cron lines = 5 timing fields + `ubuntu` + absolute path; `grep cron.d/jeromelu scripts/lightsail-deploy.sh` → install-sync intact (lines 58-60). **adversarial-reviewer: PASS** (no concerns) — verified all 12 cross-checks incl. slot non-collision and digest ordering. **First scheduled fire is operator/time-gated** — deferred to TASK-27 closure (mirrors Phase 3 TASK-12; the box must pull past this commit, then `/var/log/jeromelu/scout-refresh.log` should show both jobs run clean after the first 18:30/18:45 UTC fire).
+
 ---
 
 ## How we know it's done (running)
@@ -57,7 +62,8 @@ Added `tests/unit/scripts/data/populate/test_phase_aux.py` (9 tests): `_extract_
 - **Casualty item modelled strictly (vs. draw/match-centre envelope-only).** Locked in the plan interview (2026-05-28): the casualty/ladder extractors are live and read nested fields by exact key, so item-level drift must fail loudly. `theme` stays opaque (not read by the extractor).
 
 ## Outstanding
-- TASK-26 → TASK-28 still open (cron, prod seed + docs, worker-scraper retirement).
+- TASK-27 → TASK-28 still open (prod seed + docs, worker-scraper retirement).
+- ☐ **Cron first fire (operator/time-gated).** Once the box pulls past `0eba82e`, confirm `/var/log/jeromelu/scout-refresh.log` shows `nrlcom-casualty-ward` + `nrlcom-ladder` ran clean after the first 18:30/18:45 UTC fire (mirrors the Phase 3 TASK-12 deferral; the TASK-27 seed proves the endpoints + S3 path end-to-end, this only confirms the *scheduled* invocation).
 
 ## Commits
-`cb408c6` (TASK-21) · `bf22976` (TASK-22) · `0ba0cf6` (TASK-23) · `b405c1a` (TASK-24) · `2675094` (TASK-25). Plus the per-task run-report/queue bookkeeping commits.
+`cb408c6` (TASK-21) · `bf22976` (TASK-22) · `0ba0cf6` (TASK-23) · `b405c1a` (TASK-24) · `2675094` (TASK-25) · `0eba82e` (TASK-26). Plus the per-task run-report/queue bookkeeping commits.
