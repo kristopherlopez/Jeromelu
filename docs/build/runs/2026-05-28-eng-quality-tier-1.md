@@ -1,6 +1,6 @@
 # Engineering quality hardening — Tier 1
 
-**Date:** 2026-05-28 · **Status:** 🟡 In flight (2/6 tasks shipped — TASK-47 + TASK-48 [BLOCKED]; TASK-51 + TASK-52 not yet picked up) · **Plan:** [Engineering quality hardening — Tier 1](../PLAN.md#2026-05-28-engineering-quality-hardening--tier-1-ruff--pyright--eslint--gitleaks--deploy-gating)
+**Date:** 2026-05-28 · **Status:** 🟡 In flight (3/6 tasks shipped — TASK-48 [BLOCKED]; TASK-51 + TASK-52 not yet picked up) · **Plan:** [Engineering quality hardening — Tier 1](../PLAN.md#2026-05-28-engineering-quality-hardening--tier-1-ruff--pyright--eslint--gitleaks--deploy-gating)
 
 **TL;DR** — Tier 1 of `docs/operations/engineering-quality-hardening.md` (items 1–6) lands hard-fail CI gates for Python lint (Ruff), Python typecheck (Pyright, narrow), web lint (ESLint), secrets (Gitleaks), and deploys are gated on Tests success. Tier 1 hardening surfaced an unanticipated reality: TASK-47 (Ruff) and TASK-48 (ESLint) both have far more existing violations than the plan's pre-audit anticipated — 875 / 174 files for Ruff, 50 files for ESLint. Both BLOCKED with detailed remediation menus pending the human's rule-set decisions. TASK-49 (Pyright, narrow) shipped clean: 8 errors / 3 files in scope, all addressed (3 real type fixes; 5 suppressions queued as TASK-53 for the underlying schema-drift bug).
 
@@ -58,6 +58,53 @@
 - **D2.** Local-side scan uses `gitleaks detect --no-git --source=.` rather than the spec's `gitleaks detect --redact --source=. --no-banner --exit-code 1`. The plain `detect` form scans git history by default which surfaced 4 historical findings irrelevant to the working-tree gate; `--no-git` matches the action's HEAD-scan behavior in CI.
 - **D3.** Added inline comment to CI job documenting `GITLEAKS_LICENSE` omission decision (originally only in the spec's "Note: If license env var is unavailable, omit — document the choice here in a comment" — now actually present in the file).
 
+---
+
+### TASK-47 — Ruff plumbing (Option 1 rule-set tuning) (`6e9c227`)
+
+Unblocked 2026-05-28 by human picking Option 1 from the BLOCKED note's remediation menu. Pre-audit had anticipated near-zero violations (only grepped `datetime.utcnow`, found zero) — actual surface with the plan-verbatim rule set was 875 errors across 174 files because the rule set hit well-known false-positive surfaces (E501 at 100-char, B008 on FastAPI Depends, RUF001/2/3 on NRL content). Option 1 tuned the rule set rather than absorbing the noise.
+
+**Files (config + CI + META):**
+- `pyproject.toml` — `[tool.ruff]` block with Option 1 tunings: line-length = 120; `extend-immutable-calls` for 8 FastAPI helpers (Depends, Query, Path, Body, Header, Form, File, Cookie); `ignore = ["DTZ011", "RUF001", "RUF002", "RUF003"]`; per-file-ignores `E501` for 8 prompt/HTML-content files (3 LLM-prompt files + 5 SES report scripts); per-file ignore `["DTZ", "B011"]` for tests. Pyright block from TASK-49 preserved.
+- `requirements-dev.txt` — `ruff>=0.15,<1` range; CI pins exact (`ruff==0.15.14`).
+- `Makefile` — added `lint-python`, `format-python`, `lint` (umbrella chaining lint-python + typecheck-python; `lint-web` lands with TASK-48). `.PHONY` updated.
+- `.github/workflows/tests.yml` — new `ruff` job before `pyright`. Pins `ruff==0.15.14` in a separate step after `pip install -r requirements-dev.txt` (matches Pyright's pin pattern).
+- `docs/build/META.md` — new `### Datetime / timezone` invariant subsection. Text uses `datetime.now(UTC)` form (matches reality after Ruff's UP017 autofix swept the codebase).
+
+**Source-tree changes (~190 files, 4730/-3666 across 196 files staged):**
+- **337 safe autofixes** via `ruff check --fix` — import-sort, datetime modernization (`timezone.utc` → `UTC`), unused-import removal, deprecated-import migration, f-string cleanup, etc.
+- **24 unsafe autofixes** via `--unsafe-fixes` — RUF046 `int(round(...))` → `round(...)`; RUF059 `_`-prefix on unused-unpacked variables. Both classes are semantically safe.
+- **142 files reformatted** via `ruff format` — line wrapping at the 120-char limit, trailing-comma normalization, spacing.
+- **Manual fixes** (carefully audited):
+  - **F821 real bug** in `services/worker-publishing/app/activities/update_consensus.py:125`: `len(entity_claims)` → `len(person_claims)`. `entity_claims` was undefined — would have crashed with `NameError` at runtime if the snapshot-flip log path ever fired. **Ruff caught a production bug.**
+  - **33 B904 raise-from-inside-except** — batch-fixed via a one-shot helper script (`scripts/_fix_b904.py`, created/run/deleted in-session) that walked backwards from each raise to find the enclosing `except ... as Y:` and appended `from Y`. 31 of 33 fixed by the script; 2 unbound `except ValueError:` cases (`insights.py:84`, `lineup.py:288`) hand-fixed to `from None` (input-validation paths where the original error is uninteresting).
+  - **2 B008** in `voice_cluster_hdbscan.py:94` + `voice_cluster_runner.py:59`: `params: VoiceClusterParams = VoiceClusterParams()` got `# noqa: B008` with rationale "frozen dataclass — immutable, safely shareable across calls" (verified by reading the `@dataclass(frozen=True)` declaration).
+  - **1 B007** in `scripts/reconcile_orphan_channels.py:108` — `url` → `_url` (intentionally unused unpacked variable).
+  - **1 RUF034** in `packages/shared/jeromelu_shared/scraping/nrl.py:186` — `parsed if parsed != 0 else parsed` (no-op ternary) → `parsed` with comment update ("explicit zeros preserved by the parser").
+  - **5 E402** in `scripts/transcripts/clean_transcript.py` + `scripts/video/upload_clips_to_s3.py` — `# noqa: E402` markers with rationale "sys.path manipulation above must run first".
+  - **10 E501 inline `# noqa: E501`** markers on legitimate long lines: SQL CHECK constraint string, single-line docstrings, chained-zip expressions, f-string error messages with full-keys diagnostic, FastAPI Query `description=`, logger format strings.
+
+**Proof:**
+- `make lint-python` → `All checks passed!` + `267 files already formatted`.
+- `make typecheck-python` → 0 errors, 0 warnings, 0 informations.
+- `pytest tests/unit/` → **398 passed** (zero regression from autofix/format/manual changes).
+- `git grep -n "datetime\.utcnow" services packages scripts` → 0 matches.
+
+**adversarial-reviewer: PASS WITH CONCERNS.** No Blockers. 4 Concerns:
+- **C1 (acknowledged):** META text uses `datetime.now(UTC)` rather than the spec's `datetime.now(timezone.utc)`. Landed text matches reality after the UP017 autofix swept the codebase. Worth noting; not a bug.
+- **C2 (addressed):** Tightened the `# noqa: B008` rationale from "dataclass with only scalar defaults — safely shareable across calls" to "frozen dataclass — immutable, safely shareable across calls" per the reviewer's verification that the class is `@dataclass(frozen=True)`.
+- **C3 (post-checkoff):** Run report update is happening here, per META ritual.
+- **C4 (recorded):** F821 catching a real production bug (`len(entity_claims)` → would have NameError'd if the snapshot-flip log fired) is a load-bearing data point for the value of Ruff plumbing. Promoting to Lessons learned below.
+
+**Deviations from plan:**
+- **D1.** Spec said `select = ["E", "F", "I", "B", "DTZ", "UP", "RUF"]` and `ignore = []`. Landed `ignore = ["DTZ011", "RUF001", "RUF002", "RUF003"]` per Option 1.
+- **D2.** Spec said `line-length = 100`. Landed `line-length = 120` per Option 1.
+- **D3.** Spec said `[tool.ruff.lint.per-file-ignores]` only for `tests/**/*.py` and `**/conftest.py`. Landed 8 additional per-file-ignore entries for E501 in prompt / HTML-content files (LLM system prompts, SES email bodies, seed-mock-articles).
+- **D4.** New `[tool.ruff.lint.flake8-bugbear]` `extend-immutable-calls` block — 8 FastAPI helpers added per Option 1.
+- **D5.** B904 batch fix via one-shot helper script (`scripts/_fix_b904.py`, created/run/deleted) rather than hand-editing each of 33 instances.
+
+---
+
 **Deviations from plan:**
 - **D1.** Umbrella `lint:` Makefile target deferred. Spec said "Update the umbrella `lint` target (added in TASK-47) to also `$(MAKE) typecheck-python`." TASK-47 is BLOCKED so the target doesn't exist; only `typecheck-python` ships. NOTE block left in Makefile so the future TASK-47 unblocker wires it up.
 - **D2.** `# pyright: ignore` markers used for real schema-drift bug rather than the spec's example case ("missing type stub"). Per implementer charter "don't fix tangential bugs," the proper fix (rewriting the queries to JOIN through `ClaimAssociation`) was deferred to a new TASK-53 rather than absorbed into Pyright plumbing scope. Each marker carries an inline rationale pointing at TASK-53.
@@ -69,16 +116,6 @@
 ---
 
 ## Currently BLOCKED
-
-### TASK-47 — Ruff plumbing [BLOCKED: ruff-violation-volume — 174 files, 875 errors]
-
-Pre-audit anticipated near-zero violations (only grepped `datetime.utcnow`, found zero) — actual surface is 875 errors across 174 files because the spec'd rule set hits well-known false-positive surfaces in this codebase:
-- 389 `E501` line-too-long at the 100-char limit (codebase commonly runs 101–110 chars).
-- 92 `B008` function-call-in-default-argument — FastAPI `Depends(...) / Query(...) / Path(...)` pattern; standard FastAPI remediation is `extend-immutable-calls`.
-- 45 `RUF001/002/003` ambiguous-unicode in NRL content (×, —, ° legitimately used in comments/docstrings).
-- 50 `UP017` autofixable; 139 `I001` autofixable; etc.
-
-Spec's `>30 files` threshold tripped → BLOCKED. Three remediation options documented in the task's BLOCKED note. Recommended: option 1 — tune the rule set (`extend-immutable-calls` for FastAPI, drop ambiguous-unicode rules, drop DTZ011, raise line-length 100→120). Preserves load-bearing invariants while removing the noise floor. After tuning, expected residual is ~30–50 errors across ~20 files — manageable in a single sitting.
 
 ### TASK-48 — ESLint CI job [BLOCKED: eslint-violation-volume — 50 files, 34 errors + 24 warnings]
 
@@ -108,11 +145,14 @@ Spec's `>20 files` threshold tripped → BLOCKED. Recommended: option 1 — down
 
 - **Ruff/ESLint adoption against a brownfield codebase: predict the violation surface per rule, not just the headline rule.** Adding a new project memory or META invariant capturing this would help future planners.
 - **`reportMissingImports="error"` is load-bearing for Pyright correctness but creates a hidden dependency on the test/dev environment.** Future widenings of the Pyright include set MUST audit `import X` statements against `requirements-dev.txt` (or whatever the typecheck-time deps file is). Worth promoting to META.md once the second widening lands.
+- **TASK-47 caught a real production bug.** Ruff's F821 in `worker-publishing/.../update_consensus.py:125` (`len(entity_claims)` referencing an undefined name) would have raised `NameError` at runtime if the snapshot-flip log path ever fired. This is the load-bearing case for Ruff plumbing being a net-positive even when initial violation volume is high: even a "noisy" lint pass surfaces real bugs that would otherwise crash in production.
+- **Batch-fixing mechanical violations via a one-shot helper script is faster + safer than 33 individual Edit calls** for AST-shaped patterns like B904. The helper-script-then-delete pattern (no committed scripts) preserves clean implementer history.
 
 ---
 
 ## Commits
 
+- `6e9c227` — feat(quality): TASK-47 — Ruff plumbing (Option 1 rule-set tuning) [skip-simplify]
 - `1c2aa20` — feat(quality): TASK-50 — Gitleaks plumbing + secret-hygiene META invariant [skip-simplify]
 - `0bccec8` — feat(quality): TASK-49 — Pyright plumbing (narrow scope: packages/shared/jeromelu_shared) [skip-simplify]
 - `d1884d4` — docs(build): [BLOCKED] TASK-48 ESLint plumbing — 50 files exceeds spec threshold [skip-simplify]
