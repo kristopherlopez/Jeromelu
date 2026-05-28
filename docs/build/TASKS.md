@@ -174,48 +174,6 @@ Concrete changes:
 
 ---
 
-### TASK-50: Gitleaks plumbing — `.gitleaks.toml` + CI job + secret-hygiene META invariant
-
-**What.** Per [PLAN.md "Engineering quality hardening — Tier 1"](./PLAN.md#2026-05-28-engineering-quality-hardening--tier-1-ruff--pyright--eslint--gitleaks--deploy-gating) Interface §. Land Gitleaks as the secret scanner, hard-fail in CI from day 1, run against the full working tree (NOT the full git history — see Concrete change 4 for the rationale).
-
-Concrete changes:
-1. **Create `.gitleaks.toml`** at the repo root with the minimal-config block specified in PLAN.md "Interface §" (`[extend] useDefault = true` + empty allowlist tables).
-2. **Run `gitleaks detect --redact --source=. --no-banner --exit-code 1` locally first** (install via `brew install gitleaks` / `scoop install gitleaks` / equivalent). If findings emerge, classify each:
-   - **Real secret** → STOP, do not commit. Tag `[BLOCKED: gitleaks-real-secret-detected — <path>]` and surface to the human immediately. Do NOT push.
-   - **False positive** → add an allowlist entry to `.gitleaks.toml` with an inline rationale comment (path-based preferred over regex-based for traceability).
-3. **Add `gitleaks` job to `.github/workflows/tests.yml`**:
-   ```yaml
-     gitleaks:
-       name: gitleaks (working tree)
-       runs-on: ubuntu-latest
-       steps:
-         - uses: actions/checkout@v6
-           with:
-             fetch-depth: 0   # gitleaks-action scans the full diff range; depth=0 lets it walk PR commits
-         - uses: gitleaks/gitleaks-action@v2
-           env:
-             # Free for public repos and small orgs; check current licensing.
-             # If license env var is unavailable, omit — gitleaks runs unauthenticated
-             # at reduced telemetry. Document the choice here in a comment.
-             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-   ```
-   The `gitleaks-action` config reads `.gitleaks.toml` automatically. Hard-fails the job on any finding.
-4. **Working-tree scan, not full-history scan.** The plan deliberately scopes to the working tree + PR diff (`gitleaks-action` default) rather than `git log --all`. Historical scan can land in a Tier-2 follow-up if/when the human wants paranoia mode; for now, the gate is "no new secrets land via this PR" — which is the load-bearing property.
-5. **Update `docs/build/META.md`** — add a new `### Secret hygiene` invariant subsection (placement at the implementer's discretion, contiguous with other invariants):
-   > **Secret hygiene.** Never commit `.env*`, tokens, API keys, prod credentials, or any high-entropy string that looks like a secret. Redact secrets from logs, issue comments, PR descriptions, and run reports. Enforced by Gitleaks in CI against the working tree + PR diff; CI fails on any finding. False positives go in `.gitleaks.toml` with an inline rationale, never inline `# gitleaks:allow` comments.
-
-**How to verify.**
-- `gitleaks detect --redact --source=. --no-banner --exit-code 1` exits 0 locally on master after the task's changes are applied.
-- The PR opened with this task FAILs CI when the canonical fake AWS key `AKIAIOSFODNN7EXAMPLE` is added to a throwaway file in the branch, and PASSES CI on the revert. (`AKIAIOSFODNN7EXAMPLE` is the AWS documentation example — it matches the AWS access-key regex but is publicly known to be non-functional; using it as the test secret is safe.) Capture URLs.
-- `cat .gitleaks.toml` shows the `[extend] useDefault = true` directive; any allowlist entries each carry an inline rationale comment.
-- `docs/build/META.md` contains the new `### Secret hygiene` subsection verbatim.
-- `git diff --stat` bounded to `.gitleaks.toml`, `.github/workflows/tests.yml`, `docs/build/META.md`. **If any other file is touched (e.g. to remove an actual secret), the task IS BLOCKED and the human must drive the cleanup separately — flag this immediately.**
-- The Actions UI shows a `gitleaks (working tree)` job in green on the merge commit.
-
-**Proof notes.**
-
----
-
 ### TASK-51: Deploy gating — flip `deploy.yml` to `workflow_run` trigger; verify gate end-to-end
 
 **What.** Per [PLAN.md "Engineering quality hardening — Tier 1"](./PLAN.md#2026-05-28-engineering-quality-hardening--tier-1-ruff--pyright--eslint--gitleaks--deploy-gating) Interface §. After TASK-47–50 are merged and the new CI jobs are observably green on master, gate `deploy.yml` on `tests.yml` success via the `workflow_run` trigger. Verify the gate works in production.

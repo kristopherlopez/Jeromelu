@@ -1,6 +1,6 @@
 # Engineering quality hardening — Tier 1
 
-**Date:** 2026-05-28 · **Status:** 🟡 In flight (1/6 tasks shipped — TASK-47 + TASK-48 [BLOCKED]; TASK-50/51/52 not yet picked up) · **Plan:** [Engineering quality hardening — Tier 1](../PLAN.md#2026-05-28-engineering-quality-hardening--tier-1-ruff--pyright--eslint--gitleaks--deploy-gating)
+**Date:** 2026-05-28 · **Status:** 🟡 In flight (2/6 tasks shipped — TASK-47 + TASK-48 [BLOCKED]; TASK-51 + TASK-52 not yet picked up) · **Plan:** [Engineering quality hardening — Tier 1](../PLAN.md#2026-05-28-engineering-quality-hardening--tier-1-ruff--pyright--eslint--gitleaks--deploy-gating)
 
 **TL;DR** — Tier 1 of `docs/operations/engineering-quality-hardening.md` (items 1–6) lands hard-fail CI gates for Python lint (Ruff), Python typecheck (Pyright, narrow), web lint (ESLint), secrets (Gitleaks), and deploys are gated on Tests success. Tier 1 hardening surfaced an unanticipated reality: TASK-47 (Ruff) and TASK-48 (ESLint) both have far more existing violations than the plan's pre-audit anticipated — 875 / 174 files for Ruff, 50 files for ESLint. Both BLOCKED with detailed remediation menus pending the human's rule-set decisions. TASK-49 (Pyright, narrow) shipped clean: 8 errors / 3 files in scope, all addressed (3 real type fixes; 5 suppressions queued as TASK-53 for the underlying schema-drift bug).
 
@@ -27,6 +27,36 @@
 - `cat pyproject.toml` shows the `[tool.pyright]` block matching PLAN.md "Interface §" verbatim (include, exclude, pythonVersion, typeCheckingMode, reportMissingImports="error", reportGeneralTypeIssues="error").
 
 **adversarial-reviewer: PASS after one Blocker round.** First pass found a real Blocker: `openai` and `temporalio` are imported at module top-level inside the Pyright include set but were excluded from `requirements-test.txt` per its "network SDKs excluded for fast installs" policy, and weren't in `requirements-dev.txt` either — `reportMissingImports="error"` would have failed CI. Resolved by adding both to `requirements-dev.txt` (which only the Pyright CI job installs, preserving the lean unit-test install path). Also addressed 3 concerns in the same iteration: inline rationale on `# pyright: ignore` markers, pin discipline (range in file + exact in CI step), Makefile umbrella-lint NOTE.
+
+---
+
+### TASK-50 — Gitleaks plumbing + secret-hygiene META invariant (`1c2aa20`)
+
+**Files:**
+- `.gitleaks.toml` (new) — extends gitleaks defaults via `[extend] useDefault = true`; 3 allowlist categories with inline rationale:
+  - **Path excludes** for `.venv/`, `node_modules/`, `.next/`, `dist/`, `build/`, `.git/`, `__pycache__/`, `*.lock`, `package-lock.json`, and `.env*` (gitignored, never in CI's tracked-files scope; the local-side exclusion just makes `--no-git` scans match CI's posture so the developer doesn't see local-only secrets surfacing).
+  - **`services/gpu/Dockerfile` + `services/gpu/build_and_push.sh`** — `--secret id=hf_token,env=HUGGINGFACE_API_KEY` is a BuildKit secret-mount label, not a value; the value is read from the env var at build time.
+  - **`docs/operations/aws-resource-inventory.md`** — narrow regex (UUID-format only via `regexTarget = "secret"`); the doc contains KMS Key UUIDs that gitleaks's `generic-api-key` entropy rule flags. Narrow regex preserves coverage for non-UUID secrets (real AWS access tokens, generic API keys, anything else) if they ever land in the doc.
+- `.github/workflows/tests.yml` — new `gitleaks` job using `gitleaks/gitleaks-action@v2`. `fetch-depth: 0` per the spec. Inline comment documents that `GITLEAKS_LICENSE` is intentionally omitted (free tier).
+- `docs/build/META.md` — new `### Secret hygiene` invariant subsection placed between `### Infrastructure (AWS)` and `### Heavy ML deps stay isolated`. Documents rule, enforcement, and false-positive workflow.
+
+**Proof:**
+- `gitleaks detect --no-git --source=. --no-banner --redact --exit-code 1` → `no leaks found`, exit 0.
+- Initial baseline (before the allowlist was tuned) surfaced 7 findings in `.env` (gitignored, never committed — local dev secrets the action wouldn't see in CI's tracked-files scope) and 4 historical findings in old commits (KMS UUIDs + BuildKit secret labels). All addressed via path-excludes (`.env`) or category-narrow allowlist entries (everything else). No real secret was discovered.
+- `git diff --stat 1c2aa20^..1c2aa20` covers exactly the 3 expected files.
+- `pytest tests/unit/` → 398 passed (no regression).
+
+**adversarial-reviewer: PASS WITH CONCERNS.** No Blockers. 5 Concerns:
+- **C1 (addressed):** Initial `aws-resource-inventory.md` allowlist was path-blanket — would have suppressed real AWS access tokens too. Reviewer recommended narrowing to UUID-pattern regex. Implementer narrowed via `regexTarget = "secret"` + UUID-only regex (32 hex + 4 dashes). Probe-tested with two AKIA paste attempts (canonical docs example `AKIAIOSFODNN7EXAMPLE` and a randomized AKIA-format string) — neither fired, but this is a property of gitleaks v8.30.1's default `aws-access-token` rule applying entropy/safe-word filters, NOT a property of the allowlist. The narrowing strictly reduces the suppression scope as the reviewer requested.
+- **C2 (acknowledged):** META invariant text not literally verbatim — implementer added CI-job path reference, "description rationale" wording (matches gitleaks 8.x TOML syntax), and a local-check command. Additions are improvements; "verbatim" was load-bearing in the spec word but spirit preserved.
+- **C3 (addressed):** Added inline comment in CI job documenting the `GITLEAKS_LICENSE` omission decision (free tier, public repo).
+- **C4 (addressed):** Removed the redundant `(^|/)\.env$` regex (already covered by `(^|/)\.env(\.|$)`).
+- **C5 (deferred per META):** CI-side end-to-end verification (fake-AKIA push → red, revert → green) is a post-checkoff operator step.
+
+**Deviations from plan:**
+- **D1.** Allowlist is array-of-tables `[[allowlists]]` rather than the spec's singular `[allowlist]` form. Required by gitleaks 8.x — the singular form requires at least one populated check (paths/regexes/commits/stopwords); the array form is the standard pattern for multiple independent entries with `description` per entry.
+- **D2.** Local-side scan uses `gitleaks detect --no-git --source=.` rather than the spec's `gitleaks detect --redact --source=. --no-banner --exit-code 1`. The plain `detect` form scans git history by default which surfaced 4 historical findings irrelevant to the working-tree gate; `--no-git` matches the action's HEAD-scan behavior in CI.
+- **D3.** Added inline comment to CI job documenting `GITLEAKS_LICENSE` omission decision (originally only in the spec's "Note: If license env var is unavailable, omit — document the choice here in a comment" — now actually present in the file).
 
 **Deviations from plan:**
 - **D1.** Umbrella `lint:` Makefile target deferred. Spec said "Update the umbrella `lint` target (added in TASK-47) to also `$(MAKE) typecheck-python`." TASK-47 is BLOCKED so the target doesn't exist; only `typecheck-python` ships. NOTE block left in Makefile so the future TASK-47 unblocker wires it up.
@@ -83,6 +113,7 @@ Spec's `>20 files` threshold tripped → BLOCKED. Recommended: option 1 — down
 
 ## Commits
 
+- `1c2aa20` — feat(quality): TASK-50 — Gitleaks plumbing + secret-hygiene META invariant [skip-simplify]
 - `0bccec8` — feat(quality): TASK-49 — Pyright plumbing (narrow scope: packages/shared/jeromelu_shared) [skip-simplify]
 - `d1884d4` — docs(build): [BLOCKED] TASK-48 ESLint plumbing — 50 files exceeds spec threshold [skip-simplify]
 - `6484d2e` — docs(build): [BLOCKED] TASK-47 ruff plumbing — 875 errors / 174 files exceeds spec threshold [skip-simplify]
