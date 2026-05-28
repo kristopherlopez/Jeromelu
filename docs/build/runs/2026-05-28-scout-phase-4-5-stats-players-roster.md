@@ -1,6 +1,6 @@
 # Scout Phase 4.5 — nrl.com stats + players roster (D8 harden, schedule, seed)
 
-**Date:** 2026-05-28 · **Status:** 🟡 In flight (6 of 8 tasks shipped) · **Plan:** Scout Phase 4.5 (active — see [PLAN.md](../PLAN.md))
+**Date:** 2026-05-28 · **Status:** 🟡 In flight (7 of 8 tasks shipped) · **Plan:** Scout Phase 4.5 (active — see [PLAN.md](../PLAN.md))
 
 **TL;DR** — Phase 4.5 is a Phase 4-style hardening replay: both `services/api/app/scout/nrlcom_stats/` and `services/api/app/scout/nrlcom_players_roster/` ingest folders already exist with fetchers / routes / READMEs / make targets; migration `060_stat_leaderboards.sql` is applied; `populate_stat_leaderboards` is shipped and wired into `populate_db_from_s3.py` as `--phase leaderboards`; the lineage + catalogue docs already exist. What's missing is the D8 drift contract, extractor unit tests via pure-function refactor, cron scheduling, and prod seed verification. NRL only (comp 111), season 2026, forward-only — historical backfill stays Phase 5. SC Draft mode and folding `nrlcom_refresh.py` are explicitly scoped out (2026-05-28 planner interview).
 
@@ -75,6 +75,16 @@ Added `tests/unit/scripts/data/populate/test_phase_leaderboards.py` with **6 tes
 
 **Proof:** `pytest …/test_phase_leaderboards.py -v` → **6 passed in 1.61s**; `pytest …/test_dry_run_flag.py` → **12 passed** (TASK-18 commit-guard contract intact — `commit: bool = True` still threaded through `populate_stat_leaderboards`); `pytest tests/unit/scripts/data/populate/` → **43 passed**; `python -m scripts.data.populate_db_from_s3 --help` → exit 0 (orchestrator imports cleanly, `--phase leaderboards` still registered); `pytest tests/unit/` → **355 passed** (no regression; +6 new). **adversarial-reviewer: PASS WITH CONCERNS** — both non-blocking: (C1) spec said "17 keys" but the function emits 16 dict-keys (the 17th column, `captured_at`, comes from SQL `NOW()` — never bound from the row dict; test's `_EXPECTED_COLUMNS` set is 16, internally consistent with what the function actually emits — minor spec-wording artifact); (C2) session-staging discipline honoured (explicit pathspec, untracked `services/web/.claude/` left alone). **/simplify:** not run.
 
+### TASK-35 — schedule cron for nrlcom-stats (daily 18:50 UTC) + nrlcom-players-roster (weekly Tue 23:40 UTC) (`4bf0574`)
+Mirrors Phase 4 TASK-26 line-for-line.
+
+- `scripts/scout-refresh.sh`: two new `case` entries — `nrlcom-stats) ENDPOINT="nrlcom-stats?competition=111&season=$(date -u +%Y)" ;;` and `nrlcom-players-roster) ENDPOINT="nrlcom-players-roster/refresh-all?competition=111" ;;`. Usage header + `*)` catch-all error string synced (both list the new jobs in the same order).
+- `scripts/cron.d/jeromelu`: two new lines positioned in the existing schedule blocks:
+  - `50 18 * * *     ubuntu  /opt/jeromelu/scripts/scout-refresh.sh nrlcom-stats` (04:50 AEST daily, immediately after the 18:45 ladder line; ahead of the 00:30 cron-report digest so it's covered in the trailing-24h email)
+  - `40 23 * * 1     ubuntu  /opt/jeromelu/scripts/scout-refresh.sh nrlcom-players-roster` (Tuesday 09:40 AEST weekly, immediately after the Mon 23:35 supercoach-settings line; same weekly block)
+
+**Proof:** `bash -n scripts/scout-refresh.sh` → clean; case simulation emits `nrlcom-stats?competition=111&season=2026` and `nrlcom-players-roster/refresh-all?competition=111` (the `&` stays inside the double-quoted `ENDPOINT`; curl uses `-X POST "$API_URL"`, so no backgrounding); cron line count went **13 → 15** (+2 as required); no slot collisions across the daily/weekly blocks; `grep cron.d/jeromelu scripts/lightsail-deploy.sh` → install/sync intact (lines 59-60). **First scheduled fire is operator/time-gated** — `/var/log/jeromelu/scout-refresh.log` confirmation deferred to TASK-36 closure (mirrors Phase 4 TASK-26 deferral pattern). **adversarial-reviewer: PASS WITH CONCERNS** — one non-blocking: doc-update timing for the two pipeline READMEs' cadence sections is deferred to TASK-36 docs sweep per the plan's Documentation updates assignment, matching the accepted Phase 4 TASK-26 → TASK-27 split. **/simplify:** not run.
+
 ---
 
 ## How we know it's done (running)
@@ -85,7 +95,8 @@ Added `tests/unit/scripts/data/populate/test_phase_leaderboards.py` with **6 tes
 - **`value: str | None` is stricter than the spec's `float | int | str | None` union.** Empirical reality: every leader in 347 observed has a string value. The strictness is a D8-aligned choice — a future native-number `value` becomes drift, which is the correct behaviour, not a silent acceptance.
 
 ## Outstanding (deferred — operator/time-gated and surfaced infra follow-ups)
-- ☐ **TASK-35 → TASK-36:** the remaining 2 tasks of Phase 4.5 (in the queue).
+- ☐ **TASK-36:** prod seed + DB verification + docs sweep (Phase 4.5 closure). Requires box-side SSH and prod-DB writes; awaiting human go-ahead before invoking.
+- ☐ **Cron first-fire (operator/time-gated)** — once the box pulls past `4bf0574`, confirm `/var/log/jeromelu/scout-refresh.log` shows `nrlcom-stats` ran clean after the first 18:50 UTC fire and `nrlcom-players-roster` after the first Mon 23:40 UTC fire. Mirrors the Phase 3 TASK-12 / Phase 4 TASK-26 deferral pattern.
 - ☐ **End-to-end `validated:true` in JSON response** — TASK-30's local curl proof was deliberately skipped (offline this turn, per spec). Confirmation lands at the TASK-36 prod seed (the route is proven-by-construction green live + red via the deliberate break).
 - ☐ **Tighten `Profile` identity-field types when an extractor lands** — TASK-31 ships `Profile.firstName`/`lastName`/`teamNickName` as `str | None` (no extractor reading them this phase). When a `/players/data` extractor is built in a future phase, types should tighten to `str` (non-null) for the load-bearing identity fields, matching the casualty precedent. Surfaced for visibility.
 - ☐ **README correction for nrlcom_players_roster** — `services/api/app/scout/nrlcom_players_roster/README.md` line 15 mislabels `TEAM=500011` as Storm; actual Storm id is `500021`. Folded into TASK-36's doc sweep.
@@ -95,4 +106,4 @@ Added `tests/unit/scripts/data/populate/test_phase_leaderboards.py` with **6 tes
 _(populated as tasks ship)_
 
 ## Commits
-`068f37a` (planner kickoff — Phase 4.5 plan + 8 tasks queued, missed at the planner session boundary) · `f232c84` (TASK-29) · `bb84d28` (TASK-30) · `25f14ff` (TASK-31) · `cee666c` (TASK-32) · `860903b` (TASK-33) · `7c243c2` (TASK-34). Plus the per-task run-report/queue bookkeeping commits.
+`068f37a` (planner kickoff — Phase 4.5 plan + 8 tasks queued, missed at the planner session boundary) · `f232c84` (TASK-29) · `bb84d28` (TASK-30) · `25f14ff` (TASK-31) · `cee666c` (TASK-32) · `860903b` (TASK-33) · `7c243c2` (TASK-34) · `4bf0574` (TASK-35). Plus the per-task run-report/queue bookkeeping commits.

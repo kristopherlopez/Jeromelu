@@ -25,54 +25,6 @@ Prefix the title with optional tags in square brackets:
 
 ## Open tasks
 
-### TASK-35 — schedule cron for nrlcom-stats (daily 18:50 UTC) + nrlcom-players-roster (weekly Tue 23:40 UTC)
-
-**What**
-
-Cron scheduling. See `PLAN.md` → `## 2026-05-28: Scout Phase 4.5` → Interface → *Cron*.
-
-1. Modify `scripts/scout-refresh.sh`:
-    - Add two `case` entries to the existing `case "$JOB" in` block:
-      - `nrlcom-stats) ENDPOINT="nrlcom-stats?competition=111&season=$(date -u +%Y)" ;;`
-      - `nrlcom-players-roster) ENDPOINT="nrlcom-players-roster/refresh-all?competition=111" ;;`
-    - Update the `# Usage:` header line to list the two new jobs in the same order.
-    - Update the `*)` catch-all error string identically.
-2. Modify `scripts/cron.d/jeromelu`:
-    - Add (positioned at the end of the existing 18:xx UTC nrl.com block, right after the `45 18` ladder line):
-      ```
-      # Daily nrl.com stats snapshot — 18:50 UTC = 04:50 AEST. Pre-computed top-25
-      # leaderboards (~275KB) for NRL (111), current season. Archives
-      # scout/nrlcom/stats/111/{season}.json. Cheap to run daily even though
-      # the leaderboards only change a few times per week.
-      50 18 * * *     ubuntu  /opt/jeromelu/scripts/scout-refresh.sh nrlcom-stats
-      ```
-    - Add (positioned at the end of the existing Mon 23:xx UTC weekly block, right after the `35 23 * * 1` supercoach-settings line):
-      ```
-      # Weekly nrl.com players roster — Mondays 23:40 UTC = Tuesday 09:40 AEST.
-      # Walks the 17 NRL teams via refresh-all (1 req/sec; ~20s wall time).
-      # Profile data (DOB, position, image) changes slowly; weekly is right.
-      40 23 * * 1     ubuntu  /opt/jeromelu/scripts/scout-refresh.sh nrlcom-players-roster
-      ```
-
-**How to verify**
-
-- `bash -n scripts/scout-refresh.sh` → clean (syntax-only check, no execution).
-- Case simulation in a one-liner:
-  ```bash
-  for j in nrlcom-stats nrlcom-players-roster; do JOB=$j; case "$JOB" in nrlcom-stats) ENDPOINT="nrlcom-stats?competition=111&season=$(date -u +%Y)" ;; nrlcom-players-roster) ENDPOINT="nrlcom-players-roster/refresh-all?competition=111" ;; esac; echo "$j → $ENDPOINT"; done
-  ```
-  → emits `nrlcom-stats → nrlcom-stats?competition=111&season=2026` (or current year) and `nrlcom-players-roster → nrlcom-players-roster/refresh-all?competition=111`. The `&` stays inside the double-quoted `ENDPOINT` (the entire URL is passed via `curl -X POST "$API_URL"` so no shell backgrounding).
-- Both new cron lines: 5 timing fields + `ubuntu` + absolute path; no collision with existing slots (18:00/18:15/18:30/18:45 NRL.com block; Mon 23:00/23:15/23:30/23:35 weekly block; 16:30 pg-backup; 00:30 cron-report; 22:00/22:30 Mon content/disk).
-- `grep -n "cron.d/jeromelu" scripts/lightsail-deploy.sh` → the install/sync step still references the file (and so the new lines reach the box on the next deploy pull).
-- Cron-line correctness: `grep -E '^[0-9]+ [0-9]+ \* \* (\*|[0-9]+)' scripts/cron.d/jeromelu | wc -l` → previous count + 2.
-- **First scheduled fire is operator/time-gated** — defer the actual `/var/log/jeromelu/scout-refresh.log` confirmation to TASK-36 closure (mirrors Phase 4 TASK-26 deferral pattern). The TASK-36 seed exercises the endpoints end-to-end; this task only ships the scheduling.
-
-**Proof notes**
-
-_(in-flight scratchpad)_
-
----
-
 ### TASK-36 — prod seed + DB verification + docs (Phase 4.5 closure)
 
 **What**
