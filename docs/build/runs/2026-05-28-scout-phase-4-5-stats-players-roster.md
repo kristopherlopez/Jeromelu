@@ -1,6 +1,6 @@
 # Scout Phase 4.5 — nrl.com stats + players roster (D8 harden, schedule, seed)
 
-**Date:** 2026-05-28 · **Status:** 🟡 In flight (3 of 8 tasks shipped) · **Plan:** Scout Phase 4.5 (active — see [PLAN.md](../PLAN.md))
+**Date:** 2026-05-28 · **Status:** 🟡 In flight (4 of 8 tasks shipped) · **Plan:** Scout Phase 4.5 (active — see [PLAN.md](../PLAN.md))
 
 **TL;DR** — Phase 4.5 is a Phase 4-style hardening replay: both `services/api/app/scout/nrlcom_stats/` and `services/api/app/scout/nrlcom_players_roster/` ingest folders already exist with fetchers / routes / READMEs / make targets; migration `060_stat_leaderboards.sql` is applied; `populate_stat_leaderboards` is shipped and wired into `populate_db_from_s3.py` as `--phase leaderboards`; the lineage + catalogue docs already exist. What's missing is the D8 drift contract, extractor unit tests via pure-function refactor, cron scheduling, and prod seed verification. NRL only (comp 111), season 2026, forward-only — historical backfill stays Phase 5. SC Draft mode and folding `nrlcom_refresh.py` are explicitly scoped out (2026-05-28 planner interview).
 
@@ -40,6 +40,13 @@ Added `tests/unit/api/scout/nrlcom_players_roster/{__init__.py,test_models.py}` 
 
 **Proof:** `pytest tests/unit/api/scout/nrlcom_players_roster/test_models.py -v` → **4 passed in 2.01s**; `pytest tests/unit/api/scout/` → **73 passed** (was 69 post-TASK-30, +4, no regression); `python -c "from app.scout.nrlcom_players_roster.models import NrlcomPlayersRoster, ProfileGroup, Profile; print('ok')"` → `ok`. Route file confirmed untouched (TASK-32 boundary intact); no `teams.py` (TASK-33 boundary intact). **adversarial-reviewer: PASS WITH CONCERNS** — all non-blocking: (C1) README correction deferred to TASK-36 doc sweep, sanctioned by spec; (C2) identity fields declared `str | None` whereas casualty uses `str` non-null — defensible since no extractor enforces non-null this phase; flag for tightening if a future extractor lands; (C3) session-staging discipline reminder re: `services/web/.claude/` — honoured (explicit pathspec used at commit). **/simplify:** not run.
 
+### TASK-32 — nrlcom-players-roster: wire strict-parse into route + live drift test (`cee666c`)
+Wired the TASK-31 D8 contract into `services/api/app/scout/nrlcom_players_roster/routes.py` — line-for-line mirror of TASK-30 (nrlcom-stats route wiring). After `archive_response(...)` (raw to S3 first), `NrlcomPlayersRoster.model_validate(data)` + `detail["validated"] = True`, and an `except ValidationError → run.fail + HTTPException(500)` arm ordered **between** the existing `NrlcomPlayersFetchError → 502` arm and the generic `except Exception` arm; `NrlcomPlayersFetchError → 502` arm unchanged. Added `tests/integration/scout/nrlcom_players_roster/{__init__.py,test_response_shape.py}` — env-flagged (`SCOUT_DRIFT_LIVE=1`) live drift test templated on the TASK-30 nrlcom_stats integration test with `fetch_players_roster(competition=111, team=500011)` and a depth-2 sanity gate (`profileGroups[0].profiles[0]`).
+
+**Proof:** route imports clean (`PIPELINE=nrlcom-players-roster`); skip mode → **1 skipped** (exact reason); live mode → **1 passed in 2.43s** against real nrl.com; deliberate-break (`jersey_number: int` required, no default, on `Profile`) → live test **failed naming `jersey_number`** at the nested path `profileGroups.0.profiles.0.jersey_number` through `profileGroups.0.profiles.5.jersey_number` — proves the leaf-model strict-parse fires (single-branch coverage; players-roster has only one `profileGroups` scope, vs stats' `playerStats` + `teamStats`). Reverted; `git diff HEAD -- models.py` empty; post-revert live mode → 1 passed. Full scout unit suite → **73 passed** (no regression). **adversarial-reviewer: PASS WITH CONCERNS** — all non-blocking: (C1) run-report/TASKS.md sweep pending at review-time, handled in this checkoff; (C2) `services/web/.claude/` honoured via explicit pathspec; (C3) local end-to-end curl deferred to TASK-36 prod seed (same precedent as TASK-30); (C4) harness collision carry-over — run unit + integration tiers separately. **/simplify:** not run.
+
+**The `nrlcom_players_roster` per-team endpoint is now fully D8-hardened.** Server-side 17-team walk + refresh-all endpoint land in TASK-33; cron in TASK-35.
+
 ---
 
 ## How we know it's done (running)
@@ -50,7 +57,7 @@ Added `tests/unit/api/scout/nrlcom_players_roster/{__init__.py,test_models.py}` 
 - **`value: str | None` is stricter than the spec's `float | int | str | None` union.** Empirical reality: every leader in 347 observed has a string value. The strictness is a D8-aligned choice — a future native-number `value` becomes drift, which is the correct behaviour, not a silent acceptance.
 
 ## Outstanding (deferred — operator/time-gated and surfaced infra follow-ups)
-- ☐ **TASK-32 → TASK-36:** the remaining 5 tasks of Phase 4.5 (in the queue).
+- ☐ **TASK-33 → TASK-36:** the remaining 4 tasks of Phase 4.5 (in the queue).
 - ☐ **End-to-end `validated:true` in JSON response** — TASK-30's local curl proof was deliberately skipped (offline this turn, per spec). Confirmation lands at the TASK-36 prod seed (the route is proven-by-construction green live + red via the deliberate break).
 - ☐ **Tighten `Profile` identity-field types when an extractor lands** — TASK-31 ships `Profile.firstName`/`lastName`/`teamNickName` as `str | None` (no extractor reading them this phase). When a `/players/data` extractor is built in a future phase, types should tighten to `str` (non-null) for the load-bearing identity fields, matching the casualty precedent. Surfaced for visibility.
 - ☐ **README correction for nrlcom_players_roster** — `services/api/app/scout/nrlcom_players_roster/README.md` line 15 mislabels `TEAM=500011` as Storm; actual Storm id is `500021`. Folded into TASK-36's doc sweep.
@@ -60,4 +67,4 @@ Added `tests/unit/api/scout/nrlcom_players_roster/{__init__.py,test_models.py}` 
 _(populated as tasks ship)_
 
 ## Commits
-`068f37a` (planner kickoff — Phase 4.5 plan + 8 tasks queued, missed at the planner session boundary) · `f232c84` (TASK-29) · `bb84d28` (TASK-30) · `25f14ff` (TASK-31). Plus the per-task run-report/queue bookkeeping commits.
+`068f37a` (planner kickoff — Phase 4.5 plan + 8 tasks queued, missed at the planner session boundary) · `f232c84` (TASK-29) · `bb84d28` (TASK-30) · `25f14ff` (TASK-31) · `cee666c` (TASK-32). Plus the per-task run-report/queue bookkeeping commits.

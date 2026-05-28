@@ -25,33 +25,6 @@ Prefix the title with optional tags in square brackets:
 
 ## Open tasks
 
-### TASK-32 — nrlcom-players-roster: wire strict-parse into route + env-flagged live drift test
-
-**What**
-
-Wire the D8 contract from TASK-31 into the route. Pattern: TASK-30 line-for-line. See `PLAN.md` → `## 2026-05-28: Scout Phase 4.5` → Interface → *nrlcom-players-roster*.
-
-1. Modify `services/api/app/scout/nrlcom_players_roster/routes.py`:
-    - Add `from pydantic import ValidationError` and `from .models import NrlcomPlayersRoster`.
-    - After `detail["profiles"] = n_profiles`, add `NrlcomPlayersRoster.model_validate(data); detail["validated"] = True`.
-    - Add `except ValidationError as e:` arm between the existing `NrlcomPlayersFetchError → 502` arm and the generic `except Exception` arm; body raises `HTTPException(status_code=500, detail=f"nrl.com players-roster drift: {e}")` after `run.fail(...)`.
-    - Existing 502 + generic arms unchanged.
-2. Create `tests/integration/scout/nrlcom_players_roster/{__init__.py,test_response_shape.py}` mirroring `tests/integration/scout/nrlcom_casualty_ward/test_response_shape.py`; call `fetch_players_roster(competition=111, team=500011)`; sanity-assert `len(parsed.profileGroups) >= 1` and `len(parsed.profileGroups[0].profiles) >= 1`.
-
-**How to verify**
-
-- `python -c "from app.scout.nrlcom_players_roster.routes import PIPELINE; print(PIPELINE)"` → `nrlcom-players-roster`.
-- `pytest tests/integration/scout/nrlcom_players_roster/test_response_shape.py` → 1 skipped, exact reason text.
-- `SCOUT_DRIFT_LIVE=1 pytest tests/integration/scout/nrlcom_players_roster/test_response_shape.py` → 1 passed.
-- **Deliberate-break proof:** add `required_only_in_test: int` to the deepest D8-modelled level → live test fails naming it → revert; `git diff HEAD -- services/api/app/scout/nrlcom_players_roster/models.py` empty.
-- `pytest tests/unit/api/scout/` → no regression.
-
-**Proof notes**
-
-_(in-flight scratchpad)_
-
----
-
 ### TASK-33 — nrlcom-players-roster: refresh-all endpoint walking 17 NRL teams server-side
 
 **What**
