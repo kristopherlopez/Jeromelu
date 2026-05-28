@@ -17,16 +17,23 @@ Added `tests/unit/api/scout/nrlcom_casualty_ward/{__init__.py,test_models.py}` (
 
 **Proof:** `pytest tests/unit/api/scout/nrlcom_casualty_ward/test_models.py` → **4 passed**; full scout unit suite `pytest tests/unit/api/scout/` → **61 passed** (57 baseline + 4 new, no regression). Live shape verified before fixture capture: all 99 casualties share the identical 8-key set, no nulls/empties. **adversarial-reviewer: PASS WITH CONCERNS** — both non-blocking: (C1) `theme` left opaque per spec + draw precedent (extractor doesn't read it); (C2) PLAN wording floated an `expectedReturn`-null negative but the binding TASKS `What` named `teamNickname`, which is what shipped. **/simplify: no findings** (clean additive diff).
 
+### TASK-22 — casualty-ward: wire strict-parse into route + live drift test (`bf22976`)
+Wired the D8 contract into `services/api/app/scout/nrlcom_casualty_ward/routes.py`: after `archive_response(...)` (raw to S3 first), `NrlcomCasualtyWard.model_validate(data)` + `detail["validated"] = True`, and an `except ValidationError → run.fail + HTTPException(500)` arm ordered **before** the generic `except Exception`. Single-envelope abort-on-drift (the **draw** precedent, line-for-line equivalent), not the non-aborting per-match match-centre pattern; the `NrlcomCasualtyFetchError → 502` arm is unchanged. Added `tests/integration/scout/nrlcom_casualty_ward/{__init__.py,test_response_shape.py}` — env-flagged (`SCOUT_DRIFT_LIVE=1`) live drift test templated on the draw response-shape test.
+
+**Proof:** route imports clean (`PIPELINE=nrlcom-casualty-ward`); skip mode → **1 skipped** (exact reason "Set SCOUT_DRIFT_LIVE=1 …"); live mode → **1 passed** against real nrl.com; deliberate model-break (`is_replay: bool` added to `Casualty`) → live test **failed naming `is_replay`** ("Field required"), then reverted (`git diff HEAD -- models.py` empty); full scout unit suite → **61 passed** (no regression). The route's `validated:true`/500-on-drift is proven by construction (identical `model_validate`, exercised green live + red via the reverted break) per the Phase 3 TASK-08 proof level. **adversarial-reviewer: PASS WITH CONCERNS** — both non-blocking: (C1) `validated:true`/exception-ordering has no direct route-level unit test — proven by construction, a future route unit test would harden against refactor regressions (out of scope); (C2) the live-half proof rests on the recorded run, as the proof model intends. **/simplify: no findings.**
+
+**Harness note (not a defect):** running the unit + integration tiers in one `pytest` invocation triggers a same-package-name collection collision (both dirs hold a `nrlcom_casualty_ward` package) — a pre-existing structural pattern (draw has it too); CI runs the tiers separately, so it's a non-issue. Run tiers separately.
+
 ---
 
 ## How we know it's done (running)
-- Unit drift tests green in CI; the live drift test + route strict-parse land in TASK-22.
+- Unit drift tests green in CI; the live drift test runs under `SCOUT_DRIFT_LIVE=1`. Casualty-ward ingest is now D8-hardened (envelope + item strict-parse wired into the route).
 
 ## Decisions & deviations
 - **Casualty item modelled strictly (vs. draw/match-centre envelope-only).** Locked in the plan interview (2026-05-28): the casualty/ladder extractors are live and read nested fields by exact key, so item-level drift must fail loudly. `theme` stays opaque (not read by the extractor).
 
 ## Outstanding
-- TASK-22 → TASK-28 still open (route wiring + live drift ×2, ladder models + route, extractor unit tests, cron, prod seed + docs, worker-scraper retirement).
+- TASK-23 → TASK-28 still open (ladder models + route, extractor unit tests, cron, prod seed + docs, worker-scraper retirement).
 
 ## Commits
-`cb408c6` (TASK-21). Plus the per-task run-report/queue bookkeeping commit.
+`cb408c6` (TASK-21) · `bf22976` (TASK-22). Plus the per-task run-report/queue bookkeeping commits.
