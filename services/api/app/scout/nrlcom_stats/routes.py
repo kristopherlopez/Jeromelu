@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from ...deps import get_db
@@ -13,6 +14,7 @@ from ...routers.admin import require_admin
 from ..common.archive import archive_response
 from ..common.pipeline_run import set_archive_detail, start_deterministic_run
 from .fetcher import NrlcomStatsFetchError, fetch_stats
+from .models import NrlcomStats
 
 logger = logging.getLogger(__name__)
 
@@ -46,11 +48,22 @@ def run_nrlcom_stats(
             "player_stat_groups": len(data.get("playerStats", [])),
             "team_stat_groups": len(data.get("teamStats", [])),
         })
+        # D8: strict-parse the archived response so upstream shape drift
+        # surfaces as a failed run. The raw payload is already in S3 above,
+        # so a validation failure never loses the capture.
+        NrlcomStats.model_validate(data)
+        detail["validated"] = True
         logger.info("scout/nrlcom-stats: comp=%s season=%s s3=%s",
                     competition, season, archive_key)
     except NrlcomStatsFetchError as e:
         run.fail(e, summary_text=f"Upstream fetch failed: {e}")
         raise HTTPException(status_code=502, detail=f"stats fetch failed: {e}")
+    except ValidationError as e:
+        run.fail(
+            e,
+            summary_text=f"Stats response failed strict validation (drift): {e}",
+        )
+        raise HTTPException(status_code=500, detail=f"nrl.com stats drift: {e}")
     except Exception as e:
         run.fail(e, summary_text=f"Pipeline failed: {e}")
         raise
