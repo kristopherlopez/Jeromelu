@@ -25,41 +25,6 @@ Prefix the title with optional tags in square brackets:
 
 ## Open tasks
 
-### TASK-29 — nrlcom-stats: D8 strict models (envelope + 3 nested) + fixture + unit drift tests
-
-**What**
-
-Implements the D8 drift contract for the `nrlcom-stats` pipeline. See `PLAN.md` → `## 2026-05-28: Scout Phase 4.5` → Interface → *nrlcom-stats*.
-
-1. Capture a live response for the canonical fixture: hit `https://www.nrl.com/stats/data?competition=111&season=2026` (the existing `app.scout.nrlcom_stats.fetcher.fetch_stats` already does this — call it from a one-shot Python REPL with the api venv active and dump the result), redact nothing, write the raw JSON pretty-printed to `tests/fixtures/scout/nrlcom_stats/canonical_response.json`. Record the actually-observed envelope key set, category-level key set, subgroup-level key set, and leader-level key set in your scratch notes — these drive the model shape.
-2. Create `services/api/app/scout/nrlcom_stats/models.py` with four strict `BaseModel`s (`model_config = ConfigDict(extra="forbid")`):
-    - `NrlcomStats` — `playerStats: list[StatCategory]`, `teamStats: list[StatCategory]`, plus every other top-level key observed live (each typed per its observed value; opaque lists/objects → `list[Any]` / `dict[str, Any]`).
-    - `StatCategory` — `title: str` (load-bearing: the `category` DB column reads it), `groups: list[StatSubgroup]`, plus the rest of category-level keys observed live as required-present-but-nullable (the `NrlcomDraw.disclaimer` convention).
-    - `StatSubgroup` — `title: str` (load-bearing: the `subgroup`/`stat_title` DB columns read it), `statId: int | None`, `leaders: list[StatLeader]`, plus other observed keys required-present-but-nullable.
-    - `StatLeader` — `firstName: str | None`, `lastName: str | None`, `teamNickName: str | None`, `teamName: str | None`, `playerId: int | None`, `value: float | int | str | None` (extractor coerces to float; tolerate the upstream's native type), plus other observed leader-level keys required-present-but-nullable.
-   `__all__ = ["NrlcomStats", "StatCategory", "StatSubgroup", "StatLeader"]`. Add a module docstring per `nrlcom_ladder/models.py`'s precedent explaining why the model goes 4 levels deep (= the depth the extractor reads).
-3. Create `tests/unit/api/scout/nrlcom_stats/__init__.py` (empty) and `tests/unit/api/scout/nrlcom_stats/test_models.py` mirroring `tests/unit/api/scout/nrlcom_casualty_ward/test_models.py` exactly — 4 tests:
-    - `test_canonical_fixture_parses` — asserts `len(parsed.playerStats) >= 1`, `len(parsed.teamStats) >= 1`, and at least one populated `leaders[]` end-to-end.
-    - `test_unknown_top_level_field_raises` — `bad["loot_boxes"] = {}` → `ValidationError` mentioning `loot_boxes`.
-    - `test_unknown_leader_field_raises` — `bad["playerStats"][0]["groups"][0]["leaders"][0]["is_retired"] = True` → `ValidationError` mentioning `is_retired`.
-    - `test_missing_required_category_title_raises` — `del bad["playerStats"][0]["title"]` → `ValidationError` mentioning `title`.
-
-Do NOT touch `routes.py` in this task — that lands in TASK-30.
-
-**How to verify**
-
-- `pytest tests/unit/api/scout/nrlcom_stats/test_models.py -v` → 4 passed.
-- `pytest tests/unit/api/scout/` → all green, no regression vs. the post-Phase-4 baseline (102 passed).
-- The fixture file exists, is pretty-printed JSON, and contains at least one entry in each of `playerStats`, `teamStats`, `playerStats[0].groups`, `playerStats[0].groups[0].leaders`.
-- `python -c "from app.scout.nrlcom_stats.models import NrlcomStats, StatCategory, StatSubgroup, StatLeader; print('ok')"` → `ok`.
-- `git diff --cached --stat` before commit: only the 4 new/modified files (`models.py`, fixture, `__init__.py`, `test_models.py`) plus the `TASKS.md`/run-report bookkeeping that happens at checkoff.
-
-**Proof notes**
-
-_(in-flight scratchpad; authoritative proof lands in the run report at checkoff)_
-
----
-
 ### TASK-30 — nrlcom-stats: wire strict-parse into route + env-flagged live drift test
 
 **What**
