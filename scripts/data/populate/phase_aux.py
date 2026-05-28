@@ -480,20 +480,26 @@ def populate_injuries(
                 {"pid": person_id, "tid": team_id, "desc": canonical},
             ).first()
             if existing:
-                # Update expected return if changed
+                # Update expected return if changed. Build the jsonb patch in
+                # Python and merge with `||` — same pattern the INSERT below
+                # uses for `metadata_json` (`CAST(:meta AS JSONB)`). The
+                # alternative — `jsonb_build_object(...)` with bound `:text` /
+                # `:snap` — fails on psycopg under prepared-statement binding
+                # because variadic `"any"` can't infer parameter types
+                # (`could not determine data type of parameter $2`).
                 db.execute(
                     text("""
                         UPDATE injuries
                         SET expected_return_round = :rr,
-                            metadata_json = metadata_json
-                                || jsonb_build_object('expected_return_text', :text,
-                                                      'last_seen_snapshot', :snap)
+                            metadata_json = metadata_json || CAST(:patch AS JSONB)
                         WHERE injury_id = :iid
                     """),
                     {
                         "rr": ret_round,
-                        "text": return_text,
-                        "snap": snap_date.isoformat(),
+                        "patch": json.dumps({
+                            "expected_return_text": return_text,
+                            "last_seen_snapshot": snap_date.isoformat(),
+                        }),
                         "iid": existing[0],
                     },
                 )

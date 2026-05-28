@@ -73,12 +73,16 @@ The two capture pipelines that feed the wiki's match data. **Ingest shipped 2026
 
 Phase 3.5 unblocks: every team page's `## Recent Results`, every round page's `## Team Lists` + `## Results`, and every player page's per-match history including timeline events (try at 53', sin bin, etc.). Phase 3 (ingest) is the S3-archived, drift-protected foundation those extractors read.
 
-### Phase 4 — NRL.com casualty ward + ladder (~half a day each) — In design
+### Phase 4 — NRL.com casualty ward + ladder ✅ Shipped (2026-05-28; worker-scraper retirement pending TASK-28)
 
-- New `scout/nrlcom_casualty_ward/` — daily snapshot of the official league injury roll. Writes S3 with timestamped key (state changes daily). DB extractor populates `injuries`.
-- New `scout/nrlcom_ladder/` — per-round team standings + the 22 per-team metrics (form, streak, points-for/against, home/away/day/night records, average margins). DB extractor populates `team_standings` (new table).
+D8-hardened ingest (envelope **and** item/stats strict — deeper than draw/match-centre because the extractors are live), scheduled daily, seeded to prod, extractors unit-tested. NRL only (comp 111), season 2026, forward-only — historical backfill is Phase 5.
 
-Retire `services/worker-scraper/` at the end of this phase — no Scout work runs through it anymore.
+- ✅ Shipped: `scout/nrlcom_casualty_ward/` — `/casualty-ward/data?competition=111` → timestamped S3 key (`scout/nrlcom/casualty-ward/111/{YYYYMMDD}.json`); `NrlcomCasualtyWard` + `Casualty` D8 models (`extra="forbid"`); strict-parse wired into the route (drift → 500); daily cron 18:30 UTC. Live drift test under `SCOUT_DRIFT_LIVE=1`. Seeded 2026-05-28 (99 casualties; `validated:true` live).
+- ✅ Shipped: `scout/nrlcom_ladder/` — `/ladder/data?competition=111&season=Y` → `scout/nrlcom/ladder/111/{season}/round-{NN}.json`; `NrlcomLadder` + `LadderPosition` + `LadderStats` D8 models (the 22 metrics use space-separated upstream keys mapped via `Field(alias=...)` with `populate_by_name=True`); strict-parse wired into the route; daily cron 18:45 UTC. Seeded 2026-05-28 (17 teams, round 12; `validated:true` live).
+- ✅ Shipped: DB extractors `populate_injuries` (state-machine over daily snapshots → `injuries`) and `populate_team_standings` (UPSERT per `(team, comp, season, round)` → `team_standings`) in `scripts/data/populate/phase_aux.py`, with pure-function unit tests (`tests/unit/scripts/data/populate/test_phase_aux.py`). Latent `jsonb_build_object` parameter-typing bug in the injuries UPDATE branch fixed during seed verification (surfaced on the first real-archive run). Prod DB post-seed: `team_standings` 51 rows / 94% team_id resolution; `injuries` 130 rows / 99 open / 93% team_id resolution.
+- ☐ Outstanding: retire `services/worker-scraper/` (Phase 4 closure, TASK-28).
+
+**Follow-up (cross-cutting, surfaced — not self-queued):** the extractors stay **manual / backfill-driven** for now (the Phase 3.5 precedent), so the daily ingest cron archives to S3 but the DB only refreshes when an operator runs `populate_db_from_s3`. The same gap applies to the Phase 3.5 match-centre extractors. The durable fix — bake `scripts/` + `packages/shared` into the api image (or a managed ops venv) so a scheduled `docker exec jeromelu-api python -m scripts.data.populate_db_from_s3 …` just works — is an infra decision for the human/planner.
 
 ### Phase 4.5 — NRL.com stats + players roster + Draft mode (optional) — Backlog
 

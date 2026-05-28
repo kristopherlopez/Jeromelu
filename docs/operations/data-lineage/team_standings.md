@@ -14,7 +14,7 @@ tags: [area/operations, data-lineage]
 
 ## Extractor
 
-`scripts/data/populate/phase_aux.py` — `populate_team_standings()`. Walks `scout/nrlcom/ladder/{competition}/...`, idempotent UPSERT on `(nrlcom_team_nickname, competition, season, round)`. ~481 rows shipped.
+`scripts/data/populate/phase_aux.py` — `populate_team_standings()` (with the pure `_extract_standing_rows(...)` test seam, unit-tested in `tests/unit/scripts/data/populate/test_phase_aux.py`). Walks `scout/nrlcom/ladder/{competition}/...`, idempotent UPSERT on `(nrlcom_team_nickname, competition, season, round)`. 51 rows for 2026 / comp 111 across 3 captured rounds after the 2026-05-28 seed (94% team_id resolution); historical seasons remain Phase 5 backfill scope.
 
 ## Field mapping
 

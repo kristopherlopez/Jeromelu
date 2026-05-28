@@ -42,6 +42,32 @@ match-centre fixtures (`tests/fixtures/scout/nrlcom_match_centre/`). The phase's
 `populate_*` function builds the maps from the DB, calls the pure extractor, and
 UPSERTs the rows.
 
+## The nrl.com casualty-ward + ladder phases (Phase 4)
+
+`phase_aux.py` writes the two Phase 4 tables. Same pure-seam discipline as
+Phase 3.5 — the mapping is testable without S3/DB; the caller does the DB work.
+
+| Phase module function | Reads | Writes | Pure extractor (test seam) |
+|---|---|---|---|
+| `populate_team_standings` | `scout/nrlcom/ladder/{comp}/*` | `team_standings` (UPSERT per `(team, comp, season, round)`) | `_extract_standing_rows(payload, key, competition, season, round_no, team_map)` |
+| `populate_injuries` | `scout/nrlcom/casualty-ward/{comp}/*` (chronological) | `injuries` (state machine: open/close/UPDATE) | `_casualty_to_row(c, team_map, people_lookup)`, `_bucket_status(text, current_round)` |
+
+The injuries extractor is a state machine — it walks daily snapshots in order,
+opens new rows for unseen casualties, UPDATEs `metadata_json` for casualties
+still present, and SETs `resolved_at` on rows whose `(name, team_nick)` no
+longer appears today. The state-machine SQL stays inline in `populate_injuries`;
+the **field-mapping** (resolve `team_id`/`person_id`, parse `expected_return`)
+and the **status bucketing** are the pure seams.
+
+> **Gotcha (fixed 2026-05-28):** the injuries UPDATE branch originally used
+> `jsonb_build_object('expected_return_text', :text, 'last_seen_snapshot', :snap)`
+> with bound parameters. psycopg under prepared-statement binding can't infer
+> the parameter type through `variadic "any"` and fails with `could not
+> determine data type of parameter $2`. The fix mirrors the INSERT pattern: build
+> the JSON patch in Python via `json.dumps(...)` and merge with
+> `metadata_json || CAST(:patch AS JSONB)`. Surfaced on the first real-archive
+> run during the Phase 4 seed.
+
 ## `--dry-run`
 
 Fixed 2026-05-24 (was the META known-bug — phases committed internally before

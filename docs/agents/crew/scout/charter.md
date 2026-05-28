@@ -51,8 +51,8 @@ Pipeline inventory after full source enumeration (2026-05-12). Each row is a fol
 |---|---|---|---|---|
 | `scout/nrlcom_draw/` | `/draw/data?competition={N}&season={Y}&round={N}` | `nrlcom/draw/{comp}/{season}/round-{NN}.json` | `matches` (fixtures), `rounds` (round metadata derived) | ✅ ingest shipped (Phase 3); extraction → Phase 3.5 |
 | `scout/nrlcom_match_centre/` | `/draw/{league}/{season}/round-{N}/{slug}/data/` per match | `nrlcom/match-centre/{comp}/{season}/round-{NN}/{slug}.json` | `match_team_lists`, `player_match_stats` (new), `match_timeline` (new), `match_officials` (new), augments `matches` | ✅ ingest shipped (Phase 3); extraction → Phase 3.5 |
-| `scout/nrlcom_casualty_ward/` | `/casualty-ward/data?season={Y}` | `nrlcom/casualty-ward/{comp}/{YYYYMMDD}.json` | `injuries` | 🟡 not built — Phase 4 |
-| `scout/nrlcom_ladder/` | `/ladder/data?competition={N}&season={Y}[&round={N}]` | `nrlcom/ladder/{comp}/{season}/round-{NN}.json` | `team_standings` (new) | 🟡 not built — Phase 4 |
+| `scout/nrlcom_casualty_ward/` | `/casualty-ward/data?competition={N}` | `nrlcom/casualty-ward/{comp}/{YYYYMMDD}.json` | `injuries` | ✅ shipped (Phase 4) — D8 envelope+item strict, daily cron, extractor live |
+| `scout/nrlcom_ladder/` | `/ladder/data?competition={N}&season={Y}[&round={N}]` | `nrlcom/ladder/{comp}/{season}/round-{NN}.json` | `team_standings` | ✅ shipped (Phase 4) — D8 envelope+position+stats strict (alias-mapped), daily cron, extractor live |
 | `scout/nrlcom_stats/` | `/stats/data?competition={N}&season={Y}` | `nrlcom/stats/{comp}/{season}.json` | `stat_leaderboards` (new) | 🟡 not built — Phase 4.5 |
 | `scout/nrlcom_players_roster/` | `/players/data?competition={N}&team={team_id}` | `nrlcom/players-roster/{comp}/{team_slug}.json` | Enriches `people` with NRL.com profile fields | 🟡 partially exists in `jeromelu_shared/players/nrlcom_refresh.py`; needs folder-organise + S3-first |
 
@@ -127,7 +127,7 @@ A future Phase 5 could replace external cron with an in-process APScheduler if c
 
 ### D4. Disposition of `services/worker-scraper/`
 
-**Decision (locked): migrate the activities into per-pipeline folders under `services/api/app/scout/` per D9; retire the Temporal worker.** Per project memory, Temporal is not in production. The activities (`teamlists.py` and any siblings) become module-level functions inside the relevant pipeline folder (`scout/nrlcom_teamlists/fetcher.py`, etc.), called from admin endpoints under the unified Scout audit pattern. The `worker-scraper` directory stays in tree for a phase, with no new code, and is retired in Phase 4.
+**Decision (locked): migrate the activities into per-pipeline folders under `services/api/app/scout/` per D9; retire the Temporal worker.** Per project memory, Temporal is not in production. The activities (`teamlists.py` and any siblings) become module-level functions inside the relevant pipeline folder (`scout/nrlcom_teamlists/fetcher.py`, etc.), called from admin endpoints under the unified Scout audit pattern. The `worker-scraper` directory stays in tree for a phase, with no new code, and is retired in Phase 4. **Status (2026-05-28):** directory is orphaned (no code, compose, CI, or deploy-script references); retirement (delete the directory + doc sweep) is queued as Phase 4 / TASK-28.
 
 ### D5. Skills disposition
 
@@ -326,8 +326,8 @@ After backfill: future cron only writes new (current-season, current-round) snap
 | Extractor | Reads | Writes to DB |
 |---|---|---|
 | `extract_matches` | `scout/nrlcom/draw/*` + `scout/nrlcom/match-centre/*` | `matches`, `match_team_lists`, `player_match_stats` (new), `match_timeline` (new), `match_officials` (new) |
-| `extract_injuries` | `scout/nrlcom/casualty-ward/*` | `injuries` |
-| `extract_ladder` | `scout/nrlcom/ladder/*` | `team_standings` (new) |
+| `scripts/data/populate/phase_aux.py:populate_injuries` (shipped Phase 4) | `scout/nrlcom/casualty-ward/*` | `injuries` (state-machine: open / UPDATE / SET resolved_at) |
+| `scripts/data/populate/phase_aux.py:populate_team_standings` (shipped Phase 4) | `scout/nrlcom/ladder/*` | `team_standings` |
 | `extract_stat_leaderboards` | `scout/nrlcom/stats/*` | `stat_leaderboards` (new) |
 | `extract_roster_identity` | `scout/supercoach/classic/players-cf/*` | `people`, `player_attributes`, `people_roles` (current Phase 1 path — moves to read-from-S3 instead of read-from-upstream) |
 | `extract_editorial_claims` | `scout/supercoach/classic/players-cf/*` (the `notes[]` slice) | `claims`, `quotes`, `claim_associations` |

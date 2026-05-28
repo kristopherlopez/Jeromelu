@@ -54,4 +54,4 @@ Resolution:
 
 ## Coverage
 
-98 active injuries as of last population (single daily snapshot in S3). Once daily cadence builds up, append-on-change writes are minimal (only diffs).
+99 active (open) casualty-ward injuries as of the 2026-05-28 seed (130 total rows; 31 closed by the state machine using the prior 2026-05-12 snapshot). Daily cron (18:30 UTC) builds the append-on-change timeline going forward; once it accumulates, INSERTs are rare — most days just stamp `metadata_json.last_seen_snapshot` on existing open rows. Team-id resolution rate ~93%.
