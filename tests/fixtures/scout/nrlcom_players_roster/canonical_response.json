@@ -1,0 +1,1455 @@
+{
+  "filterCompetitions": [
+    {
+      "name": "Telstra Premiership",
+      "value": 111,
+      "theme": {
+        "key": "nrl-premiership",
+        "logos": {
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Telstra Women's Premiership",
+      "value": 161,
+      "theme": {
+        "key": "nrl-womens-premiership",
+        "logos": {
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Harvey Norman All Stars",
+      "value": 145,
+      "theme": {
+        "key": "harvey-norman-all-stars",
+        "logos": {
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Harvey Norman Women's All Stars",
+      "value": 169,
+      "theme": {
+        "key": "harvey-norman-all-stars",
+        "logos": {
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Ampol State of Origin",
+      "value": 116,
+      "theme": {
+        "key": "state-of-origin",
+        "logos": {
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202302142204"
+        }
+      }
+    },
+    {
+      "name": "Ampol Women’s State of Origin",
+      "value": 156,
+      "theme": {
+        "key": "womens-state-of-origin",
+        "logos": {
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202405030608"
+        }
+      }
+    },
+    {
+      "name": "Pacific Championships",
+      "value": 195,
+      "theme": {
+        "key": "pacific-championships",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Pacific Championships Women",
+      "value": 196,
+      "theme": {
+        "key": "pacific-championships",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Internationals",
+      "value": 133,
+      "theme": {
+        "key": "internationals",
+        "logos": {
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Womenʼs Internationals",
+      "value": 135,
+      "theme": {
+        "key": "internationals",
+        "logos": {
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Rugby League World Cup",
+      "value": 131,
+      "theme": {
+        "key": "world-cup-2021",
+        "logos": {
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Women's Rugby League World Cup",
+      "value": 157,
+      "theme": {
+        "key": "world-cup-2021",
+        "logos": {
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Wheelchair Rugby League World Cup",
+      "value": 130,
+      "theme": {
+        "key": "world-cup-2021",
+        "logos": {
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Hostplus Cup",
+      "value": 114,
+      "theme": {
+        "key": "qrl-premiership",
+        "logos": {
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "The Knock On Effect NSW Cup",
+      "value": 113,
+      "theme": {
+        "key": "nsw-cup",
+        "logos": {
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "NRL Nines",
+      "value": 117,
+      "theme": {
+        "key": "nrl-nines",
+        "logos": {
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "NRL Womens Nines",
+      "value": 178,
+      "theme": {
+        "key": "nrl-nines",
+        "logos": {
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "State of Origin U19s",
+      "value": 183,
+      "theme": {
+        "key": "state-of-origin-u19s",
+        "logos": {
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Women's State of Origin U19s",
+      "value": 184,
+      "theme": {
+        "key": "womens-state-of-origin-u19s",
+        "logos": {
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452"
+        }
+      }
+    }
+  ],
+  "filterTeams": [
+    {
+      "name": "Broncos",
+      "value": 500011,
+      "theme": {
+        "key": "broncos",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202603200353",
+          "badge-light.png": "202603200353",
+          "badge-light.svg": "202603200353",
+          "badge.png": "202603200353",
+          "badge.svg": "202603200353",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202603200353",
+          "silhouette.svg": "202603200353",
+          "text.svg": "202603200353",
+          "badge-basic24-light.svg": "202603200353"
+        }
+      }
+    },
+    {
+      "name": "Bulldogs",
+      "value": 500010,
+      "theme": {
+        "key": "bulldogs",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202510310458",
+          "badge.png": "202510310458",
+          "badge.svg": "202510310458",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202510310458",
+          "silhouette.svg": "202510310458",
+          "text.svg": "202605110452",
+          "badge-light.svg": "202510310458",
+          "badge-light.png": "202510310458"
+        }
+      }
+    },
+    {
+      "name": "Cowboys",
+      "value": 500012,
+      "theme": {
+        "key": "cowboys",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Dolphins",
+      "value": 500723,
+      "theme": {
+        "key": "dolphins",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Dragons",
+      "value": 500022,
+      "theme": {
+        "key": "dragons",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202602250432",
+          "badge.svg": "202602250432",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452",
+          "badge-light.svg": "202602250432",
+          "badge-light.png": "202602250432"
+        }
+      }
+    },
+    {
+      "name": "Eels",
+      "value": 500031,
+      "theme": {
+        "key": "eels",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Knights",
+      "value": 500003,
+      "theme": {
+        "key": "knights",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Panthers",
+      "value": 500014,
+      "theme": {
+        "key": "panthers",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Rabbitohs",
+      "value": 500005,
+      "theme": {
+        "key": "rabbitohs",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Raiders",
+      "value": 500013,
+      "theme": {
+        "key": "raiders",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Roosters",
+      "value": 500001,
+      "theme": {
+        "key": "roosters",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Sea Eagles",
+      "value": 500002,
+      "theme": {
+        "key": "sea-eagles",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202510300111",
+          "badge.png": "202605110452",
+          "badge.svg": "202510300111",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Sharks",
+      "value": 500028,
+      "theme": {
+        "key": "sharks",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Storm",
+      "value": 500021,
+      "theme": {
+        "key": "storm",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Titans",
+      "value": 500004,
+      "theme": {
+        "key": "titans",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Warriors",
+      "value": 500032,
+      "theme": {
+        "key": "warriors",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Wests Tigers",
+      "value": 500023,
+      "theme": {
+        "key": "wests-tigers",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    }
+  ],
+  "selectedCompetitionId": 111,
+  "selectedTeamId": 500011,
+  "profileGroups": [
+    {
+      "title": "",
+      "profiles": [
+        {
+          "firstName": "Adam",
+          "lastName": "Reynolds",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Halfback",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Reynolds.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/adam-reynolds/"
+        },
+        {
+          "firstName": "Antonio",
+          "lastName": "Verhoeven",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Centre",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Verhoeven%2CA%20Headshot%2007.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/antonio-verhoeven/"
+        },
+        {
+          "firstName": "Aublix",
+          "lastName": "Tawha",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Centre",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Tawha.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/aublix-tawha/"
+        },
+        {
+          "firstName": "Ben",
+          "lastName": "Hunt",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Halfback",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/B%20Hunt.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/ben-hunt/"
+        },
+        {
+          "firstName": "Deine",
+          "lastName": "Mariner",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Centre",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Mariner.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/deine-mariner/"
+        },
+        {
+          "firstName": "Delouise",
+          "lastName": "Hoeter",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Centre",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Hoeter.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/delouise-hoeter/"
+        },
+        {
+          "firstName": "Ezra",
+          "lastName": "Mam",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Five-Eighth",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Mam.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/ezra-mam/"
+        },
+        {
+          "firstName": "Gehamat",
+          "lastName": "Shibasaki",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Winger",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Shibasaki.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/gehamat-shibasaki/"
+        },
+        {
+          "firstName": "Grant",
+          "lastName": "Anderson",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Centre",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Anderson.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/grant-anderson/"
+        },
+        {
+          "firstName": "Hayze",
+          "lastName": "Perham",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Fullback",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Perham.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/hayze-perham/"
+        },
+        {
+          "firstName": "Jesse",
+          "lastName": "Arthars",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Centre",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Arthars.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/jesse-arthars/"
+        },
+        {
+          "firstName": "Josh",
+          "lastName": "Rogers",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Five-Eighth",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Rogers.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/josh-rogers/"
+        },
+        {
+          "firstName": "Josiah",
+          "lastName": "Karapani",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Centre",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Karapani.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/josiah-karapani/"
+        },
+        {
+          "firstName": "Kane",
+          "lastName": "Bradley",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Winger",
+          "bodyImage": "/Resources/Images/fallback/body-shot.png?preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/kane-bradley/"
+        },
+        {
+          "firstName": "Kotoni",
+          "lastName": "Staggs",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Centre",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Staggs.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/kontoni-staggs/"
+        },
+        {
+          "firstName": "Phillip",
+          "lastName": "Coates",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Winger",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Coates.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/phillip-coates/"
+        },
+        {
+          "firstName": "Reece",
+          "lastName": "Walsh",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Fullback",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Walsh.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/reece-walsh/"
+        },
+        {
+          "firstName": "Thomas",
+          "lastName": "Duffy",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Halfback",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Duffy.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/thomas-duffy/"
+        },
+        {
+          "firstName": "Ben",
+          "lastName": "Talty",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Prop",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Talty.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/ben-talty/"
+        },
+        {
+          "firstName": "Benjamin",
+          "lastName": "Te Kura",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Prop",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Te%20Kura.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/benjamin-te-kura/"
+        },
+        {
+          "firstName": "Billy",
+          "lastName": "Walters",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Hooker",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Walters.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/billy-walters/"
+        },
+        {
+          "firstName": "Blake",
+          "lastName": "Mozer",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Hooker",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Mozer.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/blake-mozer/"
+        },
+        {
+          "firstName": "Brendan",
+          "lastName": "Piakura",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "2nd Row",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Piakura.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/brendan-piakura/"
+        },
+        {
+          "firstName": "Cameron",
+          "lastName": "Bukowski",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Hooker",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Bukowski.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/cameron-bukowski/"
+        },
+        {
+          "firstName": "Corey",
+          "lastName": "Jensen",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Prop",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Jensen.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/corey-jensen/"
+        },
+        {
+          "firstName": "Cory",
+          "lastName": "Paix",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Hooker",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Paix.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/cory-paix/"
+        },
+        {
+          "firstName": "Jack",
+          "lastName": "Gosiewski",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "2nd Row",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Gosiewski.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/jack-gosiewski/"
+        },
+        {
+          "firstName": "Jaiyden",
+          "lastName": "Hunt",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Prop",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/J%20Hunt.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/jaiyden-hunt/"
+        },
+        {
+          "firstName": "Jordan",
+          "lastName": "Riki",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "2nd Row",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Riki.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/jordan-riki/"
+        },
+        {
+          "firstName": "Patrick",
+          "lastName": "Carrigan",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Lock",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Carrigan.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/patrick-carrigan/"
+        },
+        {
+          "firstName": "Payne",
+          "lastName": "Haas",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Prop",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Haas.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/payne-haas/"
+        },
+        {
+          "firstName": "Preston",
+          "lastName": "Riki",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "2nd Row",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/P%20Riki.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/preston-riki/"
+        },
+        {
+          "firstName": "Va'a",
+          "lastName": "Semu",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Prop",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Semu.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/vaa-semu/"
+        },
+        {
+          "firstName": "Xavier",
+          "lastName": "Willison",
+          "teamNickName": "Broncos",
+          "theme": {
+            "key": "broncos",
+            "logos": {
+              "badge-basic24-mono.svg": "202605110452",
+              "badge-basic24.svg": "202603200353",
+              "badge-light.png": "202603200353",
+              "badge-light.svg": "202603200353",
+              "badge.png": "202603200353",
+              "badge.svg": "202603200353",
+              "header-background.png": "202605110452",
+              "header-background.svg": "202605110452",
+              "silhouette.png": "202603200353",
+              "silhouette.svg": "202603200353",
+              "text.svg": "202603200353",
+              "badge-basic24-light.svg": "202603200353"
+            }
+          },
+          "position": "Prop",
+          "bodyImage": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Willison.png?center=0.5%2C0.5&preset=player-profile-small",
+          "url": "/players/nrl-premiership/broncos/xavier-willison/"
+        }
+      ]
+    }
+  ],
+  "isClubSite": false
+}
