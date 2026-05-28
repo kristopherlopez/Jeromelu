@@ -50,6 +50,17 @@ MAILTO=""
 # round's fixtures, archives each match's full JSON. Round resolved server-side.
 15 18 * * *     ubuntu  /opt/jeromelu/scripts/scout-refresh.sh nrlcom-match-centre
 
+# Daily nrl.com casualty-ward snapshot — 18:30 UTC = 04:30 AEST. Captures the
+# official league injury roll for NRL (111). Timestamped S3 key per day
+# (scout/nrlcom/casualty-ward/111/{YYYYMMDD}.json) — preserves the daily
+# timeline the injuries state-machine extractor replays. No season param.
+30 18 * * *     ubuntu  /opt/jeromelu/scripts/scout-refresh.sh nrlcom-casualty-ward
+
+# Daily nrl.com ladder snapshot — 18:45 UTC = 04:45 AEST. Current-round team
+# standings + the 22 per-team metrics for NRL (111), current season. Archives
+# scout/nrlcom/ladder/111/{season}/round-NN.json (round resolved server-side).
+45 18 * * *     ubuntu  /opt/jeromelu/scripts/scout-refresh.sh nrlcom-ladder
+
 # Nightly Postgres backup — 16:30 UTC = 02:30 AEST / 03:30 AEDT.
 # Streams pg_dump from the postgres container to s3://jeromelu-public-assets/
 # backups/postgres/. Retention via S3 lifecycle (14d). The wrapper writes its
