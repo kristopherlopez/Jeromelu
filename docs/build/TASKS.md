@@ -25,52 +25,6 @@ Prefix the title with optional tags in square brackets:
 
 ## Open tasks
 
-### TASK-40: `scout_backfill.py` — `--archive-only` + `--resume` + key-derivation table + unit tests
-
-**What.** Per [PLAN.md "Scout Phase 5"](./PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance) Interface §5.
-
-Harden `scripts/data/scout_backfill.py`:
-
-1. **New CLI flags:**
-   - `--archive-only` (default False; passes `archive_only=true` to every POST URL).
-   - `--resume` (default False; HEAD-skip if expected S3 key present).
-   - `--force` (default False; if `--resume` is set, `--force` overrides and re-POSTs anyway).
-   - `--bucket` (default from `S3_CLEAN_BUCKET` env, falls back to `"jeromelu-clean-documents"`).
-
-2. **S3 key derivation table** `S3_KEY_FN: dict[str, Callable]`:
-   - `"nrlcom-draw"` → `lambda comp, season, round: f"scout/nrlcom/draw/{comp}/{season}/round-{round:02d}.json"`
-   - `"nrlcom-ladder"` → analogous
-   - `"nrlcom-stats"` → `lambda comp, season, round: f"scout/nrlcom/stats/{comp}/{season}.json"` (round ignored)
-   - `"supercoach-stats"` → `lambda comp, season, round: f"nrlsupercoachstats/stats/{season}/round-{round:02d}.json"`
-   - For sources without an entry in `S3_KEY_FN` (`nrlcom-match-centre` and the SC siblings), `--resume` does a PREFIX LIST instead — for match-centre: `boto3.client('s3').list_objects_v2(Bucket=..., Prefix=f"scout/nrlcom/match-centre/{comp}/{season}/round-{round:02d}/", MaxKeys=1)` and skip if the response carries any `Contents`. For SC siblings, `--resume` is a no-op (logged once at startup).
-
-3. **Loop integration:**
-   - Before each POST, if `args.resume and not args.force`: compute expected key (or LIST), HEAD/LIST, skip with `print(f"SKIP {label} (S3 exists at {key})", file=sys.stderr)` if present.
-   - URL composition: when `args.archive_only`, append `&archive_only=true` to params dict.
-
-4. **Lazy boto3 import** — only imported when `--resume` is set, so the default codepath has no new runtime dep.
-
-5. **Updated docstring** describes the new flags + concrete examples for backfill (`--archive-only --resume`) vs daily cron (no flags).
-
-6. **Unit tests** `tests/unit/scripts/data/test_scout_backfill.py` (new):
-   - `test_url_includes_archive_only_when_flag_set` — mock `httpx.Client.post`; capture the URL and params; assert `archive_only=true` present iff `--archive-only` passed.
-   - `test_resume_skips_when_s3_head_succeeds` — patch `boto3.client('s3').head_object` to return successfully; assert the POST is NOT issued; `successes` count unchanged.
-   - `test_resume_posts_when_s3_head_404s` — patch `head_object` to raise `ClientError(404)`; assert the POST IS issued.
-   - `test_force_overrides_resume` — `--resume --force`; `head_object` returns success; assert the POST IS still issued.
-   - `test_match_centre_resume_uses_list_prefix` — special case; mock `list_objects_v2` returning empty Contents → POST issued; non-empty → skipped.
-   - `test_unknown_source_exits_2` — existing behaviour preserved.
-
-**How to verify.**
-- `python scripts/data/scout_backfill.py --help` exit 0; output lists `--archive-only`, `--resume`, `--force`, `--bucket` flags.
-- `pytest tests/unit/scripts/data/test_scout_backfill.py -v` — all green; ≥6 cases.
-- `pytest tests/unit/` — no regression (baseline 355+ tests after TASK-37/38/39).
-- `python scripts/data/scout_backfill.py --source nrlcom-stats --season-from 2026 --api http://localhost:8000 --admin-key DUMMY --archive-only --resume` against a local API (or with `httpx.Client` mocked) — first run hits the endpoint; second run skips with `SKIP season=2026 (S3 exists ...)`.
-- `git diff --stat` shows only `scripts/data/scout_backfill.py` and the new test file.
-
-**Proof notes.**
-
----
-
 ### TASK-41: Operator backfill — `nrlcom-draw` 1908–2026 (on prod box via loopback)
 
 **What.** Per [PLAN.md "Scout Phase 5"](./PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance) Tasks list. **Operator task** — runs the hardened backfill driver against prod from the prod box via the Phase 4.5 loopback procedure.
@@ -221,9 +175,9 @@ docker exec -it jeromelu-api bash -c "
 ```
 
 **How to verify.**
-- `aws s3 ls s3://jeromelu-clean-documents/nrlsupercoachstats/stats/ --recursive | wc -l` ≥ **200** (~8 seasons × ~28 rounds incl. Totals; actual round counts vary by year).
-- `aws s3 ls s3://jeromelu-clean-documents/nrlsupercoachstats/stats/ --recursive | awk -F/ '{print $3}' | sort -u | wc -l` ≥ **8** (distinct season folders 2018–2025).
-- Spot-check 2018: `aws s3 cp s3://jeromelu-clean-documents/nrlsupercoachstats/stats/2018/round-01.json - | jq '.rows | length'` ≥ 200 (canonical SC roster size).
+- `aws s3 ls s3://jeromelu-clean-documents/scout/nrlsupercoachstats/stats/ --recursive | wc -l` ≥ **200** (~8 seasons × ~28 rounds incl. Totals; actual round counts vary by year). Note the `scout/` prefix — every Scout archive is under that prefix per `archive_response()` (corrected from the original planner-sketch which omitted it).
+- `aws s3 ls s3://jeromelu-clean-documents/scout/nrlsupercoachstats/stats/ --recursive | awk -F/ '{print $4}' | sort -u | wc -l` ≥ **8** (distinct season folders 2018–2025; field 4 now because the `scout/` prefix consumes field 1).
+- Spot-check 2018: `aws s3 cp s3://jeromelu-clean-documents/scout/nrlsupercoachstats/stats/2018/round-01.json - | jq '.rows | length'` ≥ 200 (canonical SC roster size).
 - Driver summary recorded in run report scratchpad.
 - **DB verification deferred to TASK-45** — this task only proves S3 capture.
 

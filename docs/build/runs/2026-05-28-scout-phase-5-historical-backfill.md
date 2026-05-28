@@ -1,6 +1,6 @@
 # Scout Phase 5 — Historical backfill + standard-data-model conformance
 
-**Date:** 2026-05-28 · **Status:** 🟡 In flight (3/10 tasks shipped) · **Plan:** [Scout Phase 5](../PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance)
+**Date:** 2026-05-28 · **Status:** 🟡 In flight (4/10 tasks shipped — all code tasks complete; operator tasks 41-46 remaining) · **Plan:** [Scout Phase 5](../PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance)
 
 **TL;DR** — Phase 5 lands historical NRL data (draw 1908+, match-centre 1990+, ladder 1996+, stats 2013+, SC stats 2018+) into the canonical DB schema. The load-bearing constraint is "all the data needs to conform to a standard data model" — era variance is reconciled by NULLs + a new `matches.data_coverage` column ('full' / 'lineups+timeline' / 'timeline_only' / 'fixture_only'), never by alternate tables or JSONB blobs. D8 strict-parse stays modern-only; backfill bypasses it via a new `archive_only=true` route flag. Era-tolerance lives in extractors, not in models. 10 tasks: 4 code (37-40), 4 operator backfills (41-44), 1 DB sweep (45), 1 closure (46).
 
@@ -87,6 +87,29 @@ Two coupled pieces:
 
 **Follow-up surfaced (cross-cutting, not self-queued):** Relocate `extract_rows` + `SuperCoachPlayerStats` from `services/api/app/scout/supercoach_stats/{fetcher,models}.py` into `jeromelu_shared.scraping.nrl_models` (or similar). Removes the new `scripts/→app.*` dependency; matches the CLAUDE.md "Separation of concerns" rule for shared types. Touches the route's import too. Plan/planner decision for future scheduling.
 
+### TASK-40 — scout_backfill.py driver hardening (--archive-only / --resume / --force / --bucket) (`94a4d73`)
+Four new CLI flags on the Phase 5 backfill driver:
+- **`--archive-only`** — append `archive_only=true` to every POST URL.
+- **`--resume`** — before each POST, HEAD the expected S3 key (or LIST the prefix for match-centre); skip if present.
+- **`--force`** — override `--resume`; re-POST every (season, round) regardless of S3.
+- **`--bucket`** — defaults to `$S3_CLEAN_BUCKET` env, falls back to `jeromelu-clean-documents`.
+
+`S3_KEY_FN` maps 4 sources (draw, ladder, stats, supercoach-stats) to their deterministic S3 key paths. `S3_LIST_PREFIX_FN` maps the one multi-key source (match-centre) to its round-prefix; `list_objects_v2(MaxKeys=1)` is enough to decide whether to skip. SC siblings (roster/teams/settings) have no deterministic key derivable from CLI args; `--resume` is a logged no-op for them. Lazy `_get_s3_client()` import via `boto3` — only triggered when `--resume` is set, so non-resume runs have no new dep. Resume strategy resolved ONCE at startup ('head' / 'list' / 'noop') rather than per-iteration.
+
+Module docstring made a raw-string (`r"""..."""`) to silence the `\$ADMIN_KEY` SyntaxWarning surfaced on first test run.
+
+9 unit tests in `tests/unit/scripts/data/test_scout_backfill.py` (exceeds the ≥6 spec floor): archive_only-in-params, archive_only-omitted-by-default, resume-skips-on-head-200, resume-posts-on-head-404, force-overrides-resume, match-centre-list-prefix-skip, match-centre-list-prefix-empty-posts, unknown-source-exits-2, SC-siblings-resume-noop. Mocks `httpx.Client` + `boto3` S3 client so the loop runs without real network/S3.
+
+**Concurrent housekeeping (folded into the checkoff):** Fixed TASK-44's S3 prefix in its verify queries (`nrlsupercoachstats/stats/` → `scout/nrlsupercoachstats/stats/`). Planner-spec error the reviewer caught; `archive_response()` prepends `scout/` for every Scout pipeline.
+
+**Proof:**
+- `pytest tests/unit/scripts/data/test_scout_backfill.py -v` → **9 passed** (exceeds ≥6 bar).
+- `pytest tests/unit/` → **397 passed** (was 388 after TASK-39; +9 new). Zero regression.
+- `python scripts/data/scout_backfill.py --help` → exit 0; output lists all four new flags with descriptions.
+- `git diff --stat HEAD~` shows exactly: 1 modified script + 1 new test file = 2 files for TASK-40 code; 1 modified TASKS.md for the bundled TASK-44 spec fix. `services/web/.claude/` untracked left alone.
+
+**adversarial-reviewer verdict:** Returned **BLOCK** citing "empty Proof notes block"; **reclassified as PASS WITH CONCERNS** because TASKS.md preamble (lines 11-13) explicitly carves out: "an empty Proof-notes block at review time is expected and is NOT a blocker — the reviewer verifies the diff against the spec and runs the How-to-verify checks itself; proof recording is a post-pass step." The reviewer ran all 5 How-to-verify checks themselves and confirmed each passed. Every prior task in this run (37, 38, 39) shipped with the same empty-at-review pattern; proof lives in the run report at checkoff and the task is removed from TASKS.md (no Proof notes block left to fill anyway). Concerns: (C1) TASK-44 S3-prefix planner-spec error — FIXED in this commit's bundled TASKS.md edit; (C2) run-report row missing — added in this checkoff; (C3-C5) cosmetic. **/simplify:** not run.
+
 ---
 
 ## How we know it's done (running)
@@ -114,4 +137,6 @@ Phase 5 is in flight. After TASK-37: the canonical schema has the `data_coverage
 - `1dc4cee` TASK-37 checkoff — run report + META psql/Windows note
 - `5e6a95e` TASK-38 — archive_only=true mode on 4 nrl.com routes
 - `6f98548` TASK-38 checkoff — run report
-- `1e809bb` TASK-39 — archive_only on SC stats + new populate_player_rounds extractor (this checkoff)
+- `1e809bb` TASK-39 — archive_only on SC stats + new populate_player_rounds extractor
+- `a932abd` TASK-39 checkoff — run report
+- `94a4d73` TASK-40 — scout_backfill.py driver hardening + TASK-44 S3-prefix fix bundled (this checkoff)
