@@ -25,50 +25,6 @@ Prefix the title with optional tags in square brackets:
 
 ## Open tasks
 
-### TASK-30 — nrlcom-stats: wire strict-parse into route + env-flagged live drift test
-
-**What**
-
-Wire the D8 contract from TASK-29 into the production route. See `PLAN.md` → `## 2026-05-28: Scout Phase 4.5` → Interface → *nrlcom-stats*. Line-for-line equivalent of TASK-22 (casualty-ward) and TASK-24 (ladder).
-
-1. Modify `services/api/app/scout/nrlcom_stats/routes.py`:
-    - Add `from pydantic import ValidationError`.
-    - Add `from .models import NrlcomStats`.
-    - In `run_nrlcom_stats`, after `set_archive_detail(detail, archive_key)` and the existing `detail.update({...})` block, add:
-      ```python
-      NrlcomStats.model_validate(data)
-      detail["validated"] = True
-      ```
-    - Insert a new `except ValidationError as e:` arm **between** the existing `except NrlcomStatsFetchError` arm and the generic `except Exception` arm. Body:
-      ```python
-      run.fail(
-          e,
-          summary_text=f"Stats response failed strict validation (drift): {e}",
-      )
-      raise HTTPException(status_code=500, detail=f"nrl.com stats drift: {e}")
-      ```
-    - Keep the existing `NrlcomStatsFetchError → 502` arm and the generic `except Exception` arm unchanged.
-2. Create `tests/integration/scout/nrlcom_stats/__init__.py` (empty) and `tests/integration/scout/nrlcom_stats/test_response_shape.py` mirroring `tests/integration/scout/nrlcom_casualty_ward/test_response_shape.py` line-for-line, replacing the imports with:
-    - `from app.scout.nrlcom_stats.fetcher import NrlcomStatsFetchError, fetch_stats`
-    - `from app.scout.nrlcom_stats.models import NrlcomStats`
-    - In the live test, call `fetch_stats(competition=111, season=date.today().year)` (add `from datetime import date`); strict-parse; assert `len(parsed.playerStats) >= 1` as the sanity gate.
-    - Same `pytest.fail(...)` message shape, naming the fix path: update `app.scout.nrlcom_stats.models`, regenerate `tests/fixtures/scout/nrlcom_stats/canonical_response.json`, commit with a note on what changed.
-
-**How to verify**
-
-- `python -c "from app.scout.nrlcom_stats.routes import PIPELINE, run_nrlcom_stats; print(PIPELINE)"` → `nrlcom-stats` (route imports clean post-modification).
-- `pytest tests/integration/scout/nrlcom_stats/test_response_shape.py` (no env var) → 1 skipped with reason `Set SCOUT_DRIFT_LIVE=1 to run the live-endpoint drift test`.
-- `SCOUT_DRIFT_LIVE=1 pytest tests/integration/scout/nrlcom_stats/test_response_shape.py` → 1 passed against real nrl.com.
-- **Deliberate-break proof** (run last, then revert): add a required `tries_per_game: int` field to `StatLeader` without an alias; `SCOUT_DRIFT_LIVE=1 pytest …` → fails naming `tries_per_game` "Field required" at the nested path (`playerStats.0.groups.0.leaders.0.tries_per_game`). Revert (`git diff HEAD -- services/api/app/scout/nrlcom_stats/models.py` empty).
-- `pytest tests/unit/api/scout/` → all green, no regression vs. TASK-29 baseline.
-- Hit the local route once for end-to-end proof: `curl -s -X POST "http://localhost:8000/api/admin/scout/nrlcom-stats?competition=111&season=2026" -H "X-Admin-Key: $LOCAL_ADMIN_KEY" | python -m json.tool` → response includes `"validated": true` and `"s3_archive_key": "scout/nrlcom/stats/111/2026.json"`. (If running fully offline, skip this and rely on the import + skip-mode proof, mirroring how TASK-22 was accepted at the Phase-3 TASK-08 proof level.)
-
-**Proof notes**
-
-_(in-flight scratchpad)_
-
----
-
 ### TASK-31 — nrlcom-players-roster: D8 strict models + fixture + unit drift tests
 
 **What**

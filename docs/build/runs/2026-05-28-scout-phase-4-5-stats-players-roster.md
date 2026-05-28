@@ -1,6 +1,6 @@
 # Scout Phase 4.5 — nrl.com stats + players roster (D8 harden, schedule, seed)
 
-**Date:** 2026-05-28 · **Status:** 🟡 In flight (1 of 8 tasks shipped) · **Plan:** Scout Phase 4.5 (active — see [PLAN.md](../PLAN.md))
+**Date:** 2026-05-28 · **Status:** 🟡 In flight (2 of 8 tasks shipped) · **Plan:** Scout Phase 4.5 (active — see [PLAN.md](../PLAN.md))
 
 **TL;DR** — Phase 4.5 is a Phase 4-style hardening replay: both `services/api/app/scout/nrlcom_stats/` and `services/api/app/scout/nrlcom_players_roster/` ingest folders already exist with fetchers / routes / READMEs / make targets; migration `060_stat_leaderboards.sql` is applied; `populate_stat_leaderboards` is shipped and wired into `populate_db_from_s3.py` as `--phase leaderboards`; the lineage + catalogue docs already exist. What's missing is the D8 drift contract, extractor unit tests via pure-function refactor, cron scheduling, and prod seed verification. NRL only (comp 111), season 2026, forward-only — historical backfill stays Phase 5. SC Draft mode and folding `nrlcom_refresh.py` are explicitly scoped out (2026-05-28 planner interview).
 
@@ -21,21 +21,29 @@ Added `tests/unit/api/scout/nrlcom_stats/{__init__.py,test_models.py}` (template
 
 **Proof:** `pytest tests/unit/api/scout/nrlcom_stats/test_models.py -v` → **4 passed in 1.73s**; `pytest tests/unit/api/scout/` → **69 passed in 1.85s** (was 65 pre-task; no regression); full unit tier `pytest tests/unit/` → **345 passed** (reviewer cross-verified). `python -c "from app.scout.nrlcom_stats.models import NrlcomStats, StatCategory, StatSubgroup, StatLeader; print('ok')"` → `ok`. Live shape probe before fixture capture confirmed exactly 2 distinct player-leader keysets (11 keys / 12 keys — `url` sometimes missing) and 1 team-leader keyset (8 keys), informing the player-vs-team bifurcation. Route file confirmed untouched (TASK-30 boundary intact). **adversarial-reviewer: PASS WITH CONCERNS** — all non-blocking: (C1) `value: str | None` narrower than literal spec; (C2) player-only field defaults documented with in-repo precedent; (C3) plan's "102 passed" baseline in TASK-29's How-to-verify was inaccurate — the substantive regression check (no regression vs pre-task) is satisfied. **/simplify:** not run (`[skip-simplify]` flag per Phase 4 convention; pure additive D8 contract).
 
+### TASK-30 — nrlcom-stats: wire strict-parse into route + live drift test (`bb84d28`)
+Wired the TASK-29 D8 contract into `services/api/app/scout/nrlcom_stats/routes.py`: after `archive_response(...)` (raw to S3 first), `NrlcomStats.model_validate(data)` + `detail["validated"] = True`, and an `except ValidationError → run.fail + HTTPException(500)` arm ordered **between** the existing `NrlcomStatsFetchError → 502` arm and the generic `except Exception` arm. Single-envelope abort-on-drift (the **draw/casualty/ladder** precedent, line-for-line equivalent), not the non-aborting per-match match-centre pattern; the `NrlcomStatsFetchError → 502` arm is unchanged. Added `tests/integration/scout/nrlcom_stats/{__init__.py,test_response_shape.py}` — env-flagged (`SCOUT_DRIFT_LIVE=1`) live drift test templated on `tests/integration/scout/nrlcom_casualty_ward/test_response_shape.py` with `date.today().year` as the season param and both `playerStats >= 1` AND `teamStats >= 1` sanity gates.
+
+**Proof:** route imports clean (`PIPELINE=nrlcom-stats`); skip mode → **1 skipped** (exact reason "Set SCOUT_DRIFT_LIVE=1 …"); live mode → **1 passed in 3.20s** against real nrl.com; deliberate-break (`tries_per_game: int` required, no default, on `StatLeader`) → live test **failed naming `tries_per_game`** "Field required" at the nested path (`playerStats.0.groups.0.leaders.0.tries_per_game` through `teamStats.7.groups.3.leaders.4.tries_per_game` — proves strict-parse reaches the leaf model on BOTH scope branches), then reverted (`git diff HEAD -- models.py` empty, post-revert live mode 1 passed). Full scout unit suite → **69 passed** (no regression). The route's `validated:true`/500-on-drift is proven by construction (identical `model_validate`, exercised green live + red via the reverted break) per the Phase 3 TASK-08 proof level. **adversarial-reviewer: PASS WITH CONCERNS** — both non-blocking and sanctioned by spec: (C1) skipped local end-to-end curl (`validated:true` JSON-response confirmation deferred to TASK-36 prod seed per the TASK-22 precedent); (C2) the harness collision (unit + integration tiers can't run in one `pytest` invocation due to same-package-name) is pre-existing structural — CI runs tiers separately. **/simplify:** not run.
+
+**Harness note (carried over from TASK-22):** running the unit + integration tiers in one `pytest` invocation triggers a same-package-name collection collision (both dirs hold a `nrlcom_stats` package) — a pre-existing structural pattern (draw / casualty / ladder all have it too); CI runs the tiers separately, so it's a non-issue. Run tiers separately.
+
 ---
 
 ## How we know it's done (running)
-- Unit drift tests green in CI for `nrlcom_stats` envelope + 3 nested levels. Live drift test (env-flagged `SCOUT_DRIFT_LIVE=1`) lands in TASK-30.
+- Unit drift tests green in CI for `nrlcom_stats` envelope + 3 nested levels. Live drift test (env-flagged `SCOUT_DRIFT_LIVE=1`) wired and proven against real nrl.com. **The `nrlcom_stats` ingest pipeline is now fully D8-hardened** (envelope + category + subgroup + leader strict-parse wired into the route, TASK-29→30).
 
 ## Decisions & deviations
 - **`StatLeader` is a single model, not a `Union[PlayerLeader, TeamLeader]`.** Pydantic discriminated unions need an in-record discriminator; the scope discriminator is at the OUTER list level (`playerStats` vs `teamStats`), not on the leader itself. Single-model with defaulted player-only fields keeps the implementation simple while still firing on new-key drift via `extra="forbid"`. Documented in the model docstring.
 - **`value: str | None` is stricter than the spec's `float | int | str | None` union.** Empirical reality: every leader in 347 observed has a string value. The strictness is a D8-aligned choice — a future native-number `value` becomes drift, which is the correct behaviour, not a silent acceptance.
 
 ## Outstanding (deferred — operator/time-gated and surfaced infra follow-ups)
-- ☐ **TASK-30 → TASK-36:** the remaining 7 tasks of Phase 4.5 (in the queue).
+- ☐ **TASK-31 → TASK-36:** the remaining 6 tasks of Phase 4.5 (in the queue).
+- ☐ **End-to-end `validated:true` in JSON response** — TASK-30's local curl proof was deliberately skipped (offline this turn, per spec). Confirmation lands at the TASK-36 prod seed (the route is proven-by-construction green live + red via the deliberate break).
 - ☐ Same cross-cutting **extractor scheduling** infra follow-up that Phase 4 surfaced — the daily ingest cron archives to S3 but the DB only refreshes when an operator runs `populate_db_from_s3 --phase leaderboards`. Same gap will apply to `nrlcom_players_roster` (which ships NO DB extractor this phase per scope decision). Durable fix is baking `scripts/` + `packages/shared` into the api image so a scheduled `docker exec jeromelu-api python -m scripts.data.populate_db_from_s3 …` just works — an infra decision for the human/planner. Out of Phase 4.5 scope.
 
 ## Lessons learned
 _(populated as tasks ship)_
 
 ## Commits
-`068f37a` (planner kickoff — Phase 4.5 plan + 8 tasks queued, missed at the planner session boundary) · `f232c84` (TASK-29). Bookkeeping commit for TASK-29 checkoff follows.
+`068f37a` (planner kickoff — Phase 4.5 plan + 8 tasks queued, missed at the planner session boundary) · `f232c84` (TASK-29) · `bb84d28` (TASK-30). Plus the per-task run-report/queue bookkeeping commits.
