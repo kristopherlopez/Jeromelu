@@ -25,42 +25,6 @@ Prefix the title with optional tags in square brackets:
 
 ## Open tasks
 
-### TASK-38: `archive_only=true` mode on 4 nrl.com routes (draw, match-centre, ladder, stats)
-
-**What.** Per [PLAN.md "Scout Phase 5"](./PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance) Interface §2.
-
-Add a uniform `archive_only: bool = Query(default=False)` to the four route handlers and thread it into the inner `run_*` function. Behaviour:
-- **S3 archive still happens** (the whole point — archive runs before strict-parse in all four routes today).
-- **D8 strict-parse wrapped:** when `archive_only=True`, change the existing `Model.model_validate(data)` block from `model_validate → detail["validated"]=True / raise ValidationError → 500` to `try: model_validate(); detail["validated"]=True / except ValidationError: detail["validated"]=False; detail["validation_skipped"]=True; logger.warning(...)`. The capture is preserved either way.
-- **`set_archive_detail`** still records `s3_archive_key`.
-- **Response shape addition:** when `archive_only=True` and validation was skipped, the response carries `validated:false, validation_skipped:true`. On the default path (archive_only=false), `validated:true` and `validation_skipped` is omitted (no change from today).
-- For `nrlcom_match_centre` specifically: the existing per-match `try/except ValidationError → validation_failures[]` block (non-aborting) is left alone (already lenient); the new `archive_only` flag just means each match's strict-parse is bypassed entirely (no entries added to `validation_failures`).
-
-Files touched:
-- `services/api/app/scout/nrlcom_draw/routes.py`
-- `services/api/app/scout/nrlcom_match_centre/routes.py`
-- `services/api/app/scout/nrlcom_ladder/routes.py`
-- `services/api/app/scout/nrlcom_stats/routes.py`
-
-Per-route unit tests `tests/unit/api/scout/<pipeline>/test_archive_only.py` (4 new files, each ≥3 cases):
-1. `test_archive_only_true_skips_validation_on_drift` — mock the fetcher to return a payload that fails strict-parse (extra unknown field); assert response has `validated:false, validation_skipped:true, ok:true`; assert no `HTTPException` raised; assert `archive_response` was called (verify via mock).
-2. `test_archive_only_true_modern_payload_still_archives` — mock fetcher to return the canonical fixture; assert response `validated:false, validation_skipped:true, ok:true` (validation is skipped even on a valid payload — the flag is unconditional).
-3. `test_archive_only_default_false_unchanged_modern` — canonical fixture, no `archive_only` param; assert response `validated:true, ok:true`, no `validation_skipped` key (regression check — default behaviour preserved).
-
-Mocking pattern: patch `<route_module>.fetch_*` and `<route_module>.archive_response` (both already importable at module level). For match-centre, also patch `fetch_draw` and use a single-fixture-fixtures payload to keep the test bounded.
-
-**How to verify.**
-- `pytest tests/unit/api/scout/nrlcom_draw/test_archive_only.py tests/unit/api/scout/nrlcom_match_centre/test_archive_only.py tests/unit/api/scout/nrlcom_ladder/test_archive_only.py tests/unit/api/scout/nrlcom_stats/test_archive_only.py -v` — all green; 4 × ≥3 = ≥12 cases.
-- `pytest tests/unit/api/scout/` — full scout unit suite green (baseline 73 passed per Phase 4.5 TASK-32 + 1 new file each); no regression on existing tests.
-- Local end-to-end (API running locally, `make api`):
-  - `curl -X POST "http://localhost:8000/api/admin/scout/nrlcom-draw?season=2026&archive_only=true" -H "X-Admin-Key: $LOCAL_ADMIN_KEY" | jq '{ok, validated, validation_skipped, s3_archive_key}'` → `{ok:true, validated:false, validation_skipped:true, s3_archive_key:"scout/nrlcom/draw/111/2026/round-..."}`.
-  - Same curl without `archive_only` → `{ok:true, validated:true, s3_archive_key:"..."}` (no `validation_skipped` key).
-- `git diff --stat` shows only the 4 routes.py files + 4 new test files; no model, fetcher, or schema changes.
-
-**Proof notes.**
-
----
-
 ### TASK-39: `archive_only=true` on supercoach-stats + new `populate_player_rounds` extractor
 
 **What.** Per [PLAN.md "Scout Phase 5"](./PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance) Interface §2 (SC stats branch) + §3.

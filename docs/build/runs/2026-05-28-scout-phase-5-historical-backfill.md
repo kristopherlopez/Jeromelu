@@ -1,6 +1,6 @@
 # Scout Phase 5 — Historical backfill + standard-data-model conformance
 
-**Date:** 2026-05-28 · **Status:** 🟡 In flight (1/10 tasks shipped) · **Plan:** [Scout Phase 5](../PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance)
+**Date:** 2026-05-28 · **Status:** 🟡 In flight (2/10 tasks shipped) · **Plan:** [Scout Phase 5](../PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance)
 
 **TL;DR** — Phase 5 lands historical NRL data (draw 1908+, match-centre 1990+, ladder 1996+, stats 2013+, SC stats 2018+) into the canonical DB schema. The load-bearing constraint is "all the data needs to conform to a standard data model" — era variance is reconciled by NULLs + a new `matches.data_coverage` column ('full' / 'lineups+timeline' / 'timeline_only' / 'fixture_only'), never by alternate tables or JSONB blobs. D8 strict-parse stays modern-only; backfill bypasses it via a new `archive_only=true` route flag. Era-tolerance lives in extractors, not in models. 10 tasks: 4 code (37-40), 4 operator backfills (41-44), 1 DB sweep (45), 1 closure (46).
 
@@ -36,6 +36,26 @@ Parent-coverage gate in `phase_team_lists.py`, `phase_stats.py`, `phase_timeline
 
 **adversarial-reviewer: PASS WITH CONCERNS** — 7 non-blocking concerns, all sanctioned by spec/precedent: (C1) migration renumber 061→071 documented; (C2) `_derive_data_coverage` degenerate fallback chooses `'fixture_only'` rather than `'full'`, defensible via slug-disjoint design + non-downgrade upsert + dedicated unit test pin; (C3) `_extract_from_draw_fixture` slug identity scheme documented as spec impossibility resolution; (C4) `idx_matches_data_coverage` partial index added beyond spec — small/cheap/useful; (C5) pre-existing inline `import json` style in `_metadata_blob`/`_draw_metadata_blob` unchanged from HEAD — pattern matches sibling code, not regressed; (C6) untracked `services/web/.claude/.simplify-ok` honoured via explicit pathspec; (C7) `data-lineage/matches.md` doc update deferred to TASK-46 per plan's deliberate split. **/simplify:** not run (`[skip-simplify]` per Phase 4 convention; pure additive era-aware refactor).
 
+### TASK-38 — archive_only=true mode on 4 nrl.com routes (draw, match-centre, ladder, stats) (`5e6a95e`)
+Added `archive_only: bool = Query(default=False)` to the four nrl.com archive-only route endpoints, threaded into the inner `run_*` functions. When `True`: S3 capture still happens (it's before the parse); `Model.model_validate` is **skipped entirely** (NOT try/caught); response carries `validated:false, validation_skipped:true`. When `False` (default): existing daily-cron behaviour unchanged.
+
+**Spec-text vs spec-test reconciliation:** TASKS.md:34 used a literal `try: model_validate(); except ValidationError: ...` pattern, but its own case-2 unit test (line 47-48) demanded `validated:false` on a valid payload — only the unconditional-skip variant could satisfy that. PLAN.md:50 corroborated with "the strict-parse is skipped entirely". Implementer chose unconditional skip; spec-test was load-bearing over spec-text.
+
+Match-centre is the structural odd one out: the per-match strict-parse runs inside the walker loop with `try/except ValidationError → validation_failures.append(...)` (non-aborting). The new `if not archive_only:` guard wraps that inner block — when the flag is on, `validation_failures` stays empty (no per-match parse runs). Envelope-level `validated:false, validation_skipped:true` are set after the walk.
+
+13 unit tests across 4 new test files: `test_archive_only_true_skips_validation_on_drift`, `test_archive_only_true_modern_payload_still_archives`, `test_archive_only_default_false_unchanged_modern` per route (draw also has a 4th `archive_response_called_under_archive_only` check). Mocking pattern: `_FakeRun` stand-in for `DeterministicScoutRun`; patch the module-level `fetch_*`, `archive_response`, `start_deterministic_run`. Match-centre additionally patches `fetch_match_centre` + `time.sleep` to skip the 1-second per-match rate-limit.
+
+**Proof:**
+- `pytest tests/unit/api/scout/nrlcom_*/test_archive_only.py -v` → **13 passed** (exceeds ≥12 bar; 4+3+3+3).
+- `pytest tests/unit/api/scout/` → **86 passed** (was 73 per Phase 4.5 TASK-32 baseline; +13).
+- `pytest tests/unit/` → **379 passed** (was 366 after TASK-37; +13). Zero regression.
+- Route imports clean post-edit: `python -c "import app.scout.{nrlcom_draw,nrlcom_match_centre,nrlcom_ladder,nrlcom_stats}.routes"` → all four `ok`.
+- `git diff --stat HEAD~` shows exactly: 4 modified routes + 4 new test files = 8 files. `services/web/.claude/` untracked left alone via explicit pathspec.
+
+**Live curl verification deferred** per the **Phase 4.5 TASK-30 precedent** (`/openapi.json` confirmed the API on :8000 is a pre-TASK-38 process — implementer chose not to restart to avoid disrupting the user's session). The unit tests cover the same response-shape contract end-to-end; live confirmation picks up at the TASK-45 prod sweep or any subsequent API restart.
+
+**adversarial-reviewer: PASS WITH CONCERNS** — 4 non-blocking concerns, all sanctioned: (C1) doc updates batched to TASK-46 per plan's deliberate split; (C2) live-curl deferred per Phase 4.5 TASK-30 precedent; (C3) match-centre default-path assertion form noted as unusual but sound on inspection (`"validated" not in response or response.get("validated") is None`); (C4) spec interpretation question — implementer chose unconditional-skip per the case-2 test demand; PLAN.md corroborates. **/simplify:** not run (`[skip-simplify]` per Phase 4 convention).
+
 ---
 
 ## How we know it's done (running)
@@ -59,4 +79,6 @@ Phase 5 is in flight. After TASK-37: the canonical schema has the `data_coverage
 
 ## Commits
 - `4458a24` planner kickoff — Phase 5 plan + 10 tasks queued
-- `da5423d` TASK-37 — migration 071 + era-aware populate_matches + parent-coverage gate (this checkoff)
+- `da5423d` TASK-37 — migration 071 + era-aware populate_matches + parent-coverage gate
+- `1dc4cee` TASK-37 checkoff — run report + META psql/Windows note
+- `5e6a95e` TASK-38 — archive_only=true mode on 4 nrl.com routes (this checkoff)
