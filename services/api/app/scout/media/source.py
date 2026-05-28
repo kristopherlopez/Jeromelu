@@ -47,7 +47,3 @@ def resolve_youtube_media_source(
         video_id=video_id,
         channel_external_id=channel_external_id,
     )
-
-
-def youtube_media_key(media: YoutubeMediaSource, suffix: str) -> str:
-    return f"youtube/{media.channel_external_id}/{media.video_id}{suffix}"

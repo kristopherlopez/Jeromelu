@@ -25,9 +25,10 @@ from youtube_utils.exceptions import DownloadError
 
 from jeromelu_shared.config import settings
 from jeromelu_shared.db import Source
-from jeromelu_shared.s3 import audio_object_exists, upload_audio
 
-from .source import resolve_youtube_media_source, youtube_media_key
+from .keys import youtube_audio_key
+from .s3 import media_object_exists, upload_media_file
+from .source import resolve_youtube_media_source
 
 logger = logging.getLogger(__name__)
 
@@ -61,11 +62,11 @@ def acquire_audio(session: Session, source: Source) -> AudioResult:
     On failure: ``ingestion_status='failed'``, ``AudioError`` raised.
     """
     media = resolve_youtube_media_source(source, error_cls=AudioError)
-    audio_key = youtube_media_key(media, ".m4a")
+    audio_key = youtube_audio_key(media)
 
     try:
         bytes_uploaded: int | None = None
-        if audio_object_exists(audio_key):
+        if media_object_exists(audio_key):
             logger.info(
                 "Audio already in S3: s3://%s/%s",
                 settings.s3_audio_bucket, audio_key,
@@ -86,7 +87,7 @@ def acquire_audio(session: Session, source: Source) -> AudioResult:
                 bytes_uploaded = local_path.stat().st_size
                 size_mb = bytes_uploaded / (1024 * 1024)
                 logger.info("Downloaded audio: %s (%.1f MB)", local_path.name, size_mb)
-                upload_audio(audio_key, str(local_path), content_type="audio/mp4")
+                upload_media_file(audio_key, str(local_path), content_type="audio/mp4")
                 logger.info(
                     "Uploaded to s3://%s/%s",
                     settings.s3_audio_bucket, audio_key,

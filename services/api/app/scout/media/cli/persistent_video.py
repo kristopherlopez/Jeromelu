@@ -1,7 +1,7 @@
-"""CLI driver for Phase 4 video acquisition.
+"""CLI driver for persistent Scout video acquisition.
 
 Usage:
-    python -m app.scout.media.video_cli <source_id> [--quality 240|360|...]
+    python -m app.scout.media.cli.persistent_video <source_id> [--quality 240|360|...]
 
 Idempotent on the S3 object. Sets ``sources.video_s3_key``.
 """
@@ -17,16 +17,22 @@ from sqlalchemy.orm import joinedload
 
 from jeromelu_shared.db import SessionLocal, Source
 
-from .video import DEFAULT_QUALITY, VideoError, acquire_video
+from ..persistent_video import (
+    DEFAULT_QUALITY,
+    PersistentVideoError,
+    acquire_persistent_video,
+)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Acquire low-res video for a single Source (Phase 4 visual ID).",
+        description="Acquire persistent low-res video for a single Source.",
     )
     parser.add_argument("source_id", type=str, help="UUID of the sources row")
     parser.add_argument(
-        "--quality", default=DEFAULT_QUALITY,
+        "--quality",
+        default=DEFAULT_QUALITY,
+        choices=("240", "360", "480", "720"),
         help=f"Max video height (default {DEFAULT_QUALITY}). 240/360/480/720.",
     )
     parser.add_argument(
@@ -64,8 +70,8 @@ def main() -> int:
         print()
 
         try:
-            result = acquire_video(session, source, quality=args.quality)
-        except VideoError as exc:
+            result = acquire_persistent_video(session, source, quality=args.quality)
+        except PersistentVideoError as exc:
             print(f"FAILED: {exc}", file=sys.stderr)
             return 1
 

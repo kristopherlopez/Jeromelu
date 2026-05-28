@@ -26,7 +26,7 @@ It does **not** change what the Analyst, Bookkeeper, or Archivist do downstream 
 
 Pipeline inventory after full source enumeration (2026-05-12). Each row is a folder under `services/api/app/scout/` per D9, with S3-first capture per D10.
 
-**Media (legacy flat-file layout — to be folded into `scout/media/` later):**
+**Media (`scout/media/`, `scout/youtube/`, `scout/source_discovery/` — sibling packages):**
 
 | Pipeline | Source | Status |
 |---|---|---|

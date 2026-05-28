@@ -49,7 +49,7 @@ seed-players:
 # Usage: make collect-audio SOURCE_ID=<uuid>
 collect-audio:
 	@test -n "$(SOURCE_ID)" || (echo "SOURCE_ID is required: make collect-audio SOURCE_ID=<uuid>" && exit 2)
-	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.scout.media.audio_cli $(SOURCE_ID)
+	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.scout.media.cli.audio $(SOURCE_ID)
 
 # Scout — acquire low-res video for one source (yt-dlp 360p by default →
 # s3://jeromelu-raw-audio with .video.mp4 suffix). Used by Phase 4 visual
@@ -57,7 +57,7 @@ collect-audio:
 # Usage: make collect-video SOURCE_ID=<uuid> [QUALITY=240|360|480|720]
 collect-video:
 	@test -n "$(SOURCE_ID)" || (echo "SOURCE_ID is required: make collect-video SOURCE_ID=<uuid>" && exit 2)
-	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.scout.media.video_cli $(SOURCE_ID) $(if $(QUALITY),--quality $(QUALITY))
+	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.scout.media.cli.persistent_video $(SOURCE_ID) $(if $(QUALITY),--quality $(QUALITY))
 
 # Analyst — transcribe a collected source via Deepgram (diarisation + keyterm).
 # Requires audio_s3_key to be set (run collect-audio first). Writes the

@@ -1,6 +1,6 @@
 """Ephemeral video staging for the Lineup pipeline.
 
-Background: ``services/api/app/scout/media/video.py:acquire_video`` was the
+Background: ``services/api/app/scout/media/persistent_video.py`` was the
 original Phase-4 acquisition path — it persisted the low-res mp4 under
 ``youtube/<channel>/<video_id>.video.mp4`` and stamped
 ``sources.video_s3_key`` so the review UI could presign the file for
@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 
 #: Quality cap for ephemeral downloads. Mirrors ``DEFAULT_QUALITY`` in
-#: ``scout/media/video.py`` so the face-detection pipeline sees the same pixel
+#: ``scout/media/persistent_video.py`` so the face-detection pipeline sees the same pixel
 #: density it was tuned against.
 DEFAULT_QUALITY = "360"
 

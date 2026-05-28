@@ -279,7 +279,7 @@ Keeps every tracked YouTube channel's video list and per-video popularity number
 
 Scout's last Extract step. Pulls audio from approved-but-pending YouTube sources and lands it in S3. **Extract only** — does not interpret the audio. Transcription / diarisation belongs to [Analyst](../analyst/README.md) (see [analyst/transcription](../../system/transcription-pipeline.md)).
 
-**Trigger** — Manual CLI: `python -m app.scout.media.audio_cli <source_id>` or `make collect-audio SOURCE_ID=<uuid>`. The recurring drain job (APScheduler / cron over `ingestion_status='pending'`) is on the backlog.
+**Trigger** — Manual CLI: `python -m app.scout.media.cli.audio <source_id>` or `make collect-audio SOURCE_ID=<uuid>`. The recurring drain job (APScheduler / cron over `ingestion_status='pending'`) is on the backlog.
 
 **Module** — `services/api/app/scout/media/audio.py` · `acquire_audio(session, source)`.
 
@@ -313,7 +313,7 @@ External world
 ┌─────────────────────────────────────────────────────────┐
 │ Scout (one agent identity, many modules)                │
 │                                                         │
-│  Media (legacy flat files, scout/media/ later):         │
+│  Media (scout/media/ + youtube/, source_discovery/):    │
 │    • discovery (loop.py + refresh.py)                   │
 │    • audio acquisition (audio.py)                       │
 │    • metadata refresh                                   │

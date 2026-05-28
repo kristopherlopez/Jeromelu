@@ -482,8 +482,8 @@ The asymmetry that makes this work: face ID + ASD is *easier to bootstrap* (few 
 
 | Path | Purpose |
 |---|---|
-| `services/api/app/scout/media/video.py` | Low-res video acquisition (mirrors `media/audio.py`) |
-| `services/api/app/scout/media/video_cli.py` | `make collect-video SOURCE_ID=…` |
+| `services/api/app/scout/media/persistent_video.py` | Legacy/debug low-res persistent video acquisition |
+| `services/api/app/scout/media/cli/persistent_video.py` | `make collect-video SOURCE_ID=…` |
 | `services/api/app/analyst/diarize.py` | pyannote pipeline wrapper |
 | `services/api/app/analyst/diarize_cli.py` | `make diarize SOURCE_ID=…` |
 | `services/api/app/analyst/identify_voice.py` | ECAPA enroll + match |

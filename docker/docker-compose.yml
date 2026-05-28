@@ -98,7 +98,7 @@ services:
       - AWS_DEFAULT_REGION=ap-southeast-2
       # Persistent .video.mp4 files live in jeromelu-raw-audio (see
       # packages/shared/jeromelu_shared/config.py:s3_audio_bucket and
-      # services/api/app/scout/media/video.py). The worker's own default
+      # services/api/app/scout/media/persistent_video.py). The worker's own default
       # ("jeromelu-raw-transcripts") and the prod compose are wrong —
       # leaving that default in causes HeadObject 404 on reassign.
       - S3_AUDIO_BUCKET=jeromelu-raw-audio

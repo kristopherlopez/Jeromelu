@@ -7,7 +7,7 @@ tags: [area/agents, subarea/system, status/live]
 | | |
 |---|---|
 | **Module** | `services/api/app/scout/media/audio.py` |
-| **Driver** | `python -m app.scout.media.audio_cli <source_id>` · `make collect-audio SOURCE_ID=<uuid>` |
+| **Driver** | `python -m app.scout.media.cli.audio <source_id>` · `make collect-audio SOURCE_ID=<uuid>` |
 | **Crew counterpart** | [Scout](../crew/scout/README.md) — this is Scout's audio-pull surface (§3.5). |
 | **ETL role** | **Extract only.** Pulls audio bytes via yt-dlp and persists to S3. No interpretation. |
 | **Status** | Single-source CLI shipped. Recurring drain job not yet built. |

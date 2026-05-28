@@ -13,7 +13,7 @@ belongs to Analyst, Bookkeeper, Archivist, or feature routers.
 | `source_discovery/` | Agentic YouTube/web source discovery. |
 | `presenter_research/` | Agentic presenter/person research for one known channel. |
 | `youtube/` | YouTube Data API client plus refresh/metrics/coverage jobs. |
-| `media/` | YouTube audio/video acquisition helpers and CLIs. |
+| `media/` | YouTube audio acquisition plus legacy/debug persistent video helpers and CLIs. |
 
 ## Pipeline Folders
 

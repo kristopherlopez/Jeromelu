@@ -1,17 +1,21 @@
-"""Video acquisition — Scout's Phase 4 surface for visual identification.
+"""Persistent video acquisition for legacy/debug visual workflows.
 
-Sibling to ``audio.py``. For one ``sources`` row:
+For one ``sources`` row:
 
     1. yt-dlp video download at low resolution (default 360p) →
        s3://jeromelu-raw-audio/youtube/{channel_id}/{video_id}.video.mp4
        (low-res sits in the same bucket as audio for lifecycle simplicity).
     2. ``sources.video_s3_key`` populated.
 
-Independent of audio acquisition — running ``acquire_video`` on a row
+Independent of audio acquisition — running ``acquire_persistent_video`` on a row
 that already has ``audio_s3_key`` set is fine and won't disturb the audio
 state. Idempotent on the S3 object.
 
-Failure mode: ``VideoError`` raised, sources row left as-is.
+This is not the main visual-ID path anymore; Analyst now stages video
+ephemerally per request. Keep this for one-off enrolment/debugging and old
+rows with persistent ``sources.video_s3_key``.
+
+Failure mode: ``PersistentVideoError`` raised, sources row left as-is.
 """
 
 from __future__ import annotations
@@ -27,9 +31,10 @@ from youtube_utils.exceptions import DownloadError
 
 from jeromelu_shared.config import settings
 from jeromelu_shared.db import Source
-from jeromelu_shared.s3 import get_s3_client
 
-from .source import resolve_youtube_media_source, youtube_media_key
+from .keys import youtube_persistent_video_key
+from .s3 import media_object_exists, upload_media_file
+from .source import resolve_youtube_media_source
 
 logger = logging.getLogger(__name__)
 
@@ -39,13 +44,13 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 @dataclass
-class VideoResult:
+class PersistentVideoResult:
     source_id: str
     video_s3_key: str
     bytes_uploaded: int | None  # None if the object already existed in S3
 
 
-class VideoError(Exception):
+class PersistentVideoError(Exception):
     """Raised when video acquisition fails."""
 
 
@@ -57,26 +62,6 @@ class VideoError(Exception):
 #: detection of front-facing podcast faces but degrades on side angles
 #: and small/distant faces. 360p is the balance.
 DEFAULT_QUALITY = "360"
-
-def _video_object_exists(key: str) -> bool:
-    """Same bucket as audio. Inlined here to avoid importing from
-    s3.py just for the head_object pattern."""
-    client = get_s3_client()
-    try:
-        client.head_object(Bucket=settings.s3_audio_bucket, Key=key)
-        return True
-    except Exception:
-        return False
-
-
-def _upload_video(key: str, file_path: str) -> None:
-    client = get_s3_client()
-    client.upload_file(
-        file_path,
-        settings.s3_audio_bucket,
-        key,
-        ExtraArgs={"ContentType": "video/mp4"},
-    )
 
 
 def _yt_dlp_low_res_video(video_id: str, output_dir: Path, quality: str) -> Path:
@@ -124,23 +109,23 @@ def _yt_dlp_low_res_video(video_id: str, output_dir: Path, quality: str) -> Path
 # Public API
 # ---------------------------------------------------------------------------
 
-def acquire_video(
+def acquire_persistent_video(
     session: Session,
     source: Source,
     *,
     quality: str = DEFAULT_QUALITY,
-) -> VideoResult:
+) -> PersistentVideoResult:
     """Pull video for a single Source. Idempotent on the S3 object.
 
     Sets ``sources.video_s3_key``. Does not touch ``ingestion_status``
     or any other state — video acquisition is independent of Scout's
     main audio-first lifecycle.
     """
-    media = resolve_youtube_media_source(source, error_cls=VideoError)
-    video_key = youtube_media_key(media, ".video.mp4")
+    media = resolve_youtube_media_source(source, error_cls=PersistentVideoError)
+    video_key = youtube_persistent_video_key(media)
 
     bytes_uploaded: int | None = None
-    if _video_object_exists(video_key):
+    if media_object_exists(video_key):
         logger.info(
             "Video already in S3: s3://%s/%s",
             settings.s3_audio_bucket, video_key,
@@ -150,7 +135,7 @@ def acquire_video(
             try:
                 local_path = _yt_dlp_low_res_video(media.video_id, Path(tmp), quality)
             except DownloadError as exc:
-                raise VideoError(
+                raise PersistentVideoError(
                     f"yt-dlp video download failed for {media.video_id}: {exc}"
                 ) from exc
 
@@ -160,7 +145,7 @@ def acquire_video(
                 "Downloaded video: %s (%.1f MB, quality<=%s)",
                 local_path.name, size_mb, quality,
             )
-            _upload_video(video_key, str(local_path))
+            upload_media_file(video_key, str(local_path), content_type="video/mp4")
             logger.info(
                 "Uploaded to s3://%s/%s",
                 settings.s3_audio_bucket, video_key,
@@ -169,7 +154,7 @@ def acquire_video(
     source.video_s3_key = video_key
     session.commit()
 
-    return VideoResult(
+    return PersistentVideoResult(
         source_id=media.source_id,
         video_s3_key=video_key,
         bytes_uploaded=bytes_uploaded,

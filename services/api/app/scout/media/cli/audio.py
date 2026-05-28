@@ -1,7 +1,7 @@
 """CLI driver for Scout's audio acquisition.
 
 Usage:
-    python -m app.scout.media.audio_cli <source_id>
+    python -m app.scout.media.cli.audio <source_id>
 
 Idempotent on the S3 object — re-running an already-collected source is a
 no-op (just confirms the audio is in S3 and the source row is up to date).
@@ -18,7 +18,7 @@ from sqlalchemy.orm import joinedload
 
 from jeromelu_shared.db import SessionLocal, Source
 
-from .audio import AudioError, acquire_audio
+from ..audio import AudioError, acquire_audio
 
 
 def main() -> int:

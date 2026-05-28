@@ -234,9 +234,10 @@ def enrollment_context(
             _convert_to_wav(m4a_path, full_wav_path)
 
         logger.info("Loading embedding model %s", EMBEDDING_MODEL)
+        from ._pyannote_compat import token_kwargs
         emb_model = Model.from_pretrained(
             EMBEDDING_MODEL,
-            use_auth_token=settings.huggingface_api_key,
+            **token_kwargs(settings.huggingface_api_key),
         )
         try:
             import torch
