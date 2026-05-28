@@ -25,53 +25,6 @@ Prefix the title with optional tags in square brackets:
 
 ## Open tasks
 
-### TASK-39: `archive_only=true` on supercoach-stats + new `populate_player_rounds` extractor
-
-**What.** Per [PLAN.md "Scout Phase 5"](./PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance) Interface §2 (SC stats branch) + §3.
-
-Two coupled pieces:
-
-1. **`archive_only=true` on supercoach-stats route** (`services/api/app/scout/supercoach_stats/routes.py`):
-   - Add `archive_only: bool = Query(default=False)` to the endpoint and thread into `run_supercoach_stats`.
-   - **Key behaviour difference vs nrl.com routes:** this route writes to DB inline via `_upsert_player_rounds`. When `archive_only=True`, skip BOTH the strict-parse AND the upsert; response carries `validated:false, validation_skipped:true, upserted:0`.
-   - When `archive_only=False` (today's path): unchanged — fetch → S3 → strict-parse → upsert → return `validated:true, upserted=N`.
-   - The S3 archive write at `nrlsupercoachstats/stats/{season}/round-{NN}.json` still runs unconditionally (it's before strict-parse).
-
-2. **New extractor `scripts/data/populate/phase_player_rounds.py`:**
-   - `populate_player_rounds(db: Session, *, seasons: list[int], commit: bool = True) -> dict[str, Any]` — module-level function.
-   - Pure-function helper `_extract_player_round_rows(payload: dict, *, season: int, round: int) -> list[dict[str, Any]]` mirroring the Phase 4.5 `_extract_leader_rows` pattern. Takes the S3 archive payload (`{season, round, rows}`), runs `extract_rows` (imported from `jeromelu_shared.scraping.nrl`) → `SuperCoachPlayerStats.model_validate` (D8 strict — note: this DOES run because the extractor is era-aware; if 2018 shape differs, that's surfaced loudly and we add a `models_legacy.py` for old years; **deferred to a follow-up issue if it trips, not solved here pre-emptively**). Returns dicts with identity + base + STAT_DB_COLUMNS keys per the route's `_upsert_player_rounds` pattern.
-   - Driver: `list_keys` for `scout/nrlsupercoachstats/stats/` then `read_json_concurrent`; per archive, run `_extract_player_round_rows`; bulk-upsert via the same `ON CONFLICT (player_id, round, season)` SQL the route uses.
-   - `commit: bool = True` plumbing per the [populate_db_from_s3 --dry-run](./META.md#populate_db_from_s3---dry-run--fixed-2026-05-24-phase-35--task-18) contract — applies in the bulk-upsert and in the final commit.
-   - Returns `{seasons, archives_read, rows_extracted, inserted, updated, failures}`.
-
-3. **Wire into orchestrator** `scripts/data/populate_db_from_s3.py`:
-   - Import `populate_player_rounds`.
-   - Add `"player_rounds"` to `PHASES` tuple **after** `"stats"` (FK order: player_rounds requires people from `identity`/`people` phases to resolve player_id properly; not strictly FK-coupled to `matches` but conceptually downstream).
-   - Add the `elif phase == "player_rounds"` arm calling `populate_player_rounds(db, seasons=args.seasons, commit=commit)`.
-
-4. **Unit tests:**
-   - `tests/unit/api/scout/supercoach_stats/test_archive_only.py` (new) — 3 cases mirroring TASK-38 (skips validation + skips upsert + default unchanged); verify `_upsert_player_rounds` is NOT called when archive_only=true (mock-spy).
-   - `tests/unit/scripts/data/populate/test_phase_player_rounds.py` (new) — pure-function tests over `_extract_player_round_rows`:
-     - `test_canonical_archive_round_trip` — synthetic SC stats payload with 3 known rows; assert the output dicts carry `(player_id, player_name, team, position, round, season, score, price, breakeven, minutes)` plus all `STAT_DB_COLUMNS` keys.
-     - `test_empty_rows_returns_empty` — payload with `rows: []` returns `[]`.
-     - `test_strict_parse_failure_per_row_does_not_abort` — one bad row in 3; the extractor records the failure in the return value's `failures` list, emits 2 good rows. (Matches the per-match validation_failures pattern in match-centre.)
-   - `tests/unit/scripts/data/populate/test_dry_run_flag.py` — augment the existing signature test to add `populate_player_rounds` to the function list it inspects (preserves the [TASK-18 commit-guard contract](./META.md#populate_db_from_s3---dry-run--fixed-2026-05-24-phase-35--task-18)).
-
-**How to verify.**
-- `pytest tests/unit/api/scout/supercoach_stats/test_archive_only.py -v` → 3 passed.
-- `pytest tests/unit/scripts/data/populate/test_phase_player_rounds.py -v` → all green.
-- `pytest tests/unit/scripts/data/populate/test_dry_run_flag.py -v` → still green (signature-coverage extended to include the new phase function).
-- `pytest tests/unit/scripts/data/populate/` → no regression (baseline 43 passed).
-- `pytest tests/unit/` → no regression.
-- `python -m scripts.data.populate_db_from_s3 --help` exits 0 and lists `player_rounds` in the `--phase` choices.
-- `python -m scripts.data.populate_db_from_s3 --phase player_rounds --dry-run --seasons 2026` exits 0; logs `--dry-run — rolling back all changes`; no DB writes (verify with `SELECT COUNT(*) FROM player_rounds` unchanged before/after).
-- Local end-to-end: `curl -X POST "http://localhost:8000/api/admin/scout/supercoach-stats?round=12&season=2026&archive_only=true" -H "X-Admin-Key: $LOCAL_ADMIN_KEY"` → `{ok:true, validated:false, validation_skipped:true, upserted:0, fetched:0}` + S3 object present at `nrlsupercoachstats/stats/2026/round-12.json`.
-- `git diff --stat` covers: `supercoach_stats/routes.py`, `populate_db_from_s3.py`, `populate/phase_player_rounds.py` (new), the 2 new test files, and the augmented `test_dry_run_flag.py`.
-
-**Proof notes.**
-
----
-
 ### TASK-40: `scout_backfill.py` — `--archive-only` + `--resume` + key-derivation table + unit tests
 
 **What.** Per [PLAN.md "Scout Phase 5"](./PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance) Interface §5.

@@ -1,6 +1,6 @@
 # Scout Phase 5 — Historical backfill + standard-data-model conformance
 
-**Date:** 2026-05-28 · **Status:** 🟡 In flight (2/10 tasks shipped) · **Plan:** [Scout Phase 5](../PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance)
+**Date:** 2026-05-28 · **Status:** 🟡 In flight (3/10 tasks shipped) · **Plan:** [Scout Phase 5](../PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance)
 
 **TL;DR** — Phase 5 lands historical NRL data (draw 1908+, match-centre 1990+, ladder 1996+, stats 2013+, SC stats 2018+) into the canonical DB schema. The load-bearing constraint is "all the data needs to conform to a standard data model" — era variance is reconciled by NULLs + a new `matches.data_coverage` column ('full' / 'lineups+timeline' / 'timeline_only' / 'fixture_only'), never by alternate tables or JSONB blobs. D8 strict-parse stays modern-only; backfill bypasses it via a new `archive_only=true` route flag. Era-tolerance lives in extractors, not in models. 10 tasks: 4 code (37-40), 4 operator backfills (41-44), 1 DB sweep (45), 1 closure (46).
 
@@ -56,6 +56,37 @@ Match-centre is the structural odd one out: the per-match strict-parse runs insi
 
 **adversarial-reviewer: PASS WITH CONCERNS** — 4 non-blocking concerns, all sanctioned: (C1) doc updates batched to TASK-46 per plan's deliberate split; (C2) live-curl deferred per Phase 4.5 TASK-30 precedent; (C3) match-centre default-path assertion form noted as unusual but sound on inspection (`"validated" not in response or response.get("validated") is None`); (C4) spec interpretation question — implementer chose unconditional-skip per the case-2 test demand; PLAN.md corroborates. **/simplify:** not run (`[skip-simplify]` per Phase 4 convention).
 
+### TASK-39 — archive_only=true on supercoach-stats + new populate_player_rounds extractor (`1e809bb`)
+Two coupled pieces:
+
+**(1) `services/api/app/scout/supercoach_stats/routes.py`** — `archive_only=True` added. Unlike the 4 nrl.com routes (TASK-38), this route writes to DB inline via `_upsert_player_rounds`; the `archive_only` path skips BOTH the strict-parse AND the inline DB upsert. S3 capture still runs (positioned before the new if-branch). Response on `archive_only=True`: `{ok:true, validated:false, validation_skipped:true, fetched:0, upserted:0}`. Default-False path unchanged.
+
+**(2) `scripts/data/populate/phase_player_rounds.py` (NEW)** — reads `scout/nrlsupercoachstats/stats/{season}/round-{NN}.json` archives. Pure `_extract_player_round_rows(payload, *, season, round_no) -> (rows, failures)` projection seam runs `extract_rows` + per-row `SuperCoachPlayerStats.model_validate` (non-aborting; per-row ValidationError captured into `failures[]`). `populate_player_rounds(db, *, seasons=None, commit=True)` driver bulk-UPSERTs into `player_rounds` with `ON CONFLICT ON CONSTRAINT uq_player_round_season` (same constraint name as the route's `_upsert_player_rounds`). `commit: bool = True` plumbing per TASK-18 contract. Wired into orchestrator as `--phase player_rounds` (appended to PHASES end; FK-correct).
+
+**Architectural deviation, surfaced for planner:** `phase_player_rounds.py` is the **first** `scripts/` module to import from `app.*` (`extract_rows` and `SuperCoachPlayerStats` live in `app.scout.supercoach_stats.*`, not `jeromelu_shared.scraping.nrl` as the plan said). The right fix is to relocate these shared SC types into `jeromelu_shared.scraping.nrl_models` — out of TASK-39 scope; works in prod (orchestrator runs inside `jeromelu-api` container where `app.*` is natively on PYTHONPATH).
+
+12 new test cases across 2 new files + 1 augmented:
+- `tests/unit/api/scout/supercoach_stats/test_archive_only.py` (4 cases): skips-validation-and-upsert, archive_only-still-skips-on-valid, default-runs-upsert, archive_response-called-under-archive_only. Mock-spy on `_upsert_player_rounds` proves the inline DB write is gated.
+- `tests/unit/scripts/data/populate/test_phase_player_rounds.py` (4 cases): canonical 3-row round-trip with full `_IDENTITY + _BASE + STAT_DB_COLUMNS` keyset; empty rows returns empty; per-row ValidationError doesn't abort the archive (synthetic via monkeypatched `extract_rows`); season/round_no kwargs override payload (key path authoritative).
+- `tests/unit/scripts/data/populate/test_dry_run_flag.py` (extended): added `populate_player_rounds` to `_PHASE_FUNCS`; 13 passing (was 12).
+
+**Proof:**
+- `pytest tests/unit/api/scout/supercoach_stats/test_archive_only.py -v` → **4 passed**.
+- `pytest tests/unit/scripts/data/populate/test_phase_player_rounds.py -v` → **4 passed**.
+- `pytest tests/unit/scripts/data/populate/test_dry_run_flag.py -v` → **13 passed** (was 12).
+- `pytest tests/unit/api/scout/` → **90 passed** (was 86 after TASK-38; +4).
+- `pytest tests/unit/scripts/data/populate/` → **59 passed** (was 54 after TASK-37; +5 = 4 extractor + 1 dry_run extension).
+- `pytest tests/unit/` → **388 passed, 0 failed** (was 379; +9 total). Zero regression.
+- `python -m scripts.data.populate_db_from_s3 --help` (with `PYTHONPATH=services/api;packages/shared;.`) → exit 0; `--phase {...,player_rounds,all}` listed.
+- **Reviewer-run end-to-end:** `python -m scripts.data.populate_db_from_s3 --phase player_rounds --dry-run --seasons 2026` → **11 archives read, 3280 rows extracted, inserted=0/updated=3280** (idempotent against existing 2026 data; strong proof of both correctness and idempotency).
+- `git diff --stat HEAD~` shows exactly the 6 expected files; `services/web/.claude/` untracked left alone.
+
+**Live curl verification deferred** per the **Phase 4.5 TASK-30 / TASK-38 precedent**.
+
+**adversarial-reviewer: PASS WITH CONCERNS** — 7 non-blocking concerns: (C1) `scripts/→app.*` cross-cutting import (architectural drift, surfaced as follow-up; prod-safe via container PYTHONPATH); (C2) `seasons` signature widened from required to optional — functionally safer; (C3) `validated:true` omitted on SC default path — interpretation pinned by test, consistent with HEAD; (C4) PHASES placement at the end vs "after stats" — FK-correct anyway; (C5) empty raw_rows still 502s before S3 — by-design per spec, noted for TASK-44 operator backfill (will surface as failures, not skips); (C6) test-count nitpick (immaterial); (C7) docs deferred to TASK-46 per plan's deliberate split. **/simplify:** not run.
+
+**Follow-up surfaced (cross-cutting, not self-queued):** Relocate `extract_rows` + `SuperCoachPlayerStats` from `services/api/app/scout/supercoach_stats/{fetcher,models}.py` into `jeromelu_shared.scraping.nrl_models` (or similar). Removes the new `scripts/→app.*` dependency; matches the CLAUDE.md "Separation of concerns" rule for shared types. Touches the route's import too. Plan/planner decision for future scheduling.
+
 ---
 
 ## How we know it's done (running)
@@ -81,4 +112,6 @@ Phase 5 is in flight. After TASK-37: the canonical schema has the `data_coverage
 - `4458a24` planner kickoff — Phase 5 plan + 10 tasks queued
 - `da5423d` TASK-37 — migration 071 + era-aware populate_matches + parent-coverage gate
 - `1dc4cee` TASK-37 checkoff — run report + META psql/Windows note
-- `5e6a95e` TASK-38 — archive_only=true mode on 4 nrl.com routes (this checkoff)
+- `5e6a95e` TASK-38 — archive_only=true mode on 4 nrl.com routes
+- `6f98548` TASK-38 checkoff — run report
+- `1e809bb` TASK-39 — archive_only on SC stats + new populate_player_rounds extractor (this checkoff)
