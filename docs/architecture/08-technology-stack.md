@@ -79,7 +79,8 @@ or one-shot CLI invocations driven via `make` targets.
 | `postgres` | Live | Lightsail container, named volume |
 | `caddy` | Live | Lightsail container, ACME via Let's Encrypt |
 | `services/gpu/` (lineup remote inference) | Live (on-demand) | SageMaker Async, `ml.g4dn.xlarge`, scale-to-zero |
-| `worker-publishing`, `worker-scraper`, `worker-orchestrator` | Dev-only (Temporal) | Local docker-compose, not deployed |
+| `worker-publishing`, `worker-orchestrator` | Dev-only (Temporal) | Local docker-compose, not deployed |
+| `worker-scraper` | Retired 2026-05-28 | Deleted from tree (Scout Phase 4 closure, TASK-28); activities migrated to `services/api/app/scout/<pipeline>/` per the [Scout charter](../agents/crew/scout/charter.md) D4 |
 | `worker-ingestion` | Superseded | Replaced by Scout `audio.py` + Analyst `transcribe.py` |
 | `worker-extraction`, `worker-decision` | Not built | — |
 

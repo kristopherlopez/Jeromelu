@@ -1,7 +1,9 @@
 """NRL SuperCoach scraping utilities.
 
 Shared team-code mapping, name normalization, and deterministic player ID
-generation used by the worker-scraper activities.
+generation. Originally split out of the worker-scraper activities (which
+were retired and deleted 2026-05-28); now used by the Scout pipelines
+under ``services/api/app/scout/``.
 """
 
 import hashlib

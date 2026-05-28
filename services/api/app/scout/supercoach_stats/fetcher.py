@@ -1,10 +1,10 @@
 """Fetch + extract per-round SuperCoach stats from nrlsupercoachstats.com.
 
-Self-contained: inlines the jqGrid pagination logic (~50 lines) rather
-than importing from services/worker-scraper/, which is marked for
-retirement in Phase 4 of the Scout charter. The cleaning/parsing
-utilities (JQGRID_COLUMN_MAP, extract_all_stats, parsers) live in
-jeromelu_shared.scraping.nrl and are shared across Scout pipelines.
+Self-contained: inlines the jqGrid pagination logic (~50 lines). The
+predecessor Temporal worker at `services/worker-scraper/` was retired and
+deleted 2026-05-28 (Scout Phase 4 closure / TASK-28); the cleaning /
+parsing utilities (JQGRID_COLUMN_MAP, extract_all_stats, parsers) live
+in `jeromelu_shared.scraping.nrl` and are shared across Scout pipelines.
 
 After fetching, every extracted row is parsed through `SuperCoachPlayerStats`
 (strict Pydantic per D8) — drift on any field we depend on raises.

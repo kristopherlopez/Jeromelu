@@ -42,13 +42,8 @@ Temporal Server
 │   ├── FeedGenerationWorkflow
 │   └── KBGenerationWorkflow
 │
-├── worker-scraper (scraper)
-│   └── ScraperSweepWorkflow
-│       ├── fetch_prices ✓
-│       ├── fetch_scores ✗ (stub)
-│       ├── fetch_teamlists ✗ (stub)
-│       ├── validate_data ✓
-│       └── persist_player_rounds ✓
+├── worker-scraper (scraper) — RETIRED 2026-05-28 (Scout Phase 4 closure;
+│                                migrated to services/api/app/scout/<pipeline>/)
 │
 ├── worker-extraction (extraction) — NOT YET BUILT
 └── worker-decision (decision) — NOT YET BUILT

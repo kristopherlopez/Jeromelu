@@ -127,7 +127,7 @@ A future Phase 5 could replace external cron with an in-process APScheduler if c
 
 ### D4. Disposition of `services/worker-scraper/`
 
-**Decision (locked): migrate the activities into per-pipeline folders under `services/api/app/scout/` per D9; retire the Temporal worker.** Per project memory, Temporal is not in production. The activities (`teamlists.py` and any siblings) become module-level functions inside the relevant pipeline folder (`scout/nrlcom_teamlists/fetcher.py`, etc.), called from admin endpoints under the unified Scout audit pattern. The `worker-scraper` directory stays in tree for a phase, with no new code, and is retired in Phase 4. **Status (2026-05-28):** directory is orphaned (no code, compose, CI, or deploy-script references); retirement (delete the directory + doc sweep) is queued as Phase 4 / TASK-28.
+**Decision (locked): migrate the activities into per-pipeline folders under `services/api/app/scout/` per D9; retire the Temporal worker.** Per project memory, Temporal is not in production. The activities (`teamlists.py` and any siblings) become module-level functions inside the relevant pipeline folder (`scout/nrlcom_teamlists/fetcher.py`, etc.), called from admin endpoints under the unified Scout audit pattern. **Status: retired 2026-05-28** (Phase 4 closure / TASK-28). The `services/worker-scraper/` directory was orphaned (no code, compose, CI, or deploy-script references) and has been deleted; live doc references were swept. The corresponding system doc [`scraper.md`](../../system/scraper.md) remains as historical reference.
 
 ### D5. Skills disposition
 

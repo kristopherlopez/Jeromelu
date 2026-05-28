@@ -1,19 +1,17 @@
 ---
-tags: [area/agents, subarea/system, status/partial]
+tags: [area/agents, subarea/system, status/retired]
 ---
 
 # Scraper
 
-> **Reframe note (2026-05-12).** Per the [Scout charter expansion](../crew/scout/charter.md), the scraper is a **Scout component, marked for retirement**. The Temporal-shaped `worker-scraper` is being unwound: its activities migrate into per-pipeline folders under `services/api/app/scout/<pipeline_name>/` (per D9), wrapped by admin endpoints, all writing under `agent_id='scout'` with a `detail_json.pipeline` discriminator. The "Fixture / Match / Injury sync (planned)" section below describes pipelines that are now part of Scout's expanded charter and will be built there, not as new Temporal activities. The Bookkeeper consumes the resulting `player_rounds` rows but no longer owns the acquisition.
->
-> This doc remains as the historical reference for the Temporal worker until it's retired in Phase 4 of the charter rollout. New scraping work should look at [`scout.md`](../crew/scout/README.md) and the [charter expansion draft](../crew/scout/charter.md), not here.
+> **🪦 Retired and deleted 2026-05-28** (Scout Phase 4 closure, TASK-28). The `services/worker-scraper/` Temporal worker has been removed from the repository — its activities never ran in production, and every pipeline it owned (or was a stub for) now lives under `services/api/app/scout/<pipeline>/` per the [Scout charter expansion](../crew/scout/charter.md) (D4). New scraping work goes there, wrapped by admin endpoints under `agent_id='scout'`. This doc remains as the **historical reference** for what the worker did before retirement; the corresponding crew counterpart is [Scout](../crew/scout/README.md).
 
 | | |
 |---|---|
-| **Worker** | `services/worker-scraper/app/main.py` *(legacy; marked for retirement)* |
-| **Task Queue** | `scraper` |
-| **New crew counterpart** | [Scout](../crew/scout/README.md) *(Bookkeeper consumes downstream)* |
-| **Status** | Active in dev only; per-project-memory, Temporal is not in production. |
+| **Worker** | ~~`services/worker-scraper/app/main.py`~~ *(retired and deleted 2026-05-28)* |
+| **Task Queue** | `scraper` (no longer registered) |
+| **Replacement** | [Scout](../crew/scout/README.md) — per-pipeline folders under `services/api/app/scout/`, admin-endpoint-driven, audited under `agent_id='scout'` |
+| **Status** | **Retired.** Never reached production; Temporal is not deployed (per project memory). |
 
 ---
 
@@ -21,8 +19,8 @@ tags: [area/agents, subarea/system, status/partial]
 
 | | |
 |---|---|
-| **Workflow** | `services/worker-scraper/app/workflows/scraper_sweep.py` |
-| **Purpose** | Fetch NRL SuperCoach data (scores, prices, team lists) on a weekly schedule |
+| **Workflow** | ~~`services/worker-scraper/app/workflows/scraper_sweep.py`~~ *(deleted 2026-05-28)* |
+| **Purpose** | Fetch NRL SuperCoach data (scores, prices, team lists) on a weekly schedule — superseded by `services/api/app/scout/supercoach_stats/` (shipped Phase 2) and the nrl.com Scout pipelines (Phases 3–4) |
 
 **Schedule:**
 - Monday 6 AM AEST: scores
@@ -56,7 +54,7 @@ tags: [area/agents, subarea/system, status/partial]
 
 ## Standalone Fetcher Scripts
 
-In `scripts/fetchers/`. Fetch NRL stats but are **not yet wired into Temporal** — they run manually and write to local YAML files. They use the same shared scraping utilities as `worker-scraper`.
+In `scripts/fetchers/`. Fetch NRL stats but were **never wired into Temporal** — they run manually and write to local YAML files. They use the same shared scraping utilities the (now-retired) `worker-scraper` did.
 
 | Script | Source | Output | Purpose |
 |---|---|---|---|
@@ -66,7 +64,7 @@ In `scripts/fetchers/`. Fetch NRL stats but are **not yet wired into Temporal** 
 
 **Usage:** `python scripts/fetchers/fetch_player_stats.py --round 2 --season 2026`
 
-These are candidates for promotion into `worker-scraper` Temporal activities once the stubs are replaced.
+These were historically candidates for promotion into `worker-scraper` Temporal activities. With `worker-scraper` retired, future structural work on them follows the Scout pattern instead — per-pipeline folders under `services/api/app/scout/`, admin-endpoint-driven.
 
 ---
 

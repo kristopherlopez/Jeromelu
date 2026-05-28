@@ -49,4 +49,4 @@ The strict Pydantic model is over the **extracted** shape, not the raw jqGrid ro
 
 ## Legacy code
 
-The Temporal-shaped equivalent lives in `services/worker-scraper/app/activities/{prices,persist,validation}.py`. That worker is marked for retirement in Phase 4 of the charter; no new code goes there. The shared utilities in `jeromelu_shared.scraping.nrl` remain canonical.
+The Temporal-shaped equivalent used to live in `services/worker-scraper/app/activities/{prices,persist,validation}.py`. That worker was **retired and deleted 2026-05-28** (Scout Phase 4 closure / TASK-28). The shared utilities in `jeromelu_shared.scraping.nrl` remain canonical.

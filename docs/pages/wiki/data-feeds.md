@@ -126,9 +126,9 @@ This is the inventory: every input table the wiki depends on, what populates it,
 | **L1** | `teams` | Seed scripts | ✅ 58 rows | `scripts/data/seed_teams.py` | **Yes** — seed → ongoing refresh |
 | **L1** | `venues` | Seed scripts | ✅ 27 rows | `scripts/data/seed_venues.py` | **Yes** — seed → ongoing |
 | **L1** | `channels` | Scout discovery + recon approval | ✅ 14 rows | `services/api/app/scout/`, `routers/recon.py` | **Yes** — already in scope |
-| **L2** | `player_rounds` | SuperCoach scraper (per-round stats) | ❌ 0 rows | `scripts/data/fetchers/fetch_player_stats.py`, `services/worker-scraper/` | **Yes** (currently Bookkeeper/scraper) |
+| **L2** | `player_rounds` | SuperCoach scraper (per-round stats) | ❌ 0 rows | `scripts/data/fetchers/fetch_player_stats.py`; shipped Phase 2 module `services/api/app/scout/supercoach_stats/` (was: `services/worker-scraper/`, retired 2026-05-28) | **Yes** (Scout — Phase 2 shipped) |
 | **L2** | `matches` | NRL.com fetcher | ❌ 0 rows | `scripts/data/fetchers/fetch_match_stats.py` | **Yes** (currently scraper) |
-| **L2** | `match_team_lists` | NRL.com team list fetcher | ❌ 0 rows | `scripts/data/fetchers/fetch_teamlists.py`, `services/worker-scraper/app/activities/teamlists.py` | **Yes** (currently scraper) |
+| **L2** | `match_team_lists` | NRL.com team list fetcher | ❌ 0 rows | `scripts/data/fetchers/fetch_teamlists.py`; shipped via Scout `services/api/app/scout/nrlcom_match_centre/` (Phase 3 ingest) + `scripts/data/populate/phase_team_lists.py` (Phase 3.5 extractor). Previously stub-only in `services/worker-scraper/app/activities/teamlists.py` (retired 2026-05-28). | **Yes** (Scout — Phase 3/3.5 shipped) |
 | **L2** | `injuries` | NRL.com casualty ward fetcher | ❌ 0 rows | *Code does not exist yet* | **Yes** (new pipeline to build) |
 | **L2** | `rounds` | NRL.com draw fetcher | ❌ 0 rows | *Code does not exist yet* | **Yes** (new pipeline to build) |
 | **L3** | `sources` | Scout discovery | ✅ 2,235 rows | `services/api/app/scout/source_discovery/agent.py`, `youtube/refresh.py` | **Yes** — already in scope |
@@ -239,7 +239,7 @@ The Extract-only rule still applies — Scout fetches raw, Analyst transforms:
 ### Implications of the expansion
 
 - [`scout.md`](../../agents/crew/scout/README.md) needs a scope rewrite: §"What Scout DOES NOT cover" currently lists "Numeric NRL data" and "Player roster registry" as out-of-scope; both move into scope.
-- [`scraper.md`](../../agents/system/scraper.md) becomes a *system component* under Scout (the `services/worker-scraper/` Temporal worker) rather than a Bookkeeper-owned subsystem. Bookkeeper consumes the data; Scout produces it.
+- [`scraper.md`](../../agents/system/scraper.md) was a *system component* under Scout (the `services/worker-scraper/` Temporal worker) rather than a Bookkeeper-owned subsystem; the worker is **retired and deleted 2026-05-28** (Phase 4 closure / TASK-28) and the doc remains as historical reference. Bookkeeper consumes the data; Scout produces it.
 - The [Bookkeeper crew doc](../../agents/crew/bookkeeper/README.md) needs a corresponding scope clarification — it becomes a *consumer* and *math-runner*, not a fetcher.
 - The fetcher scripts under `scripts/data/fetchers/` migrate into per-pipeline folders under `services/api/app/scout/<pipeline_name>/` (per D9 of the charter), each with its own fetcher, models, route, and README — alongside the legacy flat-file media-inventory code.
 - Audit pattern (`agent_runs` with `agent_id='scout'`) extends to all acquisition pipelines, giving us one dashboard for "is data acquisition healthy?"
@@ -283,8 +283,8 @@ The unblock order, ranked by leverage (most pages affected per unit of work):
 
 These need answers before Scout's charter expansion ships, and most influence the Archivist build downstream.
 
-1. ~~**Where exactly does the scraper code live after the move?**~~ *Resolved (2026-05-12) by charter D9.* Each pipeline lives in its own folder under `services/api/app/scout/<pipeline_name>/`; `services/worker-scraper/` is retired in Phase 4 of the charter rollout, with no new code added.
-2. **Cron orchestration — who runs the L2 fetchers, and how often?** Today they're skill-runnable but not on a schedule. Options: (a) APScheduler in the API process, (b) the `scheduler` skill, (c) external cron on the prod box, (d) the `worker-scraper` service runs a schedule loop. Pick one and standardise.
+1. ~~**Where exactly does the scraper code live after the move?**~~ *Resolved (2026-05-12) by charter D9.* Each pipeline lives in its own folder under `services/api/app/scout/<pipeline_name>/`; **`services/worker-scraper/` was retired and deleted 2026-05-28** (Phase 4 closure / TASK-28).
+2. ~~**Cron orchestration — who runs the L2 fetchers, and how often?**~~ *Resolved by charter D3 + Phase 3/4 closure.* External cron on the prod box (`scripts/cron.d/jeromelu`) hits the admin endpoints — see `scripts/scout-refresh.sh`. (Option (d) above — the `worker-scraper` service running a schedule loop — is moot now that the worker is retired.)
 3. **Should fetchers populate via the same `agent_runs` audit pattern as Scout's media-discovery loops?** Yes if Scout's expanded charter is real — gives one dashboard. Means the deterministic fetcher runs need a `record_agent_started/ended` wrapper.
 4. **Does Bookkeeper become consume-only after this move?** Yes — Bookkeeper becomes a math/derivation layer over the data Scout fetches. Bookkeeper docs need updating.
 5. **NRL.com endpoint stability.** The casualty ward and round-metadata endpoints (per memory note) are public JSON but undocumented. Building the injury and round fetchers means committing to maintaining them when NRL.com changes shape.
@@ -299,7 +299,7 @@ If the Scout-charter expansion is approved, the following docs need updating as 
 | Doc | Change |
 |-----|--------|
 | [`docs/agents/crew/scout/README.md`](../../agents/crew/scout/README.md) | §"What Scout DOES cover" gains all L2 acquisition pipelines. §"What Scout DOES NOT cover" loses "Numeric NRL data" and "Player roster registry". §"Pipeline position" diagram updated. |
-| [`docs/agents/system/scraper.md`](../../agents/system/scraper.md) | Reframed as a Scout component (the `worker-scraper` service), not a Bookkeeper subsystem. Cross-link to Scout. |
+| [`docs/agents/system/scraper.md`](../../agents/system/scraper.md) | Reframed as a Scout component (the `worker-scraper` service), not a Bookkeeper subsystem. Cross-link to Scout. **(Worker retired and deleted 2026-05-28; doc kept as historical reference.)** |
 | [`docs/agents/crew/bookkeeper/README.md`](../../agents/crew/bookkeeper/README.md) | Scope clarification: Bookkeeper is consume-only over the data Scout fetches. |
 | [`docs/agents/crew/README.md`](../../agents/crew/README.md) | Update the Bookkeeper one-liner to reflect consume-only scope. |
 | [`docs/agents/crew/dynamics.md`](../../agents/crew/dynamics.md) | Cadence table — Bookkeeper trigger becomes "Scout scrape complete" instead of "scraper sweep complete". |
