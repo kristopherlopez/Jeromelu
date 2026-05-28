@@ -148,6 +148,7 @@ The human IAM user (`kristopher.lopez`) has `ssm:DescribeParameters` but **not**
 - **API**: FastAPI + uvicorn on port 8000, venv at `services/api/.venv`.
 - **Infra**: Docker Compose at `docker/docker-compose.yml`.
 - **Make targets**: `up`, `down`, `api`, `web`, `db-shell`, `logs`, `clean`, `migrate`, `test`, `test-eval`.
+- **`make migrate` on Windows**: requires `psql` on PATH. PostgreSQL 17/18 installers put it at `C:\Program Files\PostgreSQL\<ver>\bin\psql.exe` but Git Bash doesn't pick it up automatically. Workaround: `PATH="/c/Program Files/PostgreSQL/17/bin:$PATH" bash packages/db/migrate.sh`. Don't fall back to `docker exec psql` — that bypasses `schema_migrations` tracking and creates drift (META invariant).
 
 ---
 

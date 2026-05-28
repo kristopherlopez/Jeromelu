@@ -25,52 +25,6 @@ Prefix the title with optional tags in square brackets:
 
 ## Open tasks
 
-### TASK-37: Migration 061 — `matches.data_coverage` + era-aware `populate_matches` + parent-coverage gate
-
-**What.** Per [PLAN.md "Scout Phase 5"](./PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance) Interface §1 + §4.
-
-1. **Migration** `packages/db/migrations/061_matches_data_coverage.sql`:
-   ```sql
-   ALTER TABLE matches ADD COLUMN data_coverage text NOT NULL DEFAULT 'full';
-   ALTER TABLE matches ADD CONSTRAINT matches_data_coverage_chk
-     CHECK (data_coverage IN ('full', 'lineups+timeline', 'timeline_only', 'fixture_only'));
-   ```
-   Apply via `make migrate`. Existing rows take the `'full'` default — that's correct because current `matches` is 2024+ data.
-
-2. **Era-aware `populate_matches`** in `scripts/data/populate/phase_matches.py`:
-   - Today reads `scout/nrlcom/match-centre/*` only. After this task it ALSO walks `scout/nrlcom/draw/*` and emits a row per draw fixture that has no corresponding match-centre archive.
-   - Extend `_extract_one` (match-centre projection) to set `data_coverage`:
-     - `'full'` if the match-centre payload has a `stats.players` array (non-empty).
-     - `'lineups+timeline'` if it has `players` but no `stats.players`.
-     - `'timeline_only'` if it has `timeline` but no `players`.
-     - Default still `'full'` (existing modern-shape behaviour preserved).
-   - New helper `_extract_from_draw_fixture(fixture: dict, *, season: int, round: int, competition: int, team_map, venue_map) -> dict | None` — projects a single draw fixture to a `matches` row with `data_coverage='fixture_only'`, status from `fixture.matchState` (use the existing `_STATUS_MAP`), `external_match_id` from `fixture.matchId` (string).
-   - Driver loop additions:
-     - List both `scout/nrlcom/match-centre/{comp}/*` and `scout/nrlcom/draw/{comp}/*`.
-     - For draw archives: walk every fixture; skip if a match-centre key exists at the derived path (`scout/nrlcom/match-centre/{comp}/{season}/round-{NN}/{slug}.json` where slug comes from `fixture.matchCentreUrl`); otherwise project via `_extract_from_draw_fixture`.
-     - Upsert SQL unchanged (existing partial unique index covers both code paths).
-
-3. **Parent-coverage gate** in child extractors: `scripts/data/populate/phase_team_lists.py`, `phase_stats.py`, `phase_timeline.py` — when reading a match-centre archive, look up `matches.data_coverage` for the resolved match; if it's `'fixture_only'`, skip child row writes (defensive — fixture_only matches will never have a match-centre archive, but the guard prevents orphans if archives arrive out of order).
-
-4. **Unit tests** `tests/unit/scripts/data/populate/test_phase_matches.py` (extend, don't replace):
-   - `test_full_match_centre_emits_data_coverage_full` — existing 2026 fixture used in current tests; assert `data_coverage='full'`.
-   - `test_timeline_only_match_centre_emits_data_coverage_timeline_only` — small fixture with `timeline` array but no `players`/`stats`; assert `data_coverage='timeline_only'`.
-   - `test_draw_only_fixture_emits_data_coverage_fixture_only` — synthetic 1908 draw fixture (no match-centre archive); assert `data_coverage='fixture_only'`, no team_lists/stats rows produced.
-   - `test_match_centre_present_skips_draw_projection` — both archives present; assert only one row emitted (match-centre wins).
-
-**How to verify.**
-- `make migrate` runs clean; `make migrate-status` shows 061 applied; `psql -c "SELECT column_name, data_type, column_default FROM information_schema.columns WHERE table_name='matches' AND column_name='data_coverage'"` returns one row with default `'full'::text` and the CHECK constraint visible via `\d matches`.
-- `psql -c "SELECT data_coverage, COUNT(*) FROM matches GROUP BY 1"` on local dev → all existing rows `'full'` (no other values yet).
-- `pytest tests/unit/scripts/data/populate/test_phase_matches.py -v` — all green, includes the four new cases above.
-- `pytest tests/unit/scripts/data/populate/` — full populate suite green, no regression (baseline was 43 passed per Phase 4.5 TASK-34 run report).
-- `pytest tests/unit/` — full unit suite green (baseline 355 passed).
-- Dry-run check: `python -m scripts.data.populate_db_from_s3 --phase matches --dry-run --seasons 2026` exits 0; reports counts; rollback at end.
-- `git diff --stat` for the commit covers: migration, `phase_matches.py`, `phase_team_lists.py`, `phase_stats.py`, `phase_timeline.py`, `test_phase_matches.py` only — no other phase touched.
-
-**Proof notes.**
-
----
-
 ### TASK-38: `archive_only=true` mode on 4 nrl.com routes (draw, match-centre, ladder, stats)
 
 **What.** Per [PLAN.md "Scout Phase 5"](./PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance) Interface §2.
