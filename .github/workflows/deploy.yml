@@ -1,7 +1,21 @@
 name: Build & Deploy
 
+# Gated on `Tests` workflow success. The `tests.yml` job set (pytest,
+# web-typecheck, web-lint, ruff, pyright, gitleaks) runs on every push
+# to master; on green completion this workflow fires via workflow_run
+# and either deploys (if any of api/web/video-worker/deploy_only paths
+# changed) or no-ops (path filter has nothing to build).
+#
+# `workflow_dispatch` is the emergency-override path — runs immediately
+# regardless of Tests state. Use sparingly; the gate exists to stop bad
+# code shipping.
+#
+# Per docs/build/META.md "Run reports" — TASK-51 (Engineering quality
+# hardening — Tier 1) landed this gate 2026-05-28.
 on:
-  push:
+  workflow_run:
+    workflows: [Tests]
+    types: [completed]
     branches: [master]
   workflow_dispatch:
 
@@ -23,6 +37,13 @@ jobs:
   #     a new service should ride this pipeline.
   detect-changes:
     runs-on: ubuntu-latest
+    # Guard: under workflow_run trigger, only proceed if Tests was
+    # green; under workflow_dispatch (manual), proceed unconditionally.
+    # Every downstream job `needs: detect-changes`, so this single
+    # if-guard gates the whole pipeline.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     outputs:
       api: ${{ steps.changes.outputs.api }}
       web: ${{ steps.changes.outputs.web }}
@@ -93,8 +114,14 @@ jobs:
         if: matrix.changed == 'true'
         run: |
           IMAGE="${{ env.ECR_REGISTRY }}/${{ matrix.ecr_repo }}"
-          docker build -f ${{ matrix.path }}/Dockerfile -t $IMAGE:${{ github.sha }} -t $IMAGE:latest .
-          docker push $IMAGE:${{ github.sha }}
+          # Under workflow_run, github.sha is the default-branch HEAD
+          # at action-dispatch time, which may drift from the SHA Tests
+          # actually validated. Use head_sha from the upstream workflow_run
+          # event for fidelity; fall back to github.sha for
+          # workflow_dispatch (where workflow_run context is absent).
+          SHA="${{ github.event.workflow_run.head_sha || github.sha }}"
+          docker build -f ${{ matrix.path }}/Dockerfile -t $IMAGE:$SHA -t $IMAGE:latest .
+          docker push $IMAGE:$SHA
           docker push $IMAGE:latest
 
   deploy-lightsail:

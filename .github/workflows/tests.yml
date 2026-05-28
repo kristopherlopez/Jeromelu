@@ -1,6 +1,12 @@
 name: Tests
 
-# Runs the unit tier (tests/unit/) on every PR and on push to master.
+# Runs the 6 quality gates on every PR and on push to master:
+#   unit            — pytest tests/unit
+#   web-typecheck   — tsc --noEmit (services/web)
+#   web-lint        — npm run lint (services/web)
+#   ruff            — Python lint + format check
+#   pyright         — Python typecheck (packages/shared/jeromelu_shared)
+#   gitleaks        — secret scan (working tree / PR diff)
 #
 # Lightweight by design: requirements-test.txt deliberately excludes the
 # ML stack (torch, pyannote, deepgram, insightface, opencv, anthropic,
@@ -8,10 +14,11 @@ name: Tests
 # app.analyst.transcribe_helpers — that module avoids the diarize ->
 # pyannote -> torch chain so this CI runs in seconds, not minutes.
 #
-# This workflow does NOT gate deploy.yml. Failing tests show as a red
-# status check + email; deploy.yml runs independently. Once this proves
-# stable, add `needs: tests` to the deploy-lightsail job to make it a
-# hard gate. See tests/README.md for the tier split.
+# This workflow GATES deploy.yml via workflow_run since TASK-51
+# (2026-05-28). On red, deploy.yml does NOT trigger; emergency
+# overrides use workflow_dispatch on deploy.yml. See docs/ops/ci-cd.md
+# "Tests gate" section for the mechanism. See tests/README.md for the
+# test-tier split.
 
 on:
   pull_request:

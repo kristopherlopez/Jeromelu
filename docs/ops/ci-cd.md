@@ -9,8 +9,8 @@ Four workflows live under `.github/workflows/`:
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `deploy.yml` | push to `master`, `workflow_dispatch` | Build api/web images → push to ECR → restart compose stack on Lightsail → invalidate CloudFront. |
-| `tests.yml` | PR / push to `master` | `pytest tests/unit` + `tsc --noEmit` on `services/web`. Runs unconditionally — does NOT gate `deploy.yml` (yet). |
+| `deploy.yml` | **`workflow_run` on `Tests` (master, success only)**, `workflow_dispatch` | Build api/web images → push to ECR → restart compose stack on Lightsail → invalidate CloudFront. Gated on `Tests` success since TASK-51 (2026-05-28); manual dispatch bypasses the gate for emergency deploys. |
+| `tests.yml` | PR / push to `master` | 6 parallel jobs: `pytest tests/unit`, `tsc --noEmit` (services/web), `npm run lint` (services/web), `ruff check + format`, `pyright` (packages/shared), `gitleaks` (working tree). All hard-fail. Gates `deploy.yml` via `workflow_run`. |
 | `terraform.yml` | PR / push touching `infra/terraform/**` | `fmt -check` + `init` + `validate` + `plan`; comments the plan on PRs. **Apply stays manual.** |
 | `cost-report.yml` | `schedule: cron '0 22 * * *'` (22:00 UTC daily), `workflow_dispatch` | Runs `scripts/cost_report.py`: queries Cost Explorer for MTD spend by service + projection, describes the live resources, ships an HTML email via SES from `reports@jeromelu.ai` to `kristopher.lopez@gmail.com`. |
 
@@ -45,20 +45,38 @@ Anything outside those globs does not trigger CI builds or deploys.
 
 - **`services/gpu`** — the GPU container deploys out-of-band via `services/gpu/build_and_push.sh` + `services/gpu/deploy.py` (different runtime, different cadence — SageMaker Async on `ml.g4dn.xlarge`).
 - **Database migrations** — notify-only by design. Apply on the box.
-- **Tests + web typecheck** — run in `tests.yml` (see below). Not yet a hard gate on `deploy.yml`, but failures still show as red status checks on the commit.
+
+### Tests gate (TASK-51, 2026-05-28)
+
+`deploy.yml` is now gated on `tests.yml` success via the `workflow_run` trigger. Mechanism:
+
+- On every push to `master`, `tests.yml` runs first.
+- If **any** job in `tests.yml` fails (pytest, web-typecheck, web-lint, ruff, pyright, gitleaks), `deploy.yml` does **not** start. The triggering commit ships nothing.
+- If all 6 jobs pass, `deploy.yml` fires automatically. `workflow_run.head_sha` (used for image tagging) is the SHA `tests.yml` actually validated — not the current default-branch HEAD, which could drift.
+
+**Emergency override.** `workflow_dispatch` on `deploy.yml` runs immediately regardless of `tests.yml` state. The conditional guard in `detect-changes` (`if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'`) lets the manual path through unconditionally. Use only when shipping a hotfix while CI is flaky — every other path goes through the gate.
 
 If a new service should ride this pipeline, add a path filter to `detect-changes`, a matrix entry to `build-and-push`, and update this document.
 
 ---
 
-## `tests.yml` — unit tests + web typecheck
+## `tests.yml` — quality gates
 
-Runs on every PR and every push to `master`. Two jobs in parallel:
+Runs on every PR and every push to `master`. **Six parallel jobs** — each is a hard-fail gate, and the workflow's aggregate status gates `deploy.yml` via `workflow_run`.
 
 1. **`unit`** — `pytest tests/unit` against `requirements-test.txt`. Lightweight by design: the ML stack (torch, pyannote, deepgram, insightface, opencv) is deliberately excluded. See `tests/README.md` for tier layout.
 2. **`web-typecheck`** — `tsc --noEmit` on `services/web`. Runs **unconditionally** (no paths-filter), because the Docker build in `deploy.yml` IS gated by paths-filter — a broken TS import landing in a non-web commit would otherwise stay invisible until the next web-touching commit. This job surfaces the failure at the originating commit. ~1-2 min.
+3. **`web-lint`** — `npm run lint` on `services/web`. Hard-fails on errors; warnings are informational. Several React 19 advisory rules (`react-hooks/refs`, `react-hooks/set-state-in-effect`, `react-hooks/immutability`, `react-hooks/incompatible-library`) are downgraded to `warn` in `services/web/eslint.config.mjs` pending incremental migration. Added by TASK-48.
+4. **`ruff`** — `ruff check + format --check` over `services packages scripts tests`. Pins `ruff==0.15.14`. Config in root `pyproject.toml [tool.ruff]`. Added by TASK-47.
+5. **`pyright`** — `pyright` over `packages/shared/jeromelu_shared/` (narrow include). Pins `pyright==1.1.409`. Config in `pyproject.toml [tool.pyright]`. Added by TASK-49.
+6. **`gitleaks`** — `gitleaks/gitleaks-action@v2` scans the PR diff (or master HEAD) for secrets. Config in `.gitleaks.toml`. Added by TASK-50.
 
-Neither job currently gates `deploy.yml`. Promote to a hard gate by adding `needs: [unit, web-typecheck]` on `deploy-lightsail` once they prove stable.
+### Quality gates — how to silence a false positive
+
+- **Ruff** — per-file ignore in `pyproject.toml [tool.ruff.lint.per-file-ignores]` for file-scoped issues; inline `# noqa: <RULE>  # <rationale>` for per-line. Never silence without rationale.
+- **Pyright** — inline `# pyright: ignore[reportXxx]  # <rationale>` per line. Never silence without rationale; never blanket-ignore a file.
+- **ESLint** — per-line `// eslint-disable-next-line <rule>  // <rationale>`, or downgrade the rule severity in `services/web/eslint.config.mjs` if the codebase needs incremental migration (see the React 19 advisory rules for the precedent).
+- **Gitleaks** — `[[allowlists]]` entry in `.gitleaks.toml` with a `description` rationale. Narrow regex preferred over path-blanket. Never inline `# gitleaks:allow` comments.
 
 ### Local mirror — pre-push hook
 
