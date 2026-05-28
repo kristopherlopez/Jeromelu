@@ -84,11 +84,18 @@ D8-hardened ingest (envelope **and** item/stats strict — deeper than draw/matc
 
 **Follow-up (cross-cutting, surfaced — not self-queued):** the extractors stay **manual / backfill-driven** for now (the Phase 3.5 precedent), so the daily ingest cron archives to S3 but the DB only refreshes when an operator runs `populate_db_from_s3`. The same gap applies to the Phase 3.5 match-centre extractors. The durable fix — bake `scripts/` + `packages/shared` into the api image (or a managed ops venv) so a scheduled `docker exec jeromelu-api python -m scripts.data.populate_db_from_s3 …` just works — is an infra decision for the human/planner.
 
-### Phase 4.5 — NRL.com stats + players roster + Draft mode (optional) — Backlog
+### Phase 4.5 — NRL.com stats + players roster ✅ Shipped (2026-05-28)
 
-- New `scout/nrlcom_stats/` — pre-computed leaderboards (top-25 per category) for the wiki's `## Key Players` and Bookkeeper's leaderboard queries.
-- New `scout/nrlcom_players_roster/` — fold the existing `jeromelu_shared/players/nrlcom_refresh.py` enrichment into a proper folder per D9.
-- Optional: SuperCoach Draft mode (`scout/supercoach_draft_*`) — parallel of classic, if Draft becomes a product concern.
+Hardening replay of the existing (but unhardened) `scout/nrlcom_stats/` + `scout/nrlcom_players_roster/` ingest folders + the existing `populate_stat_leaderboards` extractor. Discovery (2026-05-28) found the fetchers/routes/`make` targets + migration 060 + the extractor already shipped pre-phase; the gap was the D8 contract, route ValidationError-aborts, extractor unit tests via pure-function refactor, cron scheduling, and prod seed verification. NRL only (comp 111), season 2026, forward-only — historical backfill stays Phase 5.
+
+- ✅ Shipped: `scout/nrlcom_stats/` — D8 four-level strict (envelope + category + subgroup + leader, with single-model player-vs-team leader bifurcation per the `NrlcomDraw.videoProviders` precedent); route ValidationError → 500; live drift test under `SCOUT_DRIFT_LIVE=1`; daily cron 18:50 UTC; `_extract_leader_rows` pure-function refactor + 6 unit tests. **Seeded 2026-05-28** — 347 rows in `stat_leaderboards` for 2026/comp=111 (100% person_id resolution, 98.8% team_id resolution); 4,595 rows across all 14 seasons.
+- ✅ Shipped: `scout/nrlcom_players_roster/` — D8 envelope + group + flat-`Profile` strict (live shape simpler than plan anticipated; no nested `ProfileBody` needed); route ValidationError → 500; live drift test under `SCOUT_DRIFT_LIVE=1`; new `POST /api/admin/scout/nrlcom-players-roster/refresh-all` endpoint walks 17 NRL teams server-side at 1 req/sec (~20s wall time); weekly Mon 23:40 UTC cron. **17-team catalogue** (`NRL_TEAM_IDS` constant) derived from the response's own `filterTeams[]` — no S3 ladder/draw read needed. **Seeded 2026-05-28** — 17/17 teams walked with `validated:true`, errors:[], 549 player profiles in S3. **No new DB extractor this phase** (S3-only) — the existing HTML-scrape `jeromelu_shared/players/nrlcom_refresh.py` enrichment is untouched.
+
+**Deferred (out of scope, surfaced not self-queued):**
+- SuperCoach Draft mode (`scout/supercoach_draft_*`) — parallel of classic, if Draft becomes a product concern.
+- Folding `jeromelu_shared/players/nrlcom_refresh.py` (HTML profile scraper) into the `scout/nrlcom_players_roster/` folder per D9. The HTML-scrape and JSON-fetch are different upstream sources reaching different enrichment fields; the fold is a refactor concern, not a hardening one.
+- Extractor scheduling (cross-cutting Phase 4 follow-up — daily ingest cron archives to S3 but DB only refreshes when an operator runs `populate_db_from_s3`; same gap applies here for `--phase leaderboards`).
+- Tightening `Profile` identity-field types from `str | None` to `str` non-null when a future `/players/data` extractor lands.
 
 ### Phase 5 — Historical backfill (one-time, ~4-5 hours operationally) — In design
 

@@ -53,8 +53,8 @@ Pipeline inventory after full source enumeration (2026-05-12). Each row is a fol
 | `scout/nrlcom_match_centre/` | `/draw/{league}/{season}/round-{N}/{slug}/data/` per match | `nrlcom/match-centre/{comp}/{season}/round-{NN}/{slug}.json` | `match_team_lists`, `player_match_stats` (new), `match_timeline` (new), `match_officials` (new), augments `matches` | ✅ ingest shipped (Phase 3); extraction → Phase 3.5 |
 | `scout/nrlcom_casualty_ward/` | `/casualty-ward/data?competition={N}` | `nrlcom/casualty-ward/{comp}/{YYYYMMDD}.json` | `injuries` | ✅ shipped (Phase 4) — D8 envelope+item strict, daily cron, extractor live |
 | `scout/nrlcom_ladder/` | `/ladder/data?competition={N}&season={Y}[&round={N}]` | `nrlcom/ladder/{comp}/{season}/round-{NN}.json` | `team_standings` | ✅ shipped (Phase 4) — D8 envelope+position+stats strict (alias-mapped), daily cron, extractor live |
-| `scout/nrlcom_stats/` | `/stats/data?competition={N}&season={Y}` | `nrlcom/stats/{comp}/{season}.json` | `stat_leaderboards` (new) | 🟡 not built — Phase 4.5 |
-| `scout/nrlcom_players_roster/` | `/players/data?competition={N}&team={team_id}` | `nrlcom/players-roster/{comp}/{team_slug}.json` | Enriches `people` with NRL.com profile fields | 🟡 partially exists in `jeromelu_shared/players/nrlcom_refresh.py`; needs folder-organise + S3-first |
+| `scout/nrlcom_stats/` | `/stats/data?competition={N}&season={Y}` | `nrlcom/stats/{comp}/{season}.json` | `stat_leaderboards` | ✅ shipped (Phase 4.5) — D8 envelope+category+subgroup+leader strict, daily cron (18:50 UTC), extractor live (manual via `populate_db_from_s3 --phase leaderboards`) |
+| `scout/nrlcom_players_roster/` | `/players/data?competition={N}&team={team_id}` | `nrlcom/players-roster/{comp}/team-{team_id}.json` | (no JSON-side extractor this phase; HTML-scrape enrichment in `jeromelu_shared/players/nrlcom_refresh.py` unchanged) | ✅ shipped (Phase 4.5) — D8 envelope+group+profile strict, weekly Mon 23:40 UTC cron via 17-team `refresh-all` server-side walk |
 
 **Data — nrlsupercoachstats.com (third-tier, fills SC scoring breakdown gap):**
 

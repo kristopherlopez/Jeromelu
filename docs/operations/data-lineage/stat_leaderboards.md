@@ -14,7 +14,7 @@ tags: [area/operations, data-lineage]
 
 ## Extractor
 
-`scripts/data/populate/phase_aux.py` — `populate_stat_leaderboards()`. Walks `scout/nrlcom/stats/{competition}/...`, flattens nested `playerStats[].groups[].stats[].leaders[]` (and parallel `teamStats[]`) into one wide table. Idempotent UPSERT on `(competition, season, scope, category, subgroup, stat_title, leader_position)`. ~4,594 rows shipped (2013-2025).
+`scripts/data/populate/phase_aux.py` — `populate_stat_leaderboards()`. Walks `scout/nrlcom/stats/{competition}/...`, flattens nested `playerStats[].groups[].stats[].leaders[]` (and parallel `teamStats[]`) into one wide table. Idempotent UPSERT on `(competition, season, scope, category, subgroup, stat_title, leader_position)`. As of Phase 4.5 seed (2026-05-28): **4,595 rows across 14 seasons (2013-2026)**; for 2026/comp=111 specifically: **347 rows** — **100% person_id resolution** (182/182 player rows) and **98.8% team_id resolution** (343/347 overall). The pure projection seam `_extract_leader_rows(payload, *, key, competition, season, team_map, player_map)` is the test seam used by `tests/unit/scripts/data/populate/test_phase_leaderboards.py`.
 
 ## Field mapping
 

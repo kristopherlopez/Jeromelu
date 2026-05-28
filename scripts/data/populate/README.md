@@ -51,6 +51,7 @@ Phase 3.5 — the mapping is testable without S3/DB; the caller does the DB work
 |---|---|---|---|
 | `populate_team_standings` | `scout/nrlcom/ladder/{comp}/*` | `team_standings` (UPSERT per `(team, comp, season, round)`) | `_extract_standing_rows(payload, key, competition, season, round_no, team_map)` |
 | `populate_injuries` | `scout/nrlcom/casualty-ward/{comp}/*` (chronological) | `injuries` (state machine: open/close/UPDATE) | `_casualty_to_row(c, team_map, people_lookup)`, `_bucket_status(text, current_round)` |
+| `populate_stat_leaderboards` (Phase 4.5) | `scout/nrlcom/stats/{comp}/*` | `stat_leaderboards` (UPSERT per `(competition, season, scope, category, subgroup, stat_title, leader_position)`) | `_extract_leader_rows(payload, key, competition, season, team_map, player_map)` |
 
 The injuries extractor is a state machine — it walks daily snapshots in order,
 opens new rows for unseen casualties, UPDATEs `metadata_json` for casualties
