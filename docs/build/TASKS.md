@@ -174,46 +174,6 @@ Concrete changes:
 
 ---
 
-### TASK-49: Pyright plumbing — pyproject.toml + Make target + CI job (narrow scope: `packages/shared/jeromelu_shared`)
-
-**What.** Per [PLAN.md "Engineering quality hardening — Tier 1"](./PLAN.md#2026-05-28-engineering-quality-hardening--tier-1-ruff--pyright--eslint--gitleaks--deploy-gating) Interface §. Land Pyright as the Python typechecker, hard-fail in CI from day 1, scoped narrow to `packages/shared/jeromelu_shared/`. **Note:** widening the include set (to `services/api/app/`, `packages/db/`, key workers, high-value scripts) is explicitly out of scope for this task — a future plan handles that incrementally.
-
-Concrete changes:
-1. **Append `[tool.pyright]` block to the root `pyproject.toml`** (created in TASK-47), replacing the placeholder comment. Use the block specified in PLAN.md "Interface §" verbatim.
-2. **Extend `requirements-dev.txt`** with `pyright>=1.1.380,<2`. Same pin-discipline as Ruff — pick the latest 1.1.x available at task time and reflect the exact version in the CI workflow step.
-3. **Update `Makefile`**: add the `typecheck-python` target. Update the umbrella `lint` target (added in TASK-47) to also `$(MAKE) typecheck-python`. Update `.PHONY:` to include `typecheck-python`.
-4. **Add `pyright` job to `.github/workflows/tests.yml`**:
-   ```yaml
-     pyright:
-       name: pyright (packages/shared/jeromelu_shared)
-       runs-on: ubuntu-latest
-       steps:
-         - uses: actions/checkout@v6
-         - uses: actions/setup-python@v6
-           with:
-             python-version: "3.12"
-             cache: pip
-             cache-dependency-path: |
-               requirements-test.txt
-               requirements-dev.txt
-         - run: pip install -r requirements-test.txt -r requirements-dev.txt
-           # Install requirements-test.txt too so transitive dep types resolve.
-         - run: pyright
-   ```
-5. **Run `pyright` locally and fix every reported error within the include set.** Add per-symbol `# pyright: ignore[reportXxx]` comments only when a fix is genuinely out of scope (e.g. a missing type stub from an upstream library) — and each `# pyright: ignore` MUST have an inline rationale (`# pyright: ignore[reportMissingTypeStubs]  # boto3-stubs not installed`). **If the error count exceeds 20 within the narrow scope, STOP and tag `[BLOCKED: pyright-violation-volume — N errors in packages/shared]` — the implementer surfaces to the human before bulk-fixing or adding bulk ignores.**
-6. **Do NOT install pyright as a dev-time Node package globally.** The Python wheel of pyright (`pip install pyright`) bundles a node runtime via the `nodeenv` dependency on first call — that's the expected path here. Document this in a 1-line comment in the workflow step if non-obvious.
-
-**How to verify.**
-- `grep -A 8 "\[tool.pyright\]" pyproject.toml` shows the block matching PLAN.md Interface § exactly (include = packages/shared/jeromelu_shared; pythonVersion = "3.12"; typeCheckingMode = "standard"; reportMissingImports + reportGeneralTypeIssues = "error").
-- `make typecheck-python` exits 0 locally on master.
-- The PR opened with this task FAILs CI when a return-type annotation is intentionally broken in `packages/shared/jeromelu_shared/scraping/nrl.py` (or any file in scope), and PASSES CI on the revert. Capture URLs.
-- `git diff --stat` is bounded to `pyproject.toml`, `requirements-dev.txt`, `Makefile`, `.github/workflows/tests.yml`, and at most a handful of files in `packages/shared/jeromelu_shared/` for any initial fixes / ignores. Anything beyond that scope is a Concern.
-- The Actions UI shows a `pyright (packages/shared/jeromelu_shared)` job in green on the merge commit.
-
-**Proof notes.**
-
----
-
 ### TASK-50: Gitleaks plumbing — `.gitleaks.toml` + CI job + secret-hygiene META invariant
 
 **What.** Per [PLAN.md "Engineering quality hardening — Tier 1"](./PLAN.md#2026-05-28-engineering-quality-hardening--tier-1-ruff--pyright--eslint--gitleaks--deploy-gating) Interface §. Land Gitleaks as the secret scanner, hard-fail in CI from day 1, run against the full working tree (NOT the full git history — see Concrete change 4 for the rationale).
@@ -619,6 +579,32 @@ Files to update:
 - `docs/build/runs/README.md` top row is the Phase 5 entry.
 - The run report's per-task entries match the commit SHAs in `git log --oneline -20` (TASK-37 through TASK-46).
 - All TASK-37..TASK-46 entries also removed from TASKS.md (each task's checkoff already did this; verify the file ends with `## Open tasks` empty + `## Completed work` blurb only).
+
+**Proof notes.**
+
+---
+
+### TASK-53: Fix `insights.py` dormant queries — `Claim.subject_entity_id` was removed in migration 036
+
+**What.** Surfaced during TASK-49 (Pyright plumbing). `packages/shared/jeromelu_shared/insights.py` functions `query_round_claims()` (line ~88) and `query_claim_consensus()` (line ~123) reference `Claim.subject_entity_id`, which is not a column on `Claim` per `packages/shared/jeromelu_shared/db/models.py:711–733`. Per `models.py:751–771`, entity links moved to `ClaimAssociation` (polymorphic FK to person_id / team_id / etc.) in migration 036.
+
+These functions are dormant — called only by `scripts/insights/generate_round_tips.py`. Production-side likely hasn't run them since the migration 036 schema change. They would raise `AttributeError` at runtime.
+
+The five attribute accesses are currently suppressed with `# pyright: ignore[reportAttributeAccessIssue]` plus a NOTE comment block above `query_round_claims` pointing to this task.
+
+**Concrete changes:**
+1. Rewrite `query_round_claims()` to JOIN through `ClaimAssociation`, grouping by `(person_id, claim_type)` (or `(team_id, claim_type)` depending on what `generate_round_tips.py` expects — inspect the caller for the role values it actually uses). Output shape unchanged: `dict[str, list[dict]]` keyed by `entity_id_str`.
+2. Rewrite `query_claim_consensus()` similarly. Output shape unchanged: `dict[str, dict[str, int]]`.
+3. Remove the 5 `# pyright: ignore[reportAttributeAccessIssue]` markers + the NOTE block above `query_round_claims`.
+4. Add a unit test under `tests/unit/shared/test_insights.py` that builds an in-memory `Claim` + `ClaimAssociation` fixture and exercises both functions — verifies the rewrite is correct.
+5. Run `scripts/insights/generate_round_tips.py --round <N> --season 2026` against a dev DB to confirm runtime behaviour is intact.
+
+**How to verify.**
+- `make typecheck-python` (Pyright) exits 0 with the `# pyright: ignore` markers removed.
+- New unit test `tests/unit/shared/test_insights.py::test_query_round_claims_groups_by_person_id` (and consensus equivalent) passes.
+- `make test` exits 0.
+- Manual run of `generate_round_tips.py` produces output of the expected shape (a SuperCoach round-tips article without error).
+- `git grep -n "subject_entity_id" packages/shared/jeromelu_shared/` returns zero matches.
 
 **Proof notes.**
 
