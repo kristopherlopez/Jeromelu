@@ -1,6 +1,6 @@
 # Scout Phase 4 — nrl.com casualty ward + ladder (harden, schedule, seed) + retire worker-scraper
 
-**Date:** 2026-05-28 · **Status:** 🟡 In progress · **Plan:** [PLAN.md § 2026-05-28: Scout Phase 4](../PLAN.md)
+**Date:** 2026-05-28 · **Status:** 🟢 Shipped (cron first-fire + cross-cutting extractor-scheduling deferred — see Outstanding) · **Plan:** Scout Phase 4 (completed; removed from PLAN.md)
 
 **TL;DR** — Phase 4 is a hardening replay, not greenfield: the casualty-ward + ladder ingest folders, the DB extractors (`populate_injuries` / `populate_team_standings`), the make targets, and the migrations (`031_injuries`, `059_team_standings`) all already existed. This run adds the D8 drift contract (strict envelope **and** item/stats models — deeper than draw/match-centre because the extractors are live), extractor unit tests, cron scheduling, the prod seed, and retires the orphaned `services/worker-scraper/`. NRL only (comp 111), season 2026, forward-only.
 
@@ -65,6 +65,25 @@ Seeded prod on the box via loopback (`--resolve`, `ADMIN_KEY` from `/opt/jeromel
 
 **adversarial-reviewer: PASS WITH CONCERNS** — both addressed before commit: (C1) D4 worker-scraper status annotation added; (C2) D13 inventory rows for the two Phase 4 extractors flipped to the shipped names (other D13 stale names are pre-Phase-4 Phase 3.5 drift — out of TASK-27 scope). (C3, non-blocking) **Deploy-before-next-manual-populate risk:** the fix lives on master but until prod pulls past `025294a`, any operator running `populate_db_from_s3 --phase injuries` on the box will re-hit the SQL bug. Daily cron only writes S3 (extractor is manual per the surfaced follow-up), so there's no automatic-execution risk — only a heads-up for the next operator-triggered populate.
 
+### TASK-28 — retire worker-scraper (delete dir + doc sweep) (`70fae11`)
+Phase 4 closure per D4. The `services/worker-scraper/` Temporal worker was orphaned (no code, compose, CI, deploy-script, or Makefile references; never ran in production — Temporal is not deployed) and is now deleted from the tree. Live doc references swept across 11 files; `docs/agents/system/scraper.md` reframed with a retirement header and kept as historical reference; `docs/archive/prd/jeromelu-ai-scraper-prd.md` deliberately untouched per plan.
+
+**Diff:** 23 files (12 deletions / 11 modifications); 556 lines removed, 36 added.
+
+**Doc sweep targets** (all updated):
+- `docs/agents/system/scraper.md` (retirement header; status table + workflow rows past-tensed)
+- `docs/agents/system/README.md` (agent tree → RETIRED 2026-05-28)
+- `docs/agents/crew/scout/charter.md` (D4 → retired in this commit)
+- `docs/agents/crew/scout/roadmap.md` (4 refs flipped: line 31, line 56, Phase 4 heading parenthetical dropped, Outstanding ☐ → ✅)
+- `docs/agents/crew/scout/README.md` (status line: "now-retired" reference)
+- `docs/agents/crew/scout/architecture.md` (Acquire row reflects Phases 1–4 shipped + worker retired)
+- `docs/architecture/08-technology-stack.md` (split worker-scraper out of the joint dev-only row → its own Retired row)
+- `docs/pages/wiki/data-feeds.md` (6 refs flipped — L2 table for `player_rounds` + `match_team_lists`; Implications paragraph; 2× Open Questions; Doc changes table)
+- `services/api/app/scout/supercoach_stats/{README.md,fetcher.py}` (stale "marked for retirement" → past tense)
+- `packages/shared/jeromelu_shared/scraping/nrl.py` (module docstring: now used by Scout pipelines, not retired worker)
+
+**Proof:** `test -d services/worker-scraper` → **gone** (after `git rm -rf` + manual cleanup of orphaned `__pycache__/`); `python -c "import app.scout.supercoach_stats.fetcher; from jeromelu_shared.scraping.nrl import JQGRID_COLUMN_MAP"` → **imports OK; 55 column keys**; `pytest tests/unit/api/scout/ tests/unit/scripts/data/populate/` → **102 passed**; `grep -rln "worker-scraper|worker_scraper"` → zero refs in code/compose/CI/deploy/Makefile (only the 11 intentional retirement-history notes + 4 build-process records + 1 archive). **adversarial-reviewer: PASS WITH CONCERNS** — all non-blocking: (C1) the spec's strict "only archive matches" reading vs. the pragmatic "no live operational refs" reading (the reviewer agreed retirement-notes are the only natural form of recording history); (C2) bookkeeping at-checkoff (recorded here); (C3) the two source-file docstring history notes could be swept again in ~3 months (acceptable for now — net improvement on the prior stale "marked for retirement" comments). **/simplify: no findings.**
+
 ---
 
 ## How we know it's done (running)
@@ -73,10 +92,16 @@ Seeded prod on the box via loopback (`--resolve`, `ADMIN_KEY` from `/opt/jeromel
 ## Decisions & deviations
 - **Casualty item modelled strictly (vs. draw/match-centre envelope-only).** Locked in the plan interview (2026-05-28): the casualty/ladder extractors are live and read nested fields by exact key, so item-level drift must fail loudly. `theme` stays opaque (not read by the extractor).
 
-## Outstanding
-- TASK-28 still open (retire `services/worker-scraper/` + doc sweep).
+## Outstanding (deferred — operator/time-gated and surfaced infra follow-ups)
 - ☐ **Cron first fire (operator/time-gated).** Once the box pulls past `0eba82e`, confirm `/var/log/jeromelu/scout-refresh.log` shows `nrlcom-casualty-ward` + `nrlcom-ladder` ran clean after the first 18:30/18:45 UTC fire (mirrors the Phase 3 TASK-12 deferral; the TASK-27 seed already proves the endpoints + S3 path end-to-end, this only confirms the *scheduled* invocation).
-- ☐ **Extractor scheduling (cross-cutting follow-up, surfaced — not self-queued).** The daily ingest cron archives to S3 but the DB only refreshes when an operator runs `populate_db_from_s3`. The same gap applies to the Phase 3.5 match-centre extractors. The durable fix — bake `scripts/` + `packages/shared` into the api image (or a managed ops venv) so a scheduled `docker exec jeromelu-api python -m scripts.data.populate_db_from_s3 …` just works — is an infra decision for the human/planner.
+- ☐ **Extractor scheduling (cross-cutting follow-up, surfaced — not self-queued).** The daily ingest cron archives to S3 but the DB only refreshes when an operator runs `populate_db_from_s3`. The same gap applies to the Phase 3.5 match-centre extractors. The durable fix — bake `scripts/` + `packages/shared` into the api image (or a managed ops venv) so a scheduled `docker exec jeromelu-api python -m scripts.data.populate_db_from_s3 …` just works — is an infra decision for the human/planner. Surfaced for visibility; explicitly out of Phase 4 scope.
+- ⚠️ **Deploy-before-next-manual-populate (TASK-27 C3).** The latent `jsonb_build_object` SQL fix landed in `025294a`; until prod pulls past it, an operator running `--phase injuries` on the box will re-hit the bug. Daily cron only writes S3, so no automatic-execution risk — only a heads-up for the next manual populate.
+
+## Lessons learned
+- **Phase 4 was a hardening replay, not greenfield.** Discovery (2026-05-28) found the ingest folders, both DB extractors, the make targets, and both migrations already existed. The tasks added the D8 drift contract (envelope + item/stats strict, with `Field(alias=...)` for ladder's space-keyed metrics), extractor unit tests via pure-function refactor, cron scheduling, the prod seed, and the worker-scraper retirement. **Future planners should `grep -r` for placeholder folders / extractors before writing tasks** — saves the implementer doing the same discovery and lets the plan name the exact gaps.
+- **Latent bugs in unscheduled code paths surface on the first real run.** The injuries UPDATE branch's `jsonb_build_object` parameter-typing bug pre-dated Phase 4 — it had never been exercised because the casualty-ward archives didn't exist until TASK-27's seed. **Unit-testing the pure mapping seam (TASK-25) was correct but insufficient** — a fixture-loaded SQLite or integration test of the full state machine would catch this class of bug. Worth a future task to add integration coverage for the state-machine phases (`populate_injuries`, the close-pass).
+- **Strict-item D8 models pay for themselves on the seed run.** The casualty + ladder strict-parse fired `validated:true` on every endpoint call in prod — the live drift tests + the route's per-call validation give two independent guard rails. The ladder model's `populate_by_name=True` + `Field(alias="points for")` for space-keyed JSON keys is a reusable pattern for any future feed with non-Python-identifier keys.
+- **The Phase 3.5 `docker cp → /runtmp` procedure works but is brittle.** Layout requires `/runtmp/scripts/` (not contents directly in /runtmp) to make `python -m scripts.data.populate_db_from_s3` work — the cp DEST has to be a pre-existing directory. Worth baking into the populate README's runtime section (already there).
 
 ## Commits
-`cb408c6` (TASK-21) · `bf22976` (TASK-22) · `0ba0cf6` (TASK-23) · `b405c1a` (TASK-24) · `2675094` (TASK-25) · `0eba82e` (TASK-26) · `025294a` (TASK-27). Plus the per-task run-report/queue bookkeeping commits.
+`cb408c6` (TASK-21) · `bf22976` (TASK-22) · `0ba0cf6` (TASK-23) · `b405c1a` (TASK-24) · `2675094` (TASK-25) · `0eba82e` (TASK-26) · `025294a` (TASK-27) · `70fae11` (TASK-28). Plus the per-task run-report/queue bookkeeping commits.

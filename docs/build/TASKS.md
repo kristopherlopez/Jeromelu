@@ -25,13 +25,7 @@ Prefix the title with optional tags in square brackets:
 
 ## Open tasks
 
-> All eight tasks implement **PLAN.md § 2026-05-28: Scout Phase 4 — nrl.com casualty ward + ladder + retire worker-scraper.** Scope is NRL only (competition 111), season 2026, forward-only — historical backfill is Phase 5. The pipelines, extractors, make targets, and migrations already exist; these tasks add the D8 drift contract, extractor tests, scheduling, the seed, and retire the orphaned worker. Casualty + ladder are single-envelope fetches → drift aborts with `HTTPException(500)` (the **draw** precedent), not the non-aborting match-centre pattern.
-
-### TASK-28 — retire worker-scraper (delete dir + doc sweep)
-
-- **What:** Per the plan's *Files deleted* + *Documentation updates* (D4). Delete the entire `services/worker-scraper/` directory. Update the live docs that reference it: `docs/agents/system/scraper.md` (mark the Temporal worker **retired/deleted**), `docs/agents/crew/scout/charter.md` (D4 → done), `docs/agents/crew/scout/roadmap.md` (Phase 4 retirement line → done), `docs/agents/crew/scout/README.md`, `docs/agents/system/README.md`, `docs/architecture/08-technology-stack.md`, `docs/pages/wiki/data-feeds.md`. Leave `docs/archive/prd/jeromelu-ai-scraper-prd.md` (historical archive). Append the worker-scraper retirement to the Phase 4 run report.
-- **How to verify:** `services/worker-scraper/` gone. `grep -rn "worker-scraper\|worker_scraper"` across the repo returns **only** `docs/archive/prd/` matches — zero code, compose (`docker/*.yml`), CI (`.github/`), deploy-script, or live-doc references. `make -n` unaffected; the api package still imports cleanly (nothing imported from the deleted dir — pre-verified at planning time). Confirmed orphaned at planning time: not present in either compose file, CI, or `Makefile`.
-- **Proof notes:** _(empty at review time)_
+_(queue empty — no open tasks)_
 
 
 ## Completed work
