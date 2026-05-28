@@ -33,12 +33,16 @@ def _build_team_id_map(db: Session) -> dict[int, str]:
     return {nid: str(tid) for tid, nid in rows}
 
 
-def _build_match_id_map(db: Session, seasons: list[int] | None) -> dict[str, str]:
-    q = "SELECT match_id, external_match_id FROM matches WHERE source='nrl_com' AND external_match_id IS NOT NULL"
+def _build_match_id_map(db: Session, seasons: list[int] | None) -> dict[str, tuple[str, str]]:
+    """external_match_id → (match_id, data_coverage). See phase_team_lists."""
+    q = (
+        "SELECT match_id, external_match_id, data_coverage "
+        "FROM matches WHERE source='nrl_com' AND external_match_id IS NOT NULL"
+    )
     if seasons:
         q += f" AND season IN ({','.join(str(s) for s in seasons)})"
     rows = db.execute(text(q)).fetchall()
-    return {ext: str(mid) for mid, ext in rows}
+    return {ext: (str(mid), dc) for mid, ext, dc in rows}
 
 
 def _build_player_id_map(db: Session) -> dict[int, str]:
@@ -147,6 +151,7 @@ def populate_timeline_and_officials(
     officials_inserted = 0
     officials_updated = 0
     matches_unmatched = 0
+    matches_fixture_only_skipped = 0
 
     timeline_sql = text("""
         INSERT INTO match_timeline (
@@ -203,7 +208,11 @@ def populate_timeline_and_officials(
         if not match_ext or match_ext not in match_map:
             matches_unmatched += 1
             continue
-        match_id = match_map[match_ext]
+        match_id, data_coverage = match_map[match_ext]
+        if data_coverage == "fixture_only":
+            # Parent-coverage gate (defensive); see phase_team_lists.
+            matches_fixture_only_skipped += 1
+            continue
 
         # Timeline events
         for row in _extract_timeline_rows(payload, key, match_id, team_map, player_map):
@@ -226,10 +235,11 @@ def populate_timeline_and_officials(
 
     if commit: db.commit()
     logger.info(
-        "phase_timeline: timeline_inserted=%d updated=%d  officials_inserted=%d updated=%d  matches_unmatched=%d",
+        "phase_timeline: timeline_inserted=%d updated=%d  officials_inserted=%d updated=%d  "
+        "matches_unmatched=%d fixture_only_skipped=%d",
         timeline_inserted, timeline_updated,
         officials_inserted, officials_updated,
-        matches_unmatched,
+        matches_unmatched, matches_fixture_only_skipped,
     )
     return {
         "archives_read": archives_read,
@@ -239,4 +249,5 @@ def populate_timeline_and_officials(
         "officials_inserted": officials_inserted,
         "officials_updated": officials_updated,
         "matches_unmatched": matches_unmatched,
+        "matches_fixture_only_skipped": matches_fixture_only_skipped,
     }

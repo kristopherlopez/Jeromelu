@@ -38,12 +38,23 @@ def _build_team_id_map(db: Session) -> dict[int, str]:
     return {nid: str(tid) for tid, nid in rows}
 
 
-def _build_match_id_map(db: Session, seasons: list[int] | None) -> dict[str, str]:
-    q = "SELECT match_id, external_match_id FROM matches WHERE source='nrl_com' AND external_match_id IS NOT NULL"
+def _build_match_id_map(db: Session, seasons: list[int] | None) -> dict[str, tuple[str, str]]:
+    """external_match_id → (match_id, data_coverage).
+
+    `data_coverage` is consulted in the per-archive loop: 'fixture_only'
+    matches are draw-only era projections and have no team-list data —
+    skipping them is defensive (no match-centre archive could resolve to
+    one), but guards against accidental orphan inserts if archives arrive
+    out of order.
+    """
+    q = (
+        "SELECT match_id, external_match_id, data_coverage "
+        "FROM matches WHERE source='nrl_com' AND external_match_id IS NOT NULL"
+    )
     if seasons:
         q += f" AND season IN ({','.join(str(s) for s in seasons)})"
     rows = db.execute(text(q)).fetchall()
-    return {ext: str(mid) for mid, ext in rows}
+    return {ext: (str(mid), dc) for mid, ext, dc in rows}
 
 
 def _build_player_id_map(db: Session) -> dict[int, str]:
@@ -177,6 +188,7 @@ def populate_team_lists(
     coaches_already_present = 0
     players_no_match = 0
     matches_unmatched = 0
+    matches_fixture_only_skipped = 0
 
     for key, payload, err in read_json_concurrent(keys, max_workers=16):
         if err is not None or payload is None:
@@ -187,7 +199,14 @@ def populate_team_lists(
         if not match_ext or match_ext not in match_map:
             matches_unmatched += 1
             continue
-        match_id = match_map[match_ext]
+        match_id, data_coverage = match_map[match_ext]
+        if data_coverage == "fixture_only":
+            # Parent-coverage gate: fixture_only matches are draw-only era
+            # projections; they have no team-list data. Should never collide
+            # with a match-centre archive (disjoint slug namespaces), but
+            # guard defensively if archives arrive out of order.
+            matches_fixture_only_skipped += 1
+            continue
 
         # Players — pure projection, then the canonical-capture existence pre-check + INSERT.
         player_rows = _extract_player_list_rows(payload, match_id, team_map, player_map)
@@ -284,9 +303,9 @@ def populate_team_lists(
     if commit: db.commit()
     logger.info(
         "phase_team_lists: rows_inserted=%d already=%d coaches_inserted=%d coaches_already=%d "
-        "players_no_match=%d matches_unmatched=%d",
+        "players_no_match=%d matches_unmatched=%d fixture_only_skipped=%d",
         rows_inserted, rows_already_present, coaches_inserted, coaches_already_present,
-        players_no_match, matches_unmatched,
+        players_no_match, matches_unmatched, matches_fixture_only_skipped,
     )
     return {
         "archives_read": archives_read,
@@ -297,4 +316,5 @@ def populate_team_lists(
         "coaches_already_present": coaches_already_present,
         "players_no_match": players_no_match,
         "matches_unmatched": matches_unmatched,
+        "matches_fixture_only_skipped": matches_fixture_only_skipped,
     }
