@@ -27,6 +27,7 @@ from jeromelu_shared.db.session import SessionLocal
 
 from .populate.phase_identity import backfill_identity
 from .populate.phase_matches import populate_matches
+from .populate.phase_player_rounds import populate_player_rounds
 from .populate.phase_rounds import populate_rounds
 from .populate.phase_attributes import populate_player_attributes
 from .populate.phase_aux import (
@@ -48,7 +49,7 @@ logger = logging.getLogger(__name__)
 
 PHASES = ("identity", "people", "rounds", "matches", "team_lists", "stats",
           "timeline", "standings", "leaderboards", "injuries", "reresolve",
-          "attributes")
+          "attributes", "player_rounds")
 
 
 def main() -> int:
@@ -124,6 +125,10 @@ def main() -> int:
                 results[phase] = populate_stat_leaderboards(db, competition=args.competition, commit=commit)
             elif phase == "injuries":
                 results[phase] = populate_injuries(db, competition=args.competition, commit=commit)
+            elif phase == "player_rounds":
+                results[phase] = populate_player_rounds(
+                    db, seasons=args.seasons, commit=commit,
+                )
             else:
                 logger.warning("phase %s not yet implemented — skipping", phase)
                 results[phase] = {"skipped": True}

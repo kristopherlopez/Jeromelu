@@ -24,6 +24,7 @@ from scripts.data.populate.phase_people import (
     populate_people_history,
     reresolve_person_ids,
 )
+from scripts.data.populate.phase_player_rounds import populate_player_rounds
 from scripts.data.populate.phase_rounds import populate_rounds
 from scripts.data.populate.phase_stats import populate_player_match_stats
 from scripts.data.populate.phase_team_lists import populate_team_lists
@@ -43,6 +44,7 @@ _PHASE_FUNCS = [
     populate_team_standings,
     populate_stat_leaderboards,
     populate_injuries,
+    populate_player_rounds,
 ]
 
 

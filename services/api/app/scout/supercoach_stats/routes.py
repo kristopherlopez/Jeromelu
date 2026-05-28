@@ -89,11 +89,18 @@ def run_supercoach_stats(
     *,
     season: int,
     round: int,
+    archive_only: bool = False,
 ) -> dict[str, Any]:
     """Fetch + strict-parse + upsert, wrapped in the agent_audit pattern.
 
     Returns the run summary including run_id, ok, season, round, fetched,
     upserted.
+
+    `archive_only=True` skips both the strict-parse AND the inline DB upsert
+    — Phase 5 historical-backfill mode. The S3 capture still happens. Response
+    carries `validated:false, validation_skipped:true, upserted:0, fetched:0`.
+    The DB extraction picks up later via `populate_db_from_s3 --phase
+    player_rounds` (era-aware reader of the same S3 archives).
     """
     brief = f"SuperCoach stats fetch + upsert (season={season}, round={round})"
     run = start_deterministic_run(
@@ -126,19 +133,31 @@ def run_supercoach_stats(
         )
         set_archive_detail(detail, archive_key)
 
-        extracted = extract_rows(raw_rows)
-        if not extracted:
-            raise SuperCoachStatsFetchError(
-                f"Zero parseable rows after extraction (raw: {len(raw_rows)})"
+        if archive_only:
+            # Phase 5 historical-backfill mode: skip extraction + strict-parse
+            # + DB upsert. The capture is preserved in S3 above.
+            detail["validated"] = False
+            detail["validation_skipped"] = True
+            detail.update({"fetched": 0, "upserted": 0})
+            logger.info(
+                "scout/supercoach-stats: archive_only=true; strict-parse + upsert "
+                "skipped (season=%s round=%s raw_rows=%d s3=%s)",
+                season, round, len(raw_rows), archive_key,
             )
-        # Strict-parse per D8 — drift in any field raises ValidationError.
-        players = [SuperCoachPlayerStats.model_validate(p) for p in extracted]
-        fetched = len(players)
-        as_dicts = [p.model_dump() for p in players]
-        upserted = _upsert_player_rounds(
-            db, players=as_dicts, round=round, season=season,
-        )
-        detail.update({"fetched": fetched, "upserted": upserted})
+        else:
+            extracted = extract_rows(raw_rows)
+            if not extracted:
+                raise SuperCoachStatsFetchError(
+                    f"Zero parseable rows after extraction (raw: {len(raw_rows)})"
+                )
+            # Strict-parse per D8 — drift in any field raises ValidationError.
+            players = [SuperCoachPlayerStats.model_validate(p) for p in extracted]
+            fetched = len(players)
+            as_dicts = [p.model_dump() for p in players]
+            upserted = _upsert_player_rounds(
+                db, players=as_dicts, round=round, season=season,
+            )
+            detail.update({"fetched": fetched, "upserted": upserted})
     except SuperCoachStatsFetchError as e:
         detail["fetched"] = fetched
         run.fail(e, summary_text=f"Upstream fetch failed: {e}")
@@ -151,7 +170,7 @@ def run_supercoach_stats(
     run.complete(
         summary_text=(
             f"SuperCoach stats refresh: season={season} round={round} "
-            f"fetched={fetched} upserted={upserted}"
+            f"fetched={fetched} upserted={upserted} archive_only={archive_only}"
         )
     )
 
@@ -163,6 +182,7 @@ def run_supercoach_stats(
         "round": round,
         "fetched": fetched,
         "upserted": upserted,
+        **({"validated": False, "validation_skipped": True} if archive_only else {}),
     }
 
 
@@ -181,6 +201,10 @@ def supercoach_stats_endpoint(
         default=None,
         description="SC season year (defaults to current year)",
     ),
+    archive_only: bool = Query(
+        default=False,
+        description="Phase 5 historical-backfill mode: skip strict-parse + DB upsert (S3 only). Daily cron leaves false.",
+    ),
     db: Session = Depends(get_db),
 ):
     """Acquire SuperCoach stats for one (round, season) and upsert into player_rounds.
@@ -192,4 +216,6 @@ def supercoach_stats_endpoint(
     under `agent_id='scout'`, `detail_json.pipeline='supercoach-stats'`.
     """
     effective_season = season or date.today().year
-    return run_supercoach_stats(db, season=effective_season, round=round)
+    return run_supercoach_stats(
+        db, season=effective_season, round=round, archive_only=archive_only,
+    )
