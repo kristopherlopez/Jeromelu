@@ -24,16 +24,26 @@ Wired the D8 contract into `services/api/app/scout/nrlcom_casualty_ward/routes.p
 
 **Harness note (not a defect):** running the unit + integration tiers in one `pytest` invocation triggers a same-package-name collection collision (both dirs hold a `nrlcom_casualty_ward` package) — a pre-existing structural pattern (draw has it too); CI runs the tiers separately, so it's a non-issue. Run tiers separately.
 
+### TASK-23 — ladder: D8 models (alias-mapped stats) + fixture + unit drift tests (`0ba0cf6`)
+Added the D8 drift contract for the ladder pipeline. Captured the live `/ladder/data?competition=111&season=2026` response (2026-05-28 — 17 positions, one 22-key stats shape, 40KB) to `tests/fixtures/scout/nrlcom_ladder/canonical_response.json`. Created `services/api/app/scout/nrlcom_ladder/models.py` with three strict models (`extra="forbid"`):
+- `NrlcomLadder` (envelope) — `positions: list[LadderPosition]` + the 10 metadata top-level keys observed live (`filterCompetitions`/`filterRounds`/`filterSeasons` lists, `finalistTeams` **int**, 3 `selected*` ints, 3 `show*` bools).
+- `LadderPosition` — required `teamNickname: str` (load-bearing) + `stats: LadderStats`; `clubProfileUrl`/`movement`/`next`/`theme` required-present-nullable. **No `position` field** — the upstream response has none; the extractor falls back to the enumerate index (`pos.get("position") or idx`), and a future upstream `position` would correctly trip the envelope guard.
+- `LadderStats` (`populate_by_name=True`) — the 22 metrics; the 16 space-separated keys (`"points for"`, `"average winning margin"`, …) mapped via `Field(alias=...)`. 13 int, 2 float (margins), 7 str. Every field required-present-but-nullable (the casualty/`disclaimer` convention) so a removed/renamed metric trips; `extra="forbid"` catches a newly-added one.
+
+Added `tests/unit/api/scout/nrlcom_ladder/{__init__.py,test_models.py}`: canonical parse (asserts `points_for`/`points_against`/`average_winning_margin` populate — proves the space-alias mapping reaches the Python fields) + 3 negatives (unknown top-level, unknown `stats` key, missing required `teamNickname`). Route wiring deferred to TASK-24.
+
+**Proof:** `pytest tests/unit/api/scout/nrlcom_ladder/test_models.py` → **4 passed**; full scout unit suite → **65 passed** (61 + 4 new, no regression). All 17 positions verified to share one 6-key position shape + one 22-key stats shape before capture. **adversarial-reviewer: PASS** (no blocking concerns) — programmatically cross-checked the model field/alias set == the fixture's 22 stats keys (zero diff either direction); confirmed required-key/nullable-value contract (dropped key trips, null value tolerated), `extra="forbid"` on all three, no route wiring leaked. **/simplify: no findings.**
+
 ---
 
 ## How we know it's done (running)
-- Unit drift tests green in CI; the live drift test runs under `SCOUT_DRIFT_LIVE=1`. Casualty-ward ingest is now D8-hardened (envelope + item strict-parse wired into the route).
+- Unit drift tests green in CI; the live drift tests run under `SCOUT_DRIFT_LIVE=1`. Casualty-ward ingest is fully D8-hardened (envelope + item strict-parse wired into the route, TASK-21/22). Ladder models + fixture shipped (TASK-23); route wiring is TASK-24.
 
 ## Decisions & deviations
 - **Casualty item modelled strictly (vs. draw/match-centre envelope-only).** Locked in the plan interview (2026-05-28): the casualty/ladder extractors are live and read nested fields by exact key, so item-level drift must fail loudly. `theme` stays opaque (not read by the extractor).
 
 ## Outstanding
-- TASK-23 → TASK-28 still open (ladder models + route, extractor unit tests, cron, prod seed + docs, worker-scraper retirement).
+- TASK-24 → TASK-28 still open (ladder route wiring, extractor unit tests, cron, prod seed + docs, worker-scraper retirement).
 
 ## Commits
-`cb408c6` (TASK-21) · `bf22976` (TASK-22). Plus the per-task run-report/queue bookkeeping commits.
+`cb408c6` (TASK-21) · `bf22976` (TASK-22) · `0ba0cf6` (TASK-23). Plus the per-task run-report/queue bookkeeping commits.
