@@ -25,7 +25,311 @@ Prefix the title with optional tags in square brackets:
 
 ## Open tasks
 
-_(queue empty — no open tasks)_
+### TASK-29 — nrlcom-stats: D8 strict models (envelope + 3 nested) + fixture + unit drift tests
+
+**What**
+
+Implements the D8 drift contract for the `nrlcom-stats` pipeline. See `PLAN.md` → `## 2026-05-28: Scout Phase 4.5` → Interface → *nrlcom-stats*.
+
+1. Capture a live response for the canonical fixture: hit `https://www.nrl.com/stats/data?competition=111&season=2026` (the existing `app.scout.nrlcom_stats.fetcher.fetch_stats` already does this — call it from a one-shot Python REPL with the api venv active and dump the result), redact nothing, write the raw JSON pretty-printed to `tests/fixtures/scout/nrlcom_stats/canonical_response.json`. Record the actually-observed envelope key set, category-level key set, subgroup-level key set, and leader-level key set in your scratch notes — these drive the model shape.
+2. Create `services/api/app/scout/nrlcom_stats/models.py` with four strict `BaseModel`s (`model_config = ConfigDict(extra="forbid")`):
+    - `NrlcomStats` — `playerStats: list[StatCategory]`, `teamStats: list[StatCategory]`, plus every other top-level key observed live (each typed per its observed value; opaque lists/objects → `list[Any]` / `dict[str, Any]`).
+    - `StatCategory` — `title: str` (load-bearing: the `category` DB column reads it), `groups: list[StatSubgroup]`, plus the rest of category-level keys observed live as required-present-but-nullable (the `NrlcomDraw.disclaimer` convention).
+    - `StatSubgroup` — `title: str` (load-bearing: the `subgroup`/`stat_title` DB columns read it), `statId: int | None`, `leaders: list[StatLeader]`, plus other observed keys required-present-but-nullable.
+    - `StatLeader` — `firstName: str | None`, `lastName: str | None`, `teamNickName: str | None`, `teamName: str | None`, `playerId: int | None`, `value: float | int | str | None` (extractor coerces to float; tolerate the upstream's native type), plus other observed leader-level keys required-present-but-nullable.
+   `__all__ = ["NrlcomStats", "StatCategory", "StatSubgroup", "StatLeader"]`. Add a module docstring per `nrlcom_ladder/models.py`'s precedent explaining why the model goes 4 levels deep (= the depth the extractor reads).
+3. Create `tests/unit/api/scout/nrlcom_stats/__init__.py` (empty) and `tests/unit/api/scout/nrlcom_stats/test_models.py` mirroring `tests/unit/api/scout/nrlcom_casualty_ward/test_models.py` exactly — 4 tests:
+    - `test_canonical_fixture_parses` — asserts `len(parsed.playerStats) >= 1`, `len(parsed.teamStats) >= 1`, and at least one populated `leaders[]` end-to-end.
+    - `test_unknown_top_level_field_raises` — `bad["loot_boxes"] = {}` → `ValidationError` mentioning `loot_boxes`.
+    - `test_unknown_leader_field_raises` — `bad["playerStats"][0]["groups"][0]["leaders"][0]["is_retired"] = True` → `ValidationError` mentioning `is_retired`.
+    - `test_missing_required_category_title_raises` — `del bad["playerStats"][0]["title"]` → `ValidationError` mentioning `title`.
+
+Do NOT touch `routes.py` in this task — that lands in TASK-30.
+
+**How to verify**
+
+- `pytest tests/unit/api/scout/nrlcom_stats/test_models.py -v` → 4 passed.
+- `pytest tests/unit/api/scout/` → all green, no regression vs. the post-Phase-4 baseline (102 passed).
+- The fixture file exists, is pretty-printed JSON, and contains at least one entry in each of `playerStats`, `teamStats`, `playerStats[0].groups`, `playerStats[0].groups[0].leaders`.
+- `python -c "from app.scout.nrlcom_stats.models import NrlcomStats, StatCategory, StatSubgroup, StatLeader; print('ok')"` → `ok`.
+- `git diff --cached --stat` before commit: only the 4 new/modified files (`models.py`, fixture, `__init__.py`, `test_models.py`) plus the `TASKS.md`/run-report bookkeeping that happens at checkoff.
+
+**Proof notes**
+
+_(in-flight scratchpad; authoritative proof lands in the run report at checkoff)_
+
+---
+
+### TASK-30 — nrlcom-stats: wire strict-parse into route + env-flagged live drift test
+
+**What**
+
+Wire the D8 contract from TASK-29 into the production route. See `PLAN.md` → `## 2026-05-28: Scout Phase 4.5` → Interface → *nrlcom-stats*. Line-for-line equivalent of TASK-22 (casualty-ward) and TASK-24 (ladder).
+
+1. Modify `services/api/app/scout/nrlcom_stats/routes.py`:
+    - Add `from pydantic import ValidationError`.
+    - Add `from .models import NrlcomStats`.
+    - In `run_nrlcom_stats`, after `set_archive_detail(detail, archive_key)` and the existing `detail.update({...})` block, add:
+      ```python
+      NrlcomStats.model_validate(data)
+      detail["validated"] = True
+      ```
+    - Insert a new `except ValidationError as e:` arm **between** the existing `except NrlcomStatsFetchError` arm and the generic `except Exception` arm. Body:
+      ```python
+      run.fail(
+          e,
+          summary_text=f"Stats response failed strict validation (drift): {e}",
+      )
+      raise HTTPException(status_code=500, detail=f"nrl.com stats drift: {e}")
+      ```
+    - Keep the existing `NrlcomStatsFetchError → 502` arm and the generic `except Exception` arm unchanged.
+2. Create `tests/integration/scout/nrlcom_stats/__init__.py` (empty) and `tests/integration/scout/nrlcom_stats/test_response_shape.py` mirroring `tests/integration/scout/nrlcom_casualty_ward/test_response_shape.py` line-for-line, replacing the imports with:
+    - `from app.scout.nrlcom_stats.fetcher import NrlcomStatsFetchError, fetch_stats`
+    - `from app.scout.nrlcom_stats.models import NrlcomStats`
+    - In the live test, call `fetch_stats(competition=111, season=date.today().year)` (add `from datetime import date`); strict-parse; assert `len(parsed.playerStats) >= 1` as the sanity gate.
+    - Same `pytest.fail(...)` message shape, naming the fix path: update `app.scout.nrlcom_stats.models`, regenerate `tests/fixtures/scout/nrlcom_stats/canonical_response.json`, commit with a note on what changed.
+
+**How to verify**
+
+- `python -c "from app.scout.nrlcom_stats.routes import PIPELINE, run_nrlcom_stats; print(PIPELINE)"` → `nrlcom-stats` (route imports clean post-modification).
+- `pytest tests/integration/scout/nrlcom_stats/test_response_shape.py` (no env var) → 1 skipped with reason `Set SCOUT_DRIFT_LIVE=1 to run the live-endpoint drift test`.
+- `SCOUT_DRIFT_LIVE=1 pytest tests/integration/scout/nrlcom_stats/test_response_shape.py` → 1 passed against real nrl.com.
+- **Deliberate-break proof** (run last, then revert): add a required `tries_per_game: int` field to `StatLeader` without an alias; `SCOUT_DRIFT_LIVE=1 pytest …` → fails naming `tries_per_game` "Field required" at the nested path (`playerStats.0.groups.0.leaders.0.tries_per_game`). Revert (`git diff HEAD -- services/api/app/scout/nrlcom_stats/models.py` empty).
+- `pytest tests/unit/api/scout/` → all green, no regression vs. TASK-29 baseline.
+- Hit the local route once for end-to-end proof: `curl -s -X POST "http://localhost:8000/api/admin/scout/nrlcom-stats?competition=111&season=2026" -H "X-Admin-Key: $LOCAL_ADMIN_KEY" | python -m json.tool` → response includes `"validated": true` and `"s3_archive_key": "scout/nrlcom/stats/111/2026.json"`. (If running fully offline, skip this and rely on the import + skip-mode proof, mirroring how TASK-22 was accepted at the Phase-3 TASK-08 proof level.)
+
+**Proof notes**
+
+_(in-flight scratchpad)_
+
+---
+
+### TASK-31 — nrlcom-players-roster: D8 strict models + fixture + unit drift tests
+
+**What**
+
+D8 contract for `nrlcom-players-roster`. See `PLAN.md` → `## 2026-05-28: Scout Phase 4.5` → Interface → *nrlcom-players-roster*. Pattern follows TASK-29 exactly; depth is shallower because no DB extractor reads `/players/data` yet (S3-only this phase per scope decision).
+
+1. Capture a live response for ONE team via `app.scout.nrlcom_players_roster.fetcher.fetch_players_roster(competition=111, team=500011)` (Storm) → `tests/fixtures/scout/nrlcom_players_roster/canonical_response.json`.
+2. Create `services/api/app/scout/nrlcom_players_roster/models.py`:
+    - `NrlcomPlayersRoster` (envelope, `extra="forbid"`): `profileGroups: list[ProfileGroup]`, plus all observed top-level keys (typed per observed value; opaque slots → `list[Any]` / `dict[str, Any]`).
+    - `ProfileGroup` (`extra="forbid"`): `profiles: list[Profile]`, plus all observed group-level keys required-present-but-nullable (a `title`/`type` discriminator is the likely shape — implementer confirms live).
+    - `Profile` (`extra="forbid"`): the top-level wrapper of one `profiles[]` entry. The live response shape determines whether biographical fields are inline on `Profile` or nested under a `profile: ProfileBody | None` slot. If nested, add `ProfileBody` (also `extra="forbid"`) carrying `firstName: str | None`, `lastName: str | None`, `playerId: int | None`, `positions: list[Any] | None`, plus other identity fields observed live. Opaque media/biographical blocks (`theme`, large nested bio object) stay typed `dict[str, Any] | None` until an extractor lands. **The required-present rule applies to every key observed live**, so a rename or removal trips drift.
+   `__all__` exports all model classes used at the route boundary.
+3. Create `tests/unit/api/scout/nrlcom_players_roster/{__init__.py,test_models.py}` mirroring `tests/unit/api/scout/nrlcom_casualty_ward/test_models.py`:
+    - `test_canonical_fixture_parses` — asserts `len(parsed.profileGroups) >= 1` and `len(parsed.profileGroups[0].profiles) >= 1`.
+    - `test_unknown_top_level_field_raises` — `bad["loot_boxes"] = {}`.
+    - `test_unknown_profile_field_raises` — invent a key on the first profile (or `ProfileBody` if nested) → `ValidationError` naming it.
+    - `test_missing_required_profile_identity_field_raises` — drop one of the load-bearing identity fields (e.g. the upstream's `playerId` if present, else the highest-confidence identity field) → `ValidationError` naming it.
+
+Do NOT touch `routes.py` in this task (lands in TASK-32) or add the refresh-all endpoint (lands in TASK-33).
+
+**How to verify**
+
+- `pytest tests/unit/api/scout/nrlcom_players_roster/test_models.py -v` → 4 passed.
+- `pytest tests/unit/api/scout/` → no regression vs. TASK-30 baseline.
+- Fixture file exists, pretty-printed JSON, ≥1 entry in `profileGroups[].profiles`.
+- `python -c "from app.scout.nrlcom_players_roster.models import NrlcomPlayersRoster; print('ok')"` → `ok`.
+
+**Proof notes**
+
+_(in-flight scratchpad)_
+
+---
+
+### TASK-32 — nrlcom-players-roster: wire strict-parse into route + env-flagged live drift test
+
+**What**
+
+Wire the D8 contract from TASK-31 into the route. Pattern: TASK-30 line-for-line. See `PLAN.md` → `## 2026-05-28: Scout Phase 4.5` → Interface → *nrlcom-players-roster*.
+
+1. Modify `services/api/app/scout/nrlcom_players_roster/routes.py`:
+    - Add `from pydantic import ValidationError` and `from .models import NrlcomPlayersRoster`.
+    - After `detail["profiles"] = n_profiles`, add `NrlcomPlayersRoster.model_validate(data); detail["validated"] = True`.
+    - Add `except ValidationError as e:` arm between the existing `NrlcomPlayersFetchError → 502` arm and the generic `except Exception` arm; body raises `HTTPException(status_code=500, detail=f"nrl.com players-roster drift: {e}")` after `run.fail(...)`.
+    - Existing 502 + generic arms unchanged.
+2. Create `tests/integration/scout/nrlcom_players_roster/{__init__.py,test_response_shape.py}` mirroring `tests/integration/scout/nrlcom_casualty_ward/test_response_shape.py`; call `fetch_players_roster(competition=111, team=500011)`; sanity-assert `len(parsed.profileGroups) >= 1` and `len(parsed.profileGroups[0].profiles) >= 1`.
+
+**How to verify**
+
+- `python -c "from app.scout.nrlcom_players_roster.routes import PIPELINE; print(PIPELINE)"` → `nrlcom-players-roster`.
+- `pytest tests/integration/scout/nrlcom_players_roster/test_response_shape.py` → 1 skipped, exact reason text.
+- `SCOUT_DRIFT_LIVE=1 pytest tests/integration/scout/nrlcom_players_roster/test_response_shape.py` → 1 passed.
+- **Deliberate-break proof:** add `required_only_in_test: int` to the deepest D8-modelled level → live test fails naming it → revert; `git diff HEAD -- services/api/app/scout/nrlcom_players_roster/models.py` empty.
+- `pytest tests/unit/api/scout/` → no regression.
+
+**Proof notes**
+
+_(in-flight scratchpad)_
+
+---
+
+### TASK-33 — nrlcom-players-roster: refresh-all endpoint walking 17 NRL teams server-side
+
+**What**
+
+Add the cron-targetable bulk endpoint. See `PLAN.md` → `## 2026-05-28: Scout Phase 4.5` → Interface → *nrlcom-players-roster*.
+
+1. Create `services/api/app/scout/nrlcom_players_roster/teams.py`:
+    - Derive the 17 NRL.com internal `team_id` values + a human-readable short name per team by reading an existing `scout/nrlcom/ladder/111/2026/round-NN.json` or `scout/nrlcom/draw/111/2026/round-NN.json` archive from S3 (the round-12 ladder is already seeded per Phase 4). Each ladder position's `theme.key`/`teamNickname` plus the `clubProfileUrl` last path segment gives the `team_id`. Alternatively each draw fixture exposes `homeTeam.teamId` / `awayTeam.teamId` directly.
+    - Export `NRL_TEAM_IDS: list[tuple[str, int]]` — 17 entries of `(short_name, team_id)`, sorted by short_name for stable iteration.
+    - Module docstring documents the source archive used to derive the IDs and the manual-update procedure (when a new NRL team joins / id changes).
+2. Modify `services/api/app/scout/nrlcom_players_roster/routes.py`:
+    - Add `import time`.
+    - Add `from .teams import NRL_TEAM_IDS`.
+    - Add a new function `run_nrlcom_players_roster_refresh_all(db: Session, *, competition: int = 111, sleep_seconds: float = 1.0) -> dict[str, Any]`:
+      - Opens an envelope `start_deterministic_run(db, pipeline="nrlcom-players-roster-refresh-all", brief=f"nrl.com players-roster walk (comp={competition}, {len(NRL_TEAM_IDS)} teams)", detail={"competition": competition, "team_count": len(NRL_TEAM_IDS)})`.
+      - Iterates `NRL_TEAM_IDS`: for each `(short, team_id)`, calls `run_nrlcom_players_roster(db, competition=competition, team=team_id)` inside `try/except HTTPException` and `except Exception`; on success appends to `results: list[dict]`; on failure appends to `errors: list[dict]` (`{"team_id": ..., "short": ..., "error": str(e)}`). **Non-aborting** — a single-team failure does not stop the walk.
+      - Sleeps `sleep_seconds` between iterations (skip after the last team).
+      - Sets `envelope.detail.update({"teams_walked": len(NRL_TEAM_IDS), "ok_count": len(results), "error_count": len(errors)})`.
+      - Calls `envelope.complete(summary_text=f"…")` if `errors == []`, else `envelope.fail(...)` with a summary listing the error team_ids — but **still return 200** to the caller (the per-team detail is in the response body; errors do not fail the envelope HTTP status).
+      - Returns `{"run_id": envelope.run_id, "ok": True, "competition": competition, "teams_walked": len(NRL_TEAM_IDS), "results": results, "errors": errors}`.
+    - Add a new route handler:
+      ```python
+      @router.post(
+          "/admin/scout/nrlcom-players-roster/refresh-all",
+          dependencies=[Depends(require_admin)],
+      )
+      def nrlcom_players_roster_refresh_all_endpoint(
+          competition: int = Query(default=111),
+          db: Session = Depends(get_db),
+      ):
+          return run_nrlcom_players_roster_refresh_all(db, competition=competition)
+      ```
+3. The per-team endpoint (`POST /api/admin/scout/nrlcom-players-roster?competition=&team=`) stays unchanged for ad-hoc operator use.
+4. No new tests required beyond compile-check — the per-team path is fully tested by TASK-31/TASK-32; the new function is a thin walker. (If implementer wants belt-and-braces, add one unit test that mocks `run_nrlcom_players_roster` to count calls and verify ordering / sleep — optional.)
+
+**How to verify**
+
+- `python -c "from app.scout.nrlcom_players_roster.teams import NRL_TEAM_IDS; print(len(NRL_TEAM_IDS)); print(NRL_TEAM_IDS[:3])"` → `17` + three sample entries; spot-check ids against the ladder/draw archive used to derive them.
+- `python -c "from app.scout.nrlcom_players_roster.routes import run_nrlcom_players_roster_refresh_all, nrlcom_players_roster_refresh_all_endpoint; print('ok')"` → `ok`.
+- `python -c "from app.main import app; print([r.path for r in app.routes if 'players-roster' in r.path])"` → both `/api/admin/scout/nrlcom-players-roster` AND `/api/admin/scout/nrlcom-players-roster/refresh-all` present.
+- Local end-to-end (skippable if offline; recordable as deferred at the box-side seed in TASK-36): `curl -s -X POST "http://localhost:8000/api/admin/scout/nrlcom-players-roster/refresh-all?competition=111" -H "X-Admin-Key: $LOCAL_ADMIN_KEY" -m 60 | python -m json.tool` → `teams_walked: 17`, `errors: []` (or documented), per-team `validated: true`, walk takes ≥16 seconds (1 sec × 16 inter-team gaps).
+- `pytest tests/unit/api/scout/` → no regression.
+
+**Proof notes**
+
+_(in-flight scratchpad)_
+
+---
+
+### TASK-34 — extractor unit tests for `populate_stat_leaderboards` via pure-function refactor
+
+**What**
+
+Behaviour-preserving refactor of `scripts/data/populate/phase_aux.py:populate_stat_leaderboards` to expose a pure projection seam — mirrors Phase 4 TASK-25's treatment of ladder + casualty. See `PLAN.md` → `## 2026-05-28: Scout Phase 4.5` → Interface → *nrlcom-stats* (last bullet).
+
+1. Modify `scripts/data/populate/phase_aux.py`:
+    - Extract `_extract_leader_rows(payload: dict, *, key: str, competition: int, season: int, team_map: dict[str, str], player_map: dict[int, str]) -> list[dict[str, Any]]` — pure function that walks `playerStats[]` and `teamStats[]` and returns the list of row-dicts the current inline code builds. No DB, no I/O. The float-coercion of `leader_value`, the team_nickname lookup via `team_map`, and the `playerId → person_id` lookup via `player_map` (only for `scope='player'`) all stay inside the pure function. `raw_payload` value (`json.dumps(leader, default=str)`) stays inside the pure function.
+    - In `populate_stat_leaderboards`, replace the nested `for scope_key …: for category_block …: for subgroup_block …: for pos_idx, leader …:` block with: per-archive, call `_extract_leader_rows(payload, key=key, competition=competition, season=season, team_map=team_map, player_map=player_map)` and loop `for row in rows: res = db.execute(upsert_sql, row); if res.scalar(): inserted += 1; else: updated += 1`.
+    - **Behaviour must be byte-equivalent** — same UPSERT SQL string, same counters, same `commit` guard, same logging.
+2. Create `tests/unit/scripts/data/populate/test_phase_leaderboards.py`:
+    - Load the TASK-29 canonical fixture (`tests/fixtures/scout/nrlcom_stats/canonical_response.json`) via the same `fixtures_dir` fixture the casualty/ladder unit tests use.
+    - 5+ tests over `_extract_leader_rows`:
+      - **`test_one_player_leader_projection`** — pass a minimal payload (one `playerStats[0].groups[0].leaders[0]` only) with known `firstName/lastName/teamNickName/value/playerId`; assert the returned row's exact field-by-field mapping (every column of `stat_leaderboards` named).
+      - **`test_player_scope_resolves_person_id_when_player_id_present`** — `player_map={123: "uuid-aaa"}`, leader has `playerId=123`; assert row's `person_id == "uuid-aaa"`. Then the same leader with `playerId=None` → `person_id is None`.
+      - **`test_team_scope_always_emits_person_id_none`** — payload with one `teamStats[0]…leaders[0]`; assert `row["scope"] == "team"` and `row["person_id"] is None` regardless of `player_map` contents.
+      - **`test_leader_value_float_coercion`** — `leader["value"] = "12.5"` → row `leader_value == 12.5`; `leader["value"] = ""` → `None`; `leader["value"] = None` → `None`; `leader["value"] = "abc"` → `None`.
+      - **`test_team_nickname_lookup`** — `team_map={"storm": "uuid-team-storm"}`, leader `teamNickName="Storm"` → `team_id == "uuid-team-storm"`. Unknown nickname → `team_id is None`. Fallback `teamName` when `teamNickName` missing (per the existing extractor logic: `nick = leader.get("teamNickName") or leader.get("teamName") or ""`).
+      - **`test_canonical_fixture_round_trip`** — load the real fixture, call `_extract_leader_rows(fixture, key="scout/nrlcom/stats/111/2026.json", competition=111, season=2026, team_map={}, player_map={})`; assert `len(rows) >= number_of_subgroups`, every row has the 17 required keys (column set), `s3_archive_key == "scout/nrlcom/stats/111/2026.json"` everywhere, and each row's `leader_position` is ≥1.
+
+**How to verify**
+
+- `pytest tests/unit/scripts/data/populate/test_phase_leaderboards.py -v` → 6 passed.
+- `pytest tests/unit/scripts/data/populate/test_dry_run_flag.py -v` → 12 passed (the TASK-18 commit-guard contract still holds — `commit: bool = True` still threaded through `populate_stat_leaderboards`).
+- `pytest tests/unit/scripts/data/populate/` → all green.
+- `python -c "from scripts.data.populate.phase_aux import _extract_leader_rows, populate_stat_leaderboards; print('ok')"` → `ok`.
+- `python -m scripts.data.populate_db_from_s3 --help` → exits 0 (the orchestrator imports the refactored function).
+- `pytest tests/unit/` → no regression vs. TASK-33 baseline.
+- Manual byte-equivalence check (no test): `git diff HEAD~ scripts/data/populate/phase_aux.py` — only the refactor seam diff; the SQL string, counters, commit guard, logging unchanged.
+
+**Proof notes**
+
+_(in-flight scratchpad)_
+
+---
+
+### TASK-35 — schedule cron for nrlcom-stats (daily 18:50 UTC) + nrlcom-players-roster (weekly Tue 23:40 UTC)
+
+**What**
+
+Cron scheduling. See `PLAN.md` → `## 2026-05-28: Scout Phase 4.5` → Interface → *Cron*.
+
+1. Modify `scripts/scout-refresh.sh`:
+    - Add two `case` entries to the existing `case "$JOB" in` block:
+      - `nrlcom-stats) ENDPOINT="nrlcom-stats?competition=111&season=$(date -u +%Y)" ;;`
+      - `nrlcom-players-roster) ENDPOINT="nrlcom-players-roster/refresh-all?competition=111" ;;`
+    - Update the `# Usage:` header line to list the two new jobs in the same order.
+    - Update the `*)` catch-all error string identically.
+2. Modify `scripts/cron.d/jeromelu`:
+    - Add (positioned at the end of the existing 18:xx UTC nrl.com block, right after the `45 18` ladder line):
+      ```
+      # Daily nrl.com stats snapshot — 18:50 UTC = 04:50 AEST. Pre-computed top-25
+      # leaderboards (~275KB) for NRL (111), current season. Archives
+      # scout/nrlcom/stats/111/{season}.json. Cheap to run daily even though
+      # the leaderboards only change a few times per week.
+      50 18 * * *     ubuntu  /opt/jeromelu/scripts/scout-refresh.sh nrlcom-stats
+      ```
+    - Add (positioned at the end of the existing Mon 23:xx UTC weekly block, right after the `35 23 * * 1` supercoach-settings line):
+      ```
+      # Weekly nrl.com players roster — Mondays 23:40 UTC = Tuesday 09:40 AEST.
+      # Walks the 17 NRL teams via refresh-all (1 req/sec; ~20s wall time).
+      # Profile data (DOB, position, image) changes slowly; weekly is right.
+      40 23 * * 1     ubuntu  /opt/jeromelu/scripts/scout-refresh.sh nrlcom-players-roster
+      ```
+
+**How to verify**
+
+- `bash -n scripts/scout-refresh.sh` → clean (syntax-only check, no execution).
+- Case simulation in a one-liner:
+  ```bash
+  for j in nrlcom-stats nrlcom-players-roster; do JOB=$j; case "$JOB" in nrlcom-stats) ENDPOINT="nrlcom-stats?competition=111&season=$(date -u +%Y)" ;; nrlcom-players-roster) ENDPOINT="nrlcom-players-roster/refresh-all?competition=111" ;; esac; echo "$j → $ENDPOINT"; done
+  ```
+  → emits `nrlcom-stats → nrlcom-stats?competition=111&season=2026` (or current year) and `nrlcom-players-roster → nrlcom-players-roster/refresh-all?competition=111`. The `&` stays inside the double-quoted `ENDPOINT` (the entire URL is passed via `curl -X POST "$API_URL"` so no shell backgrounding).
+- Both new cron lines: 5 timing fields + `ubuntu` + absolute path; no collision with existing slots (18:00/18:15/18:30/18:45 NRL.com block; Mon 23:00/23:15/23:30/23:35 weekly block; 16:30 pg-backup; 00:30 cron-report; 22:00/22:30 Mon content/disk).
+- `grep -n "cron.d/jeromelu" scripts/lightsail-deploy.sh` → the install/sync step still references the file (and so the new lines reach the box on the next deploy pull).
+- Cron-line correctness: `grep -E '^[0-9]+ [0-9]+ \* \* (\*|[0-9]+)' scripts/cron.d/jeromelu | wc -l` → previous count + 2.
+- **First scheduled fire is operator/time-gated** — defer the actual `/var/log/jeromelu/scout-refresh.log` confirmation to TASK-36 closure (mirrors Phase 4 TASK-26 deferral pattern). The TASK-36 seed exercises the endpoints end-to-end; this task only ships the scheduling.
+
+**Proof notes**
+
+_(in-flight scratchpad)_
+
+---
+
+### TASK-36 — prod seed + DB verification + docs (Phase 4.5 closure)
+
+**What**
+
+Phase 4.5 closure. See `PLAN.md` → `## 2026-05-28: Scout Phase 4.5` → Interface → *Seed + DB verification* and → *Documentation updates*. Mirrors Phase 4 TASK-27 line-for-line.
+
+1. **Seed prod via loopback** (`--resolve api.jeromelu.ai:443:127.0.0.1` from the box; `ADMIN_KEY` from `/opt/jeromelu/.env`):
+    - `curl -s -X POST "https://api.jeromelu.ai/api/admin/scout/nrlcom-stats?competition=111&season=2026" --resolve api.jeromelu.ai:443:127.0.0.1 -H "X-Admin-Key: $ADMIN_KEY" | python -m json.tool` → response shows `ok:true`, `validated:true`, `s3_archive_key:"scout/nrlcom/stats/111/2026.json"`, `player_stat_groups > 0`, `team_stat_groups > 0`. Verify S3: `aws s3 ls s3://jeromelu-clean-documents/scout/nrlcom/stats/111/` → `2026.json` recent stamp, ~275KB.
+    - `curl -s -X POST "https://api.jeromelu.ai/api/admin/scout/nrlcom-players-roster/refresh-all?competition=111" --resolve api.jeromelu.ai:443:127.0.0.1 -H "X-Admin-Key: $ADMIN_KEY" -m 120 | python -m json.tool` → `teams_walked: 17`, `errors: []`, each `results[i].validated == true`. Verify S3: `aws s3 ls s3://jeromelu-clean-documents/scout/nrlcom/players-roster/111/` → 17 `team-{team_id}.json` keys present, recent stamps.
+2. **Container-side populate** (Phase 3.5 `docker cp scripts → /runtmp` procedure documented in `scripts/data/populate/README.md`):
+    - `docker exec jeromelu-postgres psql -U jeromelu_admin -d jeromelu -c "SELECT COUNT(*) FROM stat_leaderboards WHERE season=2026 AND competition=111;"` — pre-seed count.
+    - `docker cp scripts jeromelu-api:/runtmp/scripts` (per the existing procedure); `docker exec jeromelu-api bash -lc "cd /runtmp && python -m scripts.data.populate_db_from_s3 --phase leaderboards --competition 111"` → logs show `phase_leaderboards: inserted=N updated=M`; `--phase` runs cleanly without the Phase-4 `jsonb_build_object` class of latent bug surfacing (none expected — the UPSERT here uses simple bound params throughout).
+    - Cleanup: `docker exec jeromelu-api rm -rf /runtmp` after.
+3. **Post-seed DB verification** (read-only via `docker exec jeromelu-postgres psql`):
+    - `SELECT COUNT(*) FROM stat_leaderboards WHERE season=2026 AND competition=111;` → returns the seeded count.
+    - `SELECT COUNT(*) FILTER (WHERE person_id IS NOT NULL) * 100.0 / COUNT(*) FROM stat_leaderboards WHERE scope='player' AND season=2026 AND competition=111;` → ≥80% (the Phase 4 ladder bar). Below 70% is a yellow flag worth a Concern in the run report.
+    - `SELECT COUNT(*) FILTER (WHERE team_id IS NOT NULL) * 100.0 / COUNT(*) FROM stat_leaderboards WHERE season=2026 AND competition=111;` → ≥90% (the team-nickname lookup map should be near-complete).
+    - Spot-check: `SELECT category, subgroup, leader_first_name, leader_last_name, leader_team_nickname, leader_value FROM stat_leaderboards WHERE season=2026 AND competition=111 AND scope='player' AND leader_position=1 ORDER BY category, subgroup LIMIT 10;` — the leaders should match `https://www.nrl.com/stats/?competition=111&season=2026` page for at least the well-known categories (Total Points / Tries / Tackles).
+4. **Documentation updates** — apply every entry under `PLAN.md` → `## 2026-05-28: Scout Phase 4.5` → *Documentation updates*. The new run report at `docs/build/runs/2026-05-28-scout-phase-4-5-stats-players-roster.md` should already exist (created when TASK-29 closed); set its status to **🟢 Shipped** in this task and record what each task delivered (files, proof, commit SHA) per `META.md` ritual. Remove the Phase 4.5 plan section from `PLAN.md`'s `## Active plan` once the run report is finalised.
+5. **Box-side reverts:** if any in-place edits were made on the box during seed (e.g. file overrides), revert them via `git checkout` so the next prod pull stays clean (mirrors Phase 4 TASK-27 closing step).
+
+**How to verify**
+
+- Endpoint responses include the expected fields (above) and S3 archives land at the expected keys with reasonable sizes/timestamps.
+- `stat_leaderboards` row count grows by the expected per-season cardinality (~25 leaders × number of subgroups across `playerStats`+`teamStats`).
+- person_id / team_id resolution percentages meet the bars above; if not, document the gap explicitly in the run report with a follow-up (do not silently move on).
+- All docs in the plan's *Documentation updates* list show their post-seed numbers / shipped flips.
+- `git status` after the task is clean: only TASKS.md removal of TASK-36, PLAN.md removal of the Phase 4.5 section, and the run report finalisation. No stray edits.
+- Outstanding/deferred items recorded explicitly in the run report's *Outstanding* section: at minimum (a) **cron first-fire** (operator/time-gated, mirror of Phase 4 TASK-26 deferral), (b) **extractor scheduling** (the cross-cutting Phase 4 follow-up — daily ingest cron archives to S3 but DB only refreshes when an operator runs `populate_db_from_s3 --phase leaderboards`; the `nrlcom_players_roster` pipeline has the same gap doubled because no extractor at all exists this phase).
+
+**Proof notes**
+
+_(in-flight scratchpad)_
 
 
 ## Completed work
