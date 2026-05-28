@@ -25,42 +25,6 @@ Prefix the title with optional tags in square brackets:
 
 ## Open tasks
 
-### TASK-34 — extractor unit tests for `populate_stat_leaderboards` via pure-function refactor
-
-**What**
-
-Behaviour-preserving refactor of `scripts/data/populate/phase_aux.py:populate_stat_leaderboards` to expose a pure projection seam — mirrors Phase 4 TASK-25's treatment of ladder + casualty. See `PLAN.md` → `## 2026-05-28: Scout Phase 4.5` → Interface → *nrlcom-stats* (last bullet).
-
-1. Modify `scripts/data/populate/phase_aux.py`:
-    - Extract `_extract_leader_rows(payload: dict, *, key: str, competition: int, season: int, team_map: dict[str, str], player_map: dict[int, str]) -> list[dict[str, Any]]` — pure function that walks `playerStats[]` and `teamStats[]` and returns the list of row-dicts the current inline code builds. No DB, no I/O. The float-coercion of `leader_value`, the team_nickname lookup via `team_map`, and the `playerId → person_id` lookup via `player_map` (only for `scope='player'`) all stay inside the pure function. `raw_payload` value (`json.dumps(leader, default=str)`) stays inside the pure function.
-    - In `populate_stat_leaderboards`, replace the nested `for scope_key …: for category_block …: for subgroup_block …: for pos_idx, leader …:` block with: per-archive, call `_extract_leader_rows(payload, key=key, competition=competition, season=season, team_map=team_map, player_map=player_map)` and loop `for row in rows: res = db.execute(upsert_sql, row); if res.scalar(): inserted += 1; else: updated += 1`.
-    - **Behaviour must be byte-equivalent** — same UPSERT SQL string, same counters, same `commit` guard, same logging.
-2. Create `tests/unit/scripts/data/populate/test_phase_leaderboards.py`:
-    - Load the TASK-29 canonical fixture (`tests/fixtures/scout/nrlcom_stats/canonical_response.json`) via the same `fixtures_dir` fixture the casualty/ladder unit tests use.
-    - 5+ tests over `_extract_leader_rows`:
-      - **`test_one_player_leader_projection`** — pass a minimal payload (one `playerStats[0].groups[0].leaders[0]` only) with known `firstName/lastName/teamNickName/value/playerId`; assert the returned row's exact field-by-field mapping (every column of `stat_leaderboards` named).
-      - **`test_player_scope_resolves_person_id_when_player_id_present`** — `player_map={123: "uuid-aaa"}`, leader has `playerId=123`; assert row's `person_id == "uuid-aaa"`. Then the same leader with `playerId=None` → `person_id is None`.
-      - **`test_team_scope_always_emits_person_id_none`** — payload with one `teamStats[0]…leaders[0]`; assert `row["scope"] == "team"` and `row["person_id"] is None` regardless of `player_map` contents.
-      - **`test_leader_value_float_coercion`** — `leader["value"] = "12.5"` → row `leader_value == 12.5`; `leader["value"] = ""` → `None`; `leader["value"] = None` → `None`; `leader["value"] = "abc"` → `None`.
-      - **`test_team_nickname_lookup`** — `team_map={"storm": "uuid-team-storm"}`, leader `teamNickName="Storm"` → `team_id == "uuid-team-storm"`. Unknown nickname → `team_id is None`. Fallback `teamName` when `teamNickName` missing (per the existing extractor logic: `nick = leader.get("teamNickName") or leader.get("teamName") or ""`).
-      - **`test_canonical_fixture_round_trip`** — load the real fixture, call `_extract_leader_rows(fixture, key="scout/nrlcom/stats/111/2026.json", competition=111, season=2026, team_map={}, player_map={})`; assert `len(rows) >= number_of_subgroups`, every row has the 17 required keys (column set), `s3_archive_key == "scout/nrlcom/stats/111/2026.json"` everywhere, and each row's `leader_position` is ≥1.
-
-**How to verify**
-
-- `pytest tests/unit/scripts/data/populate/test_phase_leaderboards.py -v` → 6 passed.
-- `pytest tests/unit/scripts/data/populate/test_dry_run_flag.py -v` → 12 passed (the TASK-18 commit-guard contract still holds — `commit: bool = True` still threaded through `populate_stat_leaderboards`).
-- `pytest tests/unit/scripts/data/populate/` → all green.
-- `python -c "from scripts.data.populate.phase_aux import _extract_leader_rows, populate_stat_leaderboards; print('ok')"` → `ok`.
-- `python -m scripts.data.populate_db_from_s3 --help` → exits 0 (the orchestrator imports the refactored function).
-- `pytest tests/unit/` → no regression vs. TASK-33 baseline.
-- Manual byte-equivalence check (no test): `git diff HEAD~ scripts/data/populate/phase_aux.py` — only the refactor seam diff; the SQL string, counters, commit guard, logging unchanged.
-
-**Proof notes**
-
-_(in-flight scratchpad)_
-
----
-
 ### TASK-35 — schedule cron for nrlcom-stats (daily 18:50 UTC) + nrlcom-players-roster (weekly Tue 23:40 UTC)
 
 **What**

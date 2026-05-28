@@ -1,6 +1,6 @@
 # Scout Phase 4.5 — nrl.com stats + players roster (D8 harden, schedule, seed)
 
-**Date:** 2026-05-28 · **Status:** 🟡 In flight (5 of 8 tasks shipped) · **Plan:** Scout Phase 4.5 (active — see [PLAN.md](../PLAN.md))
+**Date:** 2026-05-28 · **Status:** 🟡 In flight (6 of 8 tasks shipped) · **Plan:** Scout Phase 4.5 (active — see [PLAN.md](../PLAN.md))
 
 **TL;DR** — Phase 4.5 is a Phase 4-style hardening replay: both `services/api/app/scout/nrlcom_stats/` and `services/api/app/scout/nrlcom_players_roster/` ingest folders already exist with fetchers / routes / READMEs / make targets; migration `060_stat_leaderboards.sql` is applied; `populate_stat_leaderboards` is shipped and wired into `populate_db_from_s3.py` as `--phase leaderboards`; the lineage + catalogue docs already exist. What's missing is the D8 drift contract, extractor unit tests via pure-function refactor, cron scheduling, and prod seed verification. NRL only (comp 111), season 2026, forward-only — historical backfill stays Phase 5. SC Draft mode and folding `nrlcom_refresh.py` are explicitly scoped out (2026-05-28 planner interview).
 
@@ -60,6 +60,21 @@ Per-team agent_runs audit granularity preserved — `run_nrlcom_players_roster` 
 
 **Proof:** `python -c "from app.scout.nrlcom_players_roster.teams import NRL_TEAM_IDS; print(len(NRL_TEAM_IDS))"` → **17**; `('storm', 500021) in NRL_TEAM_IDS` → **True**; both `/api/admin/scout/nrlcom-players-roster` and `.../refresh-all` registered in `app.routes`; `pytest tests/unit/api/scout/` → **73 passed** (no regression). End-to-end POST (`teams_walked: 17`, 17 per-team `validated: true`, walk ≥16s) deferred to TASK-36 prod seed per spec carve-out (same posture as TASK-30/32). **adversarial-reviewer: PASS WITH CONCERNS** — all non-blocking: (C1) `NRL_TEAM_IDS` derived from fixture `filterTeams[]` not S3 ladder/draw archive — documented in `teams.py` docstring + plan's "Alternatively" wording authorises; (C2) opportunistic per-team Query description fix in-scope cleanup at the same edit site; (C3) `envelope.fail` uses synthetic `RuntimeError` — per-team rows carry the real types; (C4) `errors[]` schema is a strict superset of plan's literal shape (adds `short` and `status_code` — non-breaking); (C5) no unit test for walker — plan explicitly optional; (C6) end-to-end deferred to TASK-36 per spec carve-out; (C7) `services/web/.claude/` honoured via explicit pathspec. **/simplify:** not run.
 
+### TASK-34 — extractor unit tests for `populate_stat_leaderboards` via pure-function refactor (`7c243c2`)
+Behaviour-preserving refactor of `scripts/data/populate/phase_aux.py:populate_stat_leaderboards` — mirrors Phase 4 TASK-25's treatment of `_extract_standing_rows` / `_casualty_to_row`. Extracted `_extract_leader_rows(payload, *, key, competition, season, team_map, player_map) -> list[dict[str, Any]]` as a pure function: walks both `playerStats[]` and `teamStats[]` blocks, flattens the four-level nesting (scope → category → subgroup → leader), float-coerces `leader.value` (empty/None/unparseable → None), resolves team via `team_map` lower-case lookup (with `teamName` fallback when `teamNickName` missing), resolves `person_id` via `player_map` only for `scope='player'` when `playerId` is truthy. `raw_payload` (`json.dumps(leader, default=str)`) stays per-row inside the pure function.
+
+`populate_stat_leaderboards` replaces the 4-level inline for-loop body with a single call to `_extract_leader_rows` followed by a flat `for row in rows: db.execute(upsert_sql, row); …` loop. **UPSERT SQL string, `inserted` / `updated` counters, `commit: bool` guard, `read_json_concurrent` setup, and `logger.info` lines all byte-equivalent** — verified via `git diff` inspection by the reviewer.
+
+Added `tests/unit/scripts/data/populate/test_phase_leaderboards.py` with **6 tests** over `_extract_leader_rows`:
+- `test_one_player_leader_projection` — exact field-by-field mapping
+- `test_player_scope_resolves_person_id_when_player_id_present` — three sub-cases (in-map / not-in-map / `playerId=None`)
+- `test_team_scope_always_emits_person_id_none` — even when `player_map` contains a key matching `playerId=0`
+- `test_leader_value_float_coercion` — `"12.5"` / `"134"` / `""` / `None` / `"abc"`
+- `test_team_nickname_lookup` — known nickname / unknown / `teamName` fallback
+- `test_canonical_fixture_round_trip` — loads the TASK-29 fixture, asserts ≥70 rows (one per subgroup), full 16-key column set on every row, correct `s3_archive_key`, both scopes represented
+
+**Proof:** `pytest …/test_phase_leaderboards.py -v` → **6 passed in 1.61s**; `pytest …/test_dry_run_flag.py` → **12 passed** (TASK-18 commit-guard contract intact — `commit: bool = True` still threaded through `populate_stat_leaderboards`); `pytest tests/unit/scripts/data/populate/` → **43 passed**; `python -m scripts.data.populate_db_from_s3 --help` → exit 0 (orchestrator imports cleanly, `--phase leaderboards` still registered); `pytest tests/unit/` → **355 passed** (no regression; +6 new). **adversarial-reviewer: PASS WITH CONCERNS** — both non-blocking: (C1) spec said "17 keys" but the function emits 16 dict-keys (the 17th column, `captured_at`, comes from SQL `NOW()` — never bound from the row dict; test's `_EXPECTED_COLUMNS` set is 16, internally consistent with what the function actually emits — minor spec-wording artifact); (C2) session-staging discipline honoured (explicit pathspec, untracked `services/web/.claude/` left alone). **/simplify:** not run.
+
 ---
 
 ## How we know it's done (running)
@@ -70,7 +85,7 @@ Per-team agent_runs audit granularity preserved — `run_nrlcom_players_roster` 
 - **`value: str | None` is stricter than the spec's `float | int | str | None` union.** Empirical reality: every leader in 347 observed has a string value. The strictness is a D8-aligned choice — a future native-number `value` becomes drift, which is the correct behaviour, not a silent acceptance.
 
 ## Outstanding (deferred — operator/time-gated and surfaced infra follow-ups)
-- ☐ **TASK-34 → TASK-36:** the remaining 3 tasks of Phase 4.5 (in the queue).
+- ☐ **TASK-35 → TASK-36:** the remaining 2 tasks of Phase 4.5 (in the queue).
 - ☐ **End-to-end `validated:true` in JSON response** — TASK-30's local curl proof was deliberately skipped (offline this turn, per spec). Confirmation lands at the TASK-36 prod seed (the route is proven-by-construction green live + red via the deliberate break).
 - ☐ **Tighten `Profile` identity-field types when an extractor lands** — TASK-31 ships `Profile.firstName`/`lastName`/`teamNickName` as `str | None` (no extractor reading them this phase). When a `/players/data` extractor is built in a future phase, types should tighten to `str` (non-null) for the load-bearing identity fields, matching the casualty precedent. Surfaced for visibility.
 - ☐ **README correction for nrlcom_players_roster** — `services/api/app/scout/nrlcom_players_roster/README.md` line 15 mislabels `TEAM=500011` as Storm; actual Storm id is `500021`. Folded into TASK-36's doc sweep.
@@ -80,4 +95,4 @@ Per-team agent_runs audit granularity preserved — `run_nrlcom_players_roster` 
 _(populated as tasks ship)_
 
 ## Commits
-`068f37a` (planner kickoff — Phase 4.5 plan + 8 tasks queued, missed at the planner session boundary) · `f232c84` (TASK-29) · `bb84d28` (TASK-30) · `25f14ff` (TASK-31) · `cee666c` (TASK-32) · `860903b` (TASK-33). Plus the per-task run-report/queue bookkeeping commits.
+`068f37a` (planner kickoff — Phase 4.5 plan + 8 tasks queued, missed at the planner session boundary) · `f232c84` (TASK-29) · `bb84d28` (TASK-30) · `25f14ff` (TASK-31) · `cee666c` (TASK-32) · `860903b` (TASK-33) · `7c243c2` (TASK-34). Plus the per-task run-report/queue bookkeeping commits.
