@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
-from jeromelu_shared.db import Claim, KnowledgeBase, Person, PlayerRound, Source
+from jeromelu_shared.db import Claim, ClaimAssociation, KnowledgeBase, Person, PlayerRound, Source
 from jeromelu_shared.llm import chat_text, get_embeddings
 from jeromelu_shared.rag import BASE_PROMPT, TEMPERATURE_ADDONS
 
@@ -76,12 +76,6 @@ def get_current_round(db: Session, season: int) -> int:
     return (db.query(func.max(Claim.effective_round)).filter(Claim.season == season).scalar()) or 0
 
 
-# NOTE: query_round_claims / query_claim_consensus reference Claim.subject_entity_id
-# which no longer exists on the model — entity links moved to ClaimAssociation in
-# migration 036. These functions are dormant (only called by scripts/insights/
-# generate_round_tips.py) and need rewriting to JOIN through ClaimAssociation.
-# Tracked as TASK-53. The five pyright: ignore markers below are scoped to the
-# attribute-access errors that the live Claim model raises.
 def query_round_claims(
     db: Session,
     round_num: int,
@@ -90,21 +84,33 @@ def query_round_claims(
 ) -> dict[str, list[dict]]:
     """Query claims for a round, grouped by player entity_id.
 
-    Returns: {entity_id_str: [{"claim_type": ..., "claim_text": ..., "source_id": ..., ...}, ...]}
+    Joins through ``ClaimAssociation`` (polymorphic FK introduced in
+    migration 036) on the ``'subject'`` role, restricting to non-null
+    ``person_id``. Claims pointing at teams/matches via other roles are
+    excluded — this generator only reasons about player-scoped claims.
+
+    A single claim with multiple ``role='subject'`` associations (e.g.
+    "Alice and Bob will swap kicking duties") surfaces once per linked
+    person.
+
+    Returns: {person_id_str: [{"claim_id": ..., "claim_type": ..., ...}, ...]}
     """
-    q = db.query(Claim).filter(
-        Claim.effective_round == round_num,
-        Claim.season == season,
-        Claim.subject_entity_id.isnot(None),  # pyright: ignore[reportAttributeAccessIssue]  # Claim.subject_entity_id removed in migration 036 → TASK-53
+    q = (
+        db.query(Claim, ClaimAssociation.person_id)
+        .join(ClaimAssociation, ClaimAssociation.claim_id == Claim.claim_id)
+        .filter(
+            Claim.effective_round == round_num,
+            Claim.season == season,
+            ClaimAssociation.role == "subject",
+            ClaimAssociation.person_id.isnot(None),
+        )
     )
     if claim_types:
         q = q.filter(Claim.claim_type.in_(claim_types))
 
-    claims = q.all()
-
     grouped: dict[str, list[dict]] = {}
-    for c in claims:
-        eid = str(c.subject_entity_id)  # pyright: ignore[reportAttributeAccessIssue]  # Claim.subject_entity_id removed in migration 036 → TASK-53
+    for c, person_id in q.all():
+        eid = str(person_id)
         grouped.setdefault(eid, []).append(
             {
                 "claim_id": str(c.claim_id),
@@ -126,26 +132,31 @@ def query_claim_consensus(
 ) -> dict[str, dict[str, int]]:
     """Aggregate claim counts per player per claim_type.
 
-    Returns: {entity_id_str: {"buy": N, "sell": N, "hold": N, "captain": N, "avoid": N}}
+    Joins through ``ClaimAssociation`` on the ``'subject'`` role, same
+    semantics as :func:`query_round_claims`.
+
+    Returns: {person_id_str: {"buy": N, "sell": N, "hold": N, "captain": N, "avoid": N}}
     """
     rows = (
         db.query(
-            Claim.subject_entity_id,  # pyright: ignore[reportAttributeAccessIssue]  # Claim.subject_entity_id removed in migration 036 → TASK-53
+            ClaimAssociation.person_id,
             Claim.claim_type,
             func.count().label("cnt"),
         )
+        .join(Claim, Claim.claim_id == ClaimAssociation.claim_id)
         .filter(
             Claim.effective_round == round_num,
             Claim.season == season,
-            Claim.subject_entity_id.isnot(None),  # pyright: ignore[reportAttributeAccessIssue]  # Claim.subject_entity_id removed in migration 036 → TASK-53
+            ClaimAssociation.role == "subject",
+            ClaimAssociation.person_id.isnot(None),
         )
-        .group_by(Claim.subject_entity_id, Claim.claim_type)  # pyright: ignore[reportAttributeAccessIssue]  # Claim.subject_entity_id removed in migration 036 → TASK-53
+        .group_by(ClaimAssociation.person_id, Claim.claim_type)
         .all()
     )
 
     result: dict[str, dict[str, int]] = {}
-    for entity_id, claim_type, cnt in rows:
-        eid = str(entity_id)
+    for person_id, claim_type, cnt in rows:
+        eid = str(person_id)
         if eid not in result:
             result[eid] = {"buy": 0, "sell": 0, "hold": 0, "captain": 0, "avoid": 0}
         if claim_type in result[eid]:
