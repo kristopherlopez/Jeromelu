@@ -237,6 +237,70 @@ def populate_team_standings(
 # stat_leaderboards
 # ─────────────────────────────────────────────────────────────────────────
 
+def _extract_leader_rows(
+    payload: dict[str, Any],
+    *,
+    key: str,
+    competition: int,
+    season: int,
+    team_map: dict[str, str],
+    player_map: dict[int, str],
+) -> list[dict[str, Any]]:
+    """Pure projection of one /stats/data archive into stat_leaderboards rows.
+
+    Walks both `playerStats[]` and `teamStats[]` blocks and flattens
+    `<scope>Stats[].groups[].leaders[]` into one row per leader. No DB, no
+    I/O — the caller UPSERTs the returned dicts.
+
+    The `leader_value` float-coercion (string-or-None → float-or-None with
+    `""` → None and unparseable → None), the team_nickname lower-case
+    lookup via `team_map`, the `teamName` fallback when `teamNickName` is
+    missing, and the `playerId → person_id` lookup via `player_map` (only
+    for `scope='player'`) all live here. `raw_payload` is the full leader
+    JSON dump preserved per-row.
+    """
+    rows: list[dict[str, Any]] = []
+    for scope_key, scope_block in (("player", payload.get("playerStats") or []),
+                                   ("team", payload.get("teamStats") or [])):
+        for category_block in scope_block:
+            category = category_block.get("title") or ""
+            for subgroup_block in category_block.get("groups") or []:
+                subgroup_title = subgroup_block.get("title") or ""
+                stat_id = subgroup_block.get("statId")
+                leaders = subgroup_block.get("leaders") or []
+                for pos_idx, leader in enumerate(leaders, start=1):
+                    try:
+                        value = float(leader.get("value")) if leader.get("value") not in (None, "") else None
+                    except (TypeError, ValueError):
+                        value = None
+                    nick = leader.get("teamNickName") or leader.get("teamName") or ""
+                    team_id = team_map.get(nick.lower())
+                    person_id = None
+                    if scope_key == "player":
+                        pid = leader.get("playerId")
+                        if pid:
+                            person_id = player_map.get(int(pid))
+                    rows.append({
+                        "competition": competition,
+                        "season": season,
+                        "scope": scope_key,
+                        "category": category,
+                        "subgroup": subgroup_title,
+                        "stat_id": stat_id,
+                        "stat_title": subgroup_title,
+                        "leader_position": pos_idx,
+                        "leader_first_name": leader.get("firstName"),
+                        "leader_last_name": leader.get("lastName"),
+                        "leader_team_nickname": nick,
+                        "leader_value": value,
+                        "person_id": person_id,
+                        "team_id": team_id,
+                        "raw_payload": json.dumps(leader, default=str),
+                        "s3_archive_key": key,
+                    })
+    return rows
+
+
 def populate_stat_leaderboards(
     db: Session,
     *,
@@ -290,49 +354,19 @@ def populate_stat_leaderboards(
             continue
         season = int(m.group("season"))
 
-        for scope_key, scope_block in (("player", payload.get("playerStats") or []),
-                                       ("team", payload.get("teamStats") or [])):
-            for category_block in scope_block:
-                category = category_block.get("title") or ""
-                for subgroup_block in category_block.get("groups") or []:
-                    subgroup_title = subgroup_block.get("title") or ""
-                    stat_id = subgroup_block.get("statId")
-                    leaders = subgroup_block.get("leaders") or []
-                    for pos_idx, leader in enumerate(leaders, start=1):
-                        try:
-                            value = float(leader.get("value")) if leader.get("value") not in (None, "") else None
-                        except (TypeError, ValueError):
-                            value = None
-                        nick = leader.get("teamNickName") or leader.get("teamName") or ""
-                        team_id = team_map.get(nick.lower())
-                        person_id = None
-                        if scope_key == "player":
-                            pid = leader.get("playerId")
-                            if pid:
-                                person_id = player_map.get(int(pid))
-                        row = {
-                            "competition": competition,
-                            "season": season,
-                            "scope": scope_key,
-                            "category": category,
-                            "subgroup": subgroup_title,
-                            "stat_id": stat_id,
-                            "stat_title": subgroup_title,
-                            "leader_position": pos_idx,
-                            "leader_first_name": leader.get("firstName"),
-                            "leader_last_name": leader.get("lastName"),
-                            "leader_team_nickname": nick,
-                            "leader_value": value,
-                            "person_id": person_id,
-                            "team_id": team_id,
-                            "raw_payload": json.dumps(leader, default=str),
-                            "s3_archive_key": key,
-                        }
-                        res = db.execute(upsert_sql, row)
-                        if res.scalar():
-                            inserted += 1
-                        else:
-                            updated += 1
+        for row in _extract_leader_rows(
+            payload,
+            key=key,
+            competition=competition,
+            season=season,
+            team_map=team_map,
+            player_map=player_map,
+        ):
+            res = db.execute(upsert_sql, row)
+            if res.scalar():
+                inserted += 1
+            else:
+                updated += 1
 
     if commit: db.commit()
     logger.info("phase_leaderboards: inserted=%d updated=%d", inserted, updated)
