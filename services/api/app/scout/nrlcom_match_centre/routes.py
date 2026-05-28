@@ -38,8 +38,16 @@ def run_nrlcom_match_centre(
     competition: int,
     season: int,
     round: int | None = None,
+    archive_only: bool = False,
 ) -> dict[str, Any]:
-    """Walk the draw → fetch each match-centre → archive each to S3."""
+    """Walk the draw → fetch each match-centre → archive each to S3.
+
+    `archive_only=True` skips the per-match D8 strict-parse — Phase 5
+    historical-backfill mode. The S3 archive per match still happens
+    (capture is preserved). Response carries `validated:false,
+    validation_skipped:true` at the envelope level; `validation_failures`
+    stays empty (no per-match strict-parse ran).
+    """
     brief = (
         f"nrl.com match-centre walk (comp={competition} season={season} round={round})"
     )
@@ -98,14 +106,19 @@ def run_nrlcom_match_centre(
 
             # D8: strict-parse the envelope (raw already archived above). Drift on
             # a single match is logged but does NOT abort the round walk — one bad
-            # match shouldn't lose the rest of the round's capture.
-            try:
-                NrlcomMatchCentre.model_validate(match_data)
-            except ValidationError as e:
-                validation_failures.append({"slug": slug, "error": str(e)[:300]})
+            # match shouldn't lose the rest of the round's capture. archive_only=True
+            # skips the per-match strict-parse entirely (Phase 5 historical backfill).
+            if not archive_only:
+                try:
+                    NrlcomMatchCentre.model_validate(match_data)
+                except ValidationError as e:
+                    validation_failures.append({"slug": slug, "error": str(e)[:300]})
 
             time.sleep(RATE_LIMIT_SECONDS)
 
+        if archive_only:
+            detail["validated"] = False
+            detail["validation_skipped"] = True
         detail.update({
             "matches_archived": matches_archived,
             "fetch_failures": fetch_failures,
@@ -114,8 +127,9 @@ def run_nrlcom_match_centre(
             "archive_keys": archive_keys[:5] + (["..."] if len(archive_keys) > 5 else []),
         })
         logger.info(
-            "scout/nrlcom-match-centre: comp=%s season=%s round=%s — archived %d/%d",
-            competition, season, round, matches_archived, len(fixtures),
+            "scout/nrlcom-match-centre: comp=%s season=%s round=%s archive_only=%s "
+            "— archived %d/%d",
+            competition, season, round, archive_only, matches_archived, len(fixtures),
         )
     except NrlcomDrawFetchError as e:
         run.fail(e, summary_text=f"Could not discover fixtures: {e}")
@@ -143,10 +157,16 @@ def nrlcom_match_centre_endpoint(
     competition: int = Query(default=111, description="NRL=111"),
     season: int = Query(..., description="Season year"),
     round: int | None = Query(default=None, description="Round number (omit for current round)"),
+    archive_only: bool = Query(
+        default=False,
+        description="Phase 5 historical-backfill mode: skip per-match D8 strict-parse. Daily cron leaves false.",
+    ),
     db: Session = Depends(get_db),
 ):
     """Walk draw → fetch each match-centre → archive each to S3.
 
     `round` omitted → resolves the current round from the draw's `selectedRoundId`.
     """
-    return run_nrlcom_match_centre(db, competition=competition, season=season, round=round)
+    return run_nrlcom_match_centre(
+        db, competition=competition, season=season, round=round, archive_only=archive_only,
+    )

@@ -30,8 +30,17 @@ def run_nrlcom_draw(
     competition: int,
     season: int,
     round: int | None = None,
+    archive_only: bool = False,
 ) -> dict[str, Any]:
-    """Fetch /draw/data + archive to S3."""
+    """Fetch /draw/data + archive to S3.
+
+    `archive_only=True` skips D8 strict-parse entirely — used by the Phase 5
+    historical backfill where era-specific shape variance is expected and the
+    strict model would 500. The S3 capture still happens (it runs before the
+    parse). Response carries `validated:false, validation_skipped:true`. The
+    daily-cron path leaves `archive_only` at its default False — drift on the
+    modern shape still surfaces as 500.
+    """
     brief = f"nrl.com draw fetch (comp={competition} season={season} round={round})"
     run = start_deterministic_run(
         db,
@@ -59,13 +68,24 @@ def run_nrlcom_draw(
         })
         # D8: strict-parse the archived response so upstream shape drift
         # surfaces as a failed run. The raw payload is already in S3 above,
-        # so a validation failure never loses the capture.
-        NrlcomDraw.model_validate(data)
-        detail["validated"] = True
-        logger.info(
-            "scout/nrlcom-draw: comp=%s season=%s round=%s fixtures=%d s3=%s",
-            competition, season, round_for_path, n_fixtures, archive_key,
-        )
+        # so a validation failure never loses the capture. In archive_only
+        # mode (Phase 5 historical backfill) the strict-parse is skipped
+        # entirely — capture is preserved unconditionally.
+        if archive_only:
+            detail["validated"] = False
+            detail["validation_skipped"] = True
+            logger.info(
+                "scout/nrlcom-draw: archive_only=true; strict-parse skipped "
+                "(comp=%s season=%s round=%s fixtures=%d s3=%s)",
+                competition, season, round_for_path, n_fixtures, archive_key,
+            )
+        else:
+            NrlcomDraw.model_validate(data)
+            detail["validated"] = True
+            logger.info(
+                "scout/nrlcom-draw: comp=%s season=%s round=%s fixtures=%d s3=%s",
+                competition, season, round_for_path, n_fixtures, archive_key,
+            )
     except NrlcomDrawFetchError as e:
         run.fail(e, summary_text=f"Upstream fetch failed: {e}")
         raise HTTPException(status_code=502, detail=f"nrl.com draw fetch failed: {e}")
@@ -96,7 +116,13 @@ def nrlcom_draw_endpoint(
     competition: int = Query(default=111, description="NRL=111, NRLW=etc."),
     season: int = Query(..., description="Season year (1908..present)"),
     round: int | None = Query(default=None, description="Optional round number (omit for current)"),
+    archive_only: bool = Query(
+        default=False,
+        description="Phase 5 historical-backfill mode: skip D8 strict-parse. Daily cron leaves false.",
+    ),
     db: Session = Depends(get_db),
 ):
     """Fetch nrl.com /draw/data and archive to S3."""
-    return run_nrlcom_draw(db, competition=competition, season=season, round=round)
+    return run_nrlcom_draw(
+        db, competition=competition, season=season, round=round, archive_only=archive_only,
+    )

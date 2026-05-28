@@ -25,8 +25,13 @@ PIPELINE = "nrlcom-stats"
 
 
 def run_nrlcom_stats(
-    db: Session, *, competition: int, season: int,
+    db: Session, *, competition: int, season: int, archive_only: bool = False,
 ) -> dict[str, Any]:
+    """Fetch /stats/data + archive to S3.
+
+    `archive_only=True` skips D8 strict-parse — Phase 5 historical-backfill
+    mode. See nrlcom_draw.routes for the pattern.
+    """
     brief = f"nrl.com stats (comp={competition} season={season})"
     run = start_deterministic_run(
         db,
@@ -50,11 +55,21 @@ def run_nrlcom_stats(
         })
         # D8: strict-parse the archived response so upstream shape drift
         # surfaces as a failed run. The raw payload is already in S3 above,
-        # so a validation failure never loses the capture.
-        NrlcomStats.model_validate(data)
-        detail["validated"] = True
-        logger.info("scout/nrlcom-stats: comp=%s season=%s s3=%s",
-                    competition, season, archive_key)
+        # so a validation failure never loses the capture. archive_only=True
+        # skips the strict-parse entirely (Phase 5 historical backfill).
+        if archive_only:
+            detail["validated"] = False
+            detail["validation_skipped"] = True
+            logger.info(
+                "scout/nrlcom-stats: archive_only=true; strict-parse skipped "
+                "(comp=%s season=%s s3=%s)",
+                competition, season, archive_key,
+            )
+        else:
+            NrlcomStats.model_validate(data)
+            detail["validated"] = True
+            logger.info("scout/nrlcom-stats: comp=%s season=%s s3=%s",
+                        competition, season, archive_key)
     except NrlcomStatsFetchError as e:
         run.fail(e, summary_text=f"Upstream fetch failed: {e}")
         raise HTTPException(status_code=502, detail=f"stats fetch failed: {e}")
@@ -81,7 +96,13 @@ def run_nrlcom_stats(
 def nrlcom_stats_endpoint(
     competition: int = Query(default=111),
     season: int = Query(...),
+    archive_only: bool = Query(
+        default=False,
+        description="Phase 5 historical-backfill mode: skip D8 strict-parse. Daily cron leaves false.",
+    ),
     db: Session = Depends(get_db),
 ):
     """Fetch nrl.com /stats/data and archive to S3."""
-    return run_nrlcom_stats(db, competition=competition, season=season)
+    return run_nrlcom_stats(
+        db, competition=competition, season=season, archive_only=archive_only,
+    )
