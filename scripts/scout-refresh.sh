@@ -3,7 +3,7 @@
 # Used by cron (scripts/cron.d/jeromelu) to refresh channel and video
 # metrics on a schedule.
 #
-# Usage: scout-refresh.sh {channel-stats|videos|supercoach-teams|supercoach-settings|nrlcom-draw|nrlcom-match-centre|nrlcom-casualty-ward|nrlcom-ladder}
+# Usage: scout-refresh.sh {channel-stats|videos|supercoach-teams|supercoach-settings|nrlcom-draw|nrlcom-match-centre|nrlcom-casualty-ward|nrlcom-ladder|nrlcom-stats|nrlcom-players-roster}
 #
 # Sources /opt/jeromelu/.env to pick up ADMIN_KEY. ALWAYS appends a
 # status line to /var/log/jeromelu/scout-refresh.log — including on
@@ -37,7 +37,9 @@ case "$JOB" in
   nrlcom-match-centre) ENDPOINT="nrlcom-match-centre?competition=111&season=$(date -u +%Y)" ;;
   nrlcom-casualty-ward) ENDPOINT="nrlcom-casualty-ward?competition=111" ;;
   nrlcom-ladder)        ENDPOINT="nrlcom-ladder?competition=111&season=$(date -u +%Y)" ;;
-  *) echo "usage: $0 {channel-stats|videos|supercoach-teams|supercoach-settings|nrlcom-draw|nrlcom-match-centre|nrlcom-casualty-ward|nrlcom-ladder}" >&2; exit 2 ;;
+  nrlcom-stats)         ENDPOINT="nrlcom-stats?competition=111&season=$(date -u +%Y)" ;;
+  nrlcom-players-roster) ENDPOINT="nrlcom-players-roster/refresh-all?competition=111" ;;
+  *) echo "usage: $0 {channel-stats|videos|supercoach-teams|supercoach-settings|nrlcom-draw|nrlcom-match-centre|nrlcom-casualty-ward|nrlcom-ladder|nrlcom-stats|nrlcom-players-roster}" >&2; exit 2 ;;
 esac
 
 # shellcheck disable=SC1091
