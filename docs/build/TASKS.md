@@ -25,55 +25,6 @@ Prefix the title with optional tags in square brackets:
 
 ## Open tasks
 
-### TASK-33 — nrlcom-players-roster: refresh-all endpoint walking 17 NRL teams server-side
-
-**What**
-
-Add the cron-targetable bulk endpoint. See `PLAN.md` → `## 2026-05-28: Scout Phase 4.5` → Interface → *nrlcom-players-roster*.
-
-1. Create `services/api/app/scout/nrlcom_players_roster/teams.py`:
-    - Derive the 17 NRL.com internal `team_id` values + a human-readable short name per team by reading an existing `scout/nrlcom/ladder/111/2026/round-NN.json` or `scout/nrlcom/draw/111/2026/round-NN.json` archive from S3 (the round-12 ladder is already seeded per Phase 4). Each ladder position's `theme.key`/`teamNickname` plus the `clubProfileUrl` last path segment gives the `team_id`. Alternatively each draw fixture exposes `homeTeam.teamId` / `awayTeam.teamId` directly.
-    - Export `NRL_TEAM_IDS: list[tuple[str, int]]` — 17 entries of `(short_name, team_id)`, sorted by short_name for stable iteration.
-    - Module docstring documents the source archive used to derive the IDs and the manual-update procedure (when a new NRL team joins / id changes).
-2. Modify `services/api/app/scout/nrlcom_players_roster/routes.py`:
-    - Add `import time`.
-    - Add `from .teams import NRL_TEAM_IDS`.
-    - Add a new function `run_nrlcom_players_roster_refresh_all(db: Session, *, competition: int = 111, sleep_seconds: float = 1.0) -> dict[str, Any]`:
-      - Opens an envelope `start_deterministic_run(db, pipeline="nrlcom-players-roster-refresh-all", brief=f"nrl.com players-roster walk (comp={competition}, {len(NRL_TEAM_IDS)} teams)", detail={"competition": competition, "team_count": len(NRL_TEAM_IDS)})`.
-      - Iterates `NRL_TEAM_IDS`: for each `(short, team_id)`, calls `run_nrlcom_players_roster(db, competition=competition, team=team_id)` inside `try/except HTTPException` and `except Exception`; on success appends to `results: list[dict]`; on failure appends to `errors: list[dict]` (`{"team_id": ..., "short": ..., "error": str(e)}`). **Non-aborting** — a single-team failure does not stop the walk.
-      - Sleeps `sleep_seconds` between iterations (skip after the last team).
-      - Sets `envelope.detail.update({"teams_walked": len(NRL_TEAM_IDS), "ok_count": len(results), "error_count": len(errors)})`.
-      - Calls `envelope.complete(summary_text=f"…")` if `errors == []`, else `envelope.fail(...)` with a summary listing the error team_ids — but **still return 200** to the caller (the per-team detail is in the response body; errors do not fail the envelope HTTP status).
-      - Returns `{"run_id": envelope.run_id, "ok": True, "competition": competition, "teams_walked": len(NRL_TEAM_IDS), "results": results, "errors": errors}`.
-    - Add a new route handler:
-      ```python
-      @router.post(
-          "/admin/scout/nrlcom-players-roster/refresh-all",
-          dependencies=[Depends(require_admin)],
-      )
-      def nrlcom_players_roster_refresh_all_endpoint(
-          competition: int = Query(default=111),
-          db: Session = Depends(get_db),
-      ):
-          return run_nrlcom_players_roster_refresh_all(db, competition=competition)
-      ```
-3. The per-team endpoint (`POST /api/admin/scout/nrlcom-players-roster?competition=&team=`) stays unchanged for ad-hoc operator use.
-4. No new tests required beyond compile-check — the per-team path is fully tested by TASK-31/TASK-32; the new function is a thin walker. (If implementer wants belt-and-braces, add one unit test that mocks `run_nrlcom_players_roster` to count calls and verify ordering / sleep — optional.)
-
-**How to verify**
-
-- `python -c "from app.scout.nrlcom_players_roster.teams import NRL_TEAM_IDS; print(len(NRL_TEAM_IDS)); print(NRL_TEAM_IDS[:3])"` → `17` + three sample entries; spot-check ids against the ladder/draw archive used to derive them.
-- `python -c "from app.scout.nrlcom_players_roster.routes import run_nrlcom_players_roster_refresh_all, nrlcom_players_roster_refresh_all_endpoint; print('ok')"` → `ok`.
-- `python -c "from app.main import app; print([r.path for r in app.routes if 'players-roster' in r.path])"` → both `/api/admin/scout/nrlcom-players-roster` AND `/api/admin/scout/nrlcom-players-roster/refresh-all` present.
-- Local end-to-end (skippable if offline; recordable as deferred at the box-side seed in TASK-36): `curl -s -X POST "http://localhost:8000/api/admin/scout/nrlcom-players-roster/refresh-all?competition=111" -H "X-Admin-Key: $LOCAL_ADMIN_KEY" -m 60 | python -m json.tool` → `teams_walked: 17`, `errors: []` (or documented), per-team `validated: true`, walk takes ≥16 seconds (1 sec × 16 inter-team gaps).
-- `pytest tests/unit/api/scout/` → no regression.
-
-**Proof notes**
-
-_(in-flight scratchpad)_
-
----
-
 ### TASK-34 — extractor unit tests for `populate_stat_leaderboards` via pure-function refactor
 
 **What**

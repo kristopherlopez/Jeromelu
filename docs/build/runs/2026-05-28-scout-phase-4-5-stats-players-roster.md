@@ -1,6 +1,6 @@
 # Scout Phase 4.5 — nrl.com stats + players roster (D8 harden, schedule, seed)
 
-**Date:** 2026-05-28 · **Status:** 🟡 In flight (4 of 8 tasks shipped) · **Plan:** Scout Phase 4.5 (active — see [PLAN.md](../PLAN.md))
+**Date:** 2026-05-28 · **Status:** 🟡 In flight (5 of 8 tasks shipped) · **Plan:** Scout Phase 4.5 (active — see [PLAN.md](../PLAN.md))
 
 **TL;DR** — Phase 4.5 is a Phase 4-style hardening replay: both `services/api/app/scout/nrlcom_stats/` and `services/api/app/scout/nrlcom_players_roster/` ingest folders already exist with fetchers / routes / READMEs / make targets; migration `060_stat_leaderboards.sql` is applied; `populate_stat_leaderboards` is shipped and wired into `populate_db_from_s3.py` as `--phase leaderboards`; the lineage + catalogue docs already exist. What's missing is the D8 drift contract, extractor unit tests via pure-function refactor, cron scheduling, and prod seed verification. NRL only (comp 111), season 2026, forward-only — historical backfill stays Phase 5. SC Draft mode and folding `nrlcom_refresh.py` are explicitly scoped out (2026-05-28 planner interview).
 
@@ -47,6 +47,19 @@ Wired the TASK-31 D8 contract into `services/api/app/scout/nrlcom_players_roster
 
 **The `nrlcom_players_roster` per-team endpoint is now fully D8-hardened.** Server-side 17-team walk + refresh-all endpoint land in TASK-33; cron in TASK-35.
 
+### TASK-33 — nrlcom-players-roster: refresh-all endpoint walking 17 NRL teams server-side (`860903b`)
+Added the cron-targetable bulk walker. New file `services/api/app/scout/nrlcom_players_roster/teams.py` exposes `NRL_TEAM_IDS: list[tuple[str, int]]` — 17 (short_name, team_id) pairs sorted by short_name for stable iteration. **Derivation source change from spec:** the canonical fixture's `filterTeams[]` (captured in TASK-31) already carries the full 17-team catalogue, so I derived from there rather than from a `scout/nrlcom/ladder/...` or `.../draw/...` S3 archive. The plan's "Alternatively each draw fixture exposes `homeTeam.teamId` / `awayTeam.teamId`" wording signalled openness to equivalent sources; the fixture is more canonical (version-controlled, single source of truth). Module docstring documents the choice and the manual-update procedure (refresh fixture → re-derive). Spot-checks all valid: Broncos=500011, Storm=500021, Dolphins=500723.
+
+Routes.py additions:
+- `import time` + `from .teams import NRL_TEAM_IDS`.
+- `run_nrlcom_players_roster_refresh_all(db, *, competition=111, sleep_seconds=1.0)` — opens an envelope `agent_runs` row under `pipeline='nrlcom-players-roster-refresh-all'` (distinct label from per-team's `'nrlcom-players-roster'`) and walks `NRL_TEAM_IDS` sequentially. Per-team failures (both `HTTPException` and generic `Exception`) are **non-aborting** — captured in `errors[]` and the walk continues, mirroring the match-centre "fail one match, keep walking" precedent. 1-second inter-team sleep, skipped after the last team (≥16s wall time for the full walk). Envelope completes successfully when `errors == []`, otherwise envelope.fails with a synthetic `RuntimeError` summarising the offending team_ids (per-team `agent_runs` rows still carry the true exception types — no information lost). **HTTP response is always 200**; per-team failures surface in the body (`errors[]`), not the status code.
+- `POST /api/admin/scout/nrlcom-players-roster/refresh-all` route handler.
+- Opportunistic cleanup: the per-team endpoint's `team` Query description was fixed from the misleading "Storm=500011" (Broncos!) to "Broncos=500011, Storm=500021". Surfaces in OpenAPI.
+
+Per-team agent_runs audit granularity preserved — `run_nrlcom_players_roster` continues to open its own `start_deterministic_run`, so the envelope is the parent and per-team are children. No unit test for the walker (plan explicitly says optional; the per-team path is fully covered by TASK-31/32).
+
+**Proof:** `python -c "from app.scout.nrlcom_players_roster.teams import NRL_TEAM_IDS; print(len(NRL_TEAM_IDS))"` → **17**; `('storm', 500021) in NRL_TEAM_IDS` → **True**; both `/api/admin/scout/nrlcom-players-roster` and `.../refresh-all` registered in `app.routes`; `pytest tests/unit/api/scout/` → **73 passed** (no regression). End-to-end POST (`teams_walked: 17`, 17 per-team `validated: true`, walk ≥16s) deferred to TASK-36 prod seed per spec carve-out (same posture as TASK-30/32). **adversarial-reviewer: PASS WITH CONCERNS** — all non-blocking: (C1) `NRL_TEAM_IDS` derived from fixture `filterTeams[]` not S3 ladder/draw archive — documented in `teams.py` docstring + plan's "Alternatively" wording authorises; (C2) opportunistic per-team Query description fix in-scope cleanup at the same edit site; (C3) `envelope.fail` uses synthetic `RuntimeError` — per-team rows carry the real types; (C4) `errors[]` schema is a strict superset of plan's literal shape (adds `short` and `status_code` — non-breaking); (C5) no unit test for walker — plan explicitly optional; (C6) end-to-end deferred to TASK-36 per spec carve-out; (C7) `services/web/.claude/` honoured via explicit pathspec. **/simplify:** not run.
+
 ---
 
 ## How we know it's done (running)
@@ -57,7 +70,7 @@ Wired the TASK-31 D8 contract into `services/api/app/scout/nrlcom_players_roster
 - **`value: str | None` is stricter than the spec's `float | int | str | None` union.** Empirical reality: every leader in 347 observed has a string value. The strictness is a D8-aligned choice — a future native-number `value` becomes drift, which is the correct behaviour, not a silent acceptance.
 
 ## Outstanding (deferred — operator/time-gated and surfaced infra follow-ups)
-- ☐ **TASK-33 → TASK-36:** the remaining 4 tasks of Phase 4.5 (in the queue).
+- ☐ **TASK-34 → TASK-36:** the remaining 3 tasks of Phase 4.5 (in the queue).
 - ☐ **End-to-end `validated:true` in JSON response** — TASK-30's local curl proof was deliberately skipped (offline this turn, per spec). Confirmation lands at the TASK-36 prod seed (the route is proven-by-construction green live + red via the deliberate break).
 - ☐ **Tighten `Profile` identity-field types when an extractor lands** — TASK-31 ships `Profile.firstName`/`lastName`/`teamNickName` as `str | None` (no extractor reading them this phase). When a `/players/data` extractor is built in a future phase, types should tighten to `str` (non-null) for the load-bearing identity fields, matching the casualty precedent. Surfaced for visibility.
 - ☐ **README correction for nrlcom_players_roster** — `services/api/app/scout/nrlcom_players_roster/README.md` line 15 mislabels `TEAM=500011` as Storm; actual Storm id is `500021`. Folded into TASK-36's doc sweep.
@@ -67,4 +80,4 @@ Wired the TASK-31 D8 contract into `services/api/app/scout/nrlcom_players_roster
 _(populated as tasks ship)_
 
 ## Commits
-`068f37a` (planner kickoff — Phase 4.5 plan + 8 tasks queued, missed at the planner session boundary) · `f232c84` (TASK-29) · `bb84d28` (TASK-30) · `25f14ff` (TASK-31) · `cee666c` (TASK-32). Plus the per-task run-report/queue bookkeeping commits.
+`068f37a` (planner kickoff — Phase 4.5 plan + 8 tasks queued, missed at the planner session boundary) · `f232c84` (TASK-29) · `bb84d28` (TASK-30) · `25f14ff` (TASK-31) · `cee666c` (TASK-32) · `860903b` (TASK-33). Plus the per-task run-report/queue bookkeeping commits.
