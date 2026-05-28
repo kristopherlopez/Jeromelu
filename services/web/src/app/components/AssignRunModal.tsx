@@ -329,7 +329,7 @@ export default function AssignRunModal({
             </strong>
             {clusterId !== null && clusterId !== undefined && (
               <>
-                {" "}and copy up to 10 face exemplars from the cluster's
+                {" "}and copy up to 10 face exemplars from the cluster&apos;s
                 highest-confidence detections into their face registry.
               </>
             )}

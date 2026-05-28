@@ -289,7 +289,7 @@ export default function AssignVoiceModal({
             {eligible > 0 ? (
               <>
                 {" "}and promote up to <strong>{Math.min(eligible, 10)}</strong>{" "}
-                medoid voiceprints from the cluster's longest turns into the
+                medoid voiceprints from the cluster&apos;s longest turns into the
                 voice registry.
               </>
             ) : (

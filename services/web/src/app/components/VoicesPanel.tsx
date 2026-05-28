@@ -256,7 +256,7 @@ export default function VoicesPanel({
       <div className="flex h-full flex-col gap-4 overflow-y-auto custom-scrollbar pr-2">
         {reclusterControls}
         <div className="text-xs" style={{ color: "var(--foreground-ghost)" }}>
-          No voice clusters for this source — pyannote hasn't run, or all
+          No voice clusters for this source — pyannote hasn&apos;t run, or all
           turns lack a speaker_label.
         </div>
       </div>
@@ -431,7 +431,7 @@ function VoiceClusterSection({ cluster, onSeek, onAssign }: SectionProps) {
         <div className="text-[10px]" style={{ color: "var(--foreground-ghost)" }}>
           No turns returned for this cluster — either the API is serving an
           older response shape (restart uvicorn to pick up the latest
-          voice_clusters.py) or the source isn't fully transcribed.
+          voice_clusters.py) or the source isn&apos;t fully transcribed.
         </div>
       )}
 

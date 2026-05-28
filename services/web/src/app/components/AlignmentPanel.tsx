@@ -222,10 +222,10 @@ function FaceTranscriptList({
       </h3>
       <p className="text-[11px]" style={{ color: "var(--foreground-ghost)" }}>
         Chunks grouped into runs by the on-screen face cluster, not by
-        pyannote boundaries. The "transcript as determined by face" —
+        pyannote boundaries. The &quot;transcript as determined by face&quot; —
         each paragraph is consecutive speech where the same person was
         visible. Runs marked CONFLATED sit inside a single pyannote
-        turn that spans multiple faces — pyannote's segmentation merged
+        turn that spans multiple faces — pyannote&apos;s segmentation merged
         across a real speaker change.
       </p>
       <div className="text-xs">
@@ -430,9 +430,9 @@ function TranscriptByAttribution({
       </h3>
       <p className="text-[11px]" style={{ color: "var(--foreground-ghost)" }}>
         Same speech, attributed two ways. Left column labels each turn by
-        the dominant on-screen face cluster's Person; right column by the
-        voice cluster's Person. Where the two disagree the row is tinted
-        red — those are the turns where one modality says it's someone
+        the dominant on-screen face cluster&apos;s Person; right column by the
+        voice cluster&apos;s Person. Where the two disagree the row is tinted
+        red — those are the turns where one modality says it&apos;s someone
         different than the other.
       </p>
       <div className="text-xs">
@@ -703,7 +703,7 @@ function TimelineList({ timeline, onSeek }: TimelineProps) {
             color: "var(--foreground-ghost)",
           }}
         >
-          No timeline rows — source isn't transcribed, or restart the
+          No timeline rows — source isn&apos;t transcribed, or restart the
           API to pick up the latest endpoint shape.
         </div>
       ) : (
@@ -1094,8 +1094,8 @@ function DisagreementsList({ disagreements, onSeek }: DisagreementsProps) {
         Disagreements ({disagreements.length})
       </h3>
       <p className="text-[11px]" style={{ color: "var(--foreground-ghost)" }}>
-        Turns where the dominant on-screen face cluster's identity differs from
-        the turn's voice attribution. Operator worklist — either the face was
+        Turns where the dominant on-screen face cluster&apos;s identity differs from
+        the turn&apos;s voice attribution. Operator worklist — either the face was
         a reaction shot the ASD let through, or the voice attribution is
         wrong. Sorted by turn duration descending.
       </p>

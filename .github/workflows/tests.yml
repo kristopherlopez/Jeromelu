@@ -72,6 +72,28 @@ jobs:
         run: npm run typecheck
         working-directory: services/web
 
+  web-lint:
+    # ESLint over services/web (Next.js core-web-vitals + typescript
+    # presets). Hard-fails on errors (severity=error); warnings are
+    # informational. Several react-hooks/* rules from React 19's hook
+    # compiler are downgraded to warn in services/web/eslint.config.mjs
+    # pending incremental migration. See TASK-48 in the run report.
+    name: npm run lint (services/web)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: services/web/package-lock.json
+      - name: Install deps
+        run: npm ci
+        working-directory: services/web
+      - name: Lint
+        run: npm run lint
+        working-directory: services/web
+
   ruff:
     # Python lint + format check. Hard-fail. Scope: services packages
     # scripts tests. Config in pyproject.toml [tool.ruff].

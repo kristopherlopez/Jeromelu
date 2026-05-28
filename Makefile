@@ -1,4 +1,4 @@
-.PHONY: up down db-shell migrate migrate-status seed-teams seed-venues fetch-players seed-players api web logs clean collect-audio collect-video transcribe extract-transcript diarize diarize-compare voice-cluster enroll-voice enroll-face scout-presenters lineup-build lineup-deploy lineup-status lineup-delete test test-eval lint lint-python format-python typecheck-python prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all prod-refresh-videos prod-refresh-channel-stats prod-channel-coverage prod-seed-teams prod-seed-players prod-refresh-players prod-fetch-and-refresh-players prod-refresh-players-nrlcom deploy-prod prod-shell prod-logs
+.PHONY: up down db-shell migrate migrate-status seed-teams seed-venues fetch-players seed-players api web logs clean collect-audio collect-video transcribe extract-transcript diarize diarize-compare voice-cluster enroll-voice enroll-face scout-presenters lineup-build lineup-deploy lineup-status lineup-delete test test-eval lint lint-python format-python typecheck-python lint-web prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all prod-refresh-videos prod-refresh-channel-stats prod-channel-coverage prod-seed-teams prod-seed-players prod-refresh-players prod-fetch-and-refresh-players prod-refresh-players-nrlcom deploy-prod prod-shell prod-logs
 
 # Start local infrastructure
 up:
@@ -225,10 +225,19 @@ format-python:
 typecheck-python:
 	pyright
 
-# Umbrella — what CI's lint side checks (minus pytest). lint-web is
-# added to the chain when TASK-48 (ESLint CI job) lands.
+# ESLint over services/web (Next.js core-web-vitals + typescript
+# presets). Hard-fail in CI via tests.yml (job: web-lint). Warnings
+# are informational — the React 19 advisory rules (set-state-in-effect,
+# refs, immutability, incompatible-library) are downgraded to `warn`
+# in eslint.config.mjs pending incremental migration.
+lint-web:
+	cd services/web && npm run lint
+
+# Umbrella — what CI's lint side checks (minus pytest). Chains the
+# three language-specific lint passes + pyright.
 lint:
 	$(MAKE) lint-python
+	$(MAKE) lint-web
 	$(MAKE) typecheck-python
 
 # --- Production ---
