@@ -25,39 +25,6 @@ Prefix the title with optional tags in square brackets:
 
 ## Open tasks
 
-### TASK-31 — nrlcom-players-roster: D8 strict models + fixture + unit drift tests
-
-**What**
-
-D8 contract for `nrlcom-players-roster`. See `PLAN.md` → `## 2026-05-28: Scout Phase 4.5` → Interface → *nrlcom-players-roster*. Pattern follows TASK-29 exactly; depth is shallower because no DB extractor reads `/players/data` yet (S3-only this phase per scope decision).
-
-1. Capture a live response for ONE team via `app.scout.nrlcom_players_roster.fetcher.fetch_players_roster(competition=111, team=500011)` (Storm) → `tests/fixtures/scout/nrlcom_players_roster/canonical_response.json`.
-2. Create `services/api/app/scout/nrlcom_players_roster/models.py`:
-    - `NrlcomPlayersRoster` (envelope, `extra="forbid"`): `profileGroups: list[ProfileGroup]`, plus all observed top-level keys (typed per observed value; opaque slots → `list[Any]` / `dict[str, Any]`).
-    - `ProfileGroup` (`extra="forbid"`): `profiles: list[Profile]`, plus all observed group-level keys required-present-but-nullable (a `title`/`type` discriminator is the likely shape — implementer confirms live).
-    - `Profile` (`extra="forbid"`): the top-level wrapper of one `profiles[]` entry. The live response shape determines whether biographical fields are inline on `Profile` or nested under a `profile: ProfileBody | None` slot. If nested, add `ProfileBody` (also `extra="forbid"`) carrying `firstName: str | None`, `lastName: str | None`, `playerId: int | None`, `positions: list[Any] | None`, plus other identity fields observed live. Opaque media/biographical blocks (`theme`, large nested bio object) stay typed `dict[str, Any] | None` until an extractor lands. **The required-present rule applies to every key observed live**, so a rename or removal trips drift.
-   `__all__` exports all model classes used at the route boundary.
-3. Create `tests/unit/api/scout/nrlcom_players_roster/{__init__.py,test_models.py}` mirroring `tests/unit/api/scout/nrlcom_casualty_ward/test_models.py`:
-    - `test_canonical_fixture_parses` — asserts `len(parsed.profileGroups) >= 1` and `len(parsed.profileGroups[0].profiles) >= 1`.
-    - `test_unknown_top_level_field_raises` — `bad["loot_boxes"] = {}`.
-    - `test_unknown_profile_field_raises` — invent a key on the first profile (or `ProfileBody` if nested) → `ValidationError` naming it.
-    - `test_missing_required_profile_identity_field_raises` — drop one of the load-bearing identity fields (e.g. the upstream's `playerId` if present, else the highest-confidence identity field) → `ValidationError` naming it.
-
-Do NOT touch `routes.py` in this task (lands in TASK-32) or add the refresh-all endpoint (lands in TASK-33).
-
-**How to verify**
-
-- `pytest tests/unit/api/scout/nrlcom_players_roster/test_models.py -v` → 4 passed.
-- `pytest tests/unit/api/scout/` → no regression vs. TASK-30 baseline.
-- Fixture file exists, pretty-printed JSON, ≥1 entry in `profileGroups[].profiles`.
-- `python -c "from app.scout.nrlcom_players_roster.models import NrlcomPlayersRoster; print('ok')"` → `ok`.
-
-**Proof notes**
-
-_(in-flight scratchpad)_
-
----
-
 ### TASK-32 — nrlcom-players-roster: wire strict-parse into route + env-flagged live drift test
 
 **What**
