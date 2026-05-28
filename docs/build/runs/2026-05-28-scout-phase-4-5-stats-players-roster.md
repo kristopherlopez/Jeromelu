@@ -47,7 +47,7 @@ Wired the TASK-31 D8 contract into `services/api/app/scout/nrlcom_players_roster
 
 **The `nrlcom_players_roster` per-team endpoint is now fully D8-hardened.** Server-side 17-team walk + refresh-all endpoint land in TASK-33; cron in TASK-35.
 
-### TASK-36 — prod seed + DB verification + docs (Phase 4.5 closure) (commit `<closure>`)
+### TASK-36 — prod seed + DB verification + docs (Phase 4.5 closure) (`3728f96`)
 Seeded prod via loopback (`--resolve api.jeromelu.ai:443:127.0.0.1` from the box; `ADMIN_KEY` from `/opt/jeromelu/.env`); ran in-container populate via the Phase 3.5 `docker cp scripts → /runtmp/scripts` procedure; cleaned up `/runtmp` after.
 
 **Pre-flight (the deploy gate Phase 4 didn't always remember to check):** confirmed the running api container has TASK-29..33 code baked in (`from app.scout.nrlcom_stats.models import NrlcomStats` → OK, `run_nrlcom_players_roster_refresh_all` → OK, `NRL_TEAM_IDS` → 17). Confirmed `/etc/cron.d/jeromelu` has both new lines (`50 18 nrlcom-stats` daily + `40 23 * * 1 nrlcom-players-roster` Monday-weekly).
@@ -127,4 +127,4 @@ Mirrors Phase 4 TASK-26 line-for-line.
 - ☐ Same cross-cutting **extractor scheduling** infra follow-up that Phase 4 surfaced — the daily ingest cron archives to S3 but the DB only refreshes when an operator runs `populate_db_from_s3 --phase leaderboards`. Same gap will apply to `nrlcom_players_roster` (which ships NO DB extractor this phase per scope decision). Durable fix is baking `scripts/` + `packages/shared` into the api image so a scheduled `docker exec jeromelu-api python -m scripts.data.populate_db_from_s3 …` just works — an infra decision for the human/planner. Out of Phase 4.5 scope.
 
 ## Commits
-`068f37a` (planner kickoff — Phase 4.5 plan + 8 tasks queued, missed at the planner session boundary) · `f232c84` (TASK-29) · `bb84d28` (TASK-30) · `25f14ff` (TASK-31) · `cee666c` (TASK-32) · `860903b` (TASK-33) · `7c243c2` (TASK-34) · `4bf0574` (TASK-35) · TASK-36 closure commit follows. Plus the per-task run-report/queue bookkeeping commits.
+`068f37a` (planner kickoff — Phase 4.5 plan + 8 tasks queued, missed at the planner session boundary) · `f232c84` (TASK-29) · `bb84d28` (TASK-30) · `25f14ff` (TASK-31) · `cee666c` (TASK-32) · `860903b` (TASK-33) · `7c243c2` (TASK-34) · `4bf0574` (TASK-35) · `3728f96` (TASK-36 closure). Plus the per-task run-report/queue bookkeeping commits.
