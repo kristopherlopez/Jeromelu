@@ -1,0 +1,1344 @@
+{
+  "filterCompetitions": [
+    {
+      "name": "Telstra Premiership",
+      "value": 111,
+      "theme": {
+        "key": "nrl-premiership",
+        "logos": {
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Telstra Women's Premiership",
+      "value": 161,
+      "theme": {
+        "key": "nrl-womens-premiership",
+        "logos": {
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Witzer Pre-Season Challenge",
+      "value": 119,
+      "theme": {
+        "key": "pre-season-challenge",
+        "logos": {
+          "badge-light.png": "202502070130",
+          "badge-light.svg": "202502070130",
+          "badge.png": "202502070130",
+          "badge.svg": "202502070130"
+        }
+      }
+    },
+    {
+      "name": "The Knock On Effect NSW Cup",
+      "value": 113,
+      "theme": {
+        "key": "nsw-cup",
+        "logos": {
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "name": "Hostplus Cup",
+      "value": 114,
+      "theme": {
+        "key": "qrl-premiership",
+        "logos": {
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    }
+  ],
+  "filterRounds": [
+    {
+      "name": "Round 1",
+      "value": 1
+    },
+    {
+      "name": "Round 2",
+      "value": 2
+    },
+    {
+      "name": "Round 3",
+      "value": 3
+    },
+    {
+      "name": "Round 4",
+      "value": 4
+    },
+    {
+      "name": "Round 5",
+      "value": 5
+    },
+    {
+      "name": "Round 6",
+      "value": 6
+    },
+    {
+      "name": "Round 7",
+      "value": 7
+    },
+    {
+      "name": "Round 8",
+      "value": 8
+    },
+    {
+      "name": "Round 9",
+      "value": 9
+    },
+    {
+      "name": "Round 10",
+      "value": 10
+    },
+    {
+      "name": "Round 11",
+      "value": 11
+    },
+    {
+      "name": "Round 12",
+      "value": 12
+    }
+  ],
+  "filterSeasons": [
+    {
+      "name": "2026",
+      "value": 2026
+    },
+    {
+      "name": "2025",
+      "value": 2025
+    },
+    {
+      "name": "2024",
+      "value": 2024
+    },
+    {
+      "name": "2023",
+      "value": 2023
+    },
+    {
+      "name": "2022",
+      "value": 2022
+    },
+    {
+      "name": "2021",
+      "value": 2021
+    },
+    {
+      "name": "2020",
+      "value": 2020
+    },
+    {
+      "name": "2019",
+      "value": 2019
+    },
+    {
+      "name": "2018",
+      "value": 2018
+    },
+    {
+      "name": "2017",
+      "value": 2017
+    },
+    {
+      "name": "2016",
+      "value": 2016
+    },
+    {
+      "name": "2015",
+      "value": 2015
+    },
+    {
+      "name": "2014",
+      "value": 2014
+    },
+    {
+      "name": "2013",
+      "value": 2013
+    },
+    {
+      "name": "2012",
+      "value": 2012
+    },
+    {
+      "name": "2011",
+      "value": 2011
+    },
+    {
+      "name": "2010",
+      "value": 2010
+    },
+    {
+      "name": "2009",
+      "value": 2009
+    },
+    {
+      "name": "2008",
+      "value": 2008
+    },
+    {
+      "name": "2007",
+      "value": 2007
+    },
+    {
+      "name": "2006",
+      "value": 2006
+    },
+    {
+      "name": "2005",
+      "value": 2005
+    },
+    {
+      "name": "2004",
+      "value": 2004
+    },
+    {
+      "name": "2003",
+      "value": 2003
+    },
+    {
+      "name": "2002",
+      "value": 2002
+    },
+    {
+      "name": "2001",
+      "value": 2001
+    },
+    {
+      "name": "2000",
+      "value": 2000
+    },
+    {
+      "name": "1999",
+      "value": 1999
+    },
+    {
+      "name": "1998",
+      "value": 1998
+    }
+  ],
+  "finalistTeams": 0,
+  "positions": [
+    {
+      "clubProfileUrl": "/clubs/penrith-panthers/",
+      "movement": "none",
+      "next": {
+        "fullName": "Warriors",
+        "teamId": 500032,
+        "nickname": "Warriors",
+        "theme": {
+          "key": "warriors",
+          "logos": {
+            "badge-basic24-mono.svg": "202605110452",
+            "badge-basic24.svg": "202605110452",
+            "badge-light.png": "202605110452",
+            "badge-light.svg": "202605110452",
+            "badge.png": "202605110452",
+            "badge.svg": "202605110452",
+            "header-background.png": "202605110452",
+            "header-background.svg": "202605110452",
+            "silhouette.png": "202605110452",
+            "silhouette.svg": "202605110452",
+            "text.svg": "202605110452"
+          }
+        },
+        "matchCentreUrl": "https://www.nrl.com/draw/nrl-premiership/2026/round-13/panthers-v-warriors/",
+        "isBye": false
+      },
+      "stats": {
+        "played": 11,
+        "wins": 10,
+        "drawn": 0,
+        "lost": 1,
+        "byes": 1,
+        "points for": 349,
+        "points against": 146,
+        "points difference": 203,
+        "home record": "5 - 0",
+        "away record": "5 - 1",
+        "points": 22,
+        "bonus points": 0,
+        "streak": "4W",
+        "form": "4 - 0",
+        "average losing margin": 16.0,
+        "average winning margin": 21.9,
+        "golden point": 1,
+        "close games": 2,
+        "day record": "2-0-0",
+        "night record": "8-0-1",
+        "players used": 21,
+        "odds": "$2.60"
+      },
+      "teamNickname": "Panthers",
+      "theme": {
+        "key": "panthers",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "clubProfileUrl": "/clubs/warriors/",
+      "movement": "none",
+      "next": {
+        "fullName": "Penrith Panthers",
+        "teamId": 500014,
+        "nickname": "Panthers",
+        "theme": {
+          "key": "panthers",
+          "logos": {
+            "badge-basic24-mono.svg": "202605110452",
+            "badge-basic24.svg": "202605110452",
+            "badge-light.png": "202605110452",
+            "badge-light.svg": "202605110452",
+            "badge.png": "202605110452",
+            "badge.svg": "202605110452",
+            "header-background.png": "202605110452",
+            "header-background.svg": "202605110452",
+            "silhouette.png": "202605110452",
+            "silhouette.svg": "202605110452",
+            "text.svg": "202605110452"
+          }
+        },
+        "matchCentreUrl": "https://www.nrl.com/draw/nrl-premiership/2026/round-13/panthers-v-warriors/",
+        "isBye": false
+      },
+      "stats": {
+        "played": 11,
+        "wins": 9,
+        "drawn": 0,
+        "lost": 2,
+        "byes": 1,
+        "points for": 350,
+        "points against": 194,
+        "points difference": 156,
+        "home record": "5 - 1",
+        "away record": "4 - 1",
+        "points": 20,
+        "bonus points": 0,
+        "streak": "4W",
+        "form": "4 - 0",
+        "average losing margin": 16.0,
+        "average winning margin": 20.9,
+        "golden point": 0,
+        "close games": 1,
+        "day record": "2-0-1",
+        "night record": "7-0-1",
+        "players used": 26,
+        "odds": "$9.00"
+      },
+      "teamNickname": "Warriors",
+      "theme": {
+        "key": "warriors",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "clubProfileUrl": "/clubs/sydney-roosters/",
+      "movement": "none",
+      "next": {
+        "fullName": "Melbourne Storm",
+        "teamId": 500021,
+        "nickname": "Storm",
+        "theme": {
+          "key": "storm",
+          "logos": {
+            "badge-basic24-light.svg": "202605110452",
+            "badge-basic24-mono.svg": "202605110452",
+            "badge-basic24.svg": "202605110452",
+            "badge-light.png": "202605110452",
+            "badge-light.svg": "202605110452",
+            "badge.png": "202605110452",
+            "badge.svg": "202605110452",
+            "header-background.png": "202605110452",
+            "header-background.svg": "202605110452",
+            "silhouette.png": "202605110452",
+            "silhouette.svg": "202605110452",
+            "text.svg": "202605110452"
+          }
+        },
+        "matchCentreUrl": "https://www.nrl.com/draw/nrl-premiership/2026/round-13/storm-v-roosters/",
+        "isBye": false
+      },
+      "stats": {
+        "played": 10,
+        "wins": 7,
+        "drawn": 0,
+        "lost": 3,
+        "byes": 2,
+        "points for": 293,
+        "points against": 232,
+        "points difference": 61,
+        "home record": "4 - 2",
+        "away record": "3 - 1",
+        "points": 18,
+        "bonus points": 0,
+        "streak": "1L",
+        "form": "3 - 1",
+        "average losing margin": 22.0,
+        "average winning margin": 18.1,
+        "golden point": 0,
+        "close games": 1,
+        "day record": "3-0-0",
+        "night record": "4-0-3",
+        "players used": 23,
+        "odds": "$8.50"
+      },
+      "teamNickname": "Roosters",
+      "theme": {
+        "key": "roosters",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "clubProfileUrl": "/clubs/manly-warringah-sea-eagles/",
+      "movement": "none",
+      "next": {
+        "fullName": "Cronulla-Sutherland Sharks",
+        "teamId": 500028,
+        "nickname": "Sharks",
+        "theme": {
+          "key": "sharks",
+          "logos": {
+            "badge-basic24-light.svg": "202605110452",
+            "badge-basic24-mono.svg": "202605110452",
+            "badge-basic24.svg": "202605110452",
+            "badge-light.png": "202605110452",
+            "badge-light.svg": "202605110452",
+            "badge.png": "202605110452",
+            "badge.svg": "202605110452",
+            "header-background.png": "202605110452",
+            "header-background.svg": "202605110452",
+            "silhouette.png": "202605110452",
+            "silhouette.svg": "202605110452",
+            "text.svg": "202605110452"
+          }
+        },
+        "matchCentreUrl": "https://www.nrl.com/draw/nrl-premiership/2026/round-13/sharks-v-sea-eagles/",
+        "isBye": false
+      },
+      "stats": {
+        "played": 11,
+        "wins": 7,
+        "drawn": 0,
+        "lost": 4,
+        "byes": 1,
+        "points for": 317,
+        "points against": 208,
+        "points difference": 109,
+        "home record": "3 - 3",
+        "away record": "4 - 1",
+        "points": 16,
+        "bonus points": 0,
+        "streak": "3W",
+        "form": "4 - 1",
+        "average losing margin": 10.0,
+        "average winning margin": 21.3,
+        "golden point": 1,
+        "close games": 3,
+        "day record": "2-0-1",
+        "night record": "5-0-3",
+        "players used": 26,
+        "odds": "$15.00"
+      },
+      "teamNickname": "Sea Eagles",
+      "theme": {
+        "key": "sea-eagles",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202510300111",
+          "badge.png": "202605110452",
+          "badge.svg": "202510300111",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "clubProfileUrl": "/clubs/newcastle-knights/",
+      "movement": "up",
+      "next": {
+        "fullName": "Parramatta Eels",
+        "teamId": 500031,
+        "nickname": "Eels",
+        "theme": {
+          "key": "eels",
+          "logos": {
+            "badge-basic24-mono.svg": "202605110452",
+            "badge-basic24.svg": "202605110452",
+            "badge.png": "202605110452",
+            "badge.svg": "202605110452",
+            "header-background.png": "202605110452",
+            "header-background.svg": "202605110452",
+            "silhouette.png": "202605110452",
+            "silhouette.svg": "202605110452",
+            "text.svg": "202605110452"
+          }
+        },
+        "matchCentreUrl": "https://www.nrl.com/draw/nrl-premiership/2026/round-13/knights-v-eels/",
+        "isBye": false
+      },
+      "stats": {
+        "played": 11,
+        "wins": 7,
+        "drawn": 0,
+        "lost": 4,
+        "byes": 1,
+        "points for": 312,
+        "points against": 284,
+        "points difference": 28,
+        "home record": "3 - 2",
+        "away record": "4 - 2",
+        "points": 16,
+        "bonus points": 0,
+        "streak": "3W",
+        "form": "3 - 1",
+        "average losing margin": 23.0,
+        "average winning margin": 17.1,
+        "golden point": 0,
+        "close games": 1,
+        "day record": "6-0-4",
+        "night record": "1-0-0",
+        "players used": 26,
+        "odds": "$23.00"
+      },
+      "teamNickname": "Knights",
+      "theme": {
+        "key": "knights",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "clubProfileUrl": "/clubs/north-queensland-cowboys/",
+      "movement": "up",
+      "next": {
+        "fullName": "Canberra Raiders",
+        "teamId": 500013,
+        "nickname": "Raiders",
+        "theme": {
+          "key": "raiders",
+          "logos": {
+            "badge-basic24-mono.svg": "202605110452",
+            "badge-basic24.svg": "202605110452",
+            "badge-light.png": "202605110452",
+            "badge-light.svg": "202605110452",
+            "badge.png": "202605110452",
+            "badge.svg": "202605110452",
+            "header-background.png": "202605110452",
+            "header-background.svg": "202605110452",
+            "silhouette.png": "202605110452",
+            "silhouette.svg": "202605110452",
+            "text.svg": "202605110452"
+          }
+        },
+        "matchCentreUrl": "https://www.nrl.com/draw/nrl-premiership/2026/round-13/raiders-v-cowboys/",
+        "isBye": false
+      },
+      "stats": {
+        "played": 12,
+        "wins": 8,
+        "drawn": 0,
+        "lost": 4,
+        "byes": 0,
+        "points for": 317,
+        "points against": 290,
+        "points difference": 27,
+        "home record": "4 - 2",
+        "away record": "4 - 2",
+        "points": 16,
+        "bonus points": 0,
+        "streak": "2W",
+        "form": "4 - 1",
+        "average losing margin": 18.2,
+        "average winning margin": 12.5,
+        "golden point": 1,
+        "close games": 4,
+        "day record": "1-0-1",
+        "night record": "7-0-3",
+        "players used": 26,
+        "odds": "$26.00"
+      },
+      "teamNickname": "Cowboys",
+      "theme": {
+        "key": "cowboys",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "clubProfileUrl": "/clubs/south-sydney-rabbitohs/",
+      "movement": "down",
+      "next": {
+        "isBye": true
+      },
+      "stats": {
+        "played": 11,
+        "wins": 6,
+        "drawn": 0,
+        "lost": 5,
+        "byes": 1,
+        "points for": 324,
+        "points against": 266,
+        "points difference": 58,
+        "home record": "4 - 2",
+        "away record": "2 - 3",
+        "points": 14,
+        "bonus points": 0,
+        "streak": "2L",
+        "form": "2 - 3",
+        "average losing margin": 9.6,
+        "average winning margin": 17.7,
+        "golden point": 0,
+        "close games": 3,
+        "day record": "2-0-3",
+        "night record": "4-0-2",
+        "players used": 29,
+        "odds": "$17.00"
+      },
+      "teamNickname": "Rabbitohs",
+      "theme": {
+        "key": "rabbitohs",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "clubProfileUrl": "/clubs/dolphins/",
+      "movement": "none",
+      "next": {
+        "isBye": true
+      },
+      "stats": {
+        "played": 11,
+        "wins": 6,
+        "drawn": 0,
+        "lost": 5,
+        "byes": 1,
+        "points for": 290,
+        "points against": 239,
+        "points difference": 51,
+        "home record": "3 - 3",
+        "away record": "3 - 2",
+        "points": 14,
+        "bonus points": 0,
+        "streak": "4W",
+        "form": "4 - 1",
+        "average losing margin": 12.2,
+        "average winning margin": 18.7,
+        "golden point": 1,
+        "close games": 3,
+        "day record": "0-0-1",
+        "night record": "6-0-4",
+        "players used": 26,
+        "odds": "$18.00"
+      },
+      "teamNickname": "Dolphins",
+      "theme": {
+        "key": "dolphins",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "clubProfileUrl": "/clubs/cronulla-sutherland-sharks/",
+      "movement": "none",
+      "next": {
+        "fullName": "Manly Warringah Sea Eagles",
+        "teamId": 500002,
+        "nickname": "Sea Eagles",
+        "theme": {
+          "key": "sea-eagles",
+          "logos": {
+            "badge-basic24-mono.svg": "202605110452",
+            "badge-basic24.svg": "202605110452",
+            "badge-light.png": "202605110452",
+            "badge-light.svg": "202510300111",
+            "badge.png": "202605110452",
+            "badge.svg": "202510300111",
+            "header-background.png": "202605110452",
+            "header-background.svg": "202605110452",
+            "silhouette.png": "202605110452",
+            "silhouette.svg": "202605110452",
+            "text.svg": "202605110452"
+          }
+        },
+        "matchCentreUrl": "https://www.nrl.com/draw/nrl-premiership/2026/round-13/sharks-v-sea-eagles/",
+        "isBye": false
+      },
+      "stats": {
+        "played": 10,
+        "wins": 5,
+        "drawn": 0,
+        "lost": 5,
+        "byes": 2,
+        "points for": 294,
+        "points against": 260,
+        "points difference": 34,
+        "home record": "4 - 2",
+        "away record": "1 - 3",
+        "points": 14,
+        "bonus points": 0,
+        "streak": "1W",
+        "form": "2 - 2",
+        "average losing margin": 19.2,
+        "average winning margin": 26.0,
+        "golden point": 0,
+        "close games": 0,
+        "day record": "3-0-1",
+        "night record": "2-0-4",
+        "players used": 23,
+        "odds": "$23.00"
+      },
+      "teamNickname": "Sharks",
+      "theme": {
+        "key": "sharks",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "clubProfileUrl": "/clubs/wests-tigers/",
+      "movement": "none",
+      "next": {
+        "fullName": "Canterbury-Bankstown Bulldogs",
+        "teamId": 500010,
+        "nickname": "Bulldogs",
+        "theme": {
+          "key": "bulldogs",
+          "logos": {
+            "badge-basic24-mono.svg": "202605110452",
+            "badge-basic24.svg": "202510310458",
+            "badge.png": "202510310458",
+            "badge.svg": "202510310458",
+            "header-background.png": "202605110452",
+            "header-background.svg": "202605110452",
+            "silhouette.png": "202510310458",
+            "silhouette.svg": "202510310458",
+            "text.svg": "202605110452",
+            "badge-light.svg": "202510310458",
+            "badge-light.png": "202510310458"
+          }
+        },
+        "matchCentreUrl": "https://www.nrl.com/draw/nrl-premiership/2026/round-13/wests-tigers-v-bulldogs/",
+        "isBye": false
+      },
+      "stats": {
+        "played": 10,
+        "wins": 5,
+        "drawn": 0,
+        "lost": 5,
+        "byes": 2,
+        "points for": 253,
+        "points against": 269,
+        "points difference": -16,
+        "home record": "3 - 2",
+        "away record": "2 - 3",
+        "points": 14,
+        "bonus points": 0,
+        "streak": "3L",
+        "form": "1 - 3",
+        "average losing margin": 20.6,
+        "average winning margin": 17.4,
+        "golden point": 1,
+        "close games": 3,
+        "day record": "3-0-3",
+        "night record": "2-0-2",
+        "players used": 28,
+        "odds": "$51.00"
+      },
+      "teamNickname": "Wests Tigers",
+      "theme": {
+        "key": "wests-tigers",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "clubProfileUrl": "/clubs/brisbane-broncos/",
+      "movement": "none",
+      "next": {
+        "fullName": "St. George Illawarra Dragons",
+        "teamId": 500022,
+        "nickname": "Dragons",
+        "theme": {
+          "key": "dragons",
+          "logos": {
+            "badge-basic24-light.svg": "202605110452",
+            "badge-basic24-mono.svg": "202605110452",
+            "badge-basic24.svg": "202605110452",
+            "badge.png": "202602250432",
+            "badge.svg": "202602250432",
+            "header-background.png": "202605110452",
+            "header-background.svg": "202605110452",
+            "silhouette.png": "202605110452",
+            "silhouette.svg": "202605110452",
+            "text.svg": "202605110452",
+            "badge-light.svg": "202602250432",
+            "badge-light.png": "202602250432"
+          }
+        },
+        "matchCentreUrl": "https://www.nrl.com/draw/nrl-premiership/2026/round-13/broncos-v-dragons/",
+        "isBye": false
+      },
+      "stats": {
+        "played": 11,
+        "wins": 5,
+        "drawn": 0,
+        "lost": 6,
+        "byes": 1,
+        "points for": 226,
+        "points against": 283,
+        "points difference": -57,
+        "home record": "2 - 3",
+        "away record": "3 - 3",
+        "points": 12,
+        "bonus points": 0,
+        "streak": "3L",
+        "form": "1 - 3",
+        "average losing margin": 18.3,
+        "average winning margin": 10.6,
+        "golden point": 0,
+        "close games": 3,
+        "day record": "0-0-1",
+        "night record": "5-0-5",
+        "players used": 30,
+        "odds": "$15.00"
+      },
+      "teamNickname": "Broncos",
+      "theme": {
+        "key": "broncos",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202603200353",
+          "badge-light.png": "202603200353",
+          "badge-light.svg": "202603200353",
+          "badge.png": "202603200353",
+          "badge.svg": "202603200353",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202603200353",
+          "silhouette.svg": "202603200353",
+          "text.svg": "202603200353",
+          "badge-basic24-light.svg": "202603200353"
+        }
+      }
+    },
+    {
+      "clubProfileUrl": "/clubs/canberra-raiders/",
+      "movement": "none",
+      "next": {
+        "fullName": "North Queensland Cowboys",
+        "teamId": 500012,
+        "nickname": "Cowboys",
+        "theme": {
+          "key": "cowboys",
+          "logos": {
+            "badge-basic24-light.svg": "202605110452",
+            "badge-basic24-mono.svg": "202605110452",
+            "badge-basic24.svg": "202605110452",
+            "badge-light.png": "202605110452",
+            "badge-light.svg": "202605110452",
+            "badge.png": "202605110452",
+            "badge.svg": "202605110452",
+            "header-background.png": "202605110452",
+            "header-background.svg": "202605110452",
+            "silhouette.png": "202605110452",
+            "silhouette.svg": "202605110452",
+            "text.svg": "202605110452"
+          }
+        },
+        "matchCentreUrl": "https://www.nrl.com/draw/nrl-premiership/2026/round-13/raiders-v-cowboys/",
+        "isBye": false
+      },
+      "stats": {
+        "played": 11,
+        "wins": 4,
+        "drawn": 0,
+        "lost": 7,
+        "byes": 1,
+        "points for": 223,
+        "points against": 309,
+        "points difference": -86,
+        "home record": "1 - 4",
+        "away record": "3 - 3",
+        "points": 10,
+        "bonus points": 0,
+        "streak": "2L",
+        "form": "1 - 3",
+        "average losing margin": 15.6,
+        "average winning margin": 5.8,
+        "golden point": 1,
+        "close games": 4,
+        "day record": "2-0-3",
+        "night record": "2-0-4",
+        "players used": 24,
+        "odds": "$81.00"
+      },
+      "teamNickname": "Raiders",
+      "theme": {
+        "key": "raiders",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "clubProfileUrl": "/clubs/canterbury-bankstown-bulldogs/",
+      "movement": "up",
+      "next": {
+        "fullName": "Wests Tigers",
+        "teamId": 500023,
+        "nickname": "Wests Tigers",
+        "theme": {
+          "key": "wests-tigers",
+          "logos": {
+            "badge-basic24-mono.svg": "202605110452",
+            "badge-basic24.svg": "202605110452",
+            "badge-light.svg": "202605110452",
+            "badge.png": "202605110452",
+            "badge.svg": "202605110452",
+            "header-background.png": "202605110452",
+            "header-background.svg": "202605110452",
+            "silhouette.png": "202605110452",
+            "silhouette.svg": "202605110452",
+            "text.svg": "202605110452"
+          }
+        },
+        "matchCentreUrl": "https://www.nrl.com/draw/nrl-premiership/2026/round-13/wests-tigers-v-bulldogs/",
+        "isBye": false
+      },
+      "stats": {
+        "played": 11,
+        "wins": 4,
+        "drawn": 0,
+        "lost": 7,
+        "byes": 1,
+        "points for": 203,
+        "points against": 296,
+        "points difference": -93,
+        "home record": "3 - 2",
+        "away record": "1 - 5",
+        "points": 10,
+        "bonus points": 0,
+        "streak": "1W",
+        "form": "1 - 4",
+        "average losing margin": 17.7,
+        "average winning margin": 7.8,
+        "golden point": 1,
+        "close games": 2,
+        "day record": "0-0-3",
+        "night record": "4-0-4",
+        "players used": 27,
+        "odds": "$81.00"
+      },
+      "teamNickname": "Bulldogs",
+      "theme": {
+        "key": "bulldogs",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202510310458",
+          "badge.png": "202510310458",
+          "badge.svg": "202510310458",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202510310458",
+          "silhouette.svg": "202510310458",
+          "text.svg": "202605110452",
+          "badge-light.svg": "202510310458",
+          "badge-light.png": "202510310458"
+        }
+      }
+    },
+    {
+      "clubProfileUrl": "/clubs/parramatta-eels/",
+      "movement": "up",
+      "next": {
+        "fullName": "Newcastle Knights",
+        "teamId": 500003,
+        "nickname": "Knights",
+        "theme": {
+          "key": "knights",
+          "logos": {
+            "badge-basic24-mono.svg": "202605110452",
+            "badge-basic24.svg": "202605110452",
+            "badge-light.png": "202605110452",
+            "badge-light.svg": "202605110452",
+            "badge.png": "202605110452",
+            "badge.svg": "202605110452",
+            "header-background.png": "202605110452",
+            "header-background.svg": "202605110452",
+            "silhouette.png": "202605110452",
+            "silhouette.svg": "202605110452",
+            "text.svg": "202605110452"
+          }
+        },
+        "matchCentreUrl": "https://www.nrl.com/draw/nrl-premiership/2026/round-13/knights-v-eels/",
+        "isBye": false
+      },
+      "stats": {
+        "played": 11,
+        "wins": 4,
+        "drawn": 0,
+        "lost": 7,
+        "byes": 1,
+        "points for": 235,
+        "points against": 379,
+        "points difference": -144,
+        "home record": "2 - 4",
+        "away record": "2 - 3",
+        "points": 10,
+        "bonus points": 0,
+        "streak": "1L",
+        "form": "1 - 3",
+        "average losing margin": 26.1,
+        "average winning margin": 9.8,
+        "golden point": 2,
+        "close games": 2,
+        "day record": "2-0-3",
+        "night record": "2-0-4",
+        "players used": 28,
+        "odds": "$301.00"
+      },
+      "teamNickname": "Eels",
+      "theme": {
+        "key": "eels",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "clubProfileUrl": "/clubs/melbourne-storm/",
+      "movement": "down",
+      "next": {
+        "fullName": "Sydney Roosters",
+        "teamId": 500001,
+        "nickname": "Roosters",
+        "theme": {
+          "key": "roosters",
+          "logos": {
+            "badge-basic24-mono.svg": "202605110452",
+            "badge-basic24.svg": "202605110452",
+            "badge.png": "202605110452",
+            "badge.svg": "202605110452",
+            "header-background.png": "202605110452",
+            "header-background.svg": "202605110452",
+            "silhouette.png": "202605110452",
+            "silhouette.svg": "202605110452",
+            "text.svg": "202605110452"
+          }
+        },
+        "matchCentreUrl": "https://www.nrl.com/draw/nrl-premiership/2026/round-13/storm-v-roosters/",
+        "isBye": false
+      },
+      "stats": {
+        "played": 12,
+        "wins": 4,
+        "drawn": 0,
+        "lost": 8,
+        "byes": 0,
+        "points for": 296,
+        "points against": 314,
+        "points difference": -18,
+        "home record": "2 - 3",
+        "away record": "2 - 5",
+        "points": 8,
+        "bonus points": 0,
+        "streak": "1L",
+        "form": "2 - 3",
+        "average losing margin": 18.2,
+        "average winning margin": 32.0,
+        "golden point": 0,
+        "close games": 3,
+        "day record": "1-0-0",
+        "night record": "3-0-8",
+        "players used": 29,
+        "odds": "$41.00"
+      },
+      "teamNickname": "Storm",
+      "theme": {
+        "key": "storm",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "clubProfileUrl": "/clubs/gold-coast-titans/",
+      "movement": "none",
+      "next": {
+        "isBye": true
+      },
+      "stats": {
+        "played": 11,
+        "wins": 2,
+        "drawn": 0,
+        "lost": 9,
+        "byes": 1,
+        "points for": 192,
+        "points against": 280,
+        "points difference": -88,
+        "home record": "1 - 3",
+        "away record": "1 - 6",
+        "points": 6,
+        "bonus points": 0,
+        "streak": "4L",
+        "form": "0 - 4",
+        "average losing margin": 15.3,
+        "average winning margin": 25.0,
+        "golden point": 0,
+        "close games": 2,
+        "day record": "1-0-2",
+        "night record": "1-0-7",
+        "players used": 25,
+        "odds": "$1001.00"
+      },
+      "teamNickname": "Titans",
+      "theme": {
+        "key": "titans",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      }
+    },
+    {
+      "clubProfileUrl": "/clubs/st-george-illawarra-dragons/",
+      "movement": "none",
+      "next": {
+        "fullName": "Brisbane Broncos",
+        "teamId": 500011,
+        "nickname": "Broncos",
+        "theme": {
+          "key": "broncos",
+          "logos": {
+            "badge-basic24-mono.svg": "202605110452",
+            "badge-basic24.svg": "202603200353",
+            "badge-light.png": "202603200353",
+            "badge-light.svg": "202603200353",
+            "badge.png": "202603200353",
+            "badge.svg": "202603200353",
+            "header-background.png": "202605110452",
+            "header-background.svg": "202605110452",
+            "silhouette.png": "202603200353",
+            "silhouette.svg": "202603200353",
+            "text.svg": "202603200353",
+            "badge-basic24-light.svg": "202603200353"
+          }
+        },
+        "matchCentreUrl": "https://www.nrl.com/draw/nrl-premiership/2026/round-13/broncos-v-dragons/",
+        "isBye": false
+      },
+      "stats": {
+        "played": 11,
+        "wins": 0,
+        "drawn": 0,
+        "lost": 11,
+        "byes": 1,
+        "points for": 142,
+        "points against": 367,
+        "points difference": -225,
+        "home record": "0 - 6",
+        "away record": "0 - 5",
+        "points": 2,
+        "bonus points": 0,
+        "streak": "4L",
+        "form": "0 - 4",
+        "average losing margin": 20.5,
+        "average winning margin": 0.0,
+        "golden point": 1,
+        "close games": 1,
+        "day record": "0-0-3",
+        "night record": "0-0-8",
+        "players used": 27,
+        "odds": "$1501.00"
+      },
+      "teamNickname": "Dragons",
+      "theme": {
+        "key": "dragons",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202602250432",
+          "badge.svg": "202602250432",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452",
+          "badge-light.svg": "202602250432",
+          "badge-light.png": "202602250432"
+        }
+      }
+    }
+  ],
+  "selectedCompetitionId": 111,
+  "selectedRoundId": 12,
+  "selectedSeasonId": 2026,
+  "showOdds": true,
+  "showPredictor": true,
+  "showBonusPoints": false
+}
