@@ -106,7 +106,38 @@ Concrete changes:
 
 ---
 
-### TASK-48: ESLint CI job + `lint-web` Make target
+### TASK-48: [BLOCKED: eslint-violation-volume — 50 files, 34 errors + 24 warnings] ESLint CI job + `lint-web` Make target
+
+**BLOCKED 2026-05-28 by implementer.** Baseline `npm run lint` on master HEAD surfaces 58 problems (34 errors, 24 warnings) across 50 files — over the spec's 20-file BLOCKED threshold. Surfacing per the spec's "STOP and tag `[BLOCKED]`" instruction.
+
+**Audit (eslint via `services/web/eslint.config.mjs` → `eslint-config-next/core-web-vitals` + `eslint-config-next/typescript`):**
+| Rule | Count | Severity |
+|---|---|---|
+| `react/no-unescaped-entities` | 13 | error — JSX with literal `'`/`"`/`&`/`<` etc. |
+| `@next/next/no-img-element` | 13 | warning — `<img>` should be Next.js `<Image>` |
+| `react-hooks/refs` | 12 | error — modern React rules around refs |
+| `@typescript-eslint/no-unused-vars` | 8 | warning |
+| `react-hooks/set-state-in-effect` | 6 | error — `setState` inside `useEffect` |
+| `react-hooks/immutability` | 3 | error |
+| `react-hooks/exhaustive-deps` | 2 | warning |
+| `react-hooks/incompatible-library` | 1 | error |
+
+Codebase pre-dates these rules being enforced — `npm run lint` has never run in CI, and `eslint-config-next/core-web-vitals` ships with stricter `react-hooks/*` rules than the codebase was written against.
+
+**Remediation menu (human decision required):**
+1. **Tune the config to match what the codebase ships today** — recommended path:
+   - Downgrade `react-hooks/set-state-in-effect`, `react-hooks/refs`, `react-hooks/immutability`, `react-hooks/incompatible-library` from `error` → `warn` in `services/web/eslint.config.mjs`. These are advisory rules from React 19's stricter hook compiler; the codebase needs an incremental migration, not a hard gate.
+   - Keep `react/no-unescaped-entities` as error and fix the 13 occurrences manually — it's a 30-min mechanical fix (single-quote → `&#39;` etc.).
+   - Add CI with `--max-warnings=0` once the 13 errors are fixed; warnings become informational.
+   - Net work: ~1h. Preserves the load-bearing "hard-fail in CI" property for new error-severity findings.
+2. **Fix all 50 files** — keep config as-is, refactor every `<img>` → `<Image>`, every `setState`-in-effect, every ref-handling pattern. ~6–10h of careful React work + risk of behaviour regressions in the wiki/scout UI that none of the unit tests cover.
+3. **Ship `npm run lint || true`** — overrides the plan's "hard-fail day 1" pre-confirmed pick. Lowest friction; violates the plan's load-bearing constraint.
+
+**Recommended:** option 1. The `react-hooks/*` advisory rules pre-suppose a React 19 strict-mode codebase posture that Jaromelu hasn't adopted yet. Downgrading them to `warn` is the standard incremental-migration pattern. Fixing the 13 `react/no-unescaped-entities` errors is mechanical and bounded.
+
+**To unblock:** human picks an option (or proposes a variant) and updates this task's What block. Implementer can then proceed.
+
+**What.** Per [PLAN.md "Engineering quality hardening — Tier 1"](./PLAN.md#2026-05-28-engineering-quality-hardening--tier-1-ruff--pyright--eslint--gitleaks--deploy-gating) Interface §. ESLint is already configured (`services/web/eslint.config.mjs`) and `npm run lint` works — this task wires it into CI and adds the Make target.
 
 **What.** Per [PLAN.md "Engineering quality hardening — Tier 1"](./PLAN.md#2026-05-28-engineering-quality-hardening--tier-1-ruff--pyright--eslint--gitleaks--deploy-gating) Interface §. ESLint is already configured (`services/web/eslint.config.mjs`) and `npm run lint` works — this task wires it into CI and adds the Make target.
 
