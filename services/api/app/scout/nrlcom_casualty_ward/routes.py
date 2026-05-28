@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from ...deps import get_db
@@ -14,6 +15,7 @@ from ...routers.admin import require_admin
 from ..common.archive import archive_response
 from ..common.pipeline_run import set_archive_detail, start_deterministic_run
 from .fetcher import NrlcomCasualtyFetchError, fetch_casualty_ward
+from .models import NrlcomCasualtyWard
 
 logger = logging.getLogger(__name__)
 
@@ -51,11 +53,22 @@ def run_nrlcom_casualty_ward(
         )
         set_archive_detail(detail, archive_key)
         detail["casualties"] = n
+        # D8: strict-parse the archived response so upstream shape drift
+        # surfaces as a failed run. The raw payload is already in S3 above,
+        # so a validation failure never loses the capture.
+        NrlcomCasualtyWard.model_validate(data)
+        detail["validated"] = True
         logger.info("scout/nrlcom-casualty-ward: comp=%s casualties=%d s3=%s",
                     competition, n, archive_key)
     except NrlcomCasualtyFetchError as e:
         run.fail(e, summary_text=f"Upstream fetch failed: {e}")
         raise HTTPException(status_code=502, detail=f"casualty-ward fetch failed: {e}")
+    except ValidationError as e:
+        run.fail(
+            e,
+            summary_text=f"Casualty-ward response failed strict validation (drift): {e}",
+        )
+        raise HTTPException(status_code=500, detail=f"nrl.com casualty-ward drift: {e}")
     except Exception as e:
         run.fail(e, summary_text=f"Pipeline failed: {e}")
         raise
