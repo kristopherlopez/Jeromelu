@@ -25,7 +25,463 @@ Prefix the title with optional tags in square brackets:
 
 ## Open tasks
 
-_(queue empty — no open tasks)_
+### TASK-37: Migration 061 — `matches.data_coverage` + era-aware `populate_matches` + parent-coverage gate
+
+**What.** Per [PLAN.md "Scout Phase 5"](./PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance) Interface §1 + §4.
+
+1. **Migration** `packages/db/migrations/061_matches_data_coverage.sql`:
+   ```sql
+   ALTER TABLE matches ADD COLUMN data_coverage text NOT NULL DEFAULT 'full';
+   ALTER TABLE matches ADD CONSTRAINT matches_data_coverage_chk
+     CHECK (data_coverage IN ('full', 'lineups+timeline', 'timeline_only', 'fixture_only'));
+   ```
+   Apply via `make migrate`. Existing rows take the `'full'` default — that's correct because current `matches` is 2024+ data.
+
+2. **Era-aware `populate_matches`** in `scripts/data/populate/phase_matches.py`:
+   - Today reads `scout/nrlcom/match-centre/*` only. After this task it ALSO walks `scout/nrlcom/draw/*` and emits a row per draw fixture that has no corresponding match-centre archive.
+   - Extend `_extract_one` (match-centre projection) to set `data_coverage`:
+     - `'full'` if the match-centre payload has a `stats.players` array (non-empty).
+     - `'lineups+timeline'` if it has `players` but no `stats.players`.
+     - `'timeline_only'` if it has `timeline` but no `players`.
+     - Default still `'full'` (existing modern-shape behaviour preserved).
+   - New helper `_extract_from_draw_fixture(fixture: dict, *, season: int, round: int, competition: int, team_map, venue_map) -> dict | None` — projects a single draw fixture to a `matches` row with `data_coverage='fixture_only'`, status from `fixture.matchState` (use the existing `_STATUS_MAP`), `external_match_id` from `fixture.matchId` (string).
+   - Driver loop additions:
+     - List both `scout/nrlcom/match-centre/{comp}/*` and `scout/nrlcom/draw/{comp}/*`.
+     - For draw archives: walk every fixture; skip if a match-centre key exists at the derived path (`scout/nrlcom/match-centre/{comp}/{season}/round-{NN}/{slug}.json` where slug comes from `fixture.matchCentreUrl`); otherwise project via `_extract_from_draw_fixture`.
+     - Upsert SQL unchanged (existing partial unique index covers both code paths).
+
+3. **Parent-coverage gate** in child extractors: `scripts/data/populate/phase_team_lists.py`, `phase_stats.py`, `phase_timeline.py` — when reading a match-centre archive, look up `matches.data_coverage` for the resolved match; if it's `'fixture_only'`, skip child row writes (defensive — fixture_only matches will never have a match-centre archive, but the guard prevents orphans if archives arrive out of order).
+
+4. **Unit tests** `tests/unit/scripts/data/populate/test_phase_matches.py` (extend, don't replace):
+   - `test_full_match_centre_emits_data_coverage_full` — existing 2026 fixture used in current tests; assert `data_coverage='full'`.
+   - `test_timeline_only_match_centre_emits_data_coverage_timeline_only` — small fixture with `timeline` array but no `players`/`stats`; assert `data_coverage='timeline_only'`.
+   - `test_draw_only_fixture_emits_data_coverage_fixture_only` — synthetic 1908 draw fixture (no match-centre archive); assert `data_coverage='fixture_only'`, no team_lists/stats rows produced.
+   - `test_match_centre_present_skips_draw_projection` — both archives present; assert only one row emitted (match-centre wins).
+
+**How to verify.**
+- `make migrate` runs clean; `make migrate-status` shows 061 applied; `psql -c "SELECT column_name, data_type, column_default FROM information_schema.columns WHERE table_name='matches' AND column_name='data_coverage'"` returns one row with default `'full'::text` and the CHECK constraint visible via `\d matches`.
+- `psql -c "SELECT data_coverage, COUNT(*) FROM matches GROUP BY 1"` on local dev → all existing rows `'full'` (no other values yet).
+- `pytest tests/unit/scripts/data/populate/test_phase_matches.py -v` — all green, includes the four new cases above.
+- `pytest tests/unit/scripts/data/populate/` — full populate suite green, no regression (baseline was 43 passed per Phase 4.5 TASK-34 run report).
+- `pytest tests/unit/` — full unit suite green (baseline 355 passed).
+- Dry-run check: `python -m scripts.data.populate_db_from_s3 --phase matches --dry-run --seasons 2026` exits 0; reports counts; rollback at end.
+- `git diff --stat` for the commit covers: migration, `phase_matches.py`, `phase_team_lists.py`, `phase_stats.py`, `phase_timeline.py`, `test_phase_matches.py` only — no other phase touched.
+
+**Proof notes.**
+
+---
+
+### TASK-38: `archive_only=true` mode on 4 nrl.com routes (draw, match-centre, ladder, stats)
+
+**What.** Per [PLAN.md "Scout Phase 5"](./PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance) Interface §2.
+
+Add a uniform `archive_only: bool = Query(default=False)` to the four route handlers and thread it into the inner `run_*` function. Behaviour:
+- **S3 archive still happens** (the whole point — archive runs before strict-parse in all four routes today).
+- **D8 strict-parse wrapped:** when `archive_only=True`, change the existing `Model.model_validate(data)` block from `model_validate → detail["validated"]=True / raise ValidationError → 500` to `try: model_validate(); detail["validated"]=True / except ValidationError: detail["validated"]=False; detail["validation_skipped"]=True; logger.warning(...)`. The capture is preserved either way.
+- **`set_archive_detail`** still records `s3_archive_key`.
+- **Response shape addition:** when `archive_only=True` and validation was skipped, the response carries `validated:false, validation_skipped:true`. On the default path (archive_only=false), `validated:true` and `validation_skipped` is omitted (no change from today).
+- For `nrlcom_match_centre` specifically: the existing per-match `try/except ValidationError → validation_failures[]` block (non-aborting) is left alone (already lenient); the new `archive_only` flag just means each match's strict-parse is bypassed entirely (no entries added to `validation_failures`).
+
+Files touched:
+- `services/api/app/scout/nrlcom_draw/routes.py`
+- `services/api/app/scout/nrlcom_match_centre/routes.py`
+- `services/api/app/scout/nrlcom_ladder/routes.py`
+- `services/api/app/scout/nrlcom_stats/routes.py`
+
+Per-route unit tests `tests/unit/api/scout/<pipeline>/test_archive_only.py` (4 new files, each ≥3 cases):
+1. `test_archive_only_true_skips_validation_on_drift` — mock the fetcher to return a payload that fails strict-parse (extra unknown field); assert response has `validated:false, validation_skipped:true, ok:true`; assert no `HTTPException` raised; assert `archive_response` was called (verify via mock).
+2. `test_archive_only_true_modern_payload_still_archives` — mock fetcher to return the canonical fixture; assert response `validated:false, validation_skipped:true, ok:true` (validation is skipped even on a valid payload — the flag is unconditional).
+3. `test_archive_only_default_false_unchanged_modern` — canonical fixture, no `archive_only` param; assert response `validated:true, ok:true`, no `validation_skipped` key (regression check — default behaviour preserved).
+
+Mocking pattern: patch `<route_module>.fetch_*` and `<route_module>.archive_response` (both already importable at module level). For match-centre, also patch `fetch_draw` and use a single-fixture-fixtures payload to keep the test bounded.
+
+**How to verify.**
+- `pytest tests/unit/api/scout/nrlcom_draw/test_archive_only.py tests/unit/api/scout/nrlcom_match_centre/test_archive_only.py tests/unit/api/scout/nrlcom_ladder/test_archive_only.py tests/unit/api/scout/nrlcom_stats/test_archive_only.py -v` — all green; 4 × ≥3 = ≥12 cases.
+- `pytest tests/unit/api/scout/` — full scout unit suite green (baseline 73 passed per Phase 4.5 TASK-32 + 1 new file each); no regression on existing tests.
+- Local end-to-end (API running locally, `make api`):
+  - `curl -X POST "http://localhost:8000/api/admin/scout/nrlcom-draw?season=2026&archive_only=true" -H "X-Admin-Key: $LOCAL_ADMIN_KEY" | jq '{ok, validated, validation_skipped, s3_archive_key}'` → `{ok:true, validated:false, validation_skipped:true, s3_archive_key:"scout/nrlcom/draw/111/2026/round-..."}`.
+  - Same curl without `archive_only` → `{ok:true, validated:true, s3_archive_key:"..."}` (no `validation_skipped` key).
+- `git diff --stat` shows only the 4 routes.py files + 4 new test files; no model, fetcher, or schema changes.
+
+**Proof notes.**
+
+---
+
+### TASK-39: `archive_only=true` on supercoach-stats + new `populate_player_rounds` extractor
+
+**What.** Per [PLAN.md "Scout Phase 5"](./PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance) Interface §2 (SC stats branch) + §3.
+
+Two coupled pieces:
+
+1. **`archive_only=true` on supercoach-stats route** (`services/api/app/scout/supercoach_stats/routes.py`):
+   - Add `archive_only: bool = Query(default=False)` to the endpoint and thread into `run_supercoach_stats`.
+   - **Key behaviour difference vs nrl.com routes:** this route writes to DB inline via `_upsert_player_rounds`. When `archive_only=True`, skip BOTH the strict-parse AND the upsert; response carries `validated:false, validation_skipped:true, upserted:0`.
+   - When `archive_only=False` (today's path): unchanged — fetch → S3 → strict-parse → upsert → return `validated:true, upserted=N`.
+   - The S3 archive write at `nrlsupercoachstats/stats/{season}/round-{NN}.json` still runs unconditionally (it's before strict-parse).
+
+2. **New extractor `scripts/data/populate/phase_player_rounds.py`:**
+   - `populate_player_rounds(db: Session, *, seasons: list[int], commit: bool = True) -> dict[str, Any]` — module-level function.
+   - Pure-function helper `_extract_player_round_rows(payload: dict, *, season: int, round: int) -> list[dict[str, Any]]` mirroring the Phase 4.5 `_extract_leader_rows` pattern. Takes the S3 archive payload (`{season, round, rows}`), runs `extract_rows` (imported from `jeromelu_shared.scraping.nrl`) → `SuperCoachPlayerStats.model_validate` (D8 strict — note: this DOES run because the extractor is era-aware; if 2018 shape differs, that's surfaced loudly and we add a `models_legacy.py` for old years; **deferred to a follow-up issue if it trips, not solved here pre-emptively**). Returns dicts with identity + base + STAT_DB_COLUMNS keys per the route's `_upsert_player_rounds` pattern.
+   - Driver: `list_keys` for `scout/nrlsupercoachstats/stats/` then `read_json_concurrent`; per archive, run `_extract_player_round_rows`; bulk-upsert via the same `ON CONFLICT (player_id, round, season)` SQL the route uses.
+   - `commit: bool = True` plumbing per the [populate_db_from_s3 --dry-run](./META.md#populate_db_from_s3---dry-run--fixed-2026-05-24-phase-35--task-18) contract — applies in the bulk-upsert and in the final commit.
+   - Returns `{seasons, archives_read, rows_extracted, inserted, updated, failures}`.
+
+3. **Wire into orchestrator** `scripts/data/populate_db_from_s3.py`:
+   - Import `populate_player_rounds`.
+   - Add `"player_rounds"` to `PHASES` tuple **after** `"stats"` (FK order: player_rounds requires people from `identity`/`people` phases to resolve player_id properly; not strictly FK-coupled to `matches` but conceptually downstream).
+   - Add the `elif phase == "player_rounds"` arm calling `populate_player_rounds(db, seasons=args.seasons, commit=commit)`.
+
+4. **Unit tests:**
+   - `tests/unit/api/scout/supercoach_stats/test_archive_only.py` (new) — 3 cases mirroring TASK-38 (skips validation + skips upsert + default unchanged); verify `_upsert_player_rounds` is NOT called when archive_only=true (mock-spy).
+   - `tests/unit/scripts/data/populate/test_phase_player_rounds.py` (new) — pure-function tests over `_extract_player_round_rows`:
+     - `test_canonical_archive_round_trip` — synthetic SC stats payload with 3 known rows; assert the output dicts carry `(player_id, player_name, team, position, round, season, score, price, breakeven, minutes)` plus all `STAT_DB_COLUMNS` keys.
+     - `test_empty_rows_returns_empty` — payload with `rows: []` returns `[]`.
+     - `test_strict_parse_failure_per_row_does_not_abort` — one bad row in 3; the extractor records the failure in the return value's `failures` list, emits 2 good rows. (Matches the per-match validation_failures pattern in match-centre.)
+   - `tests/unit/scripts/data/populate/test_dry_run_flag.py` — augment the existing signature test to add `populate_player_rounds` to the function list it inspects (preserves the [TASK-18 commit-guard contract](./META.md#populate_db_from_s3---dry-run--fixed-2026-05-24-phase-35--task-18)).
+
+**How to verify.**
+- `pytest tests/unit/api/scout/supercoach_stats/test_archive_only.py -v` → 3 passed.
+- `pytest tests/unit/scripts/data/populate/test_phase_player_rounds.py -v` → all green.
+- `pytest tests/unit/scripts/data/populate/test_dry_run_flag.py -v` → still green (signature-coverage extended to include the new phase function).
+- `pytest tests/unit/scripts/data/populate/` → no regression (baseline 43 passed).
+- `pytest tests/unit/` → no regression.
+- `python -m scripts.data.populate_db_from_s3 --help` exits 0 and lists `player_rounds` in the `--phase` choices.
+- `python -m scripts.data.populate_db_from_s3 --phase player_rounds --dry-run --seasons 2026` exits 0; logs `--dry-run — rolling back all changes`; no DB writes (verify with `SELECT COUNT(*) FROM player_rounds` unchanged before/after).
+- Local end-to-end: `curl -X POST "http://localhost:8000/api/admin/scout/supercoach-stats?round=12&season=2026&archive_only=true" -H "X-Admin-Key: $LOCAL_ADMIN_KEY"` → `{ok:true, validated:false, validation_skipped:true, upserted:0, fetched:0}` + S3 object present at `nrlsupercoachstats/stats/2026/round-12.json`.
+- `git diff --stat` covers: `supercoach_stats/routes.py`, `populate_db_from_s3.py`, `populate/phase_player_rounds.py` (new), the 2 new test files, and the augmented `test_dry_run_flag.py`.
+
+**Proof notes.**
+
+---
+
+### TASK-40: `scout_backfill.py` — `--archive-only` + `--resume` + key-derivation table + unit tests
+
+**What.** Per [PLAN.md "Scout Phase 5"](./PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance) Interface §5.
+
+Harden `scripts/data/scout_backfill.py`:
+
+1. **New CLI flags:**
+   - `--archive-only` (default False; passes `archive_only=true` to every POST URL).
+   - `--resume` (default False; HEAD-skip if expected S3 key present).
+   - `--force` (default False; if `--resume` is set, `--force` overrides and re-POSTs anyway).
+   - `--bucket` (default from `S3_CLEAN_BUCKET` env, falls back to `"jeromelu-clean-documents"`).
+
+2. **S3 key derivation table** `S3_KEY_FN: dict[str, Callable]`:
+   - `"nrlcom-draw"` → `lambda comp, season, round: f"scout/nrlcom/draw/{comp}/{season}/round-{round:02d}.json"`
+   - `"nrlcom-ladder"` → analogous
+   - `"nrlcom-stats"` → `lambda comp, season, round: f"scout/nrlcom/stats/{comp}/{season}.json"` (round ignored)
+   - `"supercoach-stats"` → `lambda comp, season, round: f"nrlsupercoachstats/stats/{season}/round-{round:02d}.json"`
+   - For sources without an entry in `S3_KEY_FN` (`nrlcom-match-centre` and the SC siblings), `--resume` does a PREFIX LIST instead — for match-centre: `boto3.client('s3').list_objects_v2(Bucket=..., Prefix=f"scout/nrlcom/match-centre/{comp}/{season}/round-{round:02d}/", MaxKeys=1)` and skip if the response carries any `Contents`. For SC siblings, `--resume` is a no-op (logged once at startup).
+
+3. **Loop integration:**
+   - Before each POST, if `args.resume and not args.force`: compute expected key (or LIST), HEAD/LIST, skip with `print(f"SKIP {label} (S3 exists at {key})", file=sys.stderr)` if present.
+   - URL composition: when `args.archive_only`, append `&archive_only=true` to params dict.
+
+4. **Lazy boto3 import** — only imported when `--resume` is set, so the default codepath has no new runtime dep.
+
+5. **Updated docstring** describes the new flags + concrete examples for backfill (`--archive-only --resume`) vs daily cron (no flags).
+
+6. **Unit tests** `tests/unit/scripts/data/test_scout_backfill.py` (new):
+   - `test_url_includes_archive_only_when_flag_set` — mock `httpx.Client.post`; capture the URL and params; assert `archive_only=true` present iff `--archive-only` passed.
+   - `test_resume_skips_when_s3_head_succeeds` — patch `boto3.client('s3').head_object` to return successfully; assert the POST is NOT issued; `successes` count unchanged.
+   - `test_resume_posts_when_s3_head_404s` — patch `head_object` to raise `ClientError(404)`; assert the POST IS issued.
+   - `test_force_overrides_resume` — `--resume --force`; `head_object` returns success; assert the POST IS still issued.
+   - `test_match_centre_resume_uses_list_prefix` — special case; mock `list_objects_v2` returning empty Contents → POST issued; non-empty → skipped.
+   - `test_unknown_source_exits_2` — existing behaviour preserved.
+
+**How to verify.**
+- `python scripts/data/scout_backfill.py --help` exit 0; output lists `--archive-only`, `--resume`, `--force`, `--bucket` flags.
+- `pytest tests/unit/scripts/data/test_scout_backfill.py -v` — all green; ≥6 cases.
+- `pytest tests/unit/` — no regression (baseline 355+ tests after TASK-37/38/39).
+- `python scripts/data/scout_backfill.py --source nrlcom-stats --season-from 2026 --api http://localhost:8000 --admin-key DUMMY --archive-only --resume` against a local API (or with `httpx.Client` mocked) — first run hits the endpoint; second run skips with `SKIP season=2026 (S3 exists ...)`.
+- `git diff --stat` shows only `scripts/data/scout_backfill.py` and the new test file.
+
+**Proof notes.**
+
+---
+
+### TASK-41: Operator backfill — `nrlcom-draw` 1908–2026 (on prod box via loopback)
+
+**What.** Per [PLAN.md "Scout Phase 5"](./PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance) Tasks list. **Operator task** — runs the hardened backfill driver against prod from the prod box via the Phase 4.5 loopback procedure.
+
+Procedure (run on the Lightsail box, per the `docker cp scripts → /runtmp/scripts` precedent — note the trailing-slash gotcha lesson from Phase 4.5 lessons-learned):
+1. SSH the box (`make prod-shell` or `ssh jeromelu-prod`).
+2. `mkdir /runtmp` and `docker cp scripts jeromelu-api:/runtmp/` (trailing slash matters — lands `scripts/` *folder* under `/runtmp/`).
+3. Read `ADMIN_KEY` from `/opt/jeromelu/.env`.
+4. Inside the API container, run a `tmux` or `screen` session so the long-running backfill survives SSH disconnects:
+   ```bash
+   docker exec -it jeromelu-api bash -c "
+     cd /runtmp && python -m scripts.data.scout_backfill \
+       --source nrlcom-draw \
+       --season-from 1908 --season-to 2026 \
+       --round-from 1 --round-to 30 \
+       --competition 111 \
+       --api https://api.jeromelu.ai \
+       --admin-key \$ADMIN_KEY \
+       --archive-only --resume \
+       --rate-limit 1.0 2>&1 | tee /runtmp/backfill_nrlcom-draw_$(date +%Y%m%d_%H%M).log
+   "
+   ```
+   On-box `curl` must hit the loopback — the API container itself can resolve `api.jeromelu.ai` via Docker DNS to the internal nginx proxy, so the `--resolve` trick is only needed for `curl` from the host shell. **Verify before starting:** `docker exec jeromelu-api curl -s -o /dev/null -w "%{http_code}\n" https://api.jeromelu.ai/api/health` returns 200; if not, fall back to the host-shell `curl --resolve` approach and re-shape the script invocation accordingly (BLOCKED tag if the container can't reach the API).
+5. Wall-clock: 1908–2026 × ~26 rounds at 1 req/sec ≈ 1h. Expect 502s for seasons/rounds that don't exist (early years had fewer rounds, finals structure varied) — recorded in failure log, not fatal.
+6. After completion, clean up `/runtmp` on the container: `docker exec jeromelu-api rm -rf /runtmp/scripts /runtmp/backfill_*.log` (copy the log down first if useful).
+
+**How to verify.**
+- `aws s3 ls s3://jeromelu-clean-documents/scout/nrlcom/draw/111/ --recursive | wc -l` ≥ **2700**.
+- `aws s3 ls s3://jeromelu-clean-documents/scout/nrlcom/draw/111/ --recursive | awk -F/ '{print $5}' | sort -u | wc -l` ≥ **115** (distinct season folders — 1908–2026 ≈ 119 with some empty).
+- `psql` (read via `docker exec jeromelu-postgres psql -U jeromelu_admin -d jeromelu -c "..."`):
+  - `SELECT COUNT(*) FROM agent_runs WHERE detail_json->>'pipeline'='nrlcom-draw' AND started_at > <backfill_start_ts> AND status='complete'` matches the driver's successes count (record both in the run report scratchpad).
+  - `SELECT COUNT(*) FROM agent_runs WHERE detail_json->>'pipeline'='nrlcom-draw' AND started_at > <backfill_start_ts> AND status='failed'` matches the driver's failures count.
+- Spot-check S3: `aws s3 cp s3://jeromelu-clean-documents/scout/nrlcom/draw/111/1908/round-01.json - | jq '.fixtures | length, .selectedSeasonId, .selectedRoundId'` returns plausible numbers (≥1 fixture; correct season/round).
+- The driver's final summary log section records: successes count, failures count, first 20 failure lines. **Copy this verbatim into the run report scratchpad on this task's checkoff.**
+
+**Proof notes.**
+
+---
+
+### TASK-42: Operator backfill — `nrlcom-match-centre` 1990–2026 (on prod box via loopback)
+
+**What.** Per [PLAN.md "Scout Phase 5"](./PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance) Tasks list. **Operator task** — same procedure as TASK-41.
+
+Key differences from TASK-41:
+- **Wall-clock**: ~5500 GETs at 1 req/sec ≈ **3–4h**. Use `tmux`/`screen` mandatory.
+- **Seasons**: 1990–2026 (pre-1990 has no match-centre URL in the draw fixtures per D12; the walker auto-skips fixtures missing `matchCentreUrl`).
+- **Round depth**: `--round-from 1 --round-to 30` (the walker discovers fixtures from the draw; per-round wall-clock varies).
+- **Resume granularity**: round-level (per the TASK-40 design — list `scout/nrlcom/match-centre/{comp}/{season}/round-{NN}/` prefix; skip if any keys exist).
+
+Run command (replace the source param in TASK-41's invocation):
+```bash
+docker exec -it jeromelu-api bash -c "
+  cd /runtmp && python -m scripts.data.scout_backfill \
+    --source nrlcom-match-centre \
+    --season-from 1990 --season-to 2026 \
+    --round-from 1 --round-to 30 \
+    --competition 111 \
+    --api https://api.jeromelu.ai \
+    --admin-key \$ADMIN_KEY \
+    --archive-only --resume \
+    --rate-limit 1.0 2>&1 | tee /runtmp/backfill_nrlcom-match-centre_$(date +%Y%m%d_%H%M).log
+"
+```
+
+**How to verify.**
+- `aws s3 ls s3://jeromelu-clean-documents/scout/nrlcom/match-centre/111/ --recursive | wc -l` ≥ **4500** (post-2000 has ~200 matches/year × 26 years; pre-2000 mostly empty payloads).
+- `aws s3 ls s3://jeromelu-clean-documents/scout/nrlcom/match-centre/111/ --recursive | awk -F/ '{print $5}' | sort -u | wc -l` ≥ **30** (distinct season folders).
+- Pre-2000 spot-check: `aws s3 ls s3://jeromelu-clean-documents/scout/nrlcom/match-centre/111/1995/ --recursive` returns either a small set of keys (pre-2000 has thin payloads, mostly timeline) OR zero (if 1995 draws had no `matchCentreUrl`). Both acceptable; record actual count.
+- Post-2000 spot-check: `aws s3 ls s3://jeromelu-clean-documents/scout/nrlcom/match-centre/111/2010/ --recursive | wc -l` ≥ 180.
+- One specific S3 inspect: `aws s3 cp $(aws s3 ls s3://jeromelu-clean-documents/scout/nrlcom/match-centre/111/2010/ --recursive | head -1 | awk '{print "s3://jeromelu-clean-documents/" $4}') - | jq 'keys | length'` returns a reasonable key count (≥4 — `players`/`stats`/`timeline`/`match` for full-shape post-2010).
+- Driver final summary (successes / failures / first 20 failure lines) recorded in run report scratchpad.
+
+**Proof notes.**
+
+---
+
+### TASK-43: Operator backfill — short bundle (ladder 1996–2026, stats 2013–2026, SC siblings 2024–2025)
+
+**What.** Per [PLAN.md "Scout Phase 5"](./PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance) Tasks list. **Operator task** — three small backfills bundled because each is fast (under 15 min combined) and the verification cadence is identical.
+
+Three sequential invocations on the prod box (no tmux needed; total wall-clock <20 min):
+
+```bash
+# 1. nrl.com ladder — 30 seasons × ~24 rounds avg = ~720 GETs at 1 req/sec ≈ 12 min
+docker exec -it jeromelu-api bash -c "
+  cd /runtmp && python -m scripts.data.scout_backfill \
+    --source nrlcom-ladder --season-from 1996 --season-to 2026 \
+    --round-from 1 --round-to 30 --competition 111 \
+    --api https://api.jeromelu.ai --admin-key \$ADMIN_KEY \
+    --archive-only --resume --rate-limit 1.0 2>&1 | tee /runtmp/backfill_nrlcom-ladder_$(date +%Y%m%d_%H%M).log
+"
+
+# 2. nrl.com stats — 14 seasons × 1 endpoint = 14 GETs ≈ 30 sec
+docker exec -it jeromelu-api bash -c "
+  cd /runtmp && python -m scripts.data.scout_backfill \
+    --source nrlcom-stats --season-from 2013 --season-to 2026 \
+    --competition 111 \
+    --api https://api.jeromelu.ai --admin-key \$ADMIN_KEY \
+    --archive-only --resume --rate-limit 1.0 2>&1 | tee /runtmp/backfill_nrlcom-stats_$(date +%Y%m%d_%H%M).log
+"
+
+# 3. SC siblings — supercoach-roster + supercoach-teams + supercoach-settings for 2024 and 2025
+for src in supercoach-roster supercoach-teams supercoach-settings; do
+  docker exec -it jeromelu-api bash -c "
+    cd /runtmp && python -m scripts.data.scout_backfill \
+      --source $src --season-from 2024 --season-to 2025 \
+      --api https://api.jeromelu.ai --admin-key \$ADMIN_KEY \
+      --rate-limit 1.0 2>&1 | tee /runtmp/backfill_${src}_$(date +%Y%m%d_%H%M).log
+  "
+done
+```
+
+(SC siblings run WITHOUT `--archive-only` because the 2-season window is modern-shape per D12; `--resume` is a no-op for them per the TASK-40 design.)
+
+**How to verify.**
+- `aws s3 ls s3://jeromelu-clean-documents/scout/nrlcom/ladder/111/ --recursive | wc -l` ≥ **600**.
+- `aws s3 ls s3://jeromelu-clean-documents/scout/nrlcom/stats/111/ --recursive | wc -l` = **14** (2013–2026 inclusive).
+- `aws s3 ls s3://jeromelu-clean-documents/scout/supercoach/classic/players-cf/ --recursive | wc -l` ≥ **2** (2024 + 2025; daily timestamps may produce more if existing 2025 data was already there).
+- `aws s3 ls s3://jeromelu-clean-documents/scout/supercoach/classic/teams/ --recursive | wc -l` ≥ **2** (2024 + 2025 — the existing seed was 2026 only).
+- `aws s3 ls s3://jeromelu-clean-documents/scout/supercoach/classic/settings/ --recursive | wc -l` ≥ **2**.
+- Each driver invocation reports successes / failures in its final summary — record in run report scratchpad.
+- SC siblings: backfilling DOES write to DB (no archive_only flag) — verify `SELECT COUNT(*) FROM sc_settings WHERE season IN (2024, 2025)` ≥ 2 (one per mode × season at minimum).
+
+**Proof notes.**
+
+---
+
+### TASK-44: Operator backfill — `supercoach-stats` 2018–2025 (on prod box via loopback)
+
+**What.** Per [PLAN.md "Scout Phase 5"](./PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance) Tasks list. **Operator task** — same procedure as TASK-41/42.
+
+- **Source**: `supercoach-stats` (the nrlsupercoachstats.com jqGrid endpoint).
+- **Seasons**: 2018–2025 (per D12; 2026 already current via cron).
+- **Round depth**: `--round-from 0 --round-to 30` (round 0 = Totals per the route docstring; rounds 1–30 = regular rounds; many old years had fewer than 30 rounds → 502s recorded as failures).
+- **Wall-clock**: ~250 jqGrid sessions at 1 req/sec ≈ 1–2h (each session is ~3 pages internally to the fetcher).
+- **`--archive-only` is mandatory** here because the route writes inline to `player_rounds` — without the flag, every (season, round) would trigger an UPSERT, and 2018 shape may not strict-parse cleanly. TASK-45 runs the new `populate_player_rounds` extractor to write DB rows from S3 after backfill.
+
+```bash
+docker exec -it jeromelu-api bash -c "
+  cd /runtmp && python -m scripts.data.scout_backfill \
+    --source supercoach-stats \
+    --season-from 2018 --season-to 2025 \
+    --round-from 0 --round-to 30 \
+    --api https://api.jeromelu.ai --admin-key \$ADMIN_KEY \
+    --archive-only --resume \
+    --rate-limit 1.0 2>&1 | tee /runtmp/backfill_supercoach-stats_$(date +%Y%m%d_%H%M).log
+"
+```
+
+**How to verify.**
+- `aws s3 ls s3://jeromelu-clean-documents/nrlsupercoachstats/stats/ --recursive | wc -l` ≥ **200** (~8 seasons × ~28 rounds incl. Totals; actual round counts vary by year).
+- `aws s3 ls s3://jeromelu-clean-documents/nrlsupercoachstats/stats/ --recursive | awk -F/ '{print $3}' | sort -u | wc -l` ≥ **8** (distinct season folders 2018–2025).
+- Spot-check 2018: `aws s3 cp s3://jeromelu-clean-documents/nrlsupercoachstats/stats/2018/round-01.json - | jq '.rows | length'` ≥ 200 (canonical SC roster size).
+- Driver summary recorded in run report scratchpad.
+- **DB verification deferred to TASK-45** — this task only proves S3 capture.
+
+**Proof notes.**
+
+---
+
+### TASK-45: Extractor sweep + DB conformance verification across full backfilled S3
+
+**What.** Per [PLAN.md "Scout Phase 5"](./PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance) Tasks list + Verification §end-to-end. **Operator task** — run the (now era-aware) DB extractors across the full backfilled S3, then verify the canonical schema is populated end-to-end.
+
+Steps (run on prod box, in the API container, same `docker cp scripts → /runtmp` pattern):
+
+1. **Pre-flight**: confirm the prod API container has the TASK-37/38/39 code baked in:
+   ```bash
+   docker exec jeromelu-api python -c "from scripts.data.populate.phase_player_rounds import populate_player_rounds; print('ok')"
+   docker exec jeromelu-api python -c "from scripts.data.populate.phase_matches import _extract_from_draw_fixture; print('ok')"
+   ```
+   Both must print `ok`. If not, deployment hasn't caught up — STOP and BLOCKED until [deploy pipeline path-filter](../../../../C:/Users/krist/.claude/projects/C--Users-krist-ClaudeProjects-Jeromelu/memory/project_deploy_pipeline_path_filter.md) resolves (push a forced-deploy trigger commit).
+
+2. **Run each phase** with explicit wide season range:
+   ```bash
+   SEASONS=$(seq 1908 2026 | tr '\n' ' ')
+   docker exec jeromelu-api python -m scripts.data.populate_db_from_s3 \
+     --phase matches --seasons $SEASONS --competition 111 2>&1 | tee /runtmp/populate_matches.log
+
+   docker exec jeromelu-api python -m scripts.data.populate_db_from_s3 \
+     --phase team_lists --seasons $SEASONS --competition 111 2>&1 | tee /runtmp/populate_team_lists.log
+
+   docker exec jeromelu-api python -m scripts.data.populate_db_from_s3 \
+     --phase stats --seasons $SEASONS --competition 111 2>&1 | tee /runtmp/populate_stats.log
+
+   docker exec jeromelu-api python -m scripts.data.populate_db_from_s3 \
+     --phase timeline --seasons $SEASONS --competition 111 2>&1 | tee /runtmp/populate_timeline.log
+
+   docker exec jeromelu-api python -m scripts.data.populate_db_from_s3 \
+     --phase standings --competition 111 2>&1 | tee /runtmp/populate_standings.log
+
+   docker exec jeromelu-api python -m scripts.data.populate_db_from_s3 \
+     --phase leaderboards --competition 111 2>&1 | tee /runtmp/populate_leaderboards.log
+
+   docker exec jeromelu-api python -m scripts.data.populate_db_from_s3 \
+     --phase player_rounds --seasons $SEASONS --competition 111 2>&1 | tee /runtmp/populate_player_rounds.log
+   ```
+
+3. **Capture row counts + era distribution** via `psql`:
+   ```sql
+   SELECT data_coverage, COUNT(*) FROM matches WHERE competition_id=111 GROUP BY 1 ORDER BY 1;
+   SELECT COUNT(*) FROM match_team_lists WHERE match_id IN (SELECT id FROM matches WHERE competition_id=111);
+   SELECT COUNT(*) FROM player_match_stats WHERE match_id IN (SELECT id FROM matches WHERE competition_id=111);
+   SELECT COUNT(*) FROM match_timeline WHERE match_id IN (SELECT id FROM matches WHERE competition_id=111);
+   SELECT COUNT(*) FROM stat_leaderboards WHERE competition_id=111;
+   SELECT COUNT(*) FROM team_standings WHERE competition_id=111;
+   SELECT COUNT(*) FROM player_rounds WHERE season >= 2018;
+   ```
+
+4. **Spot-check queries** (each must return non-empty unless marked):
+   - `SELECT season, round, status, data_coverage FROM matches WHERE season=1908 AND round=1 LIMIT 5` — non-empty, all `data_coverage='fixture_only'`.
+   - `SELECT m.id, COUNT(t.*) AS tl_rows FROM matches m LEFT JOIN match_timeline t ON t.match_id=m.id WHERE m.season BETWEEN 1990 AND 1999 GROUP BY m.id ORDER BY tl_rows DESC LIMIT 5` — at least some matches with timeline rows + `data_coverage='timeline_only'`.
+   - `SELECT COUNT(*) FROM player_match_stats WHERE match_id IN (SELECT id FROM matches WHERE season < 2000)` — **MUST be 0** (parent-coverage gate test).
+   - `SELECT data_coverage FROM matches WHERE season=2026 ORDER BY id DESC LIMIT 5` — all `'full'` (regression check).
+   - `SELECT season, COUNT(*) FROM player_rounds GROUP BY season ORDER BY season` — non-empty for 2018–2026.
+
+5. **Idempotency check**: re-run one phase a second time — log shows `inserted=0` and `updated=N` matching the first run's total.
+
+**How to verify.**
+- Each phase log exits 0 with a summary report at the bottom (`done. summary: {...}`).
+- Row counts meet PLAN.md's thresholds: `matches.full ≥4500`, `matches.timeline_only ≥800`, `matches.fixture_only ≥2000`; `stat_leaderboards ≥4500`; `team_standings ≥600`; `player_rounds (2018+) ≥150000`.
+- All 5 spot-check queries return as specified (including the one that MUST return 0).
+- Re-run shows `inserted=0`.
+- All counts + spot-check outputs copied verbatim into the run report scratchpad on this task's checkoff.
+
+**Proof notes.**
+
+---
+
+### TASK-46: Phase 5 closure — docs sweep + run report → Shipped
+
+**What.** Per [PLAN.md "Scout Phase 5"](./PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance) Documentation updates §.
+
+Files to update:
+
+1. `docs/agents/crew/scout/roadmap.md`:
+   - Phase 5 heading: `### Phase 5 — Historical backfill (one-time, ~5-6 hours operationally) ✅ Shipped (YYYY-MM-DD)`
+   - Body: replace the In-design checklist with the actual row counts achieved (per TASK-45 verification), the `data_coverage` distribution table, and a "Deferred (out of scope, surfaced not self-queued)" list (e.g., casualty-ward historical — no upstream support per D12; nrl.com per-team roster historical — same).
+
+2. `docs/agents/crew/scout/charter.md`:
+   - D12 row-counts column: update to actuals.
+   - Add a "Standard data model — era reconciliation" sub-section under D12 documenting the `matches.data_coverage` decision and the "NULLs + era marker, never alternate tables" principle (cite this plan).
+
+3. `docs/operations/data-lineage/matches.md`:
+   - Document the new `data_coverage` column + its CHECK constraint.
+   - Era-banded row count breakdown table (one row per coverage value with count + season range).
+   - 4 spot-check queries from TASK-45 listed for operator reference.
+
+4. 5 pipeline READMEs (`services/api/app/scout/{nrlcom_draw,nrlcom_match_centre,nrlcom_ladder,nrlcom_stats,supercoach_stats}/README.md`):
+   - "Archive-only mode" section: when to use (`archive_only=true` for historical backfill); the response shape (`validated:false, validation_skipped:true`); default behaviour unchanged (daily cron leaves it false).
+   - For `nrlcom_match_centre/README.md` specifically: document the 1990–1999 partial-shape expectation and how it surfaces as `data_coverage='timeline_only'` in the matches table.
+
+5. `scripts/data/populate/README.md`:
+   - New row in the phase table: `player_rounds` reads `nrlsupercoachstats/stats/*`, writes `player_rounds` (UPSERT on `(player_id, round, season)`), wired via `--phase player_rounds`.
+
+6. `docs/build/runs/2026-05-28-scout-phase-5-historical-backfill.md`:
+   - Status: `🟢 Shipped`.
+   - Per-task entries with what each delivered (files, proof, commit SHA).
+   - Decisions & deviations.
+   - Outstanding deferred items.
+   - Lessons learned.
+   - Commits list.
+
+7. `docs/build/runs/README.md`:
+   - Add the new row (newest first).
+
+8. `docs/build/PLAN.md`:
+   - Remove the Phase 5 plan from "Active plan" — leave the "Last shipped initiative" pointer updated to this run.
+
+**How to verify.**
+- `git diff --stat` covers the 11+ doc files listed above and NO code files.
+- `grep -r "Phase 5" docs/agents/crew/scout/roadmap.md docs/agents/crew/scout/charter.md` — every reference reflects ✅ Shipped.
+- `docs/build/PLAN.md` "Active plan" section is empty (or shows the next-up plan if one's been started).
+- `docs/build/TASKS.md` "Open tasks" section is empty (all Phase 5 tasks removed per the META ritual).
+- `docs/build/runs/README.md` top row is the Phase 5 entry.
+- The run report's per-task entries match the commit SHAs in `git log --oneline -20` (TASK-37 through TASK-46).
+- All TASK-37..TASK-46 entries also removed from TASKS.md (each task's checkoff already did this; verify the file ends with `## Open tasks` empty + `## Completed work` blurb only).
+
+**Proof notes.**
+
+
+
 
 
 ## Completed work
