@@ -39,6 +39,15 @@ Wired the D8 contract into `services/api/app/scout/nrlcom_ladder/routes.py` (exa
 
 **Proof:** route imports clean (`PIPELINE=nrlcom-ladder`); skip mode → **1 skipped** (exact reason); live mode → **1 passed** against real nrl.com; deliberate break (required `tries_scored = Field(alias="tries scored")` on `LadderStats`) → live test **failed naming `positions.0.stats."tries scored"`** ("Field required"), proving the nested stats-level guard fires, then reverted (`git diff HEAD -- models.py` empty); full scout unit suite → **65 passed** (no regression). **adversarial-reviewer: PASS WITH CONCERNS** — all non-blocking (network-gated proofs accepted at the Phase 3 TASK-08 level; reviewer independently re-verified skip-mode, import, clean revert, 65-passed suite). **/simplify: no findings.**
 
+### TASK-25 — extractor unit tests (populate_injuries + populate_team_standings) via pure-function refactor (`2675094`)
+Behaviour-preserving refactor of `scripts/data/populate/phase_aux.py` to make the two Phase 4 extractors testable without S3/DB:
+- `_extract_standing_rows(payload, *, key, competition, season, round_no, team_map) -> list[dict]` — one `team_standings` row per ladder position; caller UPSERTs via the unchanged `upsert_sql` with the unchanged insert/update counters.
+- `_casualty_to_row(c, *, team_map, people_lookup) -> dict | None` — derived injury fields (canonical name, resolved team_id/person_id, body_part, expected-return text/round, url, key_today) or `None` on skip-no-name/no-team. The chronological open/close state machine + `_bucket_status` status derivation (current-round DB lookup) stay inline in the caller.
+
+Added `tests/unit/scripts/data/populate/test_phase_aux.py` (9 tests): `_extract_standing_rows` (22-metric space-key→column mapping, team resolution by nickname, `ladder_position` enumerate-index fallback since upstream has no `position`, unresolved-team → None team_id but row still emitted); `_casualty_to_row` (field mapping, person lookup, skip-no-name, skip-no-team); `_bucket_status` (Round-N gap → `1_week`/`2_4_weeks`/`4_8_weeks` + no-current-round, plus `indefinite`/`tbc`/`season`/`training`/`test`/empty). Fixtures reuse the TASK-21/23 canonical captures.
+
+**Proof:** `pytest …/test_phase_aux.py` → **9 passed**; `test_dry_run_flag.py` → **12 passed** (TASK-18 commit-guard contract holds); `python -m scripts.data.populate_db_from_s3 --help` → **exit 0** (orchestrator imports); full `pytest tests/unit/` → **341 passed** (no regression). **adversarial-reviewer: PASS** — verified behaviour preservation line-by-line (both functions byte-equivalent to the deleted inline code; UPSERT SQL/counters/commit guards untouched; `status` still caller-side); tests non-tautological. **/simplify: no findings.**
+
 ---
 
 ## How we know it's done (running)
@@ -48,7 +57,7 @@ Wired the D8 contract into `services/api/app/scout/nrlcom_ladder/routes.py` (exa
 - **Casualty item modelled strictly (vs. draw/match-centre envelope-only).** Locked in the plan interview (2026-05-28): the casualty/ladder extractors are live and read nested fields by exact key, so item-level drift must fail loudly. `theme` stays opaque (not read by the extractor).
 
 ## Outstanding
-- TASK-25 → TASK-28 still open (extractor unit tests, cron, prod seed + docs, worker-scraper retirement).
+- TASK-26 → TASK-28 still open (cron, prod seed + docs, worker-scraper retirement).
 
 ## Commits
-`cb408c6` (TASK-21) · `bf22976` (TASK-22) · `0ba0cf6` (TASK-23) · `b405c1a` (TASK-24). Plus the per-task run-report/queue bookkeeping commits.
+`cb408c6` (TASK-21) · `bf22976` (TASK-22) · `0ba0cf6` (TASK-23) · `b405c1a` (TASK-24) · `2675094` (TASK-25). Plus the per-task run-report/queue bookkeeping commits.
