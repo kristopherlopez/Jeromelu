@@ -1,6 +1,6 @@
 # Scout Phase 4.5 — nrl.com stats + players roster (D8 harden, schedule, seed)
 
-**Date:** 2026-05-28 · **Status:** 🟡 In flight (2 of 8 tasks shipped) · **Plan:** Scout Phase 4.5 (active — see [PLAN.md](../PLAN.md))
+**Date:** 2026-05-28 · **Status:** 🟡 In flight (3 of 8 tasks shipped) · **Plan:** Scout Phase 4.5 (active — see [PLAN.md](../PLAN.md))
 
 **TL;DR** — Phase 4.5 is a Phase 4-style hardening replay: both `services/api/app/scout/nrlcom_stats/` and `services/api/app/scout/nrlcom_players_roster/` ingest folders already exist with fetchers / routes / READMEs / make targets; migration `060_stat_leaderboards.sql` is applied; `populate_stat_leaderboards` is shipped and wired into `populate_db_from_s3.py` as `--phase leaderboards`; the lineage + catalogue docs already exist. What's missing is the D8 drift contract, extractor unit tests via pure-function refactor, cron scheduling, and prod seed verification. NRL only (comp 111), season 2026, forward-only — historical backfill stays Phase 5. SC Draft mode and folding `nrlcom_refresh.py` are explicitly scoped out (2026-05-28 planner interview).
 
@@ -28,6 +28,18 @@ Wired the TASK-29 D8 contract into `services/api/app/scout/nrlcom_stats/routes.p
 
 **Harness note (carried over from TASK-22):** running the unit + integration tiers in one `pytest` invocation triggers a same-package-name collection collision (both dirs hold a `nrlcom_stats` package) — a pre-existing structural pattern (draw / casualty / ladder all have it too); CI runs the tiers separately, so it's a non-issue. Run tiers separately.
 
+### TASK-31 — nrlcom-players-roster: D8 strict models + fixture + unit drift tests (`25f14ff`)
+Added the D8 drift contract for the `nrlcom-players-roster` pipeline. Captured the live `/players/data?competition=111&team=500011` response (2026-05-28 — 34 profiles in 1 `profileGroup`, 56KB) to `tests/fixtures/scout/nrlcom_players_roster/canonical_response.json`. Created `services/api/app/scout/nrlcom_players_roster/models.py` with three strict `BaseModel`s (`extra="forbid"`):
+- `NrlcomPlayersRoster` (envelope) — `profileGroups` + `filterCompetitions` + `filterTeams` + `isClubSite` + `selectedCompetitionId` + `selectedTeamId` (6 keys observed live). **Bonus discovery:** `filterTeams[]` is the 17-team catalogue with internal `team_id` per team — exactly the source TASK-33's `teams.py` will derive from (one fetch yields the whole walk-set, no need to read from S3 ladder/draw archives).
+- `ProfileGroup` — `title: str | None` (observed `""` empty per the single-group shape) + `profiles: list[Profile]`.
+- `Profile` (**flat** — no `ProfileBody` nesting; the plan anticipated a possible nesting but live shape confirmed flat 7-key) — `firstName`, `lastName`, `teamNickName`, `position`, `url`, `bodyImage`, `theme`. All required-present-but-nullable; `theme` stays `dict[str, Any] | None` per the plan's "boundary stops at identity until an extractor lands". **No new DB extractor ships against `/players/data` this phase** — the existing HTML-scrape `jeromelu_shared/players/nrlcom_refresh.py` enrichment (which hits per-player profile PAGES, a different endpoint) is untouched per scope.
+
+**Pre-existing README bug surfaced:** the existing `services/api/app/scout/nrlcom_players_roster/README.md` mislabels `team=500011` as Storm — it's actually **Broncos** (Storm is **500021**, visible in this run's `filterTeams[]` catalogue). Recorded in the model docstring; README fix deferred to TASK-36 doc sweep (which already covers this README).
+
+Added `tests/unit/api/scout/nrlcom_players_roster/{__init__.py,test_models.py}` (templated on casualty): 4 cases — `test_canonical_fixture_parses` (asserts identity fields populated on first profile); `test_unknown_top_level_field_raises` (`loot_boxes`); `test_unknown_profile_field_raises` (`is_retired` on first profile); `test_missing_team_nickname_raises` (`teamNickName` — same field casualty removes; no `playerId` at profile level in `/players/data`, so casualty precedent matched). Route wiring deferred to TASK-32; `teams.py` + `refresh-all` deferred to TASK-33.
+
+**Proof:** `pytest tests/unit/api/scout/nrlcom_players_roster/test_models.py -v` → **4 passed in 2.01s**; `pytest tests/unit/api/scout/` → **73 passed** (was 69 post-TASK-30, +4, no regression); `python -c "from app.scout.nrlcom_players_roster.models import NrlcomPlayersRoster, ProfileGroup, Profile; print('ok')"` → `ok`. Route file confirmed untouched (TASK-32 boundary intact); no `teams.py` (TASK-33 boundary intact). **adversarial-reviewer: PASS WITH CONCERNS** — all non-blocking: (C1) README correction deferred to TASK-36 doc sweep, sanctioned by spec; (C2) identity fields declared `str | None` whereas casualty uses `str` non-null — defensible since no extractor enforces non-null this phase; flag for tightening if a future extractor lands; (C3) session-staging discipline reminder re: `services/web/.claude/` — honoured (explicit pathspec used at commit). **/simplify:** not run.
+
 ---
 
 ## How we know it's done (running)
@@ -38,12 +50,14 @@ Wired the TASK-29 D8 contract into `services/api/app/scout/nrlcom_stats/routes.p
 - **`value: str | None` is stricter than the spec's `float | int | str | None` union.** Empirical reality: every leader in 347 observed has a string value. The strictness is a D8-aligned choice — a future native-number `value` becomes drift, which is the correct behaviour, not a silent acceptance.
 
 ## Outstanding (deferred — operator/time-gated and surfaced infra follow-ups)
-- ☐ **TASK-31 → TASK-36:** the remaining 6 tasks of Phase 4.5 (in the queue).
+- ☐ **TASK-32 → TASK-36:** the remaining 5 tasks of Phase 4.5 (in the queue).
 - ☐ **End-to-end `validated:true` in JSON response** — TASK-30's local curl proof was deliberately skipped (offline this turn, per spec). Confirmation lands at the TASK-36 prod seed (the route is proven-by-construction green live + red via the deliberate break).
+- ☐ **Tighten `Profile` identity-field types when an extractor lands** — TASK-31 ships `Profile.firstName`/`lastName`/`teamNickName` as `str | None` (no extractor reading them this phase). When a `/players/data` extractor is built in a future phase, types should tighten to `str` (non-null) for the load-bearing identity fields, matching the casualty precedent. Surfaced for visibility.
+- ☐ **README correction for nrlcom_players_roster** — `services/api/app/scout/nrlcom_players_roster/README.md` line 15 mislabels `TEAM=500011` as Storm; actual Storm id is `500021`. Folded into TASK-36's doc sweep.
 - ☐ Same cross-cutting **extractor scheduling** infra follow-up that Phase 4 surfaced — the daily ingest cron archives to S3 but the DB only refreshes when an operator runs `populate_db_from_s3 --phase leaderboards`. Same gap will apply to `nrlcom_players_roster` (which ships NO DB extractor this phase per scope decision). Durable fix is baking `scripts/` + `packages/shared` into the api image so a scheduled `docker exec jeromelu-api python -m scripts.data.populate_db_from_s3 …` just works — an infra decision for the human/planner. Out of Phase 4.5 scope.
 
 ## Lessons learned
 _(populated as tasks ship)_
 
 ## Commits
-`068f37a` (planner kickoff — Phase 4.5 plan + 8 tasks queued, missed at the planner session boundary) · `f232c84` (TASK-29) · `bb84d28` (TASK-30). Plus the per-task run-report/queue bookkeeping commits.
+`068f37a` (planner kickoff — Phase 4.5 plan + 8 tasks queued, missed at the planner session boundary) · `f232c84` (TASK-29) · `bb84d28` (TASK-30) · `25f14ff` (TASK-31). Plus the per-task run-report/queue bookkeeping commits.

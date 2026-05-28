@@ -8,7 +8,7 @@ Newest first.
 
 | Date | Run | Status |
 |---|---|---|
-| 2026-05-28 | [Scout Phase 4.5 — nrl.com stats + players roster (D8 harden, schedule, seed)](./2026-05-28-scout-phase-4-5-stats-players-roster.md) | 🟡 In flight (2 of 8 tasks shipped) |
+| 2026-05-28 | [Scout Phase 4.5 — nrl.com stats + players roster (D8 harden, schedule, seed)](./2026-05-28-scout-phase-4-5-stats-players-roster.md) | 🟡 In flight (3 of 8 tasks shipped) |
 | 2026-05-28 | [Scout Phase 4 — nrl.com casualty ward + ladder + retire worker-scraper](./2026-05-28-scout-phase-4-casualty-ladder.md) | 🟢 Shipped (cron first-fire + extractor-scheduling deferred) |
 | 2026-05-27 | [Change-only storage for video_metrics + channel_metrics](./2026-05-27-change-only-metrics-storage.md) | 🟢 Shipped (prod 641 MB → 171 MB) |
 | 2026-05-24 | [Scout Phase 3.5 — nrl.com match-centre DB extractors](./2026-05-24-scout-phase-3.5-nrlcom-extractors.md) | 🟢 Shipped (runtime follow-up noted) |
