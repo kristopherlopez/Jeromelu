@@ -37,6 +37,10 @@ class DrawFixture(BaseModel):
     clock: dict[str, Any]
     callToAction: dict[str, Any] | None
     secondaryCallToAction: dict[str, Any] | None
+    # Added by nrl.com 2026-05 — broadcast providers (Nine/9Now/Kayo/Foxtel) with
+    # logo URLs. Opaque at ingest like the team/clock objects; absent on some
+    # fixtures, hence optional. Tripped the D8 drift guard 2026-05-28.
+    videoProviders: list[dict[str, Any]] | None = None
     isCurrentRound: bool
     matchMode: str
     matchState: str
