@@ -34,16 +34,21 @@ Added `tests/unit/api/scout/nrlcom_ladder/{__init__.py,test_models.py}`: canonic
 
 **Proof:** `pytest tests/unit/api/scout/nrlcom_ladder/test_models.py` → **4 passed**; full scout unit suite → **65 passed** (61 + 4 new, no regression). All 17 positions verified to share one 6-key position shape + one 22-key stats shape before capture. **adversarial-reviewer: PASS** (no blocking concerns) — programmatically cross-checked the model field/alias set == the fixture's 22 stats keys (zero diff either direction); confirmed required-key/nullable-value contract (dropped key trips, null value tolerated), `extra="forbid"` on all three, no route wiring leaked. **/simplify: no findings.**
 
+### TASK-24 — ladder: wire strict-parse into route + live drift test (`b405c1a`)
+Wired the D8 contract into `services/api/app/scout/nrlcom_ladder/routes.py` (exact mirror of TASK-22): after `archive_response(...)`, `NrlcomLadder.model_validate(data)` + `detail["validated"] = True`, and an `except ValidationError → run.fail + HTTPException(500)` arm before the generic `except Exception`; `NrlcomLadderFetchError → 502` unchanged. Added `tests/integration/scout/nrlcom_ladder/{__init__.py,test_response_shape.py}` — env-flagged live drift test (`season=date.today().year`).
+
+**Proof:** route imports clean (`PIPELINE=nrlcom-ladder`); skip mode → **1 skipped** (exact reason); live mode → **1 passed** against real nrl.com; deliberate break (required `tries_scored = Field(alias="tries scored")` on `LadderStats`) → live test **failed naming `positions.0.stats."tries scored"`** ("Field required"), proving the nested stats-level guard fires, then reverted (`git diff HEAD -- models.py` empty); full scout unit suite → **65 passed** (no regression). **adversarial-reviewer: PASS WITH CONCERNS** — all non-blocking (network-gated proofs accepted at the Phase 3 TASK-08 level; reviewer independently re-verified skip-mode, import, clean revert, 65-passed suite). **/simplify: no findings.**
+
 ---
 
 ## How we know it's done (running)
-- Unit drift tests green in CI; the live drift tests run under `SCOUT_DRIFT_LIVE=1`. Casualty-ward ingest is fully D8-hardened (envelope + item strict-parse wired into the route, TASK-21/22). Ladder models + fixture shipped (TASK-23); route wiring is TASK-24.
+- Unit drift tests green in CI; the live drift tests run under `SCOUT_DRIFT_LIVE=1`. **Both casualty-ward and ladder ingest are now fully D8-hardened** (envelope + item/stats strict-parse wired into both routes, TASK-21→24).
 
 ## Decisions & deviations
 - **Casualty item modelled strictly (vs. draw/match-centre envelope-only).** Locked in the plan interview (2026-05-28): the casualty/ladder extractors are live and read nested fields by exact key, so item-level drift must fail loudly. `theme` stays opaque (not read by the extractor).
 
 ## Outstanding
-- TASK-24 → TASK-28 still open (ladder route wiring, extractor unit tests, cron, prod seed + docs, worker-scraper retirement).
+- TASK-25 → TASK-28 still open (extractor unit tests, cron, prod seed + docs, worker-scraper retirement).
 
 ## Commits
-`cb408c6` (TASK-21) · `bf22976` (TASK-22) · `0ba0cf6` (TASK-23). Plus the per-task run-report/queue bookkeeping commits.
+`cb408c6` (TASK-21) · `bf22976` (TASK-22) · `0ba0cf6` (TASK-23) · `b405c1a` (TASK-24). Plus the per-task run-report/queue bookkeeping commits.
