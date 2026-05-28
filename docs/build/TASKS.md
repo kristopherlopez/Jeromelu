@@ -25,7 +25,43 @@ Prefix the title with optional tags in square brackets:
 
 ## Open tasks
 
-### TASK-47: Ruff plumbing — pyproject.toml + Make targets + CI job + datetime META invariant
+### TASK-47: [BLOCKED: ruff-violation-volume — 174 files, 875 errors; rule set tuning needed] Ruff plumbing — pyproject.toml + Make targets + CI job + datetime META invariant
+
+**BLOCKED 2026-05-28 by implementer.** The plan's pre-audit only grepped for `datetime.utcnow()` (zero hits, as recorded) but the broader Ruff rule set surfaces 875 errors across 174 files on master — far over the spec's 30-file BLOCKED threshold. Surfacing per the spec's "STOP and tag `[BLOCKED]`" instruction rather than improvising a remediation.
+
+**Audit (ruff 0.15.14, config = plan-verbatim):**
+| Rule | Count | Notes |
+|---|---|---|
+| `E501` line-too-long (100 char) | 389 | Codebase commonly runs 101–110 chars. Format-wraps strings but not all lines auto-wrap. |
+| `I001` unsorted-imports | 139 | Autofixable. |
+| `B008` function-call-in-default-argument | 92 | FastAPI `Depends(...)`, `Query(...)`, `Path(...)`, `Body(...)`, `Header(...)` pattern — universally flagged for FastAPI codebases. Standard remediation: `extend-immutable-calls`. |
+| `UP017` datetime-timezone-utc | 50 | Autofixable (`timezone.utc` → `UTC`). |
+| `B904` raise-without-from-inside-except | 33 | Manual; needs `raise X from e` or `raise X from None` per call. |
+| `F401` unused-import | 33 | Autofixable. |
+| `RUF022` unsorted-dunder-all | 20 | Autofixable. |
+| `RUF001/002/003` ambiguous-unicode | 45 | Mostly false positives in NRL content (×, —, ° legitimately used in comments/docstrings/strings). |
+| `DTZ011` call-date-today | 11 | `date.today()` is fine without tz since it's a date not a datetime — likely intentional. |
+| `F541` f-string-missing-placeholders | 11 | Autofixable. |
+| Other (RUF046, UP035, B905, E402, etc.) | ~52 | Mix of autofixable and manual. |
+
+`ruff check --fix` would resolve 337/875; `--unsafe-fixes` resolves 360/875. ~515 errors remain after safe autofix, still across ~100 files.
+
+**Remediation menu (human decision required):**
+1. **Tune the rule set to a "lint the real bugs, accept the codebase's existing style" posture** — recommended path:
+   - Add `[tool.ruff.lint.flake8-bugbear] extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Body", "fastapi.Header", "fastapi.Form", "fastapi.File", "fastapi.Cookie"]` — kills 92 B008.
+   - Drop `RUF001`, `RUF002`, `RUF003` from `select` (ambiguous-unicode in comments/docstrings/strings) — kills 45 false-positives in NRL content.
+   - Drop `DTZ011` (`call-date-today`) via `ignore = ["DTZ011"]` — kills 11; keep the rest of DTZ for the real datetime invariant.
+   - Raise `line-length` from 100 → 120, OR run `ruff format` once to wrap what it can and accept the long-string remainder as autofix-or-noqa.
+   - Apply `ruff check --fix` and `ruff format` once, then check residual count.
+   - Expected residual: ~30–50 errors across ~20 files (B904 raise-from churn + a handful of UP/RUF leftovers). Manageable in a single sitting.
+2. **Keep rule set verbatim per plan; bulk-fix and absorb the work** — implementer-driven, ~3–5h additional scope. Implementer applies `--fix`, then `--unsafe-fixes`, then `ruff format`, then manually walks the remaining ~150 errors (mostly B904 + E501). Larger diff surface; higher review burden.
+3. **Ship Ruff warning-only initially** — overrides the plan's "hard-fail day 1" pre-confirmed pick. Adds `continue-on-error: true` to the CI job. Implementer cleans up in follow-up tasks. Violates the plan's load-bearing constraint but is the lowest-friction landing.
+
+**Recommended:** option 1. The tunings are standard for FastAPI codebases + codebases with international/symbol-heavy content. They preserve the load-bearing invariants (DTZ for the timezone rule, F/E for real bugs, I for import order, UP for modern Python, B sans 008 for likely-bug patterns) while removing the noise floor.
+
+**To unblock:** human picks option 1/2/3 (or proposes a variant) and updates this task's What block (or the planner re-issues with a revised rule set). The implementer can then proceed.
+
+**What.** Per [PLAN.md "Engineering quality hardening — Tier 1"](./PLAN.md#2026-05-28-engineering-quality-hardening--tier-1-ruff--pyright--eslint--gitleaks--deploy-gating) Interface §. Land Ruff as the Python lint+format+import-sort tool, hard-fail in CI from day 1, scope `services packages scripts tests`.
 
 **What.** Per [PLAN.md "Engineering quality hardening — Tier 1"](./PLAN.md#2026-05-28-engineering-quality-hardening--tier-1-ruff--pyright--eslint--gitleaks--deploy-gating) Interface §. Land Ruff as the Python lint+format+import-sort tool, hard-fail in CI from day 1, scope `services packages scripts tests`.
 
