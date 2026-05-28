@@ -25,6 +25,256 @@ Prefix the title with optional tags in square brackets:
 
 ## Open tasks
 
+### TASK-47: Ruff plumbing — pyproject.toml + Make targets + CI job + datetime META invariant
+
+**What.** Per [PLAN.md "Engineering quality hardening — Tier 1"](./PLAN.md#2026-05-28-engineering-quality-hardening--tier-1-ruff--pyright--eslint--gitleaks--deploy-gating) Interface §. Land Ruff as the Python lint+format+import-sort tool, hard-fail in CI from day 1, scope `services packages scripts tests`.
+
+Concrete changes:
+1. **Create `pyproject.toml` at the repo root** with exactly the `[tool.ruff]` and `[tool.ruff.lint]` and `[tool.ruff.format]` blocks specified in PLAN.md "Interface §". Do NOT add the `[tool.pyright]` block yet — that lands in TASK-49 (separating diffs keeps the review surface small). Use a placeholder comment `# [tool.pyright] block lands in TASK-49` so the implementer of TASK-49 can find the right spot.
+2. **Extend `requirements-dev.txt`** with `ruff>=0.6,<1`. Pin the exact minor version used in CI via a second line `# CI pins ruff to the same minor` and reflect that same `==X.Y.Z` in the workflow step's `pip install ruff==X.Y.Z`. Pick the latest 0.x available at task time.
+3. **Update `Makefile`**:
+   - Append `lint-python`, `format-python`, and `lint` (umbrella stub — only chains `lint-python` for now; TASK-48 + TASK-49 add the other layers) per PLAN.md "Interface §".
+   - Update the `.PHONY:` line at the top of the file to include `lint lint-python format-python` (preserve existing ordering; insert near `test`).
+4. **Update `.github/workflows/tests.yml`**: add a `ruff` job alongside `unit` and `web-typecheck`. Skeleton:
+   ```yaml
+     ruff:
+       name: ruff check + format
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v6
+         - uses: actions/setup-python@v6
+           with:
+             python-version: "3.12"
+             cache: pip
+             cache-dependency-path: requirements-dev.txt
+         - run: pip install ruff==X.Y.Z   # match the pin in requirements-dev.txt
+         - run: ruff check services packages scripts tests
+         - run: ruff format --check services packages scripts tests
+   ```
+   Match the existing job-style conventions (concurrency group, action versions) used by `unit` and `web-typecheck`.
+5. **Run `ruff check services packages scripts tests` locally and `ruff format --check ...` and confirm both exit 0.** If either fails, autofix everything Ruff can autofix (`ruff check --fix`, `ruff format`) and manually resolve the remainder. **Expected violations are zero or near-zero per the pre-planning audit** (no `datetime.utcnow()` callsites exist; import-order churn is the most likely surfacer). If the violation count exceeds 30 files, STOP and tag `[BLOCKED: ruff-violation-volume — N files affected]` — the implementer surfaces to the human before bulk-fixing.
+6. **Update `docs/build/META.md`** — add a new `### Datetime / timezone` invariant subsection under `## Project invariants` (between an existing subsection — placement at the implementer's discretion, but contiguous with related invariants). Text:
+   > **Datetime / timezone.** Use timezone-aware datetimes. Store and compare UTC at DB/API boundaries. Never `datetime.utcnow()` — prefer `datetime.now(timezone.utc)`. Pure-data fixtures under `tests/` are exempt. Enforced by Ruff's `DTZ` rule set in `pyproject.toml`; CI fails on violation.
+
+**How to verify.**
+- `cat pyproject.toml` shows `[tool.ruff]`, `[tool.ruff.lint]` (with `select = ["E", "F", "I", "B", "DTZ", "UP", "RUF"]`), `[tool.ruff.format]` blocks; placeholder comment for the future `[tool.pyright]` block is present.
+- `grep "ruff>=" requirements-dev.txt` returns one line.
+- `make lint-python` exits 0 (chained `ruff check` and `ruff format --check`).
+- `make format-python` (no-op run) reformats nothing — `git status` is clean after.
+- `grep -rn "datetime\.utcnow" services packages scripts` returns zero matches (sanity check matches the pre-plan audit).
+- The PR opened with this task FAILs CI when an unused import is locally added to any file, and PASSES CI on the revert. Capture the failing run URL + the passing run URL into the run-report scratchpad.
+- `docs/build/META.md` contains the new `### Datetime / timezone` subsection, verbatim.
+- `git diff --stat` is bounded to: `pyproject.toml` (new), `requirements-dev.txt`, `Makefile`, `.github/workflows/tests.yml`, `docs/build/META.md`, and at most a handful of source files if Ruff surfaced violations (each fixable cleanly via autofix per the "near-zero violations" expectation).
+
+**Proof notes.**
+
+---
+
+### TASK-48: ESLint CI job + `lint-web` Make target
+
+**What.** Per [PLAN.md "Engineering quality hardening — Tier 1"](./PLAN.md#2026-05-28-engineering-quality-hardening--tier-1-ruff--pyright--eslint--gitleaks--deploy-gating) Interface §. ESLint is already configured (`services/web/eslint.config.mjs`) and `npm run lint` works — this task wires it into CI and adds the Make target.
+
+Concrete changes:
+1. **Run `cd services/web && npm run lint` locally on master first** to baseline. If it fails on master HEAD, fix the violations as part of this task (small repo; expected to be a handful at most). If the violation count is >20 files, STOP and tag `[BLOCKED: eslint-violation-volume — N files affected]` and surface to the human (could indicate eslint config drift since CI never ran it).
+2. **Add `web-lint` job to `.github/workflows/tests.yml`** alongside the existing `web-typecheck`:
+   ```yaml
+     web-lint:
+       name: npm run lint (services/web)
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v6
+         - uses: actions/setup-node@v6
+           with:
+             node-version: "20"
+             cache: npm
+             cache-dependency-path: services/web/package-lock.json
+         - name: Install deps
+           run: npm ci
+           working-directory: services/web
+         - name: Lint
+           run: npm run lint
+           working-directory: services/web
+   ```
+3. **Update `Makefile`**: add the `lint-web` target per PLAN.md "Interface §". Update the umbrella `lint` target added in TASK-47 to also `$(MAKE) lint-web`. Update `.PHONY:` to include `lint-web`.
+
+**How to verify.**
+- `make lint-web` exits 0 locally on master.
+- The PR opened with this task FAILs CI when an unused import is added to `services/web/src/app/page.tsx` (or any `.tsx` file), and PASSES CI on the revert. Capture the failing run URL + the passing run URL.
+- `git diff --stat` is bounded to `.github/workflows/tests.yml`, `Makefile`, and (at most) any files touched to clear initial ESLint violations.
+- The Actions UI shows a `npm run lint (services/web)` job in green on the merge commit.
+
+**Proof notes.**
+
+---
+
+### TASK-49: Pyright plumbing — pyproject.toml + Make target + CI job (narrow scope: `packages/shared/jeromelu_shared`)
+
+**What.** Per [PLAN.md "Engineering quality hardening — Tier 1"](./PLAN.md#2026-05-28-engineering-quality-hardening--tier-1-ruff--pyright--eslint--gitleaks--deploy-gating) Interface §. Land Pyright as the Python typechecker, hard-fail in CI from day 1, scoped narrow to `packages/shared/jeromelu_shared/`. **Note:** widening the include set (to `services/api/app/`, `packages/db/`, key workers, high-value scripts) is explicitly out of scope for this task — a future plan handles that incrementally.
+
+Concrete changes:
+1. **Append `[tool.pyright]` block to the root `pyproject.toml`** (created in TASK-47), replacing the placeholder comment. Use the block specified in PLAN.md "Interface §" verbatim.
+2. **Extend `requirements-dev.txt`** with `pyright>=1.1.380,<2`. Same pin-discipline as Ruff — pick the latest 1.1.x available at task time and reflect the exact version in the CI workflow step.
+3. **Update `Makefile`**: add the `typecheck-python` target. Update the umbrella `lint` target (added in TASK-47) to also `$(MAKE) typecheck-python`. Update `.PHONY:` to include `typecheck-python`.
+4. **Add `pyright` job to `.github/workflows/tests.yml`**:
+   ```yaml
+     pyright:
+       name: pyright (packages/shared/jeromelu_shared)
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v6
+         - uses: actions/setup-python@v6
+           with:
+             python-version: "3.12"
+             cache: pip
+             cache-dependency-path: |
+               requirements-test.txt
+               requirements-dev.txt
+         - run: pip install -r requirements-test.txt -r requirements-dev.txt
+           # Install requirements-test.txt too so transitive dep types resolve.
+         - run: pyright
+   ```
+5. **Run `pyright` locally and fix every reported error within the include set.** Add per-symbol `# pyright: ignore[reportXxx]` comments only when a fix is genuinely out of scope (e.g. a missing type stub from an upstream library) — and each `# pyright: ignore` MUST have an inline rationale (`# pyright: ignore[reportMissingTypeStubs]  # boto3-stubs not installed`). **If the error count exceeds 20 within the narrow scope, STOP and tag `[BLOCKED: pyright-violation-volume — N errors in packages/shared]` — the implementer surfaces to the human before bulk-fixing or adding bulk ignores.**
+6. **Do NOT install pyright as a dev-time Node package globally.** The Python wheel of pyright (`pip install pyright`) bundles a node runtime via the `nodeenv` dependency on first call — that's the expected path here. Document this in a 1-line comment in the workflow step if non-obvious.
+
+**How to verify.**
+- `grep -A 8 "\[tool.pyright\]" pyproject.toml` shows the block matching PLAN.md Interface § exactly (include = packages/shared/jeromelu_shared; pythonVersion = "3.12"; typeCheckingMode = "standard"; reportMissingImports + reportGeneralTypeIssues = "error").
+- `make typecheck-python` exits 0 locally on master.
+- The PR opened with this task FAILs CI when a return-type annotation is intentionally broken in `packages/shared/jeromelu_shared/scraping/nrl.py` (or any file in scope), and PASSES CI on the revert. Capture URLs.
+- `git diff --stat` is bounded to `pyproject.toml`, `requirements-dev.txt`, `Makefile`, `.github/workflows/tests.yml`, and at most a handful of files in `packages/shared/jeromelu_shared/` for any initial fixes / ignores. Anything beyond that scope is a Concern.
+- The Actions UI shows a `pyright (packages/shared/jeromelu_shared)` job in green on the merge commit.
+
+**Proof notes.**
+
+---
+
+### TASK-50: Gitleaks plumbing — `.gitleaks.toml` + CI job + secret-hygiene META invariant
+
+**What.** Per [PLAN.md "Engineering quality hardening — Tier 1"](./PLAN.md#2026-05-28-engineering-quality-hardening--tier-1-ruff--pyright--eslint--gitleaks--deploy-gating) Interface §. Land Gitleaks as the secret scanner, hard-fail in CI from day 1, run against the full working tree (NOT the full git history — see Concrete change 4 for the rationale).
+
+Concrete changes:
+1. **Create `.gitleaks.toml`** at the repo root with the minimal-config block specified in PLAN.md "Interface §" (`[extend] useDefault = true` + empty allowlist tables).
+2. **Run `gitleaks detect --redact --source=. --no-banner --exit-code 1` locally first** (install via `brew install gitleaks` / `scoop install gitleaks` / equivalent). If findings emerge, classify each:
+   - **Real secret** → STOP, do not commit. Tag `[BLOCKED: gitleaks-real-secret-detected — <path>]` and surface to the human immediately. Do NOT push.
+   - **False positive** → add an allowlist entry to `.gitleaks.toml` with an inline rationale comment (path-based preferred over regex-based for traceability).
+3. **Add `gitleaks` job to `.github/workflows/tests.yml`**:
+   ```yaml
+     gitleaks:
+       name: gitleaks (working tree)
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v6
+           with:
+             fetch-depth: 0   # gitleaks-action scans the full diff range; depth=0 lets it walk PR commits
+         - uses: gitleaks/gitleaks-action@v2
+           env:
+             # Free for public repos and small orgs; check current licensing.
+             # If license env var is unavailable, omit — gitleaks runs unauthenticated
+             # at reduced telemetry. Document the choice here in a comment.
+             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+   ```
+   The `gitleaks-action` config reads `.gitleaks.toml` automatically. Hard-fails the job on any finding.
+4. **Working-tree scan, not full-history scan.** The plan deliberately scopes to the working tree + PR diff (`gitleaks-action` default) rather than `git log --all`. Historical scan can land in a Tier-2 follow-up if/when the human wants paranoia mode; for now, the gate is "no new secrets land via this PR" — which is the load-bearing property.
+5. **Update `docs/build/META.md`** — add a new `### Secret hygiene` invariant subsection (placement at the implementer's discretion, contiguous with other invariants):
+   > **Secret hygiene.** Never commit `.env*`, tokens, API keys, prod credentials, or any high-entropy string that looks like a secret. Redact secrets from logs, issue comments, PR descriptions, and run reports. Enforced by Gitleaks in CI against the working tree + PR diff; CI fails on any finding. False positives go in `.gitleaks.toml` with an inline rationale, never inline `# gitleaks:allow` comments.
+
+**How to verify.**
+- `gitleaks detect --redact --source=. --no-banner --exit-code 1` exits 0 locally on master after the task's changes are applied.
+- The PR opened with this task FAILs CI when the canonical fake AWS key `AKIAIOSFODNN7EXAMPLE` is added to a throwaway file in the branch, and PASSES CI on the revert. (`AKIAIOSFODNN7EXAMPLE` is the AWS documentation example — it matches the AWS access-key regex but is publicly known to be non-functional; using it as the test secret is safe.) Capture URLs.
+- `cat .gitleaks.toml` shows the `[extend] useDefault = true` directive; any allowlist entries each carry an inline rationale comment.
+- `docs/build/META.md` contains the new `### Secret hygiene` subsection verbatim.
+- `git diff --stat` bounded to `.gitleaks.toml`, `.github/workflows/tests.yml`, `docs/build/META.md`. **If any other file is touched (e.g. to remove an actual secret), the task IS BLOCKED and the human must drive the cleanup separately — flag this immediately.**
+- The Actions UI shows a `gitleaks (working tree)` job in green on the merge commit.
+
+**Proof notes.**
+
+---
+
+### TASK-51: Deploy gating — flip `deploy.yml` to `workflow_run` trigger; verify gate end-to-end
+
+**What.** Per [PLAN.md "Engineering quality hardening — Tier 1"](./PLAN.md#2026-05-28-engineering-quality-hardening--tier-1-ruff--pyright--eslint--gitleaks--deploy-gating) Interface §. After TASK-47–50 are merged and the new CI jobs are observably green on master, gate `deploy.yml` on `tests.yml` success via the `workflow_run` trigger. Verify the gate works in production.
+
+**Prerequisite:** TASK-47, TASK-48, TASK-49, TASK-50 are checked off AND have produced at least one green `tests.yml` run on master HEAD. **If any of those CI jobs is currently failing intermittently on master, do NOT proceed — surface to the human first.** Confirm via the Actions UI before starting.
+
+Concrete changes:
+1. **Modify `.github/workflows/deploy.yml`:**
+   - Replace the `on:` block:
+     ```yaml
+     on:
+       workflow_run:
+         workflows: [Tests]
+         types: [completed]
+         branches: [master]
+       workflow_dispatch:
+     ```
+   - Add the conditional guard to `detect-changes` (the upstream job everything else `needs:`):
+     ```yaml
+       detect-changes:
+         runs-on: ubuntu-latest
+         if: >-
+           github.event_name == 'workflow_dispatch' ||
+           github.event.workflow_run.conclusion == 'success'
+         ...
+     ```
+   - Replace every occurrence of `${{ github.sha }}` inside the workflow with `${{ github.event.workflow_run.head_sha || github.sha }}`. (`workflow_run` triggers run in default-branch context; `github.sha` defaults to the branch HEAD, which can drift from the SHA that tests.yml actually validated. The fallback handles `workflow_dispatch`.) Spot the two locations: the matrix `docker build … -t $IMAGE:${{ github.sha }}` step and any other `github.sha` reference in the file.
+2. **Update `docs/ops/ci-cd.md`:**
+   - Modify the `deploy.yml` row in the trigger table from `push to master, workflow_dispatch` to `workflow_run on Tests (master), workflow_dispatch`.
+   - Update the "What is NOT in this pipeline" entry for "Tests + web typecheck" — flip the negation: the gate now exists; document the `workflow_run` mechanism and how to override via `workflow_dispatch` for emergency deploys.
+   - Add a new "Quality gates" subsection covering Ruff / Pyright / web-lint / Gitleaks — what each catches, how to silence a false positive.
+3. **Dry-run verification ON MASTER** (operator step, run after the PR is merged):
+   - **3a. Red-Tests → no-deploy.** Push a commit to master that intentionally breaks Ruff (or any other CI gate — Pyright is convenient). Wait for `Tests` workflow to finish red. Confirm via Actions UI that `Build & Deploy` did NOT start. Revert the breaking change with a follow-up commit; wait for `Tests` green; confirm `Build & Deploy` then runs.
+   - **3b. SHA-tag fidelity.** On the green deploy following the revert, open the `build-and-push` job log. Confirm the `docker build … -t $IMAGE:<sha>` line uses the master HEAD SHA (which under `workflow_run` context comes from `github.event.workflow_run.head_sha`). Cross-reference: `git log --oneline -1` on master after the revert merge.
+   - **3c. `workflow_dispatch` override.** From the Actions UI, manually dispatch `Build & Deploy`. Confirm it runs to completion regardless of Tests state. Confirm the image tag in the build log uses `github.sha` (the dispatch-time fallback).
+
+**How to verify.**
+- `grep -A 6 "^on:" .github/workflows/deploy.yml` shows the `workflow_run` block + `workflow_dispatch`.
+- `grep "github.sha" .github/workflows/deploy.yml` returns only lines of the form `github.event.workflow_run.head_sha || github.sha`.
+- `grep "github.event.workflow_run.conclusion" .github/workflows/deploy.yml` returns ≥1 line (the conditional guard).
+- `docs/ops/ci-cd.md` deploy.yml table row updated; new "Quality gates" subsection present.
+- Dry-run 3a observation: Actions UI shows the red Tests run with NO downstream Build & Deploy run on its commit. Capture screenshots / URLs into the run-report scratchpad. Then green run on the revert DID trigger Build & Deploy.
+- Dry-run 3b observation: SHA in `docker build … -t $IMAGE:<sha>` matches `git rev-parse HEAD` on master at the time of that deploy. Record both into the run-report scratchpad.
+- Dry-run 3c observation: `workflow_dispatch` produced a successful Build & Deploy regardless of Tests state. Record the Actions URL.
+
+**Proof notes.**
+
+---
+
+### TASK-52: Closure — engineering-quality-hardening.md Tier 1 ✅; run report → 🟢 Shipped
+
+**What.** Per [PLAN.md "Engineering quality hardening — Tier 1"](./PLAN.md#2026-05-28-engineering-quality-hardening--tier-1-ruff--pyright--eslint--gitleaks--deploy-gating) Documentation updates §. Close the plan: flip Tier 1 items 1–6 to ✅ Shipped; finalize the run report; remove the plan from PLAN.md's "Active plan".
+
+Concrete changes:
+1. **`docs/operations/engineering-quality-hardening.md`:**
+   - Under each of "1. Python lint and format", "2. Python type checking", "3. Frontend lint in CI", "4. Datetime and timezone invariant", "5. Secret hygiene", "6. Gate deploy on quality checks", add a final paragraph:
+     > **Status:** ✅ Shipped 2026-05-28 — see [run report](../build/runs/2026-05-28-eng-quality-tier-1.md).
+   - Update "Current Baseline" section to reflect the new state — bullets for: Ruff configured + CI; Pyright configured (narrow: packages/shared/jeromelu_shared); web lint in CI; Gitleaks in CI; deploy gated on tests.yml via workflow_run.
+   - "Suggested Implementation Order" section: keep the list — items 1–6 are historical; items 7+ remain as the next-up backlog. Add a one-line header note: "_Items 1–6 shipped 2026-05-28 (see [run report])."
+2. **`docs/build/runs/2026-05-28-eng-quality-tier-1.md`** (created at TASK-47 checkoff per META ritual; finalized here):
+   - Status: `🟢 Shipped`.
+   - Per-task entries (TASK-47 through TASK-52) with: files touched, proof URLs (captured from each task's "How to verify" steps), commit SHA.
+   - "Decisions & deviations" section: any choices that deviated from the plan (e.g. allowlist entries that had to be added to `.gitleaks.toml`, pyright ignores that landed in scope, ruff version pin chosen).
+   - "Outstanding deferred items": Tier 2 / Tier 3 items from the backlog that this plan did NOT address (list 7–17).
+   - "Lessons learned": surface any process learnings — promote to META.md "Known bugs and pitfalls" if they're durable.
+   - "Commits" list (oneline format from `git log`).
+3. **`docs/build/runs/README.md`:**
+   - Add a new top row (newest first) for this run.
+4. **`docs/build/PLAN.md`:**
+   - Remove the entire `### 2026-05-28: Engineering quality hardening — Tier 1 …` section from "Active plan". Phase 5's section stays (it's still active).
+5. **`docs/build/TASKS.md`:**
+   - Confirm TASK-47 through TASK-52 are all already removed via their individual checkoffs. The file should not contain a graveyard of completed Tier 1 tasks.
+
+**How to verify.**
+- `git diff --stat` covers exactly: `docs/operations/engineering-quality-hardening.md`, `docs/build/runs/2026-05-28-eng-quality-tier-1.md`, `docs/build/runs/README.md`, `docs/build/PLAN.md`, `docs/build/TASKS.md`. No code files.
+- `grep -c "✅ Shipped 2026-05-28" docs/operations/engineering-quality-hardening.md` returns **6** (one per Tier 1 item).
+- `grep -A 1 "## Active plan" docs/build/PLAN.md` no longer shows the "Engineering quality hardening — Tier 1" heading.
+- `head -5 docs/build/runs/README.md` shows the new row as the newest.
+- `grep "🟢 Shipped" docs/build/runs/2026-05-28-eng-quality-tier-1.md` returns ≥1 line.
+- The run report's per-task entries cite the actual commit SHAs from `git log --oneline -20` (TASK-47 through TASK-52).
+- `grep "TASK-4[7-9]\|TASK-5[0-2]" docs/build/TASKS.md` returns zero matches (every Tier 1 task has been removed via its own checkoff).
+
+**Proof notes.**
+
+---
+
 ### TASK-41: Operator backfill — `nrlcom-draw` 1908–2026 (on prod box via loopback)
 
 **What.** Per [PLAN.md "Scout Phase 5"](./PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance) Tasks list. **Operator task** — runs the hardened backfill driver against prod from the prod box via the Phase 4.5 loopback procedure.
