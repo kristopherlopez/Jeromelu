@@ -88,6 +88,63 @@ def _build_player_id_map(db: Session) -> dict[int, str]:
 # team_standings
 # ─────────────────────────────────────────────────────────────────────────
 
+def _extract_standing_rows(
+    payload: dict[str, Any],
+    *,
+    key: str,
+    competition: int,
+    season: int,
+    round_no: int,
+    team_map: dict[str, str],
+) -> list[dict[str, Any]]:
+    """Pure projection of one /ladder/data archive into team_standings rows.
+
+    One row per `positions[]` entry. No DB, no I/O — the caller UPSERTs the
+    returned dicts. `ladder_position` falls back to the 1-based enumerate
+    index when the upstream omits `position` (it does today). The 22 metrics
+    are read from the space-keyed `stats` object exactly as the upsert binds.
+    """
+    rows: list[dict[str, Any]] = []
+    for idx, pos in enumerate(payload.get("positions") or [], start=1):
+        stats = pos.get("stats") or {}
+        nick = pos.get("teamNickname") or ""
+        team_id = team_map.get(nick.lower())
+        rows.append({
+            "team_id": team_id,
+            "nrlcom_team_nickname": nick,
+            "competition": competition,
+            "season": season,
+            "round": round_no,
+            "ladder_position": pos.get("position") or idx,
+            "movement": pos.get("movement"),
+            "played": stats.get("played"),
+            "wins": stats.get("wins"),
+            "lost": stats.get("lost"),
+            "drawn": stats.get("drawn"),
+            "byes": stats.get("byes"),
+            "points": stats.get("points"),
+            "points_for": stats.get("points for"),
+            "points_against": stats.get("points against"),
+            "points_difference": stats.get("points difference"),
+            "bonus_points": stats.get("bonus points"),
+            "form": stats.get("form"),
+            "streak": stats.get("streak"),
+            "home_record": stats.get("home record"),
+            "away_record": stats.get("away record"),
+            "day_record": stats.get("day record"),
+            "night_record": stats.get("night record"),
+            "average_winning_margin": stats.get("average winning margin"),
+            "average_losing_margin": stats.get("average losing margin"),
+            "close_games": stats.get("close games"),
+            "golden_point": stats.get("golden point"),
+            "players_used": stats.get("players used"),
+            "odds": stats.get("odds"),
+            "raw_payload": json.dumps(pos, default=str),
+            "s3_archive_key": key,
+        })
+    return rows
+
+
 def populate_team_standings(
     db: Session,
     *,
@@ -152,44 +209,14 @@ def populate_team_standings(
         season = int(m.group("season"))
         round_no = int(m.group("round"))
 
-        for idx, pos in enumerate(payload.get("positions") or [], start=1):
-            stats = pos.get("stats") or {}
-            nick = pos.get("teamNickname") or ""
-            team_id = team_map.get(nick.lower())
-            # 'next' isn't part of the schema; 'odds' lives in stats.odds for some seasons.
-            row = {
-                "team_id": team_id,
-                "nrlcom_team_nickname": nick,
-                "competition": competition,
-                "season": season,
-                "round": round_no,
-                "ladder_position": pos.get("position") or idx,
-                "movement": pos.get("movement"),
-                "played": stats.get("played"),
-                "wins": stats.get("wins"),
-                "lost": stats.get("lost"),
-                "drawn": stats.get("drawn"),
-                "byes": stats.get("byes"),
-                "points": stats.get("points"),
-                "points_for": stats.get("points for"),
-                "points_against": stats.get("points against"),
-                "points_difference": stats.get("points difference"),
-                "bonus_points": stats.get("bonus points"),
-                "form": stats.get("form"),
-                "streak": stats.get("streak"),
-                "home_record": stats.get("home record"),
-                "away_record": stats.get("away record"),
-                "day_record": stats.get("day record"),
-                "night_record": stats.get("night record"),
-                "average_winning_margin": stats.get("average winning margin"),
-                "average_losing_margin": stats.get("average losing margin"),
-                "close_games": stats.get("close games"),
-                "golden_point": stats.get("golden point"),
-                "players_used": stats.get("players used"),
-                "odds": stats.get("odds"),
-                "raw_payload": json.dumps(pos, default=str),
-                "s3_archive_key": key,
-            }
+        for row in _extract_standing_rows(
+            payload,
+            key=key,
+            competition=competition,
+            season=season,
+            round_no=round_no,
+            team_map=team_map,
+        ):
             res = db.execute(upsert_sql, row)
             if res.scalar():
                 inserted += 1
@@ -345,6 +372,50 @@ def _build_people_name_lookup(db: Session) -> dict[tuple[str, str], str]:
     return lookup
 
 
+def _casualty_to_row(
+    c: dict[str, Any],
+    *,
+    team_map: dict[str, str],
+    people_lookup: dict[tuple[str, str], str],
+) -> dict[str, Any] | None:
+    """Pure projection of one casualty entry into the derived fields the
+    injuries state machine works with. No DB, no I/O.
+
+    Returns ``None`` for a skip (no name, or no team nickname) — exactly the
+    original inner-loop guard. The `status` is intentionally NOT computed here
+    (it depends on the current-round DB lookup); the caller derives it via
+    `_bucket_status`. The returned `key_today` is the (name, nick) dedup key
+    the state machine adds to today's seen-set.
+    """
+    fn = (c.get("firstName") or "").strip()
+    ln = (c.get("lastName") or "").strip()
+    nick = (c.get("teamNickname") or "").strip()
+    if not (fn or ln) or not nick:
+        return None
+    canonical = f"{fn} {ln}".strip()
+    team_id = team_map.get(nick.lower())
+    person_id = (
+        people_lookup.get((canonical.lower(), nick.lower()))
+        or people_lookup.get((canonical.lower(), ""))
+    )
+    return_text = (c.get("expectedReturn") or "").strip()
+    ret_round = None
+    mr = _EXPECTED_RETURN_RE.search(return_text)
+    if mr:
+        ret_round = int(mr.group(1))
+    return {
+        "canonical": canonical,
+        "team_nickname": nick,
+        "team_id": team_id,
+        "person_id": person_id,
+        "body_part": c.get("injury"),
+        "expected_return_text": return_text,
+        "expected_return_round": ret_round,
+        "url": c.get("url"),
+        "key_today": (canonical.lower(), nick.lower()),
+    }
+
+
 def populate_injuries(
     db: Session,
     *,
@@ -385,25 +456,17 @@ def populate_injuries(
         casualties = payload.get("casualties") or []
         seen_keys_today: set[tuple[str, str]] = set()
         for c in casualties:
-            fn = (c.get("firstName") or "").strip()
-            ln = (c.get("lastName") or "").strip()
-            nick = (c.get("teamNickname") or "").strip()
-            if not (fn or ln) or not nick:
+            parsed = _casualty_to_row(c, team_map=team_map, people_lookup=people_lookup)
+            if parsed is None:
                 continue
-            canonical = f"{fn} {ln}".strip()
-            team_id = team_map.get(nick.lower())
-            person_id = (
-                people_lookup.get((canonical.lower(), nick.lower()))
-                or people_lookup.get((canonical.lower(), ""))
-            )
-            return_text = (c.get("expectedReturn") or "").strip()
-            ret_round = None
-            mr = _EXPECTED_RETURN_RE.search(return_text)
-            if mr:
-                ret_round = int(mr.group(1))
+            canonical = parsed["canonical"]
+            nick = parsed["team_nickname"]
+            team_id = parsed["team_id"]
+            person_id = parsed["person_id"]
+            return_text = parsed["expected_return_text"]
+            ret_round = parsed["expected_return_round"]
 
-            key_today = (canonical.lower(), nick.lower())
-            seen_keys_today.add(key_today)
+            seen_keys_today.add(parsed["key_today"])
 
             # Is there already an open injury for this (player, team)?
             existing = db.execute(
@@ -463,11 +526,11 @@ def populate_injuries(
                         "tid": team_id,
                         "pid": person_id,
                         "status": status,
-                        "body_part": c.get("injury"),
+                        "body_part": parsed["body_part"],
                         "desc": canonical,
                         "rr": ret_round,
                         "snap": snap_date,
-                        "url": c.get("url"),
+                        "url": parsed["url"],
                         "meta": json.dumps({
                             "expected_return_text": return_text,
                             "first_snapshot": snap_date.isoformat(),
