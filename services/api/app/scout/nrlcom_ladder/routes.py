@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from ...deps import get_db
@@ -13,6 +14,7 @@ from ...routers.admin import require_admin
 from ..common.archive import archive_response
 from ..common.pipeline_run import set_archive_detail, start_deterministic_run
 from .fetcher import NrlcomLadderFetchError, fetch_ladder
+from .models import NrlcomLadder
 
 logger = logging.getLogger(__name__)
 
@@ -53,11 +55,22 @@ def run_nrlcom_ladder(
             "teams": len(positions),
             "selected_round": round_for_path,
         })
+        # D8: strict-parse the archived response so upstream shape drift
+        # surfaces as a failed run. The raw payload is already in S3 above,
+        # so a validation failure never loses the capture.
+        NrlcomLadder.model_validate(data)
+        detail["validated"] = True
         logger.info("scout/nrlcom-ladder: comp=%s season=%s round=%s teams=%d",
                     competition, season, round_for_path, len(positions))
     except NrlcomLadderFetchError as e:
         run.fail(e, summary_text=f"Upstream fetch failed: {e}")
         raise HTTPException(status_code=502, detail=f"ladder fetch failed: {e}")
+    except ValidationError as e:
+        run.fail(
+            e,
+            summary_text=f"Ladder response failed strict validation (drift): {e}",
+        )
+        raise HTTPException(status_code=500, detail=f"nrl.com ladder drift: {e}")
     except Exception as e:
         run.fail(e, summary_text=f"Pipeline failed: {e}")
         raise
