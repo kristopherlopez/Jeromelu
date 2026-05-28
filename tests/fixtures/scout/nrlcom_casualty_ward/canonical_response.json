@@ -1,0 +1,2936 @@
+{
+  "casualties": [
+    {
+      "firstName": "Grant",
+      "lastName": "Anderson",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Anderson.png?center=0.5%2C0.5",
+      "injury": "Knee",
+      "teamNickname": "Broncos",
+      "theme": {
+        "key": "broncos",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202603200353",
+          "badge-light.png": "202603200353",
+          "badge-light.svg": "202603200353",
+          "badge.png": "202603200353",
+          "badge.svg": "202603200353",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202603200353",
+          "silhouette.svg": "202603200353",
+          "text.svg": "202603200353",
+          "badge-basic24-light.svg": "202603200353"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/broncos/grant-anderson/"
+    },
+    {
+      "firstName": "Payne",
+      "lastName": "Haas",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Haas.png?center=0.5%2C0.5",
+      "injury": "Knee",
+      "teamNickname": "Broncos",
+      "theme": {
+        "key": "broncos",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202603200353",
+          "badge-light.png": "202603200353",
+          "badge-light.svg": "202603200353",
+          "badge.png": "202603200353",
+          "badge.svg": "202603200353",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202603200353",
+          "silhouette.svg": "202603200353",
+          "text.svg": "202603200353",
+          "badge-basic24-light.svg": "202603200353"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/broncos/payne-haas/"
+    },
+    {
+      "firstName": "Blake",
+      "lastName": "Mozer",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Mozer.png?center=0.5%2C0.5",
+      "injury": "Jaw",
+      "teamNickname": "Broncos",
+      "theme": {
+        "key": "broncos",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202603200353",
+          "badge-light.png": "202603200353",
+          "badge-light.svg": "202603200353",
+          "badge.png": "202603200353",
+          "badge.svg": "202603200353",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202603200353",
+          "silhouette.svg": "202603200353",
+          "text.svg": "202603200353",
+          "badge-basic24-light.svg": "202603200353"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/broncos/blake-mozer/"
+    },
+    {
+      "firstName": "Brendan",
+      "lastName": "Piakura",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Piakura.png?center=0.5%2C0.5",
+      "injury": "Knee",
+      "teamNickname": "Broncos",
+      "theme": {
+        "key": "broncos",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202603200353",
+          "badge-light.png": "202603200353",
+          "badge-light.svg": "202603200353",
+          "badge.png": "202603200353",
+          "badge.svg": "202603200353",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202603200353",
+          "silhouette.svg": "202603200353",
+          "text.svg": "202603200353",
+          "badge-basic24-light.svg": "202603200353"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/broncos/brendan-piakura/"
+    },
+    {
+      "firstName": "Benjamin",
+      "lastName": "Te Kura",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Te%20Kura.png?center=0.5%2C0.5",
+      "injury": "Personal",
+      "teamNickname": "Broncos",
+      "theme": {
+        "key": "broncos",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202603200353",
+          "badge-light.png": "202603200353",
+          "badge-light.svg": "202603200353",
+          "badge.png": "202603200353",
+          "badge.svg": "202603200353",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202603200353",
+          "silhouette.svg": "202603200353",
+          "text.svg": "202603200353",
+          "badge-basic24-light.svg": "202603200353"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/broncos/benjamin-te-kura/"
+    },
+    {
+      "firstName": "Delouise",
+      "lastName": "Hoeter",
+      "expectedReturn": "Round 15",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Hoeter.png?center=0.5%2C0.5",
+      "injury": "Leg",
+      "teamNickname": "Broncos",
+      "theme": {
+        "key": "broncos",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202603200353",
+          "badge-light.png": "202603200353",
+          "badge-light.svg": "202603200353",
+          "badge.png": "202603200353",
+          "badge.svg": "202603200353",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202603200353",
+          "silhouette.svg": "202603200353",
+          "text.svg": "202603200353",
+          "badge-basic24-light.svg": "202603200353"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/broncos/delouise-hoeter/"
+    },
+    {
+      "firstName": "Corey",
+      "lastName": "Jensen",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Jensen.png?center=0.5%2C0.5",
+      "injury": "Lung",
+      "teamNickname": "Broncos",
+      "theme": {
+        "key": "broncos",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202603200353",
+          "badge-light.png": "202603200353",
+          "badge-light.svg": "202603200353",
+          "badge.png": "202603200353",
+          "badge.svg": "202603200353",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202603200353",
+          "silhouette.svg": "202603200353",
+          "text.svg": "202603200353",
+          "badge-basic24-light.svg": "202603200353"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/broncos/corey-jensen/"
+    },
+    {
+      "firstName": "Deine",
+      "lastName": "Mariner",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Mariner.png?center=0.5%2C0.5",
+      "injury": "Thigh",
+      "teamNickname": "Broncos",
+      "theme": {
+        "key": "broncos",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202603200353",
+          "badge-light.png": "202603200353",
+          "badge-light.svg": "202603200353",
+          "badge.png": "202603200353",
+          "badge.svg": "202603200353",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202603200353",
+          "silhouette.svg": "202603200353",
+          "text.svg": "202603200353",
+          "badge-basic24-light.svg": "202603200353"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/broncos/deine-mariner/"
+    },
+    {
+      "firstName": "Jordan",
+      "lastName": "Riki",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Riki.png?center=0.5%2C0.5",
+      "injury": "Foot",
+      "teamNickname": "Broncos",
+      "theme": {
+        "key": "broncos",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202603200353",
+          "badge-light.png": "202603200353",
+          "badge-light.svg": "202603200353",
+          "badge.png": "202603200353",
+          "badge.svg": "202603200353",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202603200353",
+          "silhouette.svg": "202603200353",
+          "text.svg": "202603200353",
+          "badge-basic24-light.svg": "202603200353"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/broncos/jordan-riki/"
+    },
+    {
+      "firstName": "Antonio",
+      "lastName": "Verhoeven",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Verhoeven%2CA%20Headshot%2007.png?center=0.5%2C0.5",
+      "injury": "Shoulder",
+      "teamNickname": "Broncos",
+      "theme": {
+        "key": "broncos",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202603200353",
+          "badge-light.png": "202603200353",
+          "badge-light.svg": "202603200353",
+          "badge.png": "202603200353",
+          "badge.svg": "202603200353",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202603200353",
+          "silhouette.svg": "202603200353",
+          "text.svg": "202603200353",
+          "badge-basic24-light.svg": "202603200353"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/broncos/antonio-verhoeven/"
+    },
+    {
+      "firstName": "Billy",
+      "lastName": "Walters",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500011/Walters.png?center=0.5%2C0.5",
+      "injury": "ACL",
+      "teamNickname": "Broncos",
+      "theme": {
+        "key": "broncos",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202603200353",
+          "badge-light.png": "202603200353",
+          "badge-light.svg": "202603200353",
+          "badge.png": "202603200353",
+          "badge.svg": "202603200353",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202603200353",
+          "silhouette.svg": "202603200353",
+          "text.svg": "202603200353",
+          "badge-basic24-light.svg": "202603200353"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/broncos/billy-walters/"
+    },
+    {
+      "firstName": "Connor",
+      "lastName": "Tracey",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500010/TRACEY%2CC_20251212_4147.png?center=0.5%2C0.5",
+      "injury": "Hamstring",
+      "teamNickname": "Bulldogs",
+      "theme": {
+        "key": "bulldogs",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202510310458",
+          "badge.png": "202510310458",
+          "badge.svg": "202510310458",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202510310458",
+          "silhouette.svg": "202510310458",
+          "text.svg": "202605110452",
+          "badge-light.svg": "202510310458",
+          "badge-light.png": "202510310458"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/bulldogs/connor-tracey/"
+    },
+    {
+      "firstName": "Jacob",
+      "lastName": "Preston",
+      "expectedReturn": "Round 19",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500010/PRESTON%2CJ_20251212_3787.png?center=0.5%2C0.5",
+      "injury": "Arm",
+      "teamNickname": "Bulldogs",
+      "theme": {
+        "key": "bulldogs",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202510310458",
+          "badge.png": "202510310458",
+          "badge.svg": "202510310458",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202510310458",
+          "silhouette.svg": "202510310458",
+          "text.svg": "202605110452",
+          "badge-light.svg": "202510310458",
+          "badge-light.png": "202510310458"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/bulldogs/jacob-preston/"
+    },
+    {
+      "firstName": "Viliame",
+      "lastName": "Kikau",
+      "expectedReturn": "Round 20",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500010/KIKAU%2CV_20251212_3909.png?center=0.5%2C0.5",
+      "injury": "Pectoral",
+      "teamNickname": "Bulldogs",
+      "theme": {
+        "key": "bulldogs",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202510310458",
+          "badge.png": "202510310458",
+          "badge.svg": "202510310458",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202510310458",
+          "silhouette.svg": "202510310458",
+          "text.svg": "202605110452",
+          "badge-light.svg": "202510310458",
+          "badge-light.png": "202510310458"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/bulldogs/viliame-kikau/"
+    },
+    {
+      "firstName": "Samuel",
+      "lastName": "Hughes",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500010/HUGHES%2CS_20251212_3010.png?center=0.5%2C0.5",
+      "injury": "Neck",
+      "teamNickname": "Bulldogs",
+      "theme": {
+        "key": "bulldogs",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202510310458",
+          "badge.png": "202510310458",
+          "badge.svg": "202510310458",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202510310458",
+          "silhouette.svg": "202510310458",
+          "text.svg": "202605110452",
+          "badge-light.svg": "202510310458",
+          "badge-light.png": "202510310458"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/bulldogs/samuel-hughes/"
+    },
+    {
+      "firstName": "Jake",
+      "lastName": "Turpin",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500010/TURPIN%2CJ_20251212_3497.png?center=0.5%2C0.5",
+      "injury": "Biceps",
+      "teamNickname": "Bulldogs",
+      "theme": {
+        "key": "bulldogs",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202510310458",
+          "badge.png": "202510310458",
+          "badge.svg": "202510310458",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202510310458",
+          "silhouette.svg": "202510310458",
+          "text.svg": "202605110452",
+          "badge-light.svg": "202510310458",
+          "badge-light.png": "202510310458"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/bulldogs/jake-turpin/"
+    },
+    {
+      "firstName": "Mitchell",
+      "lastName": "Woods",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500010/WOODS%2CM_20251212_4420.png?center=0.5%2C0.5",
+      "injury": "Hamstring",
+      "teamNickname": "Bulldogs",
+      "theme": {
+        "key": "bulldogs",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202510310458",
+          "badge.png": "202510310458",
+          "badge.svg": "202510310458",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202510310458",
+          "silhouette.svg": "202510310458",
+          "text.svg": "202605110452",
+          "badge-light.svg": "202510310458",
+          "badge-light.png": "202510310458"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/bulldogs/mitchell-woods/"
+    },
+    {
+      "firstName": "Jeremiah",
+      "lastName": "Nanai",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500012/Nanai%2CJ%20260109_CD_1685.JPG.png?center=0.5%2C0.5",
+      "injury": "Shoulder",
+      "teamNickname": "Cowboys",
+      "theme": {
+        "key": "cowboys",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/cowboys/ieremia-nanai/"
+    },
+    {
+      "firstName": "Murray",
+      "lastName": "Taulagi",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500012/Taulagi%2CM%20260109_CD_0911.JPG.png?center=0.5%2C0.5",
+      "injury": "Concussion",
+      "teamNickname": "Cowboys",
+      "theme": {
+        "key": "cowboys",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/cowboys/murray-taulagi/"
+    },
+    {
+      "firstName": "Braidon",
+      "lastName": "Burns",
+      "expectedReturn": "Round 14",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500012/Burns%2CB%20260109_CD_1790.JPG.png?center=0.5%2C0.5",
+      "injury": "Hamstring",
+      "teamNickname": "Cowboys",
+      "theme": {
+        "key": "cowboys",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/cowboys/braidon-burns/"
+    },
+    {
+      "firstName": "Soni",
+      "lastName": "Luke",
+      "expectedReturn": "Round 14",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500012/Luke_Soni-720pxH.png?center=0.5%2C0.5",
+      "injury": "Knee",
+      "teamNickname": "Cowboys",
+      "theme": {
+        "key": "cowboys",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/cowboys/soni-luke/"
+    },
+    {
+      "firstName": "Tom",
+      "lastName": "Dearden",
+      "expectedReturn": "Round 16",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500012/Dearden%2CT%20260109_CD_0477.JPG.png?center=0.5%2C0.5",
+      "injury": "Ankle",
+      "teamNickname": "Cowboys",
+      "theme": {
+        "key": "cowboys",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/cowboys/tom-dearden/"
+    },
+    {
+      "firstName": "Jake",
+      "lastName": "Averillo",
+      "expectedReturn": "Round 15",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500723/Bodyshot-Averillo.png?center=0.5%2C0.5",
+      "injury": "Hand",
+      "teamNickname": "Dolphins",
+      "theme": {
+        "key": "dolphins",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/dolphins/jake-averillo/"
+    },
+    {
+      "firstName": "Herbie",
+      "lastName": "Farnworth",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500723/Bodyshot-Farnworth.png?center=0.5%2C0.5",
+      "injury": "Hamstring",
+      "teamNickname": "Dolphins",
+      "theme": {
+        "key": "dolphins",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/dolphins/herbie-farnworth/"
+    },
+    {
+      "firstName": "Kodi",
+      "lastName": "Nikorima",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500723/Bodyshot-Nikorima.png?center=0.5%2C0.5",
+      "injury": "Hamstring",
+      "teamNickname": "Dolphins",
+      "theme": {
+        "key": "dolphins",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/dolphins/kodi-nikorima/"
+    },
+    {
+      "firstName": "Mathew",
+      "lastName": "Feagai",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500022/Mathew%20Feagai%20_260119_Dragons_MK771.png?center=0.5%2C0.5",
+      "injury": "Back",
+      "teamNickname": "Dragons",
+      "theme": {
+        "key": "dragons",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202602250432",
+          "badge.svg": "202602250432",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452",
+          "badge-light.svg": "202602250432",
+          "badge-light.png": "202602250432"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/dragons/mathew-feagai/"
+    },
+    {
+      "firstName": "Jacob",
+      "lastName": "Liddle",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500022/Jacob%20Liddle%20_260119_Dragons_MK1648.png?center=0.5%2C0.5",
+      "injury": "Hamstring",
+      "teamNickname": "Dragons",
+      "theme": {
+        "key": "dragons",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202602250432",
+          "badge.svg": "202602250432",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452",
+          "badge-light.svg": "202602250432",
+          "badge-light.png": "202602250432"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/dragons/jacob-liddle/"
+    },
+    {
+      "firstName": "Moses",
+      "lastName": "Suli",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500022/Moses%20Suli%20_260119_Dragons_MK561.png?center=0.5%2C0.5",
+      "injury": "Back",
+      "teamNickname": "Dragons",
+      "theme": {
+        "key": "dragons",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202602250432",
+          "badge.svg": "202602250432",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452",
+          "badge-light.svg": "202602250432",
+          "badge-light.png": "202602250432"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/dragons/moses-suli/"
+    },
+    {
+      "firstName": "Hayden",
+      "lastName": "Buchanan",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500022/Hayden%20Buchanan%20_260119_Dragons_MK317.png?center=0.5%2C0.5",
+      "injury": "Shoulder",
+      "teamNickname": "Dragons",
+      "theme": {
+        "key": "dragons",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202602250432",
+          "badge.svg": "202602250432",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452",
+          "badge-light.svg": "202602250432",
+          "badge-light.png": "202602250432"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/dragons/hayden-buchanan/"
+    },
+    {
+      "firstName": "David",
+      "lastName": "Fale",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500022/David%20Fale%20_260119_Dragons_MK873.png?center=0.5%2C0.5",
+      "injury": "Hamstring",
+      "teamNickname": "Dragons",
+      "theme": {
+        "key": "dragons",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202602250432",
+          "badge.svg": "202602250432",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452",
+          "badge-light.svg": "202602250432",
+          "badge-light.png": "202602250432"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/dragons/david-fale/"
+    },
+    {
+      "firstName": "Kade",
+      "lastName": "Reed",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500022/Kade%20Reed%20_260119_Dragons_MK193.png?center=0.5%2C0.5",
+      "injury": "Finger",
+      "teamNickname": "Dragons",
+      "theme": {
+        "key": "dragons",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202602250432",
+          "badge.svg": "202602250432",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452",
+          "badge-light.svg": "202602250432",
+          "badge-light.png": "202602250432"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/dragons/kade-reed/"
+    },
+    {
+      "firstName": "Jaydn",
+      "lastName": "Su'A",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500022/Jaydn%20Su%27A%20_260119_Dragons_MK1187.png?center=0.5%2C0.5",
+      "injury": "Calf",
+      "teamNickname": "Dragons",
+      "theme": {
+        "key": "dragons",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202602250432",
+          "badge.svg": "202602250432",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452",
+          "badge-light.svg": "202602250432",
+          "badge-light.png": "202602250432"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/dragons/jaydn-sua/"
+    },
+    {
+      "firstName": "Christian",
+      "lastName": "Tuipulotu",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500022/Christian%20Tuipulotu%20_260119_Dragons_MK1127.png?center=0.5%2C0.5",
+      "injury": "Hamstring",
+      "teamNickname": "Dragons",
+      "theme": {
+        "key": "dragons",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202602250432",
+          "badge.svg": "202602250432",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452",
+          "badge-light.svg": "202602250432",
+          "badge-light.png": "202602250432"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/dragons/christian-tuipulotu/"
+    },
+    {
+      "firstName": "Isaiah",
+      "lastName": "Iongi",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500031/IONGI%2CI_20251211_2189.png?center=0.5%2C0.5",
+      "injury": "Ankle",
+      "teamNickname": "Eels",
+      "theme": {
+        "key": "eels",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/eels/isaiah-iongi/"
+    },
+    {
+      "firstName": "Kitione",
+      "lastName": "Kautoga",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500031/KAUTOGA%2CK_20251211_2279.png?center=0.5%2C0.5",
+      "injury": "Knee",
+      "teamNickname": "Eels",
+      "theme": {
+        "key": "eels",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/eels/kitione-kautoga/"
+    },
+    {
+      "firstName": "Sam",
+      "lastName": "Tuivaiti",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500031/TUIVAITI%2CS_20251211_1201-COPY.png?center=0.5%2C0.5",
+      "injury": "Shoulder",
+      "teamNickname": "Eels",
+      "theme": {
+        "key": "eels",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/eels/sam-tuivaiti/"
+    },
+    {
+      "firstName": "Apa",
+      "lastName": "Twidle",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500031/TWIDLE%2CA_20251211_2573.png?center=0.5%2C0.5",
+      "injury": "Shoulder",
+      "teamNickname": "Eels",
+      "theme": {
+        "key": "eels",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/eels/apa-twidle/"
+    },
+    {
+      "firstName": "Junior",
+      "lastName": "Paulo",
+      "expectedReturn": "Round 21",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500031/PAULO%2CJ_20251211_1011.png?center=0.5%2C0.5",
+      "injury": "Knee",
+      "teamNickname": "Eels",
+      "theme": {
+        "key": "eels",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/eels/junior-paulo/"
+    },
+    {
+      "firstName": "Will",
+      "lastName": "Penisini",
+      "expectedReturn": "Round 21",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500031/PENISINI%2CW_20251211_1511.png?center=0.5%2C0.5",
+      "injury": "Groin",
+      "teamNickname": "Eels",
+      "theme": {
+        "key": "eels",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/eels/will-penisini/"
+    },
+    {
+      "firstName": "Jonah",
+      "lastName": "Pezet",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500031/PEZET%2CJ_20251211_1854.png?center=0.5%2C0.5",
+      "injury": "Hamstring",
+      "teamNickname": "Eels",
+      "theme": {
+        "key": "eels",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/eels/jonah-pezet/"
+    },
+    {
+      "firstName": "Bailey",
+      "lastName": "Simonsson",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500031/SIMONSSON%2CB_20251211_1451.png?center=0.5%2C0.5",
+      "injury": "Ankle",
+      "teamNickname": "Eels",
+      "theme": {
+        "key": "eels",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/eels/bailey-simonsson/"
+    },
+    {
+      "firstName": "Matt",
+      "lastName": "Doorey",
+      "expectedReturn": "Next Season",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500031/DOOREY%2CM_20251211_1364.png?center=0.5%2C0.5",
+      "injury": "Knee",
+      "teamNickname": "Eels",
+      "theme": {
+        "key": "eels",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/eels/matt-doorey/"
+    },
+    {
+      "firstName": "J'maine",
+      "lastName": "Hopgood",
+      "expectedReturn": "Next Season",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500031/HOPGOOD%2CJ_20251211_1596.png?center=0.5%2C0.5",
+      "injury": "ACL",
+      "teamNickname": "Eels",
+      "theme": {
+        "key": "eels",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/eels/jmaine-hopgood/"
+    },
+    {
+      "firstName": "Bradman",
+      "lastName": "Best",
+      "expectedReturn": "Round 15",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500003/Bradman%20Best%20_260129_Knights_MK222.png?center=0.5%2C0.5",
+      "injury": "Calf",
+      "teamNickname": "Knights",
+      "theme": {
+        "key": "knights",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/knights/bradman-best/"
+    },
+    {
+      "firstName": "Liam",
+      "lastName": "Martin",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500014/Liam%20Martin%20_260123_Panthers_MK1012.png?center=0.5%2C0.5",
+      "injury": "Knee",
+      "teamNickname": "Panthers",
+      "theme": {
+        "key": "panthers",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/panthers/liam-martin/"
+    },
+    {
+      "firstName": "Mitch",
+      "lastName": "Kenny",
+      "expectedReturn": "Round 17",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500014/Mitch%20Kenny%20_260123_Panthers_MK239.png?center=0.5%2C0.5",
+      "injury": "Leg",
+      "teamNickname": "Panthers",
+      "theme": {
+        "key": "panthers",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/panthers/mitchell-kenny/"
+    },
+    {
+      "firstName": "Campbell",
+      "lastName": "Graham",
+      "expectedReturn": "Round 14",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500005/Campbell%20Graham_260113_Rabbitohs_MK0508.png?center=0.5%2C0.5",
+      "injury": "Calf",
+      "teamNickname": "Rabbitohs",
+      "theme": {
+        "key": "rabbitohs",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/south-sydney-rabbitohs/campbell--graham/"
+    },
+    {
+      "firstName": "Jack",
+      "lastName": "Wighton",
+      "expectedReturn": "Round 18",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500005/Jack%20Wighton_260115_Rabbitohs302.png?center=0.5%2C0.5",
+      "injury": "Arm",
+      "teamNickname": "Rabbitohs",
+      "theme": {
+        "key": "rabbitohs",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/south-sydney-rabbitohs/jack-wighton/"
+    },
+    {
+      "firstName": "Latrell",
+      "lastName": "Mitchell",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500005/Latrell%20Mitchell_260113_Rabbitohs_MK0323.png?center=0.5%2C0.5",
+      "injury": "Back",
+      "teamNickname": "Rabbitohs",
+      "theme": {
+        "key": "rabbitohs",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/south-sydney-rabbitohs/latrell-mitchell/"
+    },
+    {
+      "firstName": "Brandon",
+      "lastName": "Smith",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500005/Brandon%20Smith_260113_Rabbitohs_MK1562.png?center=0.5%2C0.5",
+      "injury": "Calf",
+      "teamNickname": "Rabbitohs",
+      "theme": {
+        "key": "rabbitohs",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/south-sydney-rabbitohs/brandon-smith/"
+    },
+    {
+      "firstName": "Isaiah",
+      "lastName": "Tass",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500005/Isaiah%20Tass_260115_Rabbitohs528.png?center=0.5%2C0.5",
+      "injury": "ACL",
+      "teamNickname": "Rabbitohs",
+      "theme": {
+        "key": "rabbitohs",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/south-sydney-rabbitohs/isaiah-tass/"
+    },
+    {
+      "firstName": "Sebastian",
+      "lastName": "Kris",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500013/Sebastian%20Kris%20_260121_Raiders_MK356.png?center=0.5%2C0.5",
+      "injury": "Quad",
+      "teamNickname": "Raiders",
+      "theme": {
+        "key": "raiders",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/raiders/sebastian-kris/"
+    },
+    {
+      "firstName": "Jayden",
+      "lastName": "Brailey",
+      "expectedReturn": "Round 14",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500013/Jayden%20Brailey%20_260121_Raiders_MK723.png?center=0.5%2C0.5",
+      "injury": "Concussion",
+      "teamNickname": "Raiders",
+      "theme": {
+        "key": "raiders",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/raiders/jayden-brailey/"
+    },
+    {
+      "firstName": "Josh",
+      "lastName": "Papalii",
+      "expectedReturn": "Round 14",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500013/Josh%20Papalii%20_260121_Raiders_MK1296.png?center=0.5%2C0.5",
+      "injury": "Calf",
+      "teamNickname": "Raiders",
+      "theme": {
+        "key": "raiders",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/raiders/josh-papalii/"
+    },
+    {
+      "firstName": "Joe",
+      "lastName": "Roddy",
+      "expectedReturn": "Round 14",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500013/Joe%20Roddy%20_260121_Raiders_MK1094.png?center=0.5%2C0.5",
+      "injury": "Hand",
+      "teamNickname": "Raiders",
+      "theme": {
+        "key": "raiders",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/raiders/joe-roddy/"
+    },
+    {
+      "firstName": "Simi",
+      "lastName": "Sasagi",
+      "expectedReturn": "Round 16",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500013/Simi%20Sasagi%20_260121_Raiders_MK803.png?center=0.5%2C0.5",
+      "injury": "Shoulder",
+      "teamNickname": "Raiders",
+      "theme": {
+        "key": "raiders",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/raiders/simi-sasagi/"
+    },
+    {
+      "firstName": "Noah",
+      "lastName": "Martin",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500013/Noah%20Martin%20_260121_Raiders_MK1680.png?center=0.5%2C0.5",
+      "injury": "Ankle",
+      "teamNickname": "Raiders",
+      "theme": {
+        "key": "raiders",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/raiders/noah-martin/"
+    },
+    {
+      "firstName": "Cody",
+      "lastName": "Ramsey",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500001/Cody%20Ramsey%20260203_Roosters230.png?center=0.5%2C0.5",
+      "injury": "Concussion",
+      "teamNickname": "Roosters",
+      "theme": {
+        "key": "roosters",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/roosters/cody-ramsey/"
+    },
+    {
+      "firstName": "Billy",
+      "lastName": "Smith",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500001/Billy%20Smith%20260203_Roosters148.png?center=0.5%2C0.5",
+      "injury": "Knee",
+      "teamNickname": "Roosters",
+      "theme": {
+        "key": "roosters",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/roosters/billy-smith/"
+    },
+    {
+      "firstName": "Mark",
+      "lastName": "Nawaqanitawase",
+      "expectedReturn": "Round 15",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500001/Mark%20Nawaqanitawase%20260203_Roosters96.png?center=0.5%2C0.5",
+      "injury": "Ankle",
+      "teamNickname": "Roosters",
+      "theme": {
+        "key": "roosters",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/roosters/mark-nawaqanitawase/"
+    },
+    {
+      "firstName": "Tommy",
+      "lastName": "Talau",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500001/Tommy%20Talau%20260203_Roosters55.png?center=0.5%2C0.5",
+      "injury": "Calf",
+      "teamNickname": "Roosters",
+      "theme": {
+        "key": "roosters",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/roosters/tommy-talau/"
+    },
+    {
+      "firstName": "Daniel",
+      "lastName": "Tupou",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500001/Daniel%20Tupou%20260203_Roosters1405.png?center=0.5%2C0.5",
+      "injury": "Calf",
+      "teamNickname": "Roosters",
+      "theme": {
+        "key": "roosters",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/roosters/daniel-tupou/"
+    },
+    {
+      "firstName": "Blake",
+      "lastName": "Steep",
+      "expectedReturn": "Next Season",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500001/Blake%20Steep%2018648.png?center=0.5%2C0.5",
+      "injury": "ACL",
+      "teamNickname": "Roosters",
+      "theme": {
+        "key": "roosters",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/roosters/blake-steep/"
+    },
+    {
+      "firstName": "Lehi",
+      "lastName": "Hopoate",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500002/Lehi%20Hopoate%20_260128_SeaEgales_MK395.png?center=0.5%2C0.5",
+      "injury": "Suspension",
+      "teamNickname": "Sea Eagles",
+      "theme": {
+        "key": "sea-eagles",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202510300111",
+          "badge.png": "202605110452",
+          "badge.svg": "202510300111",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/sea-eagles/lehi-hopoate/"
+    },
+    {
+      "firstName": "Ben",
+      "lastName": "Trbojevic",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500002/Ben%20Trbojevic%20_260128_SeaEgales_MK1909.png?center=0.5%2C0.5",
+      "injury": "Head knock",
+      "teamNickname": "Sea Eagles",
+      "theme": {
+        "key": "sea-eagles",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202510300111",
+          "badge.png": "202605110452",
+          "badge.svg": "202510300111",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/sea-eagles/ben-trbojevic/"
+    },
+    {
+      "firstName": "Tom",
+      "lastName": "Trbojevic",
+      "expectedReturn": "Round 15",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500002/Tom%20Trbojevic_260128_SeaEgales_MK1441.png?center=0.5%2C0.5",
+      "injury": "Hamstring",
+      "teamNickname": "Sea Eagles",
+      "theme": {
+        "key": "sea-eagles",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202510300111",
+          "badge.png": "202605110452",
+          "badge.svg": "202510300111",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/sea-eagles/tom-trbojevic/"
+    },
+    {
+      "firstName": "Corey",
+      "lastName": "Waddell",
+      "expectedReturn": "Round 21",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500002/Corey%20Waddell%20_260128_SeaEgales_MK2137.png?center=0.5%2C0.5",
+      "injury": "Pectoral",
+      "teamNickname": "Sea Eagles",
+      "theme": {
+        "key": "sea-eagles",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202510300111",
+          "badge.png": "202605110452",
+          "badge.svg": "202510300111",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/sea-eagles/corey-waddell/"
+    },
+    {
+      "firstName": "Caleb",
+      "lastName": "Navale",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500002/Caleb%20Navale%20_260128_SeaEgales_MK1316.png?center=0.5%2C0.5",
+      "injury": "ACL",
+      "teamNickname": "Sea Eagles",
+      "theme": {
+        "key": "sea-eagles",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202510300111",
+          "badge.png": "202605110452",
+          "badge.svg": "202510300111",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/sea-eagles/caleb-navale/"
+    },
+    {
+      "firstName": "Siosiua",
+      "lastName": "Taukeiaho",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500002/Siua%20Taukeiaho%20_260128_SeaEgales_MK1382.png?center=0.5%2C0.5",
+      "injury": "Leg",
+      "teamNickname": "Sea Eagles",
+      "theme": {
+        "key": "sea-eagles",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202510300111",
+          "badge.png": "202605110452",
+          "badge.svg": "202510300111",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/sea-eagles/siosiua-taukeiaho/"
+    },
+    {
+      "firstName": "Cameron",
+      "lastName": "McInnes",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500028/Cam%20Mcinnes_260114_Sharks_MK665.png?center=0.5%2C0.5",
+      "injury": "Ankle",
+      "teamNickname": "Sharks",
+      "theme": {
+        "key": "sharks",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/sharks/cameron-mcinnes/"
+    },
+    {
+      "firstName": "Sione",
+      "lastName": "Katoa",
+      "expectedReturn": "Round 14",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2025/500028/Katoa%2CS%20250117_BC_2746-COPY.png?center=0.5%2C0.5",
+      "injury": "Ankle",
+      "teamNickname": "Sharks",
+      "theme": {
+        "key": "sharks",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/sharks/sione-katoa/"
+    },
+    {
+      "firstName": "Nicholas",
+      "lastName": "Hynes",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500028/Nicho%20Hynes_260114_Sharks_MK1633.png?center=0.5%2C0.5",
+      "injury": "Calf",
+      "teamNickname": "Sharks",
+      "theme": {
+        "key": "sharks",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/sharks/nicholas-hynes/"
+    },
+    {
+      "firstName": "Liam",
+      "lastName": "Ison",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?https://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500028/Liam%20Ison_260114_Sharks__260114_Sharks003.png?center=0.5%2C0.5",
+      "injury": "Knee",
+      "teamNickname": "Sharks",
+      "theme": {
+        "key": "sharks",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/sharks/liam-ison/"
+    },
+    {
+      "firstName": "Shawn",
+      "lastName": "Blore",
+      "expectedReturn": "Round 14",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500021/Blore%2CS_260204_AR_26.png?center=0.5%2C0.5",
+      "injury": "Concussion",
+      "teamNickname": "Storm",
+      "theme": {
+        "key": "storm",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/storm/shawn-blore/"
+    },
+    {
+      "firstName": "Xavier",
+      "lastName": "Coates",
+      "expectedReturn": "Round 14",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500021/Coates%2CX_260204_AR_2.png?center=0.5%2C0.5",
+      "injury": "Achilles",
+      "teamNickname": "Storm",
+      "theme": {
+        "key": "storm",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/storm/xavier-coates/"
+    },
+    {
+      "firstName": "Tyran",
+      "lastName": "Wishart",
+      "expectedReturn": "Round 16",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500021/Wishart%2CT__260204_AR_3.png?center=0.5%2C0.5",
+      "injury": "Ankle",
+      "teamNickname": "Storm",
+      "theme": {
+        "key": "storm",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/storm/tyran-wishart/"
+    },
+    {
+      "firstName": "Hugo",
+      "lastName": "Peel",
+      "expectedReturn": "Round 17",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500021/Peel%2CH_260204_AR_3.png?center=0.5%2C0.5",
+      "injury": "Knee",
+      "teamNickname": "Storm",
+      "theme": {
+        "key": "storm",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/storm/hugo-peel/"
+    },
+    {
+      "firstName": "Marion",
+      "lastName": "Seve",
+      "expectedReturn": "Round 17",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500021/Seve%2CM_260204_AR_26.png?center=0.5%2C0.5",
+      "injury": "Triceps",
+      "teamNickname": "Storm",
+      "theme": {
+        "key": "storm",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/storm/marion-seve/"
+    },
+    {
+      "firstName": "Tui",
+      "lastName": "Kamikamica",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500021/Kamikamica%2CT_260204_AR_3.png?center=0.5%2C0.5",
+      "injury": "Medical Episode",
+      "teamNickname": "Storm",
+      "theme": {
+        "key": "storm",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/storm/tui-kamikamica/"
+    },
+    {
+      "firstName": "Eliesa",
+      "lastName": "Katoa",
+      "expectedReturn": "Indefinite",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500021/Katoa%2CE_260204_AR_8.png?center=0.5%2C0.5",
+      "injury": "Medical Episode",
+      "teamNickname": "Storm",
+      "theme": {
+        "key": "storm",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/storm/eliesa-katoa/"
+    },
+    {
+      "firstName": "Siale",
+      "lastName": "Faeamani",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500004/FAEAMANI%2C%20Siale-%20Bodyshot.png?center=0.5%2C0.5",
+      "injury": "Knee",
+      "teamNickname": "Titans",
+      "theme": {
+        "key": "titans",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/titans/sialetili-faeamani/"
+    },
+    {
+      "firstName": "Oliver",
+      "lastName": "Pascoe",
+      "expectedReturn": "Round 14",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500004/PASCOE%2C%20Oliver-%20Bodyshot.png?center=0.5%2C0.5",
+      "injury": "Head knock",
+      "teamNickname": "Titans",
+      "theme": {
+        "key": "titans",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/titans/oliver-pascoe/"
+    },
+    {
+      "firstName": "Brock",
+      "lastName": "Gray",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500004/GRAY%2C%20Brock-%20Bodyshot.png?center=0.5%2C0.5",
+      "injury": "ACL",
+      "teamNickname": "Titans",
+      "theme": {
+        "key": "titans",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/titans/brock-gray/"
+    },
+    {
+      "firstName": "Tukimihia",
+      "lastName": "Simpkins",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500004/SIMPKINS%2C%20Tukimihia-%20Bodyshot.png?center=0.5%2C0.5",
+      "injury": "Knee",
+      "teamNickname": "Titans",
+      "theme": {
+        "key": "titans",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/titans/tukimihia-simpkins/"
+    },
+    {
+      "firstName": "Jaimin",
+      "lastName": "Jolliffe",
+      "expectedReturn": "Next Season",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500004/JOLLIFFE%2C%20Jaimin-%20Bodyshot.png?center=0.5%2C0.5",
+      "injury": "Knee",
+      "teamNickname": "Titans",
+      "theme": {
+        "key": "titans",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/titans/jaimin-jolliffe/"
+    },
+    {
+      "firstName": "Rocco",
+      "lastName": "Berry",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500032/Rocco%20Berry-003.png?center=0.5%2C0.5",
+      "injury": "Shoulder",
+      "teamNickname": "Warriors",
+      "theme": {
+        "key": "warriors",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/warriors/rocco-berry/"
+    },
+    {
+      "firstName": "Eddie",
+      "lastName": "Ieremia-Toeava",
+      "expectedReturn": "Round 14",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500032/Eddie%20Ieremia-Toeava_003.png?center=0.5%2C0.5",
+      "injury": "Head knock",
+      "teamNickname": "Warriors",
+      "theme": {
+        "key": "warriors",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/warriors/eddie-ieremia-toeava/"
+    },
+    {
+      "firstName": "Charnze",
+      "lastName": "Nicoll-Klokstad",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500032/Charnze%20Nicoll-Klokstad_003.png?center=0.5%2C0.5",
+      "injury": "Neck",
+      "teamNickname": "Warriors",
+      "theme": {
+        "key": "warriors",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/warriors/charnze-nicoll-klokstad/"
+    },
+    {
+      "firstName": "Tanah",
+      "lastName": "Boyd",
+      "expectedReturn": "Next Season",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500032/Tanah%20Boyd-W-003.png?center=0.5%2C0.5",
+      "injury": "ACL",
+      "teamNickname": "Warriors",
+      "theme": {
+        "key": "warriors",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/warriors/tanah-boyd/"
+    },
+    {
+      "firstName": "Roger",
+      "lastName": "Tuivasa-Sheck",
+      "expectedReturn": "Next Season",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500032/Roger%20Tuivasa-Sheck_005.png?center=0.5%2C0.5",
+      "injury": "Knee",
+      "teamNickname": "Warriors",
+      "theme": {
+        "key": "warriors",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/warriors/roger-tuivasa-sheck/"
+    },
+    {
+      "firstName": "Jahream",
+      "lastName": "Bula",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500023/Jahream%20Bula%20260106_MK1483.png?center=0.5%2C0.5",
+      "injury": "Shoulder",
+      "teamNickname": "Wests Tigers",
+      "theme": {
+        "key": "wests-tigers",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/wests-tigers/jahream-bula/"
+    },
+    {
+      "firstName": "Apisai",
+      "lastName": "Koroisau",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500023/Api%20Koroisau%20260106_MK1011.png?center=0.5%2C0.5",
+      "injury": "Suspension",
+      "teamNickname": "Wests Tigers",
+      "theme": {
+        "key": "wests-tigers",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/wests-tigers/apisai-koroisau/"
+    },
+    {
+      "firstName": "Heamasi",
+      "lastName": "Makasini",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500023/Heamasi%20Makasini%20260106_MK1877.png?center=0.5%2C0.5",
+      "injury": "Foot",
+      "teamNickname": "Wests Tigers",
+      "theme": {
+        "key": "wests-tigers",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/wests-tigers/heamasi-makasini/"
+    },
+    {
+      "firstName": "Alex",
+      "lastName": "Twal",
+      "expectedReturn": "Round 13",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500023/Alex%20Twal%20260106_MK776-21.png?center=0.5%2C0.5",
+      "injury": "Knee",
+      "teamNickname": "Wests Tigers",
+      "theme": {
+        "key": "wests-tigers",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/wests-tigers/alex-twal/"
+    },
+    {
+      "firstName": "Patrick",
+      "lastName": "Herbert",
+      "expectedReturn": "Round 15",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500023/Patrick%20Herbert%2014760.png?center=0.5%2C0.5",
+      "injury": "Suspension",
+      "teamNickname": "Wests Tigers",
+      "theme": {
+        "key": "wests-tigers",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/wests-tigers/patrick-herbert/"
+    },
+    {
+      "firstName": "Adam",
+      "lastName": "Doueihi",
+      "expectedReturn": "Round 16",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500023/Adam%20Doueihi%20260106_MK365.png?center=0.5%2C0.5",
+      "injury": "Shoulder",
+      "teamNickname": "Wests Tigers",
+      "theme": {
+        "key": "wests-tigers",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/wests-tigers/adam-doueihi/"
+    },
+    {
+      "firstName": "Taylan",
+      "lastName": "May",
+      "expectedReturn": "Round 17",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500023/Taylan%20May%20260106_MK1189.png?center=0.5%2C0.5",
+      "injury": "Shoulder",
+      "teamNickname": "Wests Tigers",
+      "theme": {
+        "key": "wests-tigers",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/wests-tigers/taylan-may/"
+    },
+    {
+      "firstName": "Samuela",
+      "lastName": "Fainu",
+      "expectedReturn": "Round 22",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500023/Samuela%20Fainu%20260106_MK2345.png?center=0.5%2C0.5",
+      "injury": "Foot",
+      "teamNickname": "Wests Tigers",
+      "theme": {
+        "key": "wests-tigers",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/wests-tigers/samuela-fainu/"
+    },
+    {
+      "firstName": "Jock",
+      "lastName": "Madden",
+      "expectedReturn": "TBC",
+      "imageUrl": "/remote.axd?http://rugbyimages.statsperform.com/Player%20Bodyshots/111/2026/500023/Jock%20Madden%20260106_MK440.png?center=0.5%2C0.5",
+      "injury": "Hamstring",
+      "teamNickname": "Wests Tigers",
+      "theme": {
+        "key": "wests-tigers",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "url": "https://www.nrl.com/players/nrl-premiership/wests-tigers/jock-madden/"
+    }
+  ],
+  "filterCompetitions": [
+    {
+      "theme": {
+        "key": "nrl-premiership",
+        "logos": {
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452"
+        }
+      },
+      "text": "Telstra Premiership",
+      "value": 111
+    },
+    {
+      "theme": {
+        "key": "nrl-womens-premiership",
+        "logos": {
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452"
+        }
+      },
+      "text": "Telstra Women's Premiership",
+      "value": 161
+    }
+  ],
+  "filterExpectedReturns": [
+    {
+      "text": "All Expected Returns",
+      "value": "0"
+    },
+    {
+      "text": "Round 13",
+      "value": "round-13"
+    },
+    {
+      "text": "Round 14",
+      "value": "round-14"
+    },
+    {
+      "text": "Round 15",
+      "value": "round-15"
+    },
+    {
+      "text": "Round 16",
+      "value": "round-16"
+    },
+    {
+      "text": "Round 17",
+      "value": "round-17"
+    },
+    {
+      "text": "Round 18",
+      "value": "round-18"
+    },
+    {
+      "text": "Round 19",
+      "value": "round-19"
+    },
+    {
+      "text": "Round 20",
+      "value": "round-20"
+    },
+    {
+      "text": "Round 21",
+      "value": "round-21"
+    },
+    {
+      "text": "Round 22",
+      "value": "round-22"
+    },
+    {
+      "text": "Round 23",
+      "value": "round-23"
+    },
+    {
+      "text": "Round 24",
+      "value": "round-24"
+    },
+    {
+      "text": "Round 25",
+      "value": "round-25"
+    },
+    {
+      "text": "Round 26",
+      "value": "round-26"
+    },
+    {
+      "text": "Round 27",
+      "value": "round-27"
+    },
+    {
+      "text": "TBC",
+      "value": "tbc"
+    },
+    {
+      "text": "Trials",
+      "value": "trials"
+    },
+    {
+      "text": "Next Season",
+      "value": "next-season"
+    },
+    {
+      "text": "Indefinite",
+      "value": "indefinite"
+    },
+    {
+      "text": "Finals",
+      "value": "finals"
+    },
+    {
+      "text": "Pre-Season Challenge",
+      "value": "pre-season-challenge"
+    },
+    {
+      "text": "Pre-season Training",
+      "value": "pre-season-training"
+    },
+    {
+      "text": "Pacific Championships",
+      "value": "pacific-championships"
+    },
+    {
+      "text": "Finals Week 3",
+      "value": "finals-week-3"
+    },
+    {
+      "text": "Grand Final",
+      "value": "grand-final"
+    }
+  ],
+  "filterTeams": [
+    {
+      "text": "All Teams",
+      "value": 0
+    },
+    {
+      "theme": {
+        "key": "broncos",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202603200353",
+          "badge-light.png": "202603200353",
+          "badge-light.svg": "202603200353",
+          "badge.png": "202603200353",
+          "badge.svg": "202603200353",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202603200353",
+          "silhouette.svg": "202603200353",
+          "text.svg": "202603200353",
+          "badge-basic24-light.svg": "202603200353"
+        }
+      },
+      "text": "Broncos",
+      "value": 500011
+    },
+    {
+      "theme": {
+        "key": "bulldogs",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202510310458",
+          "badge.png": "202510310458",
+          "badge.svg": "202510310458",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202510310458",
+          "silhouette.svg": "202510310458",
+          "text.svg": "202605110452",
+          "badge-light.svg": "202510310458",
+          "badge-light.png": "202510310458"
+        }
+      },
+      "text": "Bulldogs",
+      "value": 500010
+    },
+    {
+      "theme": {
+        "key": "cowboys",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "text": "Cowboys",
+      "value": 500012
+    },
+    {
+      "theme": {
+        "key": "dolphins",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "text": "Dolphins",
+      "value": 500723
+    },
+    {
+      "theme": {
+        "key": "dragons",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202602250432",
+          "badge.svg": "202602250432",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452",
+          "badge-light.svg": "202602250432",
+          "badge-light.png": "202602250432"
+        }
+      },
+      "text": "Dragons",
+      "value": 500022
+    },
+    {
+      "theme": {
+        "key": "eels",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "text": "Eels",
+      "value": 500031
+    },
+    {
+      "theme": {
+        "key": "knights",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "text": "Knights",
+      "value": 500003
+    },
+    {
+      "theme": {
+        "key": "panthers",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "text": "Panthers",
+      "value": 500014
+    },
+    {
+      "theme": {
+        "key": "rabbitohs",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "text": "Rabbitohs",
+      "value": 500005
+    },
+    {
+      "theme": {
+        "key": "raiders",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "text": "Raiders",
+      "value": 500013
+    },
+    {
+      "theme": {
+        "key": "roosters",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "text": "Roosters",
+      "value": 500001
+    },
+    {
+      "theme": {
+        "key": "sea-eagles",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202510300111",
+          "badge.png": "202605110452",
+          "badge.svg": "202510300111",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "text": "Sea Eagles",
+      "value": 500002
+    },
+    {
+      "theme": {
+        "key": "sharks",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "text": "Sharks",
+      "value": 500028
+    },
+    {
+      "theme": {
+        "key": "storm",
+        "logos": {
+          "badge-basic24-light.svg": "202605110452",
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "text": "Storm",
+      "value": 500021
+    },
+    {
+      "theme": {
+        "key": "titans",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "text": "Titans",
+      "value": 500004
+    },
+    {
+      "theme": {
+        "key": "warriors",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.png": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "text": "Warriors",
+      "value": 500032
+    },
+    {
+      "theme": {
+        "key": "wests-tigers",
+        "logos": {
+          "badge-basic24-mono.svg": "202605110452",
+          "badge-basic24.svg": "202605110452",
+          "badge-light.svg": "202605110452",
+          "badge.png": "202605110452",
+          "badge.svg": "202605110452",
+          "header-background.png": "202605110452",
+          "header-background.svg": "202605110452",
+          "silhouette.png": "202605110452",
+          "silhouette.svg": "202605110452",
+          "text.svg": "202605110452"
+        }
+      },
+      "text": "Wests Tigers",
+      "value": 500023
+    }
+  ],
+  "selectedCompetitionId": 111
+}
