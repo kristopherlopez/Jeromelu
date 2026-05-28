@@ -35,9 +35,9 @@ import logging
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
 from uuid import uuid4
 
 from jeromelu_shared.config import settings
@@ -81,7 +81,7 @@ def _yt_dlp_low_res_video(video_id: str, output_dir: Path, quality: str) -> Path
     # inside the function lets the API boot without yt-dlp installed; if a
     # caller ever invokes this from the API, the ModuleNotFoundError will
     # surface here and signal the architectural boundary was crossed.
-    import yt_dlp  # noqa: PLC0415
+    import yt_dlp
 
     fmt = (
         f"best[ext=mp4][vcodec!*=none][acodec!*=none][height<={quality}]"
@@ -104,9 +104,7 @@ def _yt_dlp_low_res_video(video_id: str, output_dir: Path, quality: str) -> Path
 
     candidates = list(output_dir.glob(f"{video_id}.*"))
     if not candidates:
-        raise VideoStagingError(
-            f"yt-dlp produced no output in {output_dir} for {video_id}"
-        )
+        raise VideoStagingError(f"yt-dlp produced no output in {output_dir} for {video_id}")
     mp4s = [c for c in candidates if c.suffix == ".mp4"]
     return mp4s[0] if mp4s else candidates[0]
 
@@ -136,7 +134,8 @@ def delete_staging_video(key: str) -> None:
     except Exception as exc:
         logger.warning(
             "delete_staging_video failed for %s — lifecycle will eventually clean: %s",
-            key, exc,
+            key,
+            exc,
         )
 
 
@@ -148,7 +147,9 @@ def download_persistent_video(video_s3_key: str, dest: Path) -> None:
     ran ``make collect-video``).
     """
     get_s3_client().download_file(
-        settings.s3_audio_bucket, video_s3_key, str(dest),
+        settings.s3_audio_bucket,
+        video_s3_key,
+        str(dest),
     )
 
 
@@ -162,19 +163,23 @@ def extract_frame(video_path: Path, ts: float, dest: Path) -> None:
         raise VideoStagingError("ffmpeg not found on PATH")
     proc = subprocess.run(
         [
-            "ffmpeg", "-y",
-            "-ss", f"{ts:.3f}",
-            "-i", str(video_path),
-            "-frames:v", "1",
-            "-q:v", "2",
+            "ffmpeg",
+            "-y",
+            "-ss",
+            f"{ts:.3f}",
+            "-i",
+            str(video_path),
+            "-frames:v",
+            "1",
+            "-q:v",
+            "2",
             str(dest),
         ],
         capture_output=True,
     )
     if proc.returncode != 0:
         raise VideoStagingError(
-            f"ffmpeg frame extraction failed at ts={ts}: "
-            f"{proc.stderr.decode('utf-8', errors='replace')[:500]}"
+            f"ffmpeg frame extraction failed at ts={ts}: {proc.stderr.decode('utf-8', errors='replace')[:500]}"
         )
 
 
@@ -187,9 +192,7 @@ def acquire_video_temp(canonical_url: str, *, quality: str = DEFAULT_QUALITY) ->
     """
     video_id = _video_id_from_url(canonical_url)
     if not video_id:
-        raise VideoStagingError(
-            f"could not parse YouTube video id from {canonical_url!r}"
-        )
+        raise VideoStagingError(f"could not parse YouTube video id from {canonical_url!r}")
 
     request_id = uuid4().hex
     key = _staging_key(request_id)
@@ -199,7 +202,9 @@ def acquire_video_temp(canonical_url: str, *, quality: str = DEFAULT_QUALITY) ->
         size = _upload(local_path, key)
         logger.info(
             "Staged video: s3://%s/%s (%.1f MB)",
-            settings.s3_audio_bucket, key, size / (1024 * 1024),
+            settings.s3_audio_bucket,
+            key,
+            size / (1024 * 1024),
         )
     return key
 
@@ -214,23 +219,23 @@ def staged_video_local(canonical_url: str, *, quality: str = DEFAULT_QUALITY) ->
     """
     video_id = _video_id_from_url(canonical_url)
     if not video_id:
-        raise VideoStagingError(
-            f"could not parse YouTube video id from {canonical_url!r}"
-        )
+        raise VideoStagingError(f"could not parse YouTube video id from {canonical_url!r}")
 
     with tempfile.TemporaryDirectory(prefix="jeromelu-video-local-") as tmp:
         local_path = _yt_dlp_low_res_video(video_id, Path(tmp), quality)
         size = local_path.stat().st_size
         logger.info(
             "Local-staged video: %s (%.1f MB)",
-            local_path, size / (1024 * 1024),
+            local_path,
+            size / (1024 * 1024),
         )
         yield local_path
 
 
 @contextmanager
-def staged_video(canonical_url: str | None, *, persistent_key: str | None = None,
-                 quality: str = DEFAULT_QUALITY) -> Iterator[str | None]:
+def staged_video(
+    canonical_url: str | None, *, persistent_key: str | None = None, quality: str = DEFAULT_QUALITY
+) -> Iterator[str | None]:
     """Yield an S3 key the GPU container can consume, with cleanup.
 
     Three regimes:

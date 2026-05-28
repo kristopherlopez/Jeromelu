@@ -9,9 +9,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "packages" / "shared"))
 
-from datetime import datetime, timezone, timedelta
-from jeromelu_shared.db.session import SessionLocal
+from datetime import UTC, datetime, timedelta
+
 from jeromelu_shared.db import KnowledgeBase
+from jeromelu_shared.db.session import SessionLocal
 
 SEASON = 2026
 
@@ -63,7 +64,13 @@ I've watched everything. I've read everyone. Make your moves.
         "title": "Round 5 Captain Picks",
         "effective_round": 5,
         "hours_ago": 3,
-        "metadata_json": {"article_type": "captains", "round": 5, "season": SEASON, "player_count": 5, "claim_count": 18},
+        "metadata_json": {
+            "article_type": "captains",
+            "round": 5,
+            "season": SEASON,
+            "player_count": 5,
+            "claim_count": 18,
+        },
         "content": """## Top 5 Captain Picks — Round 5
 
 ### 1. Isaah Yeo (Panthers) — HIGH conviction
@@ -163,7 +170,13 @@ Carrigan just doesn't stop. 55 tackles, 62 base, and he's doing it every single 
         "title": "Round 5 Trade Targets",
         "effective_round": 5,
         "hours_ago": 5,
-        "metadata_json": {"article_type": "trades", "round": 5, "season": SEASON, "player_count": 10, "claim_count": 22},
+        "metadata_json": {
+            "article_type": "trades",
+            "round": 5,
+            "season": SEASON,
+            "player_count": 10,
+            "claim_count": 22,
+        },
         "content": """## Top 3 Buys
 
 ### 1. Bradman Best (Knights) — $485k, BE 38
@@ -206,7 +219,13 @@ Best in, Edwards out. That's the move of the round. You bank the $127k price dif
         "title": "Round 5 Stocks Up / Stocks Down",
         "effective_round": 5,
         "hours_ago": 6,
-        "metadata_json": {"article_type": "stocks", "round": 5, "season": SEASON, "player_count": 10, "claim_count": 15},
+        "metadata_json": {
+            "article_type": "stocks",
+            "round": 5,
+            "season": SEASON,
+            "player_count": 10,
+            "claim_count": 15,
+        },
         "content": """## Stocks Up
 
 ### Bradman Best — $485k (+$32k this round)
@@ -255,7 +274,13 @@ The elephant in the room. Cleary's been managed since his return and the Panther
         "title": "Round 5 Podcast Consensus",
         "effective_round": 5,
         "hours_ago": 8,
-        "metadata_json": {"article_type": "consensus", "round": 5, "season": SEASON, "player_count": 15, "claim_count": 42},
+        "metadata_json": {
+            "article_type": "consensus",
+            "round": 5,
+            "season": SEASON,
+            "player_count": 15,
+            "claim_count": 42,
+        },
         "content": """## What The Pods Are Saying — Round 5
 
 I've tracked five major SuperCoach podcasts this week. Here's where they agree, where they diverge, and what it means for your team.
@@ -352,7 +377,13 @@ I watched six hours of tape this week. Trust the process. Make your moves.
         "title": "Round 4 Podcast Consensus",
         "effective_round": 4,
         "hours_ago": 175,
-        "metadata_json": {"article_type": "consensus", "round": 4, "season": SEASON, "player_count": 12, "claim_count": 38},
+        "metadata_json": {
+            "article_type": "consensus",
+            "round": 4,
+            "season": SEASON,
+            "player_count": 12,
+            "claim_count": 38,
+        },
         "content": """## What The Pods Are Saying — Round 4
 
 ### Universal Agreement
@@ -389,13 +420,11 @@ def main():
     db = SessionLocal()
     try:
         # Clean existing mock articles
-        db.query(KnowledgeBase).filter(
-            KnowledgeBase.kb_type.like("article_%")
-        ).delete(synchronize_session=False)
+        db.query(KnowledgeBase).filter(KnowledgeBase.kb_type.like("article_%")).delete(synchronize_session=False)
         db.commit()
         print("Cleared existing articles")
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         count = 0
 
         for article in MOCK_ARTICLES:

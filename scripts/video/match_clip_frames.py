@@ -36,16 +36,26 @@ def extract_frame(clip_path: Path, output_path: Path, position: str = "first") -
     """Extract first or last frame from a clip."""
     if position == "first":
         cmd = [
-            "ffmpeg", "-y", "-i", str(clip_path),
-            "-vf", "select=eq(n\\,0)",
-            "-frames:v", "1",
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(clip_path),
+            "-vf",
+            "select=eq(n\\,0)",
+            "-frames:v",
+            "1",
             str(output_path),
         ]
     else:  # last
         cmd = [
-            "ffmpeg", "-y", "-sseof", "-0.04",
-            "-i", str(clip_path),
-            "-frames:v", "1",
+            "ffmpeg",
+            "-y",
+            "-sseof",
+            "-0.04",
+            "-i",
+            str(clip_path),
+            "-frames:v",
+            "1",
             str(output_path),
         ]
 

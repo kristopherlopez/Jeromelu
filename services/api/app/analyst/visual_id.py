@@ -24,11 +24,10 @@ fusion.py + transcribe.py are the surfaces that consume the
 
 from __future__ import annotations
 
+import itertools
 import json
 import logging
 import math
-import shutil
-import subprocess
 import tempfile
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -37,12 +36,11 @@ from typing import Any
 from uuid import UUID
 
 import numpy as np
-from sqlalchemy.orm import Session
-
 from jeromelu_shared.config import settings
 from jeromelu_shared.db import PersonFaceEmbedding, Source, SourceFaceDetection
 from jeromelu_shared.s3 import download_raw, get_s3_client, upload_raw
 from sqlalchemy import func as sa_func
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -114,10 +112,12 @@ FACE_TRACK_JSON_VERSION = 4
 # Dataclasses + errors
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class FaceDetection:
     """One face detected in one frame."""
-    bbox: list[float]            # [x1, y1, x2, y2] in pixel coords
+
+    bbox: list[float]  # [x1, y1, x2, y2] in pixel coords
     det_score: float
     embedding: np.ndarray | None = None  # 512-dim, dropped before JSON write
     person_id: UUID | None = None
@@ -169,6 +169,7 @@ class VisualIdError(Exception):
 # Helpers — S3 + ffmpeg
 # ---------------------------------------------------------------------------
 
+
 def _face_track_s3_key_from_audio(audio_s3_key: str) -> str:
     if audio_s3_key.endswith(".m4a"):
         return audio_s3_key[: -len(".m4a")] + ".face_track.json"
@@ -196,11 +197,12 @@ def _frame_iterator(video_path: Path, sample_rate: float):
     Uses cv2 directly. Cheaper than ffmpeg dump-to-disk + load loop.
     """
     import cv2  # lazy: opencv pulls a chunk of native deps
+
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
         raise VisualIdError(f"failed to open video at {video_path}")
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-    interval = max(1, int(round(fps / sample_rate)))
+    interval = max(1, round(fps / sample_rate))
     i = 0
     try:
         while True:
@@ -222,6 +224,7 @@ def _video_dimensions(video_path: Path) -> tuple[int, int]:
     so the overlay needs the same numbers to scale to its render size.
     """
     import cv2
+
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
         raise VisualIdError(f"failed to open video at {video_path}")
@@ -238,6 +241,7 @@ def _video_dimensions(video_path: Path) -> tuple[int, int]:
 # ---------------------------------------------------------------------------
 # Helpers — face matching
 # ---------------------------------------------------------------------------
+
 
 def load_face_registry(
     session: Session,
@@ -317,6 +321,7 @@ def _match_face(
 # Helpers — format heuristic
 # ---------------------------------------------------------------------------
 
+
 def _detect_video_format(frames: list[FrameDetections]) -> str:
     """Heuristic: in multi-cam podcasts the dominant on-screen face
     changes frequently as the camera cuts. In single-cam, all hosts are
@@ -328,20 +333,11 @@ def _detect_video_format(frames: list[FrameDetections]) -> str:
     formats / unknown (default to multi_cam since cuts are typical for
     podcast video).
     """
-    matched_frames = [
-        max(f.faces, key=lambda x: x.det_score, default=None)
-        for f in frames
-        if f.faces
-    ]
-    matched_frames = [
-        f for f in matched_frames if f and f.person_id is not None
-    ]
+    matched_frames = [max(f.faces, key=lambda x: x.det_score, default=None) for f in frames if f.faces]
+    matched_frames = [f for f in matched_frames if f and f.person_id is not None]
     if len(matched_frames) < 5:
         return "audio_only"  # not enough visual signal
-    changes = sum(
-        1 for a, b in zip(matched_frames, matched_frames[1:])
-        if a.person_id != b.person_id
-    )
+    changes = sum(1 for a, b in itertools.pairwise(matched_frames) if a.person_id != b.person_id)
     rate = changes / len(matched_frames)
     if rate >= 0.10:
         return "multi_cam"
@@ -353,6 +349,7 @@ def _detect_video_format(frames: list[FrameDetections]) -> str:
 # ---------------------------------------------------------------------------
 # Helpers — per-turn vote
 # ---------------------------------------------------------------------------
+
 
 def _select_active_face(faces: list[FaceDetection]) -> FaceDetection | None:
     """Pick the face most likely to be speaking in this frame.
@@ -456,18 +453,21 @@ def _per_turn_vote(
         if agreement < agreement_threshold:
             results.append(None)
             continue
-        results.append(VisualMatch(
-            person_id=winner_pid,
-            similarity=max(winner_sims),
-            agreement=agreement,
-            face_count=len(active_faces),
-        ))
+        results.append(
+            VisualMatch(
+                person_id=winner_pid,
+                similarity=max(winner_sims),
+                agreement=agreement,
+                face_count=len(active_faces),
+            )
+        )
     return results
 
 
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def _face_track_object_exists(key: str) -> bool:
     client = get_s3_client()
@@ -486,14 +486,16 @@ def _frames_from_face_track(doc: dict[str, Any]) -> list[FrameDetections]:
         faces: list[FaceDetection] = []
         for face in f.get("faces", []):
             pid_str = face.get("person_id")
-            faces.append(FaceDetection(
-                bbox=face.get("bbox", []),
-                det_score=float(face.get("det_score", 0.0)),
-                embedding=None,
-                person_id=UUID(pid_str) if pid_str else None,
-                similarity=face.get("similarity"),
-                mouth_opening=face.get("mouth_opening"),
-            ))
+            faces.append(
+                FaceDetection(
+                    bbox=face.get("bbox", []),
+                    det_score=float(face.get("det_score", 0.0)),
+                    embedding=None,
+                    person_id=UUID(pid_str) if pid_str else None,
+                    similarity=face.get("similarity"),
+                    mouth_opening=face.get("mouth_opening"),
+                )
+            )
         out.append(FrameDetections(ts=float(f["ts"]), faces=faces))
     return out
 
@@ -513,8 +515,9 @@ def _get_face_app():
     global _face_app
     if _face_app is not None:
         return _face_app
-    from insightface.app import FaceAnalysis
     import onnxruntime
+    from insightface.app import FaceAnalysis
+
     available = set(onnxruntime.get_available_providers())
     providers: list[str] = []
     if "CUDAExecutionProvider" in available:
@@ -567,6 +570,7 @@ def visual_identify(
     """
     if settings.lineup_remote and session is not None and not force_local:
         from .remote import visual_identify_remote
+
         return visual_identify_remote(
             session,
             audio_s3_key=audio_s3_key,
@@ -586,9 +590,7 @@ def visual_identify(
         registry_matrix, person_ids = registry
     else:
         if session is None:
-            raise VisualIdError(
-                "visual_identify needs either `session` or `registry`"
-            )
+            raise VisualIdError("visual_identify needs either `session` or `registry`")
         registry_matrix, person_ids = load_face_registry(session)
     logger.info("Face registry: %d embeddings", registry_matrix.shape[0])
 
@@ -604,11 +606,7 @@ def visual_identify(
     # (emit_detections_artefact=True) — the cached JSON dropped
     # embeddings, so there's nothing to emit. The caller would silently
     # get a result without the artefact key otherwise.
-    if (
-        not force_reextract
-        and not emit_detections_artefact
-        and _face_track_object_exists(face_track_key)
-    ):
+    if not force_reextract and not emit_detections_artefact and _face_track_object_exists(face_track_key):
         try:
             existing = json.loads(download_raw(face_track_key))
         except Exception:
@@ -622,13 +620,11 @@ def visual_identify(
             duration_seconds = existing.get("duration_seconds", 0.0)
             video_format = existing.get("video_format", "audio_only")
             per_turn = _per_turn_vote(
-                frames, pyannote_turns, agreement_threshold=agreement_threshold,
+                frames,
+                pyannote_turns,
+                agreement_threshold=agreement_threshold,
             )
-            distinct_persons = len({
-                face.person_id
-                for f in frames for face in f.faces
-                if face.person_id is not None
-            })
+            distinct_persons = len({face.person_id for f in frames for face in f.faces if face.person_id is not None})
             turns_matched = sum(1 for r in per_turn if r is not None)
             frames_with_faces = sum(1 for f in frames if f.faces)
             return VisualIdentifyResult(
@@ -648,7 +644,8 @@ def visual_identify(
 
         logger.info(
             "Downloading video from s3://%s/%s",
-            settings.s3_audio_bucket, video_s3_key,
+            settings.s3_audio_bucket,
+            video_s3_key,
         )
         _download_video(video_s3_key, video_path)
 
@@ -690,7 +687,9 @@ def visual_identify(
                 last_log = int(ts) // 60
                 logger.info(
                     "  %d:00 processed (%d frames, %d with faces)",
-                    last_log, len(frames), frames_with_faces,
+                    last_log,
+                    len(frames),
+                    frames_with_faces,
                 )
 
         if not frames:
@@ -699,7 +698,9 @@ def visual_identify(
         duration_seconds = frames[-1].ts if frames else 0.0
         video_format = _detect_video_format(frames)
         per_turn = _per_turn_vote(
-            frames, pyannote_turns, agreement_threshold=agreement_threshold,
+            frames,
+            pyannote_turns,
+            agreement_threshold=agreement_threshold,
         )
 
         # Build the face-track JSON (drop embeddings — they're not needed
@@ -735,7 +736,8 @@ def visual_identify(
         upload_raw(face_track_key, json.dumps(face_track_payload, ensure_ascii=False))
         logger.info(
             "Stored face-track JSON: s3://%s/%s",
-            settings.s3_raw_bucket, face_track_key,
+            settings.s3_raw_bucket,
+            face_track_key,
         )
 
         # Slice B — persist per-detection embeddings to source_face_detections.
@@ -752,11 +754,7 @@ def visual_identify(
         if emit_detections_artefact:
             face_detections_key = _emit_face_detections_npz(audio_s3_key, frames)
 
-    distinct_persons = len({
-        face.person_id
-        for f in frames for face in f.faces
-        if face.person_id is not None
-    })
+    distinct_persons = len({face.person_id for f in frames for face in f.faces if face.person_id is not None})
     turns_matched = sum(1 for r in per_turn if r is not None)
 
     return VisualIdentifyResult(
@@ -774,7 +772,7 @@ def visual_identify(
 
 def _emit_face_detections_npz(
     audio_s3_key: str,
-    frames: list["FrameDetections"],
+    frames: list[FrameDetections],
 ) -> str | None:
     """Slice B PR 1.5 — write a ``.npz`` of per-detection data to S3
     so the GPU container can hand embeddings back to the API for
@@ -804,13 +802,9 @@ def _emit_face_detections_npz(
             rows_emb.append(emb.tolist())
             # NaN sentinels for nullable floats — the API restores them
             # to None on the way back into Postgres.
-            rows_mouth.append(
-                float(face.mouth_opening) if face.mouth_opening is not None else float("nan")
-            )
+            rows_mouth.append(float(face.mouth_opening) if face.mouth_opening is not None else float("nan"))
             rows_person.append(str(face.person_id) if face.person_id else "")
-            rows_match.append(
-                float(face.similarity) if face.similarity is not None else float("nan")
-            )
+            rows_match.append(float(face.similarity) if face.similarity is not None else float("nan"))
 
     if not rows_ts:
         return None
@@ -832,7 +826,9 @@ def _emit_face_detections_npz(
     upload_raw(key, buf.read())
     logger.info(
         "Wrote %d detections to s3://%s/%s",
-        len(rows_ts), settings.s3_raw_bucket, key,
+        len(rows_ts),
+        settings.s3_raw_bucket,
+        key,
     )
     return key
 
@@ -840,7 +836,7 @@ def _emit_face_detections_npz(
 def _persist_face_detections(
     session: Session,
     source_id: UUID,
-    frames: list["FrameDetections"],
+    frames: list[FrameDetections],
 ) -> int:
     """Slice B — write one ``source_face_detections`` row per detected
     face for the given source. Idempotent: if the source already has
@@ -850,13 +846,19 @@ def _persist_face_detections(
 
     Returns the number of rows inserted (0 if skipped).
     """
-    existing = session.query(sa_func.count(SourceFaceDetection.detection_id)).filter(
-        SourceFaceDetection.source_id == source_id,
-    ).scalar() or 0
+    existing = (
+        session.query(sa_func.count(SourceFaceDetection.detection_id))
+        .filter(
+            SourceFaceDetection.source_id == source_id,
+        )
+        .scalar()
+        or 0
+    )
     if existing > 0:
         logger.info(
             "source_face_detections already populated for %s (%d rows); skip",
-            source_id, existing,
+            source_id,
+            existing,
         )
         return 0
 
@@ -870,25 +872,23 @@ def _persist_face_detections(
             if emb.shape[0] != EMBEDDING_DIM or not np.all(np.isfinite(emb)):
                 continue
             bbox = face.bbox
-            rows.append(SourceFaceDetection(
-                source_id=source_id,
-                frame_ts=float(f.ts),
-                bbox_x1=float(bbox[0]),
-                bbox_y1=float(bbox[1]),
-                bbox_x2=float(bbox[2]),
-                bbox_y2=float(bbox[3]),
-                det_score=float(face.det_score),
-                embedding=emb.tolist(),
-                embedding_model=EMBEDDING_MODEL,
-                mouth_opening=(
-                    float(face.mouth_opening) if face.mouth_opening is not None else None
-                ),
-                matched_person_id=face.person_id,
-                match_score=(
-                    float(face.similarity) if face.similarity is not None else None
-                ),
-                cluster_id=None,
-            ))
+            rows.append(
+                SourceFaceDetection(
+                    source_id=source_id,
+                    frame_ts=float(f.ts),
+                    bbox_x1=float(bbox[0]),
+                    bbox_y1=float(bbox[1]),
+                    bbox_x2=float(bbox[2]),
+                    bbox_y2=float(bbox[3]),
+                    det_score=float(face.det_score),
+                    embedding=emb.tolist(),
+                    embedding_model=EMBEDDING_MODEL,
+                    mouth_opening=(float(face.mouth_opening) if face.mouth_opening is not None else None),
+                    matched_person_id=face.person_id,
+                    match_score=(float(face.similarity) if face.similarity is not None else None),
+                    cluster_id=None,
+                )
+            )
 
     if not rows:
         return 0
@@ -896,7 +896,8 @@ def _persist_face_detections(
     session.commit()
     logger.info(
         "Persisted %d source_face_detections rows for %s",
-        len(rows), source_id,
+        len(rows),
+        source_id,
     )
     return len(rows)
 
@@ -953,17 +954,15 @@ def regenerate_face_track_json_from_detections(
         ts = float(d.frame_ts)
         face = {
             "bbox": [
-                float(d.bbox_x1), float(d.bbox_y1),
-                float(d.bbox_x2), float(d.bbox_y2),
+                float(d.bbox_x1),
+                float(d.bbox_y1),
+                float(d.bbox_x2),
+                float(d.bbox_y2),
             ],
             "det_score": float(d.det_score),
             "person_id": str(d.matched_person_id) if d.matched_person_id else None,
-            "similarity": (
-                float(d.match_score) if d.match_score is not None else None
-            ),
-            "mouth_opening": (
-                float(d.mouth_opening) if d.mouth_opening is not None else None
-            ),
+            "similarity": (float(d.match_score) if d.match_score is not None else None),
+            "mouth_opening": (float(d.mouth_opening) if d.mouth_opening is not None else None),
         }
         by_frame.setdefault(ts, []).append(face)
 
@@ -979,7 +978,8 @@ def regenerate_face_track_json_from_detections(
         "sample_rate": existing.get("sample_rate", FRAME_SAMPLE_RATE),
         "video_s3_key": existing.get("video_s3_key", source.video_s3_key or ""),
         "video_format": existing.get(
-            "video_format", source.video_format or "audio_only",
+            "video_format",
+            source.video_format or "audio_only",
         ),
         "duration_seconds": existing.get(
             "duration_seconds",
@@ -993,7 +993,9 @@ def regenerate_face_track_json_from_detections(
     upload_raw(face_track_key, json.dumps(payload, ensure_ascii=False))
     logger.info(
         "Regenerated face-track JSON for %s (%d frames, %d detections)",
-        source_id, len(frames), len(detections),
+        source_id,
+        len(frames),
+        len(detections),
     )
     return face_track_key
 

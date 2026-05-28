@@ -1,11 +1,10 @@
 """Indexing activity — write Source and SourceDocument records to DB."""
 
 import logging
-from datetime import datetime, timezone
-
-from temporalio import activity
+from datetime import UTC, datetime
 
 from jeromelu_shared.db import Channel, SessionLocal, Source, SourceDocument
+from temporalio import activity
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +21,7 @@ def _parse_published_at(published_at: str) -> datetime | None:
 
 def _checksum_exists(session, checksum: str) -> bool:
     """Check if a document with this checksum already exists (dedup)."""
-    return session.query(SourceDocument.document_id).filter(
-        SourceDocument.checksum == checksum
-    ).first() is not None
+    return session.query(SourceDocument.document_id).filter(SourceDocument.checksum == checksum).first() is not None
 
 
 @activity.defn
@@ -55,9 +52,7 @@ async def index_document(video: dict, collection_result: dict) -> dict:
         channel = None
         ext_id = video.get("channel_id")
         if ext_id:
-            channel = session.query(Channel).filter(
-                Channel.external_id == ext_id
-            ).first()
+            channel = session.query(Channel).filter(Channel.external_id == ext_id).first()
 
         # Create Source record (one per video)
         source = Source(
@@ -69,7 +64,7 @@ async def index_document(video: dict, collection_result: dict) -> dict:
             approved_flag=True,  # From whitelist
             ingestion_status="completed",
             published_at=_parse_published_at(video.get("published_at", "")),
-            ingested_at=datetime.now(timezone.utc),
+            ingested_at=datetime.now(UTC),
         )
         session.add(source)
         session.flush()  # Get source_id
@@ -88,7 +83,9 @@ async def index_document(video: dict, collection_result: dict) -> dict:
 
         logger.info(
             "Indexed video %s — source_id=%s, document_id=%s",
-            video_id, source.source_id, document.document_id,
+            video_id,
+            source.source_id,
+            document.document_id,
         )
 
         return {
@@ -99,7 +96,7 @@ async def index_document(video: dict, collection_result: dict) -> dict:
             "skipped": False,
         }
 
-    except Exception as e:
+    except Exception:
         session.rollback()
         logger.exception("Failed to index video %s", video_id)
         raise

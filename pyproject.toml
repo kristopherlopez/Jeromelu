@@ -1,13 +1,85 @@
 # Root tooling config for the Jaromelu monorepo.
 #
-# Pyright: Python typechecker. Hard-fail in CI via
-# .github/workflows/tests.yml (job: pyright). Scope is narrow to
-# packages/shared/jeromelu_shared/ — widening is a follow-up plan.
-# Local entry point:
-#   make typecheck-python
+# Ruff: Python lint + format + import-sort. Hard-fail in CI via
+# .github/workflows/tests.yml (job: ruff). Local entry points:
+#   make lint-python    # ruff check + ruff format --check
+#   make format-python  # ruff format + ruff check --fix
 #
-# [tool.ruff] block is queued — see TASK-47 (currently BLOCKED on
-# rule-set tuning; will land here once unblocked).
+# Per docs/build/META.md "Datetime / timezone" invariant, the DTZ rule
+# set enforces timezone-aware datetimes outside tests (DTZ011 dropped
+# because date.today() is the right call for naive-date contexts).
+#
+# Pyright: Python typechecker. Scope is narrow to
+# packages/shared/jeromelu_shared/ per [tool.pyright] include. Hard-fail
+# in CI via .github/workflows/tests.yml (job: pyright). Local entry:
+#   make typecheck-python
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = [
+    ".venv",
+    "**/.venv",
+    "**/node_modules",
+    "**/migrations",
+    "data",
+    "scripts/data/scraped_*",
+]
+
+[tool.ruff.lint]
+# E/F  = pycodestyle + pyflakes (style, syntax, unused imports/vars)
+# I    = isort (import order + grouping)
+# B    = flake8-bugbear (likely-bug patterns)
+# DTZ  = flake8-datetimez (timezone-aware datetime invariant)
+# UP   = pyupgrade (modern syntax for the pinned target-version)
+# RUF  = ruff-specific best-practice rules
+select = ["E", "F", "I", "B", "DTZ", "UP", "RUF"]
+# DTZ011 (call-date-today): date.today() is the right call for naive-
+#   date contexts (round numbers, season identifiers). The real datetime
+#   invariant is the rest of DTZ — naive datetime construction is what
+#   we want to catch.
+# RUF001/002/003 (ambiguous-unicode in strings/docstrings/comments):
+#   high false-positive rate on NRL content (×, —, °, ′ legitimately
+#   used in match reports, statistics, and operator notes).
+ignore = ["DTZ011", "RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI dependency-injection helpers are evaluated once at route-
+# definition time, not at every call. The B008 rule (function-call-in-
+# default-argument) doesn't know that — extending the immutable-calls
+# allowlist with these is the standard FastAPI accommodation.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.Header",
+    "fastapi.Form",
+    "fastapi.File",
+    "fastapi.Cookie",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests may use naive datetimes for fixtures; allow `assert False` for
+# explicit failure paths.
+"tests/**/*.py" = ["DTZ", "B011"]
+"**/conftest.py" = ["DTZ"]
+# Files where long lines are semantically meaningful — LLM prompt
+# definitions, long-form markdown content for UI seeding, or HTML
+# email bodies for SES reports. Breaking a sentence mid-prompt or
+# an HTML attribute mid-style="..." damages the artifact; we ignore
+# E501 here.
+"services/api/app/scout/source_discovery/prompt.py" = ["E501"]
+"services/api/app/scout/presenter_research/agent.py" = ["E501"]
+"scripts/insights/seed_mock_articles.py" = ["E501"]
+"scripts/content_report.py" = ["E501"]
+"scripts/cost_report.py" = ["E501"]
+"scripts/cron_report.py" = ["E501"]
+"scripts/disk_report.py" = ["E501"]
+"scripts/error_report.py" = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
 
 [tool.pyright]
 include = ["packages/shared/jeromelu_shared"]

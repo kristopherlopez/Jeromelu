@@ -26,24 +26,21 @@ import math
 import shutil
 import subprocess
 import tempfile
-from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from uuid import UUID
 
 import numpy as np
-from sqlalchemy.orm import Session
-
 from jeromelu_shared.config import settings
 from jeromelu_shared.db import PersonVoiceprint, Source
 from jeromelu_shared.s3 import get_s3_client
+from sqlalchemy.orm import Session
 
 from .diarize import (
     EMBEDDING_DIM,
     EMBEDDING_MODEL,
     MIN_TURN_DURATION,
-    _medoid,
     _sliding_windows,
 )
 
@@ -77,6 +74,7 @@ DEFAULT_MIN_WINDOWS = 1
 # Result types + errors
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class EnrollResult:
     person_id: UUID
@@ -91,9 +89,9 @@ class EnrollResult:
 @dataclass
 class IdentifyResult:
     person_id: UUID
-    similarity: float          # max similarity across winning person's windows
-    window_agreement: float    # fraction of windows that voted for the winner
-    window_count: int          # how many windows participated in the vote
+    similarity: float  # max similarity across winning person's windows
+    window_agreement: float  # fraction of windows that voted for the winner
+    window_count: int  # how many windows participated in the vote
 
 
 class EnrollmentError(Exception):
@@ -103,6 +101,7 @@ class EnrollmentError(Exception):
 # ---------------------------------------------------------------------------
 # Audio helpers — mirrors diarize.py's lifecycle
 # ---------------------------------------------------------------------------
+
 
 def _download_audio(audio_s3_key: str, dest: Path) -> None:
     client = get_s3_client()
@@ -117,9 +116,7 @@ def _convert_to_wav(src: Path, dst: Path) -> None:
         capture_output=True,
     )
     if proc.returncode != 0:
-        raise EnrollmentError(
-            f"ffmpeg conversion failed: {proc.stderr.decode('utf-8', errors='replace')}"
-        )
+        raise EnrollmentError(f"ffmpeg conversion failed: {proc.stderr.decode('utf-8', errors='replace')}")
 
 
 def _crop_to_wav(src: Path, dst: Path, start_ts: float, end_ts: float) -> None:
@@ -132,11 +129,20 @@ def _crop_to_wav(src: Path, dst: Path, start_ts: float, end_ts: float) -> None:
         raise EnrollmentError("ffmpeg not found on PATH")
     proc = subprocess.run(
         [
-            "ffmpeg", "-y", "-loglevel", "error",
-            "-i", str(src),
-            "-ss", f"{start_ts:.3f}",
-            "-to", f"{end_ts:.3f}",
-            "-ac", "1", "-ar", "16000",
+            "ffmpeg",
+            "-y",
+            "-loglevel",
+            "error",
+            "-i",
+            str(src),
+            "-ss",
+            f"{start_ts:.3f}",
+            "-to",
+            f"{end_ts:.3f}",
+            "-ac",
+            "1",
+            "-ar",
+            "16000",
             str(dst),
         ],
         capture_output=True,
@@ -152,6 +158,7 @@ def _crop_to_wav(src: Path, dst: Path, start_ts: float, end_ts: float) -> None:
 # Enrollment
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class _EnrollmentContext:
     """Shared setup for a batch of enrollments against the same source.
@@ -161,6 +168,7 @@ class _EnrollmentContext:
     expensive bits — full-audio download + pyannote model load — are
     amortised across N spans instead of paid per span.
     """
+
     source_id: UUID
     m4a_path: Path
     tmpdir: Path
@@ -197,23 +205,16 @@ def enrollment_context(
     if source is None:
         raise EnrollmentError(f"no source with id {source_id}")
     if not source.audio_s3_key:
-        raise EnrollmentError(
-            f"source {source_id} has no audio_s3_key — run Scout's "
-            "acquire_audio first"
-        )
+        raise EnrollmentError(f"source {source_id} has no audio_s3_key — run Scout's acquire_audio first")
     if not settings.huggingface_api_key:
-        raise EnrollmentError(
-            "HUGGINGFACE_API_KEY is not configured — required to load the "
-            "embedding model"
-        )
+        raise EnrollmentError("HUGGINGFACE_API_KEY is not configured — required to load the embedding model")
 
     # Lazy imports — pyannote pulls torch + a chunk of the pip world.
     try:
         from pyannote.audio import Inference, Model
     except ImportError as exc:
         raise EnrollmentError(
-            f"pyannote.audio not installed: {exc}. "
-            "Run `pip install -r services/api/requirements.txt`."
+            f"pyannote.audio not installed: {exc}. Run `pip install -r services/api/requirements.txt`."
         ) from exc
 
     with tempfile.TemporaryDirectory(prefix="jeromelu-enroll-") as tmp:
@@ -221,7 +222,8 @@ def enrollment_context(
         m4a_path = tmpdir / "audio.m4a"
         logger.info(
             "Downloading audio for enrollment from s3://%s/%s",
-            settings.s3_audio_bucket, source.audio_s3_key,
+            settings.s3_audio_bucket,
+            source.audio_s3_key,
         )
         _download_audio(source.audio_s3_key, m4a_path)
 
@@ -235,12 +237,14 @@ def enrollment_context(
 
         logger.info("Loading embedding model %s", EMBEDDING_MODEL)
         from ._pyannote_compat import token_kwargs
+
         emb_model = Model.from_pretrained(
             EMBEDDING_MODEL,
             **token_kwargs(settings.huggingface_api_key),
         )
         try:
             import torch
+
             if torch.cuda.is_available():
                 emb_model = emb_model.to(torch.device("cuda"))
         except Exception:
@@ -287,12 +291,11 @@ def enroll_span_with_context(
         logger.warning(
             "Enrollment span %.1fs is below the recommended %.0fs minimum. "
             "Voiceprint will be created but match quality may be marginal.",
-            duration, SOFT_MIN_ENROLLMENT_DURATION,
+            duration,
+            SOFT_MIN_ENROLLMENT_DURATION,
         )
     if created_by not in ("manual", "auto-confirmed"):
-        raise EnrollmentError(
-            f"created_by must be 'manual' or 'auto-confirmed', got {created_by!r}"
-        )
+        raise EnrollmentError(f"created_by must be 'manual' or 'auto-confirmed', got {created_by!r}")
 
     # Two paths:
     #   1. Full WAV pre-converted (prefetch_wav=True in context setup).
@@ -321,30 +324,33 @@ def enroll_span_with_context(
             emb = ctx.emb_inference.crop(str(wav_path), seg)
         except Exception as exc:
             logger.debug(
-                "Embedding failed for window %.2f-%.2f: %s", w_start, w_end, exc,
+                "Embedding failed for window %.2f-%.2f: %s",
+                w_start,
+                w_end,
+                exc,
             )
             skipped += 1
             continue
         emb = np.asarray(emb).reshape(-1)
         if emb.shape[0] != EMBEDDING_DIM:
-            raise EnrollmentError(
-                f"unexpected embedding dim {emb.shape[0]} (expected {EMBEDDING_DIM})"
-            )
+            raise EnrollmentError(f"unexpected embedding dim {emb.shape[0]} (expected {EMBEDDING_DIM})")
         if not np.all(np.isfinite(emb)):
             skipped += 1
             continue
         # When using a per-span WAV, windows are zero-based and need
         # `start_ts` added back. With the full WAV, windows are already
         # in original-timeline coords (window_offset=0).
-        rows.append(PersonVoiceprint(
-            person_id=person_id,
-            source_id=ctx.source_id,
-            start_ts=float(window_offset + w_start),
-            end_ts=float(window_offset + w_end),
-            embedding=emb.tolist(),
-            embedding_model=EMBEDDING_MODEL,
-            created_by=created_by,
-        ))
+        rows.append(
+            PersonVoiceprint(
+                person_id=person_id,
+                source_id=ctx.source_id,
+                start_ts=float(window_offset + w_start),
+                end_ts=float(window_offset + w_end),
+                embedding=emb.tolist(),
+                embedding_model=EMBEDDING_MODEL,
+                created_by=created_by,
+            )
+        )
 
     if not rows:
         raise EnrollmentError(
@@ -404,6 +410,7 @@ def enroll(
 # Identification
 # ---------------------------------------------------------------------------
 
+
 def load_voiceprint_matrix(
     session: Session,
     *,
@@ -429,7 +436,7 @@ def load_voiceprint_matrix(
 
 
 def identify_turn_in_memory(
-    voiceprints: np.ndarray,        # N × EMBEDDING_DIM
+    voiceprints: np.ndarray,  # N × EMBEDDING_DIM
     voiceprint_person_ids: list[UUID],
     window_embeddings: list[list[float]],
     *,
@@ -509,7 +516,8 @@ def identify_pyannote_turns(
     """
     embedding_model = pyannote_doc.get("embedding_model")
     voiceprints, person_ids = load_voiceprint_matrix(
-        session, embedding_model=embedding_model,
+        session,
+        embedding_model=embedding_model,
     )
 
     results: list[IdentifyResult | None] = []
@@ -523,17 +531,23 @@ def identify_pyannote_turns(
         # Defensive filter: pre-fix pyannote JSONs may carry NaN windows.
         # Drop any window that isn't shaped right or has non-finite values.
         win_embs = [
-            e for e in win_embs
-            if isinstance(e, list) and len(e) == EMBEDDING_DIM
+            e
+            for e in win_embs
+            if isinstance(e, list)
+            and len(e) == EMBEDDING_DIM
             and all(isinstance(v, (int, float)) and math.isfinite(v) for v in e)
         ]
         if not win_embs:
             results.append(None)
             continue
-        results.append(identify_turn_in_memory(
-            voiceprints, person_ids, win_embs,
-            cosine_threshold=cosine_threshold,
-            agreement_threshold=agreement_threshold,
-        ))
+        results.append(
+            identify_turn_in_memory(
+                voiceprints,
+                person_ids,
+                win_embs,
+                cosine_threshold=cosine_threshold,
+                agreement_threshold=agreement_threshold,
+            )
+        )
 
     return results

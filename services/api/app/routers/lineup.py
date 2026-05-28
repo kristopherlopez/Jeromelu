@@ -14,45 +14,12 @@ import logging
 import tempfile
 import uuid
 from collections import defaultdict
-from datetime import datetime, timezone
+from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterator
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
-from sqlalchemy import func, update as sa_update
-from sqlalchemy.orm import Session
-
-from app.analyst.face_clusters import analyse_clusters, cluster_source_detections
-from app.analyst.face_runs import (
-    compute_face_runs,
-    compute_face_runs_from_detections,
-    detections_exist,
-)
-from app.analyst.identify_voice import (
-    EnrollmentError,
-    enroll,
-)
-from app.analyst.identity_alignment import fetch_alignment
-from app.analyst.face_segment_transcript_cli import (
-    DEFAULT_MIN_SEGMENT_SECONDS as FACE_TX_DEFAULT_MIN_SEGMENT,
-    DEFAULT_MOUTH_THRESHOLD as FACE_TX_DEFAULT_MOUTH,
-    DEFAULT_SMOOTH_GAP_SECONDS as FACE_TX_DEFAULT_SMOOTH,
-    segment_by_face,
-)
-from app.analyst.voice_cluster_hdbscan import VoiceClusterParams
-from app.analyst.voice_cluster_runner import recluster_source_voice
-from app.analyst.voice_clusters import (
-    VOICEPRINT_SAMPLE_LIMIT,
-    compute_voice_clusters,
-)
-from app.analyst.video_worker_client import VideoWorkerError, fetch_frame_to
-from app.analyst.visual_id import (
-    VisualIdError,
-    enroll_face_from_image,
-    regenerate_face_track_json_from_detections,
-)
 from jeromelu_shared.db import (
     Person,
     PersonFaceEmbedding,
@@ -64,6 +31,46 @@ from jeromelu_shared.db import (
     SourceSpeaker,
 )
 from jeromelu_shared.s3 import download_raw
+from pydantic import BaseModel, Field
+from sqlalchemy import func
+from sqlalchemy import update as sa_update
+from sqlalchemy.orm import Session
+
+from app.analyst.face_clusters import analyse_clusters, cluster_source_detections
+from app.analyst.face_runs import (
+    compute_face_runs,
+    compute_face_runs_from_detections,
+    detections_exist,
+)
+from app.analyst.face_segment_transcript_cli import (
+    DEFAULT_MIN_SEGMENT_SECONDS as FACE_TX_DEFAULT_MIN_SEGMENT,
+)
+from app.analyst.face_segment_transcript_cli import (
+    DEFAULT_MOUTH_THRESHOLD as FACE_TX_DEFAULT_MOUTH,
+)
+from app.analyst.face_segment_transcript_cli import (
+    DEFAULT_SMOOTH_GAP_SECONDS as FACE_TX_DEFAULT_SMOOTH,
+)
+from app.analyst.face_segment_transcript_cli import (
+    segment_by_face,
+)
+from app.analyst.identify_voice import (
+    EnrollmentError,
+    enroll,
+)
+from app.analyst.identity_alignment import fetch_alignment
+from app.analyst.video_worker_client import VideoWorkerError, fetch_frame_to
+from app.analyst.visual_id import (
+    VisualIdError,
+    enroll_face_from_image,
+    regenerate_face_track_json_from_detections,
+)
+from app.analyst.voice_cluster_hdbscan import VoiceClusterParams
+from app.analyst.voice_cluster_runner import recluster_source_voice
+from app.analyst.voice_clusters import (
+    VOICEPRINT_SAMPLE_LIMIT,
+    compute_voice_clusters,
+)
 
 from ..deps import get_db
 
@@ -110,7 +117,7 @@ def _fetch_reassign_frame(source: Source, ts: float, dest: Path) -> None:
                 ts=ts,
             )
     except VideoWorkerError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 router = APIRouter()
@@ -172,13 +179,15 @@ def _aggregate_face_groups(face_track: dict) -> list[dict]:
 
         sims = [e["similarity"] for e in entries if e["similarity"] is not None]
         scores = [e["det_score"] for e in entries]
-        out.append({
-            "person_id": pid,
-            "detection_count": len(entries),
-            "avg_det_score": round(sum(scores) / len(scores), 3) if scores else 0.0,
-            "avg_similarity": round(sum(sims) / len(sims), 3) if sims else None,
-            "samples": samples,
-        })
+        out.append(
+            {
+                "person_id": pid,
+                "detection_count": len(entries),
+                "avg_det_score": round(sum(scores) / len(scores), 3) if scores else 0.0,
+                "avg_similarity": round(sum(sims) / len(sims), 3) if sims else None,
+                "samples": samples,
+            }
+        )
     return out
 
 
@@ -201,12 +210,12 @@ def get_face_groups(source_id: uuid.UUID, db: Session = Depends(get_db)):
         body = download_raw(key)
     except Exception as exc:
         logger.warning("Face-track fetch failed for %s: %s", source_id, exc)
-        raise HTTPException(status_code=404, detail="Face-track not found")
+        raise HTTPException(status_code=404, detail="Face-track not found") from exc
 
     try:
         face_track = json.loads(body)
     except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=502, detail=f"Face-track JSON malformed: {exc}")
+        raise HTTPException(status_code=502, detail=f"Face-track JSON malformed: {exc}") from exc
 
     groups = _aggregate_face_groups(face_track)
 
@@ -222,14 +231,16 @@ def get_face_groups(source_id: uuid.UUID, db: Session = Depends(get_db)):
     total = 0
     for g in groups:
         total += g["detection_count"]
-        enriched.append({
-            "person_id": g["person_id"],
-            "person_name": name_by_id.get(g["person_id"]) if g["person_id"] else None,
-            "detection_count": g["detection_count"],
-            "avg_det_score": g["avg_det_score"],
-            "avg_similarity": g["avg_similarity"],
-            "samples": g["samples"],
-        })
+        enriched.append(
+            {
+                "person_id": g["person_id"],
+                "person_name": name_by_id.get(g["person_id"]) if g["person_id"] else None,
+                "detection_count": g["detection_count"],
+                "avg_det_score": g["avg_det_score"],
+                "avg_similarity": g["avg_similarity"],
+                "samples": g["samples"],
+            }
+        )
 
     return {
         "source_id": str(source_id),
@@ -259,9 +270,7 @@ def get_face_crop(
     source = db.query(Source).filter(Source.source_id == source_id).first()
     if not source:
         raise HTTPException(status_code=404, detail="Source not found")
-    if not source.video_s3_key and not (
-        source.source_type == "youtube" and source.canonical_url
-    ):
+    if not source.video_s3_key and not (source.source_type == "youtube" and source.canonical_url):
         raise HTTPException(
             status_code=400,
             detail="Source has no pixels available (no video_s3_key, not a YouTube source)",
@@ -276,7 +285,7 @@ def get_face_crop(
     try:
         bbox_t = (float(parts[0]), float(parts[1]), float(parts[2]), float(parts[3]))
     except ValueError:
-        raise HTTPException(status_code=400, detail="bbox values must be numeric")
+        raise HTTPException(status_code=400, detail="bbox values must be numeric") from None
     if bbox_t[2] <= bbox_t[0] or bbox_t[3] <= bbox_t[1]:
         raise HTTPException(status_code=400, detail="bbox must satisfy x2>x1, y2>y1")
 
@@ -300,7 +309,7 @@ def get_face_crop(
                     bbox=bbox_t,
                 )
         except VideoWorkerError as exc:
-            raise HTTPException(status_code=502, detail=str(exc))
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
 
         return Response(
             content=crop_path.read_bytes(),
@@ -388,7 +397,8 @@ def move_run_between_clusters(
     """
     if body.end_ts <= body.start_ts:
         raise HTTPException(
-            status_code=400, detail="end_ts must be greater than start_ts",
+            status_code=400,
+            detail="end_ts must be greater than start_ts",
         )
     if body.source_cluster_id == body.target_cluster_id:
         raise HTTPException(
@@ -400,20 +410,28 @@ def move_run_between_clusters(
     # row exists for noise, so skip the lookup and the count-decrement.
     src_meta: SourceFaceCluster | None = None
     if body.source_cluster_id is not None:
-        src_meta = db.query(SourceFaceCluster).filter(
-            SourceFaceCluster.source_id == source_id,
-            SourceFaceCluster.cluster_id == body.source_cluster_id,
-        ).first()
+        src_meta = (
+            db.query(SourceFaceCluster)
+            .filter(
+                SourceFaceCluster.source_id == source_id,
+                SourceFaceCluster.cluster_id == body.source_cluster_id,
+            )
+            .first()
+        )
         if not src_meta:
             raise HTTPException(
                 status_code=404,
                 detail=f"source cluster {body.source_cluster_id} not found for this source",
             )
 
-    tgt_meta = db.query(SourceFaceCluster).filter(
-        SourceFaceCluster.source_id == source_id,
-        SourceFaceCluster.cluster_id == body.target_cluster_id,
-    ).first()
+    tgt_meta = (
+        db.query(SourceFaceCluster)
+        .filter(
+            SourceFaceCluster.source_id == source_id,
+            SourceFaceCluster.cluster_id == body.target_cluster_id,
+        )
+        .first()
+    )
     if not tgt_meta:
         raise HTTPException(
             status_code=404,
@@ -427,16 +445,19 @@ def move_run_between_clusters(
         if body.source_cluster_id is None
         else SourceFaceDetection.cluster_id == body.source_cluster_id
     )
-    moved = db.execute(
-        sa_update(SourceFaceDetection)
-        .where(
-            SourceFaceDetection.source_id == source_id,
-            src_cluster_predicate,
-            SourceFaceDetection.frame_ts >= body.start_ts,
-            SourceFaceDetection.frame_ts <= body.end_ts,
-        )
-        .values(cluster_id=body.target_cluster_id)
-    ).rowcount or 0
+    moved = (
+        db.execute(
+            sa_update(SourceFaceDetection)
+            .where(
+                SourceFaceDetection.source_id == source_id,
+                src_cluster_predicate,
+                SourceFaceDetection.frame_ts >= body.start_ts,
+                SourceFaceDetection.frame_ts <= body.end_ts,
+            )
+            .values(cluster_id=body.target_cluster_id)
+        ).rowcount
+        or 0
+    )
 
     # Adjust the cached counts so the next /face-runs call shows the
     # right sizes. The full stats (mouth_open_std, etc) are stale until
@@ -444,9 +465,9 @@ def move_run_between_clusters(
     if moved:
         if src_meta is not None:
             src_meta.detection_count = max(0, (src_meta.detection_count or 0) - moved)
-            src_meta.updated_at = datetime.now(timezone.utc)
+            src_meta.updated_at = datetime.now(UTC)
         tgt_meta.detection_count = (tgt_meta.detection_count or 0) + moved
-        tgt_meta.updated_at = datetime.now(timezone.utc)
+        tgt_meta.updated_at = datetime.now(UTC)
     db.commit()
 
     return {
@@ -489,10 +510,14 @@ def override_face_cluster(
     present in the request body are touched — null means "leave as-is",
     NOT "clear to null" (use an explicit empty-string label to clear).
     """
-    row = db.query(SourceFaceCluster).filter(
-        SourceFaceCluster.source_id == source_id,
-        SourceFaceCluster.cluster_id == cluster_id,
-    ).first()
+    row = (
+        db.query(SourceFaceCluster)
+        .filter(
+            SourceFaceCluster.source_id == source_id,
+            SourceFaceCluster.cluster_id == cluster_id,
+        )
+        .first()
+    )
     if not row:
         raise HTTPException(
             status_code=404,
@@ -513,7 +538,7 @@ def override_face_cluster(
     if body.notes is not None:
         row.notes = body.notes or None
 
-    row.updated_at = datetime.now(timezone.utc)
+    row.updated_at = datetime.now(UTC)
     db.commit()
     return {
         "source_id": str(row.source_id),
@@ -578,12 +603,14 @@ def get_face_runs(
                 SourceFaceDetection.source_id == source_id,
                 SourceFaceDetection.cluster_id.is_(None),
             )
-            .scalar() or 0
+            .scalar()
+            or 0
         )
         total_count = (
             db.query(func.count(SourceFaceDetection.detection_id))
             .filter(SourceFaceDetection.source_id == source_id)
-            .scalar() or 0
+            .scalar()
+            or 0
         )
         # All detections unclustered → first run; trigger clustering.
         # Some unclustered but not all → noise from a prior pass; leave
@@ -603,7 +630,8 @@ def get_face_runs(
                 db.query(func.count())
                 .select_from(SourceFaceCluster)
                 .filter(SourceFaceCluster.source_id == source_id)
-                .scalar() or 0
+                .scalar()
+                or 0
             )
             if cluster_meta_count == 0:
                 logger.info(
@@ -613,7 +641,9 @@ def get_face_runs(
                 analyse_clusters(db, source_id)
 
         runs_payload = compute_face_runs_from_detections(
-            db, source_id, include_excluded=include_excluded,
+            db,
+            source_id,
+            include_excluded=include_excluded,
         )
         # Try to read frame dims from the cached face-track JSON for
         # the response — the detections table doesn't store them.
@@ -632,24 +662,21 @@ def get_face_runs(
             body = download_raw(key)
         except Exception as exc:
             logger.warning("Face-track fetch failed for %s: %s", source_id, exc)
-            raise HTTPException(status_code=404, detail="Face-track not found")
+            raise HTTPException(status_code=404, detail="Face-track not found") from exc
         try:
             face_track = json.loads(body)
         except json.JSONDecodeError as exc:
             raise HTTPException(
-                status_code=502, detail=f"Face-track JSON malformed: {exc}",
-            )
+                status_code=502,
+                detail=f"Face-track JSON malformed: {exc}",
+            ) from exc
         runs_payload = compute_face_runs(face_track)
         duration_seconds = face_track.get("duration_seconds")
         frame_width = face_track.get("frame_width")
         frame_height = face_track.get("frame_height")
 
     # Look up the source's document so we can find overlapping turns.
-    doc = (
-        db.query(SourceDocument)
-        .filter(SourceDocument.source_id == source_id)
-        .first()
-    )
+    doc = db.query(SourceDocument).filter(SourceDocument.source_id == source_id).first()
     turns = []
     if doc:
         turns = (
@@ -682,31 +709,27 @@ def get_face_runs(
         for t in turns:
             if t.start_ts >= end or t.end_ts <= start:
                 continue
-            out.append({
-                "segment_id": str(t.segment_id),
-                "start_ts": float(t.start_ts),
-                "end_ts": float(t.end_ts),
-                "speaker_label": t.speaker_label,
-                "speaker_person_id": str(t.speaker_person_id) if t.speaker_person_id else None,
-                "speaker_person_name": (
-                    name_by_id.get(str(t.speaker_person_id))
-                    if t.speaker_person_id else None
-                ),
-                "match_method": t.match_method,
-            })
+            out.append(
+                {
+                    "segment_id": str(t.segment_id),
+                    "start_ts": float(t.start_ts),
+                    "end_ts": float(t.end_ts),
+                    "speaker_label": t.speaker_label,
+                    "speaker_person_id": str(t.speaker_person_id) if t.speaker_person_id else None,
+                    "speaker_person_name": (name_by_id.get(str(t.speaker_person_id)) if t.speaker_person_id else None),
+                    "match_method": t.match_method,
+                }
+            )
         return out
 
     # Decorate runs with person names + overlapping turns. Also resolve
     # the cluster's dominant person_name from the same lookup.
     for pos in runs_payload["positions"]:
         pos["dominant_person_name"] = (
-            name_by_id.get(pos["dominant_person_id"])
-            if pos.get("dominant_person_id") else None
+            name_by_id.get(pos["dominant_person_id"]) if pos.get("dominant_person_id") else None
         )
         for run in pos["runs"]:
-            run["person_name"] = (
-                name_by_id.get(run["person_id"]) if run["person_id"] else None
-            )
+            run["person_name"] = name_by_id.get(run["person_id"]) if run["person_id"] else None
             run["overlapping_turns"] = turns_overlapping(run["start_ts"], run["end_ts"])
 
     return {
@@ -739,7 +762,7 @@ def get_face_track(source_id: uuid.UUID, db: Session = Depends(get_db)):
         body = download_raw(key)
     except Exception as exc:
         logger.warning("Face-track fetch failed for %s: %s", source_id, exc)
-        raise HTTPException(status_code=404, detail="Face-track not found")
+        raise HTTPException(status_code=404, detail="Face-track not found") from exc
 
     return Response(
         content=body,
@@ -791,10 +814,7 @@ def regenerate_face_track(source_id: uuid.UUID, db: Session = Depends(get_db)):
         # actionable — surface as 404 rather than a confusing 200/null.
         raise HTTPException(
             status_code=404,
-            detail=(
-                "No face-track JSON or no detections to regenerate from. "
-                "Run visual_identify first."
-            ),
+            detail=("No face-track JSON or no detections to regenerate from. Run visual_identify first."),
         )
 
     distinct_persons = (
@@ -809,7 +829,8 @@ def regenerate_face_track(source_id: uuid.UUID, db: Session = Depends(get_db)):
     detection_count = (
         db.query(func.count(SourceFaceDetection.detection_id))
         .filter(SourceFaceDetection.source_id == source_id)
-        .scalar() or 0
+        .scalar()
+        or 0
     )
     return {
         "source_id": str(source_id),
@@ -868,6 +889,7 @@ def rename_speaker(
 # ---------------------------------------------------------------------------
 # Face reassign (Phase 4b-action) — operator overrides a misidentified turn
 # ---------------------------------------------------------------------------
+
 
 class ReassignRequest(BaseModel):
     person_id: uuid.UUID | None = Field(
@@ -964,19 +986,13 @@ def reassign_speaker(
     # Either a persisted video (legacy) or a YouTube canonical_url we can
     # re-fetch ephemerally — without one of those, there's no pixels to
     # crop a face out of.
-    if not source.video_s3_key and not (
-        source.source_type == "youtube" and source.canonical_url
-    ):
+    if not source.video_s3_key and not (source.source_type == "youtube" and source.canonical_url):
         raise HTTPException(
             status_code=400,
             detail="Source has no video_s3_key and no YouTube URL — face reassign needs pixels",
         )
 
-    speaker = (
-        db.query(SourceSpeaker)
-        .filter(SourceSpeaker.segment_id == segment_id)
-        .first()
-    )
+    speaker = db.query(SourceSpeaker).filter(SourceSpeaker.segment_id == segment_id).first()
     if not speaker:
         raise HTTPException(status_code=404, detail="Speaker segment not found")
 
@@ -1000,11 +1016,7 @@ def reassign_speaker(
                 status_code=400,
                 detail="`new_person_name` is too long (max 200 chars)",
             )
-        person = (
-            db.query(Person)
-            .filter(func.lower(Person.canonical_name) == new_name.lower())
-            .first()
-        )
+        person = db.query(Person).filter(func.lower(Person.canonical_name) == new_name.lower()).first()
         if not person:
             person = Person(canonical_name=new_name)
             db.add(person)
@@ -1029,15 +1041,17 @@ def reassign_speaker(
         try:
             # The Person resolution is already done; tell the client up
             # front so the checklist starts populated.
-            yield _ndjson({
-                "step": "person",
-                "status": "done",
-                "detail": {
-                    "person_id": str(target_person_id),
-                    "person_name": person_name,
-                    "person_created": person_created,
-                },
-            })
+            yield _ndjson(
+                {
+                    "step": "person",
+                    "status": "done",
+                    "detail": {
+                        "person_id": str(target_person_id),
+                        "person_name": person_name,
+                        "person_created": person_created,
+                    },
+                }
+            )
 
             # Step: video-worker frame fetch. Slowest substep on cold
             # cache; ~3s on yt-dlp section path, ~instant on cache hit.
@@ -1047,11 +1061,13 @@ def reassign_speaker(
                 try:
                     _fetch_reassign_frame(source, frame_ts, frame_path)
                 except HTTPException as exc:
-                    yield _ndjson({
-                        "step": "frame",
-                        "status": "error",
-                        "detail": str(exc.detail),
-                    })
+                    yield _ndjson(
+                        {
+                            "step": "frame",
+                            "status": "error",
+                            "detail": str(exc.detail),
+                        }
+                    )
                     return
                 yield _ndjson({"step": "frame", "status": "done"})
 
@@ -1067,18 +1083,22 @@ def reassign_speaker(
                         frame_ts=frame_ts,
                         created_by="manual",
                     )
-                    yield _ndjson({
-                        "step": "face",
-                        "status": "done",
-                        "detail": {"face_embedding_id": str(face_id_written)},
-                    })
+                    yield _ndjson(
+                        {
+                            "step": "face",
+                            "status": "done",
+                            "detail": {"face_embedding_id": str(face_id_written)},
+                        }
+                    )
                 except VisualIdError as exc:
                     logger.warning("Face enrollment skipped during reassign: %s", exc)
-                    yield _ndjson({
-                        "step": "face",
-                        "status": "skip",
-                        "detail": str(exc),
-                    })
+                    yield _ndjson(
+                        {
+                            "step": "face",
+                            "status": "skip",
+                            "detail": str(exc),
+                        }
+                    )
 
             # Step: voiceprint enrollment from the turn's audio span.
             # Skipped when the turn is shorter than the embedder's min.
@@ -1093,18 +1113,22 @@ def reassign_speaker(
                     created_by="manual",
                 )
                 voice_rows_written = result.voiceprints_written
-                yield _ndjson({
-                    "step": "voice",
-                    "status": "done",
-                    "detail": {"voiceprints_written": voice_rows_written},
-                })
+                yield _ndjson(
+                    {
+                        "step": "voice",
+                        "status": "done",
+                        "detail": {"voiceprints_written": voice_rows_written},
+                    }
+                )
             except EnrollmentError as exc:
                 logger.warning("Voiceprint enrollment skipped during reassign: %s", exc)
-                yield _ndjson({
-                    "step": "voice",
-                    "status": "skip",
-                    "detail": str(exc),
-                })
+                yield _ndjson(
+                    {
+                        "step": "voice",
+                        "status": "skip",
+                        "detail": str(exc),
+                    }
+                )
 
             # Step: mark the turn manually corrected and commit. This
             # also flushes the new Person row (if any) durably.
@@ -1116,19 +1140,21 @@ def reassign_speaker(
             yield _ndjson({"step": "commit", "status": "done"})
 
             # Terminal event with the same shape as the legacy response.
-            yield _ndjson({
-                "step": "result",
-                "status": "done",
-                "detail": {
-                    "segment_id": str(segment_id),
-                    "person_id": str(target_person_id),
-                    "person_name": person_name,
-                    "person_created": person_created,
-                    "face_embedding_id": str(face_id_written) if face_id_written else None,
-                    "voiceprints_written": voice_rows_written,
-                    "match_method": "manual",
-                },
-            })
+            yield _ndjson(
+                {
+                    "step": "result",
+                    "status": "done",
+                    "detail": {
+                        "segment_id": str(segment_id),
+                        "person_id": str(target_person_id),
+                        "person_name": person_name,
+                        "person_created": person_created,
+                        "face_embedding_id": str(face_id_written) if face_id_written else None,
+                        "voiceprints_written": voice_rows_written,
+                        "match_method": "manual",
+                    },
+                }
+            )
         except Exception as exc:
             # Anything that escapes a step's own handler ends up here.
             # Roll back the session so a partial write doesn't persist,
@@ -1138,11 +1164,13 @@ def reassign_speaker(
                 db.rollback()
             except Exception:
                 pass
-            yield _ndjson({
-                "step": "unknown",
-                "status": "error",
-                "detail": f"{type(exc).__name__}: {exc}",
-            })
+            yield _ndjson(
+                {
+                    "step": "unknown",
+                    "status": "error",
+                    "detail": f"{type(exc).__name__}: {exc}",
+                }
+            )
 
     return StreamingResponse(stream(), media_type="application/x-ndjson")
 
@@ -1232,9 +1260,7 @@ def bulk_assign_face_run(
     source = db.query(Source).filter(Source.source_id == source_id).first()
     if not source:
         raise HTTPException(status_code=404, detail="Source not found")
-    if not source.video_s3_key and not (
-        source.source_type == "youtube" and source.canonical_url
-    ):
+    if not source.video_s3_key and not (source.source_type == "youtube" and source.canonical_url):
         raise HTTPException(
             status_code=400,
             detail="Source has no video_s3_key and no YouTube URL — face reassign needs pixels",
@@ -1264,11 +1290,7 @@ def bulk_assign_face_run(
         new_name = (body.new_person_name or "").strip()
         if not new_name:
             raise HTTPException(status_code=400, detail="`new_person_name` is empty")
-        person = (
-            db.query(Person)
-            .filter(func.lower(Person.canonical_name) == new_name.lower())
-            .first()
-        )
+        person = db.query(Person).filter(func.lower(Person.canonical_name) == new_name.lower()).first()
         if not person:
             person = Person(canonical_name=new_name)
             db.add(person)
@@ -1301,7 +1323,7 @@ def bulk_assign_face_run(
     # Process in the request order so the client's progress UI lines up
     # with what it sent.
     speakers_by_id = {sp.segment_id: sp for sp in speakers}
-    ordered = [speakers_by_id[sid] for sid in body.segment_ids]
+    [speakers_by_id[sid] for sid in body.segment_ids]
 
     use_cluster = body.cluster_id is not None
     cluster_detections: list[SourceFaceDetection] = []
@@ -1318,24 +1340,23 @@ def bulk_assign_face_run(
         if not cluster_detections:
             raise HTTPException(
                 status_code=404,
-                detail=(
-                    f"No source_face_detections for cluster_id={body.cluster_id} "
-                    f"in source {source_id}"
-                ),
+                detail=(f"No source_face_detections for cluster_id={body.cluster_id} in source {source_id}"),
             )
 
     def stream() -> Iterator[bytes]:
         face_writes = 0
         try:
-            yield _ndjson({
-                "step": "person",
-                "status": "done",
-                "detail": {
-                    "person_id": str(target_person_id),
-                    "person_name": person_name,
-                    "person_created": person_created,
-                },
-            })
+            yield _ndjson(
+                {
+                    "step": "person",
+                    "status": "done",
+                    "detail": {
+                        "person_id": str(target_person_id),
+                        "person_name": person_name,
+                        "person_created": person_created,
+                    },
+                }
+            )
 
             # ---- Face exemplars (cluster mode only) -----------------
             # The detections table already holds high-quality embeddings
@@ -1345,14 +1366,16 @@ def bulk_assign_face_run(
             # each turn's midpoint (which often catches the wrong
             # person on screen anyway).
             if use_cluster:
-                yield _ndjson({
-                    "step": "cluster_face",
-                    "status": "start",
-                    "detail": {
-                        "cluster_id": body.cluster_id,
-                        "available_detections": len(cluster_detections),
-                    },
-                })
+                yield _ndjson(
+                    {
+                        "step": "cluster_face",
+                        "status": "start",
+                        "detail": {
+                            "cluster_id": body.cluster_id,
+                            "available_detections": len(cluster_detections),
+                        },
+                    }
+                )
                 samples = cluster_detections[:CLUSTER_EMBEDDING_SAMPLE_LIMIT]
                 exemplar_rows = [
                     PersonFaceEmbedding(
@@ -1368,14 +1391,16 @@ def bulk_assign_face_run(
                 db.add_all(exemplar_rows)
                 db.commit()
                 face_writes = len(exemplar_rows)
-                yield _ndjson({
-                    "step": "cluster_face",
-                    "status": "done",
-                    "detail": {
-                        "cluster_id": body.cluster_id,
-                        "exemplars_written": face_writes,
-                    },
-                })
+                yield _ndjson(
+                    {
+                        "step": "cluster_face",
+                        "status": "done",
+                        "detail": {
+                            "cluster_id": body.cluster_id,
+                            "exemplars_written": face_writes,
+                        },
+                    }
+                )
 
             # ---- Bulk SP attribution --------------------------------
             # Replaces the previous per-turn loop. One UPDATE statement,
@@ -1387,22 +1412,27 @@ def bulk_assign_face_run(
             # deferred to a dedicated voice-focused pass; see
             # speaker-identification.md § Bulk-assign.
             yield _ndjson({"step": "attribute", "status": "start"})
-            turns_updated = db.execute(
-                sa_update(SourceSpeaker)
-                .where(
-                    SourceSpeaker.segment_id.in_(body.segment_ids),
-                )
-                .values(
-                    speaker_person_id=target_person_id,
-                    match_method="manual",
-                    match_confidence=1.0,
-                )
-            ).rowcount or 0
-            yield _ndjson({
-                "step": "attribute",
-                "status": "done",
-                "detail": {"turns_updated": turns_updated},
-            })
+            turns_updated = (
+                db.execute(
+                    sa_update(SourceSpeaker)
+                    .where(
+                        SourceSpeaker.segment_id.in_(body.segment_ids),
+                    )
+                    .values(
+                        speaker_person_id=target_person_id,
+                        match_method="manual",
+                        match_confidence=1.0,
+                    )
+                ).rowcount
+                or 0
+            )
+            yield _ndjson(
+                {
+                    "step": "attribute",
+                    "status": "done",
+                    "detail": {"turns_updated": turns_updated},
+                }
+            )
 
             # ---- Cluster-wide detection attribution -----------------
             # Updates matched_person_id on every detection in the
@@ -1410,14 +1440,17 @@ def bulk_assign_face_run(
             # person. Cheap UPDATE; runs only in cluster mode.
             cluster_detections_updated = 0
             if use_cluster:
-                cluster_detections_updated = db.execute(
-                    sa_update(SourceFaceDetection)
-                    .where(
-                        SourceFaceDetection.source_id == source_id,
-                        SourceFaceDetection.cluster_id == body.cluster_id,
-                    )
-                    .values(matched_person_id=target_person_id)
-                ).rowcount or 0
+                cluster_detections_updated = (
+                    db.execute(
+                        sa_update(SourceFaceDetection)
+                        .where(
+                            SourceFaceDetection.source_id == source_id,
+                            SourceFaceDetection.cluster_id == body.cluster_id,
+                        )
+                        .values(matched_person_id=target_person_id)
+                    ).rowcount
+                    or 0
+                )
 
             # Also stamp source_face_clusters.attributed_person_id so
             # the cluster table is consistent with the detections.
@@ -1430,7 +1463,7 @@ def bulk_assign_face_run(
                     )
                     .values(
                         attributed_person_id=target_person_id,
-                        updated_at=datetime.now(timezone.utc),
+                        updated_at=datetime.now(UTC),
                     )
                 )
 
@@ -1460,43 +1493,49 @@ def bulk_assign_face_run(
                     "Face-track JSON regen failed for %s after bulk-assign",
                     source_id,
                 )
-                yield _ndjson({
-                    "step": "regen_face_track",
-                    "status": "error",
-                    "detail": (
-                        f"{type(exc).__name__}: {exc}. DB updated; retry via "
-                        f"POST /api/sources/{source_id}/face-track/regenerate "
-                        "to refresh the overlay."
-                    ),
-                })
+                yield _ndjson(
+                    {
+                        "step": "regen_face_track",
+                        "status": "error",
+                        "detail": (
+                            f"{type(exc).__name__}: {exc}. DB updated; retry via "
+                            f"POST /api/sources/{source_id}/face-track/regenerate "
+                            "to refresh the overlay."
+                        ),
+                    }
+                )
                 return
             yield _ndjson({"step": "regen_face_track", "status": "done"})
 
-            yield _ndjson({
-                "step": "result",
-                "status": "done",
-                "detail": {
-                    "person_id": str(target_person_id),
-                    "person_name": person_name,
-                    "person_created": person_created,
-                    "turns_updated": turns_updated,
-                    "face_embeddings_written": face_writes,
-                    "voiceprints_written": 0,  # voice enrollment deferred — see docstring
-                    "cluster_detections_updated": cluster_detections_updated,
-                    "match_method": "manual",
-                },
-            })
+            yield _ndjson(
+                {
+                    "step": "result",
+                    "status": "done",
+                    "detail": {
+                        "person_id": str(target_person_id),
+                        "person_name": person_name,
+                        "person_created": person_created,
+                        "turns_updated": turns_updated,
+                        "face_embeddings_written": face_writes,
+                        "voiceprints_written": 0,  # voice enrollment deferred — see docstring
+                        "cluster_detections_updated": cluster_detections_updated,
+                        "match_method": "manual",
+                    },
+                }
+            )
         except Exception as exc:
             logger.exception("bulk reassign failed mid-stream")
             try:
                 db.rollback()
             except Exception:
                 pass
-            yield _ndjson({
-                "step": "unknown",
-                "status": "error",
-                "detail": f"{type(exc).__name__}: {exc}",
-            })
+            yield _ndjson(
+                {
+                    "step": "unknown",
+                    "status": "error",
+                    "detail": f"{type(exc).__name__}: {exc}",
+                }
+            )
 
     return StreamingResponse(stream(), media_type="application/x-ndjson")
 
@@ -1540,10 +1579,7 @@ def get_voice_clusters(source_id: uuid.UUID, db: Session = Depends(get_db)):
             name_by_id[str(p.person_id)] = p.canonical_name
 
     for sp in payload["speakers"]:
-        sp["dominant_person_name"] = (
-            name_by_id.get(sp["dominant_person_id"])
-            if sp.get("dominant_person_id") else None
-        )
+        sp["dominant_person_name"] = name_by_id.get(sp["dominant_person_id"]) if sp.get("dominant_person_id") else None
 
     return {
         "source_id": str(source_id),
@@ -1555,8 +1591,7 @@ class VoiceClusterAssignRequest(BaseModel):
     person_id: uuid.UUID | None = Field(
         default=None,
         description=(
-            "Existing Person to attribute every turn in the cluster to. "
-            "Mutually exclusive with ``new_person_name``."
+            "Existing Person to attribute every turn in the cluster to. Mutually exclusive with ``new_person_name``."
         ),
     )
     new_person_name: str | None = Field(
@@ -1564,8 +1599,7 @@ class VoiceClusterAssignRequest(BaseModel):
         min_length=1,
         max_length=200,
         description=(
-            "Canonical name of a Person to create (or reuse, case-insensitive). "
-            "Mutually exclusive with ``person_id``."
+            "Canonical name of a Person to create (or reuse, case-insensitive). Mutually exclusive with ``person_id``."
         ),
     )
 
@@ -1612,11 +1646,7 @@ def bulk_assign_voice_cluster(
             detail="Provide exactly one of `person_id` or `new_person_name`",
         )
 
-    doc = (
-        db.query(SourceDocument)
-        .filter(SourceDocument.source_id == source_id)
-        .first()
-    )
+    doc = db.query(SourceDocument).filter(SourceDocument.source_id == source_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Source has no document")
 
@@ -1627,7 +1657,8 @@ def bulk_assign_voice_cluster(
     # pyannote raw labels (``SPEAKER_NN``) without the frontend having
     # to know which one it's looking at.
     effective_label = func.coalesce(
-        SourceSpeaker.cluster_label, SourceSpeaker.speaker_label,
+        SourceSpeaker.cluster_label,
+        SourceSpeaker.speaker_label,
     )
     cluster_turn_count = (
         db.query(func.count(SourceSpeaker.segment_id))
@@ -1635,15 +1666,13 @@ def bulk_assign_voice_cluster(
             SourceSpeaker.document_id == doc.document_id,
             effective_label == speaker_label,
         )
-        .scalar() or 0
+        .scalar()
+        or 0
     )
     if cluster_turn_count == 0:
         raise HTTPException(
             status_code=404,
-            detail=(
-                f"No source_speakers rows for label={speaker_label!r} in "
-                f"source {source_id}"
-            ),
+            detail=(f"No source_speakers rows for label={speaker_label!r} in source {source_id}"),
         )
 
     # Resolve Person up-front and commit. enroll-voice-cli flushed-only
@@ -1659,11 +1688,7 @@ def bulk_assign_voice_cluster(
         new_name = (body.new_person_name or "").strip()
         if not new_name:
             raise HTTPException(status_code=400, detail="`new_person_name` is empty")
-        person = (
-            db.query(Person)
-            .filter(func.lower(Person.canonical_name) == new_name.lower())
-            .first()
-        )
+        person = db.query(Person).filter(func.lower(Person.canonical_name) == new_name.lower()).first()
         if not person:
             person = Person(canonical_name=new_name)
             db.add(person)
@@ -1692,35 +1717,41 @@ def bulk_assign_voice_cluster(
 
     def stream() -> Iterator[bytes]:
         try:
-            yield _ndjson({
-                "step": "person",
-                "status": "done",
-                "detail": {
-                    "person_id": str(target_person_id),
-                    "person_name": person_name,
-                    "person_created": person_created,
-                },
-            })
+            yield _ndjson(
+                {
+                    "step": "person",
+                    "status": "done",
+                    "detail": {
+                        "person_id": str(target_person_id),
+                        "person_name": person_name,
+                        "person_created": person_created,
+                    },
+                }
+            )
 
             # ---- Voiceprint promotion -------------------------------
             voiceprints_written = 0
             if not sample_rows:
-                yield _ndjson({
-                    "step": "voice_enrol",
-                    "status": "skip",
-                    "detail": (
-                        "No turns with non-NULL embedding in this cluster — "
-                        "speaker_person_id will still be set, but no "
-                        "voiceprints can be written. Re-run diarisation if "
-                        "this is unexpected."
-                    ),
-                })
+                yield _ndjson(
+                    {
+                        "step": "voice_enrol",
+                        "status": "skip",
+                        "detail": (
+                            "No turns with non-NULL embedding in this cluster — "
+                            "speaker_person_id will still be set, but no "
+                            "voiceprints can be written. Re-run diarisation if "
+                            "this is unexpected."
+                        ),
+                    }
+                )
             else:
-                yield _ndjson({
-                    "step": "voice_enrol",
-                    "status": "start",
-                    "detail": {"sample_size": len(sample_rows)},
-                })
+                yield _ndjson(
+                    {
+                        "step": "voice_enrol",
+                        "status": "start",
+                        "detail": {"sample_size": len(sample_rows)},
+                    }
+                )
                 voiceprint_rows = [
                     PersonVoiceprint(
                         person_id=target_person_id,
@@ -1736,61 +1767,72 @@ def bulk_assign_voice_cluster(
                 db.add_all(voiceprint_rows)
                 db.flush()
                 voiceprints_written = len(voiceprint_rows)
-                yield _ndjson({
-                    "step": "voice_enrol",
-                    "status": "done",
-                    "detail": {"voiceprints_written": voiceprints_written},
-                })
+                yield _ndjson(
+                    {
+                        "step": "voice_enrol",
+                        "status": "done",
+                        "detail": {"voiceprints_written": voiceprints_written},
+                    }
+                )
 
             # ---- Bulk SP attribution --------------------------------
             yield _ndjson({"step": "attribute", "status": "start"})
-            turns_updated = db.execute(
-                sa_update(SourceSpeaker)
-                .where(
-                    SourceSpeaker.document_id == doc.document_id,
-                    effective_label == speaker_label,
-                )
-                .values(
-                    speaker_person_id=target_person_id,
-                    match_method="manual",
-                    match_confidence=1.0,
-                )
-            ).rowcount or 0
-            yield _ndjson({
-                "step": "attribute",
-                "status": "done",
-                "detail": {"turns_updated": turns_updated},
-            })
+            turns_updated = (
+                db.execute(
+                    sa_update(SourceSpeaker)
+                    .where(
+                        SourceSpeaker.document_id == doc.document_id,
+                        effective_label == speaker_label,
+                    )
+                    .values(
+                        speaker_person_id=target_person_id,
+                        match_method="manual",
+                        match_confidence=1.0,
+                    )
+                ).rowcount
+                or 0
+            )
+            yield _ndjson(
+                {
+                    "step": "attribute",
+                    "status": "done",
+                    "detail": {"turns_updated": turns_updated},
+                }
+            )
 
             # ---- Commit ---------------------------------------------
             yield _ndjson({"step": "commit", "status": "start"})
             db.commit()
             yield _ndjson({"step": "commit", "status": "done"})
 
-            yield _ndjson({
-                "step": "result",
-                "status": "done",
-                "detail": {
-                    "person_id": str(target_person_id),
-                    "person_name": person_name,
-                    "person_created": person_created,
-                    "speaker_label": speaker_label,
-                    "turns_updated": turns_updated,
-                    "voiceprints_written": voiceprints_written,
-                    "match_method": "manual",
-                },
-            })
+            yield _ndjson(
+                {
+                    "step": "result",
+                    "status": "done",
+                    "detail": {
+                        "person_id": str(target_person_id),
+                        "person_name": person_name,
+                        "person_created": person_created,
+                        "speaker_label": speaker_label,
+                        "turns_updated": turns_updated,
+                        "voiceprints_written": voiceprints_written,
+                        "match_method": "manual",
+                    },
+                }
+            )
         except Exception as exc:
             logger.exception("voice-cluster assign failed mid-stream")
             try:
                 db.rollback()
             except Exception:
                 pass
-            yield _ndjson({
-                "step": "unknown",
-                "status": "error",
-                "detail": f"{type(exc).__name__}: {exc}",
-            })
+            yield _ndjson(
+                {
+                    "step": "unknown",
+                    "status": "error",
+                    "detail": f"{type(exc).__name__}: {exc}",
+                }
+            )
 
     return StreamingResponse(stream(), media_type="application/x-ndjson")
 
@@ -1802,6 +1844,7 @@ class VoiceTurnReassignRequest(BaseModel):
     worker, no S3 audio download — the turn's medoid embedding is
     already on the row.
     """
+
     person_id: uuid.UUID | None = Field(
         default=None,
         description="Existing Person to attribute this turn to.",
@@ -1811,8 +1854,7 @@ class VoiceTurnReassignRequest(BaseModel):
         min_length=1,
         max_length=200,
         description=(
-            "Canonical name of a Person to create (or reuse, "
-            "case-insensitive). Mutually exclusive with person_id."
+            "Canonical name of a Person to create (or reuse, case-insensitive). Mutually exclusive with person_id."
         ),
     )
 
@@ -1854,23 +1896,16 @@ def voice_reassign_turn(
     if not source:
         raise HTTPException(status_code=404, detail="Source not found")
 
-    turn = (
-        db.query(SourceSpeaker)
-        .filter(SourceSpeaker.segment_id == segment_id)
-        .first()
-    )
+    turn = db.query(SourceSpeaker).filter(SourceSpeaker.segment_id == segment_id).first()
     if not turn:
         raise HTTPException(status_code=404, detail="Turn not found")
     # Confirm the segment belongs to this source — defends against
     # cross-source URL tampering.
-    doc = (
-        db.query(SourceDocument)
-        .filter(SourceDocument.document_id == turn.document_id)
-        .first()
-    )
+    doc = db.query(SourceDocument).filter(SourceDocument.document_id == turn.document_id).first()
     if not doc or doc.source_id != source_id:
         raise HTTPException(
-            status_code=404, detail="Turn does not belong to this source",
+            status_code=404,
+            detail="Turn does not belong to this source",
         )
 
     # Resolve / create Person. Commit the new person before the turn
@@ -1885,11 +1920,7 @@ def voice_reassign_turn(
         new_name = (body.new_person_name or "").strip()
         if not new_name:
             raise HTTPException(status_code=400, detail="new_person_name is empty")
-        person = (
-            db.query(Person)
-            .filter(func.lower(Person.canonical_name) == new_name.lower())
-            .first()
-        )
+        person = db.query(Person).filter(func.lower(Person.canonical_name) == new_name.lower()).first()
         if not person:
             person = Person(canonical_name=new_name)
             db.add(person)
@@ -1936,20 +1967,24 @@ class VoiceReclusterRequest(BaseModel):
     these as sliders so the operator can tighten / loosen the clustering
     per-source without redeploying.
     """
+
     min_cluster_size: int | None = Field(
-        default=None, ge=2, le=200,
+        default=None,
+        ge=2,
+        le=200,
         description="HDBSCAN min_cluster_size. Lower → finds smaller clusters.",
     )
     min_samples: int | None = Field(
-        default=None, ge=1, le=50,
+        default=None,
+        ge=1,
+        le=50,
         description="HDBSCAN min_samples. Lower → more permissive density.",
     )
     noise_threshold: float | None = Field(
-        default=None, ge=0.0, le=1.0,
-        description=(
-            "Cosine similarity floor (0..1). Higher → tighter clusters, "
-            "more turns labelled noise."
-        ),
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description=("Cosine similarity floor (0..1). Higher → tighter clusters, more turns labelled noise."),
     )
 
 
@@ -1982,11 +2017,7 @@ def recluster_voice_clusters(
     params = VoiceClusterParams(
         min_cluster_size=body.min_cluster_size or defaults.min_cluster_size,
         min_samples=body.min_samples or defaults.min_samples,
-        noise_threshold=(
-            body.noise_threshold
-            if body.noise_threshold is not None
-            else defaults.noise_threshold
-        ),
+        noise_threshold=(body.noise_threshold if body.noise_threshold is not None else defaults.noise_threshold),
     )
     result = recluster_source_voice(db, source_id, params=params)
     return {
@@ -2024,11 +2055,7 @@ def get_voice_timeline(source_id: uuid.UUID, db: Session = Depends(get_db)):
     source = db.query(Source).filter(Source.source_id == source_id).first()
     if not source:
         raise HTTPException(status_code=404, detail="Source not found")
-    doc = (
-        db.query(SourceDocument)
-        .filter(SourceDocument.source_id == source_id)
-        .first()
-    )
+    doc = db.query(SourceDocument).filter(SourceDocument.source_id == source_id).first()
     if not doc:
         return {"source_id": str(source_id), "turns": []}
 
@@ -2091,11 +2118,7 @@ def get_word_attribution(source_id: uuid.UUID, db: Session = Depends(get_db)):
     source = db.query(Source).filter(Source.source_id == source_id).first()
     if not source:
         raise HTTPException(status_code=404, detail="Source not found")
-    doc = (
-        db.query(SourceDocument)
-        .filter(SourceDocument.source_id == source_id)
-        .first()
-    )
+    doc = db.query(SourceDocument).filter(SourceDocument.source_id == source_id).first()
     if not doc or not doc.s3_key:
         return {"source_id": str(source_id), "words": []}
 
@@ -2105,7 +2128,7 @@ def get_word_attribution(source_id: uuid.UUID, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=502,
             detail=f"Failed to load Deepgram JSON from S3: {exc}",
-        )
+        ) from exc
 
     # Face frames sorted by ts, plus per-frame active speaker (cluster
     # with highest mouth_opening above threshold).
@@ -2127,12 +2150,9 @@ def get_word_attribution(source_id: uuid.UUID, db: Session = Depends(get_db)):
     sorted_frame_ts = sorted(by_frame.keys())
 
     cluster_meta = {
-        c.cluster_id: c
-        for c in db.query(SourceFaceCluster).filter(SourceFaceCluster.source_id == source_id).all()
+        c.cluster_id: c for c in db.query(SourceFaceCluster).filter(SourceFaceCluster.source_id == source_id).all()
     }
-    person_ids: set[uuid.UUID] = {
-        c.attributed_person_id for c in cluster_meta.values() if c.attributed_person_id
-    }
+    person_ids: set[uuid.UUID] = {c.attributed_person_id for c in cluster_meta.values() if c.attributed_person_id}
     for r in det_rows:
         if r.matched_person_id:
             person_ids.add(r.matched_person_id)
@@ -2156,9 +2176,7 @@ def get_word_attribution(source_id: uuid.UUID, db: Session = Depends(get_db)):
             "per_detection_matched_person_name": names.get(matched_pid) if matched_pid else None,
         }
 
-    excluded_cluster_ids = {
-        cid for cid, c in cluster_meta.items() if c.excluded
-    }
+    excluded_cluster_ids = {cid for cid, c in cluster_meta.items() if c.excluded}
 
     def lookup_faces(word_start: float) -> tuple[list[dict], dict | None]:
         """Return (visible_faces, active_speaker).
@@ -2212,9 +2230,7 @@ def get_word_attribution(source_id: uuid.UUID, db: Session = Depends(get_db)):
             entry["mouth_opening"] = float(mo)
             entry["is_excluded"] = (cid in excluded_cluster_ids) if cid is not None else False
             entry["is_active_speaker"] = (
-                active is not None
-                and cid == active["face_cluster_id"]
-                and mo == active["mouth_opening"]
+                active is not None and cid == active["face_cluster_id"] and mo == active["mouth_opening"]
             )
             visible.append(entry)
         return visible, active
@@ -2233,14 +2249,16 @@ def get_word_attribution(source_id: uuid.UUID, db: Session = Depends(get_db)):
         except (KeyError, TypeError, ValueError):
             continue
         visible, active = lookup_faces(ws)
-        out_words.append({
-            "start": ws,
-            "end": we,
-            "word": str(w.get("punctuated_word") or w.get("word") or ""),
-            "confidence": float(w.get("confidence") or 0.0),
-            "visible_faces": visible,
-            "active_speaker": active,
-        })
+        out_words.append(
+            {
+                "start": ws,
+                "end": we,
+                "word": str(w.get("punctuated_word") or w.get("word") or ""),
+                "confidence": float(w.get("confidence") or 0.0),
+                "visible_faces": visible,
+                "active_speaker": active,
+            }
+        )
 
     return {
         "source_id": str(source_id),
@@ -2287,16 +2305,11 @@ def get_face_transcript(
         raise HTTPException(status_code=404, detail="Source not found")
 
     segments = segment_by_face(
-        db, source_id,
-        mouth_threshold=(
-            mouth_threshold if mouth_threshold is not None else FACE_TX_DEFAULT_MOUTH
-        ),
-        smooth_gap_seconds=(
-            smooth_gap if smooth_gap is not None else FACE_TX_DEFAULT_SMOOTH
-        ),
-        min_segment_seconds=(
-            min_segment if min_segment is not None else FACE_TX_DEFAULT_MIN_SEGMENT
-        ),
+        db,
+        source_id,
+        mouth_threshold=(mouth_threshold if mouth_threshold is not None else FACE_TX_DEFAULT_MOUTH),
+        smooth_gap_seconds=(smooth_gap if smooth_gap is not None else FACE_TX_DEFAULT_SMOOTH),
+        min_segment_seconds=(min_segment if min_segment is not None else FACE_TX_DEFAULT_MIN_SEGMENT),
     )
 
     if not include_silence:
@@ -2317,15 +2330,9 @@ def get_face_transcript(
     return {
         "source_id": str(source_id),
         "params_used": {
-            "mouth_threshold": (
-                mouth_threshold if mouth_threshold is not None else FACE_TX_DEFAULT_MOUTH
-            ),
-            "smooth_gap": (
-                smooth_gap if smooth_gap is not None else FACE_TX_DEFAULT_SMOOTH
-            ),
-            "min_segment": (
-                min_segment if min_segment is not None else FACE_TX_DEFAULT_MIN_SEGMENT
-            ),
+            "mouth_threshold": (mouth_threshold if mouth_threshold is not None else FACE_TX_DEFAULT_MOUTH),
+            "smooth_gap": (smooth_gap if smooth_gap is not None else FACE_TX_DEFAULT_SMOOTH),
+            "min_segment": (min_segment if min_segment is not None else FACE_TX_DEFAULT_MIN_SEGMENT),
             "include_silence": include_silence,
         },
         "segments": payload,

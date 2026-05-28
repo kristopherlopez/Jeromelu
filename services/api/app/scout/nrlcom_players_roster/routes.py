@@ -27,7 +27,10 @@ PIPELINE = "nrlcom-players-roster"
 
 
 def run_nrlcom_players_roster(
-    db: Session, *, competition: int, team: int,
+    db: Session,
+    *,
+    competition: int,
+    team: int,
 ) -> dict[str, Any]:
     brief = f"nrl.com players-roster (comp={competition} team={team})"
     run = start_deterministic_run(
@@ -55,27 +58,21 @@ def run_nrlcom_players_roster(
         # so a validation failure never loses the capture.
         NrlcomPlayersRoster.model_validate(data)
         detail["validated"] = True
-        logger.info("scout/nrlcom-players-roster: comp=%s team=%s profiles=%d",
-                    competition, team, n_profiles)
+        logger.info("scout/nrlcom-players-roster: comp=%s team=%s profiles=%d", competition, team, n_profiles)
     except NrlcomPlayersFetchError as e:
         run.fail(e, summary_text=f"Upstream fetch failed: {e}")
-        raise HTTPException(status_code=502, detail=f"players-roster fetch failed: {e}")
+        raise HTTPException(status_code=502, detail=f"players-roster fetch failed: {e}") from e
     except ValidationError as e:
         run.fail(
             e,
             summary_text=f"Players-roster response failed strict validation (drift): {e}",
         )
-        raise HTTPException(status_code=500, detail=f"nrl.com players-roster drift: {e}")
+        raise HTTPException(status_code=500, detail=f"nrl.com players-roster drift: {e}") from e
     except Exception as e:
         run.fail(e, summary_text=f"Pipeline failed: {e}")
         raise
 
-    run.complete(
-        summary_text=(
-            f"nrl.com players-roster: comp={competition} team={team} "
-            f"profiles={n_profiles}"
-        )
-    )
+    run.complete(summary_text=(f"nrl.com players-roster: comp={competition} team={team} profiles={n_profiles}"))
     return {"run_id": run.run_id, "ok": True, **detail}
 
 
@@ -131,55 +128,67 @@ def run_nrlcom_players_roster_refresh_all(
     for idx, (short, team_id) in enumerate(NRL_TEAM_IDS):
         try:
             per_team = run_nrlcom_players_roster(
-                db, competition=competition, team=team_id,
+                db,
+                competition=competition,
+                team=team_id,
             )
             # Per-team detail comes back as {run_id, ok, **detail}; project
             # only the fields the envelope cares about for the response body.
-            results.append({
-                "team_id": team_id,
-                "short": short,
-                "ok": True,
-                "profiles": per_team.get("profiles"),
-                "s3_archive_key": per_team.get("s3_archive_key"),
-                "validated": per_team.get("validated"),
-                "run_id": per_team.get("run_id"),
-            })
-        except HTTPException as e:
-            errors.append({
-                "team_id": team_id,
-                "short": short,
-                "status_code": e.status_code,
-                "error": str(e.detail),
-            })
-            logger.warning(
-                "scout/nrlcom-players-roster-refresh-all: team=%s (%s) failed "
-                "with HTTPException %s: %s",
-                team_id, short, e.status_code, e.detail,
+            results.append(
+                {
+                    "team_id": team_id,
+                    "short": short,
+                    "ok": True,
+                    "profiles": per_team.get("profiles"),
+                    "s3_archive_key": per_team.get("s3_archive_key"),
+                    "validated": per_team.get("validated"),
+                    "run_id": per_team.get("run_id"),
+                }
             )
-        except Exception as e:  # noqa: BLE001
-            errors.append({
-                "team_id": team_id,
-                "short": short,
-                "error": f"{type(e).__name__}: {e}",
-            })
+        except HTTPException as e:
+            errors.append(
+                {
+                    "team_id": team_id,
+                    "short": short,
+                    "status_code": e.status_code,
+                    "error": str(e.detail),
+                }
+            )
             logger.warning(
-                "scout/nrlcom-players-roster-refresh-all: team=%s (%s) failed "
-                "with %s: %s",
-                team_id, short, type(e).__name__, e,
+                "scout/nrlcom-players-roster-refresh-all: team=%s (%s) failed with HTTPException %s: %s",
+                team_id,
+                short,
+                e.status_code,
+                e.detail,
+            )
+        except Exception as e:
+            errors.append(
+                {
+                    "team_id": team_id,
+                    "short": short,
+                    "error": f"{type(e).__name__}: {e}",
+                }
+            )
+            logger.warning(
+                "scout/nrlcom-players-roster-refresh-all: team=%s (%s) failed with %s: %s",
+                team_id,
+                short,
+                type(e).__name__,
+                e,
             )
 
         if idx < n_teams - 1:
             time.sleep(sleep_seconds)
 
-    envelope.detail.update({
-        "teams_walked": n_teams,
-        "ok_count": len(results),
-        "error_count": len(errors),
-    })
-
-    summary = (
-        f"nrl.com players-roster walk: comp={competition} ok={len(results)}/{n_teams}"
+    envelope.detail.update(
+        {
+            "teams_walked": n_teams,
+            "ok_count": len(results),
+            "error_count": len(errors),
+        }
     )
+
+    summary = f"nrl.com players-roster walk: comp={competition} ok={len(results)}/{n_teams}"
     if errors:
         bad_ids = ",".join(str(e["team_id"]) for e in errors)
         envelope.fail(

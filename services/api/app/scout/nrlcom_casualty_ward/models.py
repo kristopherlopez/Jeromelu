@@ -62,4 +62,4 @@ class NrlcomCasualtyWard(BaseModel):
     selectedCompetitionId: int
 
 
-__all__ = ["NrlcomCasualtyWard", "Casualty"]
+__all__ = ["Casualty", "NrlcomCasualtyWard"]

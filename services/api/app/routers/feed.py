@@ -1,16 +1,13 @@
 """Feed API — serve Events as FeedItems for the frontend."""
 
-import hashlib
-import json
 import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
-
 from jeromelu_shared.db import Event, Person, Prediction, Source
 from jeromelu_shared.rag import ask_jeromelu
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
 from ..deps import get_db
 
@@ -51,10 +48,12 @@ def _event_to_item(ev: Event, entities: dict, sources: dict, predictions: dict) 
         for eid in ev.related_entity_ids:
             person = entities.get(eid)
             if person and person.canonical_name:
-                players.append({
-                    "name": person.canonical_name,
-                    "entityId": str(person.person_id),
-                })
+                players.append(
+                    {
+                        "name": person.canonical_name,
+                        "entityId": str(person.person_id),
+                    }
+                )
 
     # Source ref (single, from FK)
     source = None
@@ -121,11 +120,7 @@ def get_feed(
     db: Session = Depends(get_db),
 ):
     """Paginated feed of events."""
-    query = (
-        db.query(Event)
-        .filter(Event.visibility == "public")
-        .order_by(Event.created_at.desc())
-    )
+    query = db.query(Event).filter(Event.visibility == "public").order_by(Event.created_at.desc())
 
     # Cursor pagination
     if before:
@@ -184,6 +179,7 @@ def get_feed(
 # ---------------------------------------------------------------------------
 # POST /api/feed/ask — Ask JeromeLu, persist Q&A as feed events
 # ---------------------------------------------------------------------------
+
 
 class FeedAskRequest(BaseModel):
     question: str = Field(..., max_length=500)

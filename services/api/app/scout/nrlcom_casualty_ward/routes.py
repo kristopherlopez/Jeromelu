@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -48,7 +48,7 @@ def run_nrlcom_casualty_ward(
         archive_key = archive_response(
             source="nrlcom",
             pipeline="casualty-ward",
-            identity_path=f"{competition}/{datetime.now(timezone.utc).strftime('%Y%m%d')}.json",
+            identity_path=f"{competition}/{datetime.now(UTC).strftime('%Y%m%d')}.json",
             payload=data,
         )
         set_archive_detail(detail, archive_key)
@@ -58,17 +58,16 @@ def run_nrlcom_casualty_ward(
         # so a validation failure never loses the capture.
         NrlcomCasualtyWard.model_validate(data)
         detail["validated"] = True
-        logger.info("scout/nrlcom-casualty-ward: comp=%s casualties=%d s3=%s",
-                    competition, n, archive_key)
+        logger.info("scout/nrlcom-casualty-ward: comp=%s casualties=%d s3=%s", competition, n, archive_key)
     except NrlcomCasualtyFetchError as e:
         run.fail(e, summary_text=f"Upstream fetch failed: {e}")
-        raise HTTPException(status_code=502, detail=f"casualty-ward fetch failed: {e}")
+        raise HTTPException(status_code=502, detail=f"casualty-ward fetch failed: {e}") from e
     except ValidationError as e:
         run.fail(
             e,
             summary_text=f"Casualty-ward response failed strict validation (drift): {e}",
         )
-        raise HTTPException(status_code=500, detail=f"nrl.com casualty-ward drift: {e}")
+        raise HTTPException(status_code=500, detail=f"nrl.com casualty-ward drift: {e}") from e
     except Exception as e:
         run.fail(e, summary_text=f"Pipeline failed: {e}")
         raise

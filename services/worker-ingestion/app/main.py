@@ -1,9 +1,8 @@
 import asyncio
 import logging
 
+from jeromelu_shared.temporal import INGESTION_QUEUE, get_temporal_client
 from temporalio.worker import Worker
-
-from jeromelu_shared.temporal import get_temporal_client, INGESTION_QUEUE
 
 from app.activities.collection import collect_transcript
 from app.activities.discovery import discover_new_videos

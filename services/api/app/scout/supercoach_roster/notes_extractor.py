@@ -24,15 +24,14 @@ import logging
 import re
 from typing import Any
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
 from jeromelu_shared.db.models import (
     Claim,
     ClaimAssociation,
     Person,
     Quote,
 )
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -90,8 +89,7 @@ def extract_notes_as_claims(
     person_by_sc_id: dict[int, str] = {}
     if sc_ids_with_notes:
         rows = db.execute(
-            select(Person.person_id, Person.supercoach_id)
-            .where(Person.supercoach_id.in_(sc_ids_with_notes))
+            select(Person.person_id, Person.supercoach_id).where(Person.supercoach_id.in_(sc_ids_with_notes))
         ).all()
         person_by_sc_id = {sc_id: str(pid) for pid, sc_id in rows}
 
@@ -99,8 +97,7 @@ def extract_notes_as_claims(
     #    editorial speaker — dedup happens against this set.
     existing: set[tuple[str, str]] = set()
     rows = db.execute(
-        select(Quote.said_at_reference, Quote.quoted_text)
-        .where(Quote.speaker_person_id == SC_EDITORIAL_PERSON_ID)
+        select(Quote.said_at_reference, Quote.quoted_text).where(Quote.speaker_person_id == SC_EDITORIAL_PERSON_ID)
     ).all()
     for said_at, quoted_text in rows:
         existing.add((said_at or "", quoted_text or ""))
@@ -165,10 +162,12 @@ def extract_notes_as_claims(
     db.commit()
 
     logger.info(
-        "sc-editorial notes extract: seen=%d inserted=%d already_present=%d "
-        "players_with_notes=%d unmatched=%d",
-        notes_seen, notes_inserted, already_present,
-        players_with_notes, player_unmatched,
+        "sc-editorial notes extract: seen=%d inserted=%d already_present=%d players_with_notes=%d unmatched=%d",
+        notes_seen,
+        notes_inserted,
+        already_present,
+        players_with_notes,
+        player_unmatched,
     )
 
     return {
@@ -181,9 +180,9 @@ def extract_notes_as_claims(
 
 
 __all__ = [
-    "extract_notes_as_claims",
-    "classify_claim_type",
+    "SC_EDITORIAL_DOCUMENT_ID",
     "SC_EDITORIAL_PERSON_ID",
     "SC_EDITORIAL_SOURCE_ID",
-    "SC_EDITORIAL_DOCUMENT_ID",
+    "classify_claim_type",
+    "extract_notes_as_claims",
 ]

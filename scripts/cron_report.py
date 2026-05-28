@@ -41,12 +41,11 @@ import sys
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import boto3
 from botocore.exceptions import ClientError
-
 
 # Windows-style stdout fix is harmless on Linux — keeps parity with cost_report.py.
 if hasattr(sys.stdout, "reconfigure"):
@@ -83,17 +82,20 @@ COLOR = {OK: "#1a7f37", WARN: "#bf8700", FAIL: "#cf222e"}
 
 # ---- Data model ------------------------------------------------------------
 
+
 @dataclass
 class Row:
     """One row in the digest. Each scheduled job produces one Row."""
+
     name: str
-    schedule: str          # human-readable, e.g. "23:00 UTC daily"
-    status: str            # OK / WARN / FAIL
-    last_run: str          # "2026-05-23T23:00:12Z" or "—"
-    detail: str            # one-line summary of what the run did
+    schedule: str  # human-readable, e.g. "23:00 UTC daily"
+    status: str  # OK / WARN / FAIL
+    last_run: str  # "2026-05-23T23:00:12Z" or "—"
+    detail: str  # one-line summary of what the run did
 
 
 # ---- Postgres helpers ------------------------------------------------------
+
 
 def _psql(query: str) -> str:
     """Run a single SQL statement against the prod DB via docker exec.
@@ -105,12 +107,25 @@ def _psql(query: str) -> str:
     db = os.environ.get("POSTGRES_DB", "jeromelu")
     result = subprocess.run(
         [
-            "docker", "exec", "-i", "jeromelu-postgres",
-            "psql", "-U", user, "-d", db,
-            "-t", "-A", "-F", "\t",
-            "-c", query,
+            "docker",
+            "exec",
+            "-i",
+            "jeromelu-postgres",
+            "psql",
+            "-U",
+            user,
+            "-d",
+            db,
+            "-t",
+            "-A",
+            "-F",
+            "\t",
+            "-c",
+            query,
         ],
-        capture_output=True, text=True, check=True,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     return result.stdout.strip()
 
@@ -120,7 +135,7 @@ def count_channel_metrics_24h(now: datetime) -> tuple[int, int]:
     out = _psql(
         "SELECT COUNT(*), COUNT(DISTINCT channel_id) "
         "FROM channel_metrics "
-        f"WHERE sampled_at > NOW() - INTERVAL '24 hours';"
+        "WHERE sampled_at > NOW() - INTERVAL '24 hours';"
     )
     if not out:
         return 0, 0
@@ -135,17 +150,13 @@ def count_video_metrics_24h(now: datetime) -> tuple[int, int, int]:
     ingested_at within the window — proxy for "discovered today".
     """
     metrics_out = _psql(
-        "SELECT COUNT(*), COUNT(DISTINCT source_id) "
-        "FROM video_metrics "
-        "WHERE sampled_at > NOW() - INTERVAL '24 hours';"
+        "SELECT COUNT(*), COUNT(DISTINCT source_id) FROM video_metrics WHERE sampled_at > NOW() - INTERVAL '24 hours';"
     )
     # `created_at` is the discovery timestamp (NOT NULL, default now()).
     # `ingested_at` is later — set when transcription/audio fetch lands,
     # so it's the wrong field for "new videos discovered today".
     new_out = _psql(
-        "SELECT COUNT(*) FROM sources "
-        "WHERE source_type = 'youtube' "
-        "AND created_at > NOW() - INTERVAL '24 hours';"
+        "SELECT COUNT(*) FROM sources WHERE source_type = 'youtube' AND created_at > NOW() - INTERVAL '24 hours';"
     )
     if not metrics_out:
         return 0, 0, int(new_out or 0)
@@ -213,12 +224,13 @@ def latest_pg_backup_log(now: datetime) -> datetime | None:
 def _parse_log_ts(s: str) -> datetime | None:
     """Logs use date -u +%FT%TZ → 2026-05-23T23:00:12Z."""
     try:
-        return datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        return datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
     except ValueError:
         return None
 
 
 # ---- S3 / pg-backup --------------------------------------------------------
+
 
 def latest_pg_backup_s3(now: datetime) -> dict[str, Any] | None:
     """Latest object under s3://{bucket}/{prefix} within RUN_WINDOW.
@@ -244,6 +256,7 @@ def latest_pg_backup_s3(now: datetime) -> dict[str, Any] | None:
 
 # ---- GitHub Actions API ----------------------------------------------------
 
+
 def latest_cost_report_run(now: datetime) -> dict[str, Any] | None:
     """Most recent run of cost-report.yml in window, via GH REST API.
 
@@ -255,10 +268,7 @@ def latest_cost_report_run(now: datetime) -> dict[str, Any] | None:
     if not token:
         return {"status": "unknown", "reason": "GITHUB_TOKEN not set"}
 
-    url = (
-        f"https://api.github.com/repos/{GITHUB_REPO}"
-        f"/actions/workflows/{COST_REPORT_WORKFLOW}/runs?per_page=1"
-    )
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/actions/workflows/{COST_REPORT_WORKFLOW}/runs?per_page=1"
     req = urllib.request.Request(
         url,
         headers={
@@ -277,13 +287,11 @@ def latest_cost_report_run(now: datetime) -> dict[str, Any] | None:
     if not runs:
         return None
     run = runs[0]
-    created_at = datetime.strptime(
-        run["created_at"], "%Y-%m-%dT%H:%M:%SZ"
-    ).replace(tzinfo=timezone.utc)
+    created_at = datetime.strptime(run["created_at"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
     if created_at < now - RUN_WINDOW:
         return None
     return {
-        "status": run["status"],          # queued / in_progress / completed
+        "status": run["status"],  # queued / in_progress / completed
         "conclusion": run["conclusion"],  # success / failure / cancelled / ...
         "created_at": created_at,
         "html_url": run["html_url"],
@@ -291,6 +299,7 @@ def latest_cost_report_run(now: datetime) -> dict[str, Any] | None:
 
 
 # ---- Per-job row builders --------------------------------------------------
+
 
 def row_cost_report(now: datetime) -> Row:
     run = latest_cost_report_run(now)
@@ -433,15 +442,14 @@ def _truncate(s: str, n: int) -> str:
 
 # ---- Rendering -------------------------------------------------------------
 
+
 def render_text(today: datetime, rows: list[Row]) -> str:
     lines: list[str] = []
     lines.append(f"Jeromelu cron health — {today.date().isoformat()}")
     lines.append("=" * 60)
     lines.append("")
     counts = _status_counts(rows)
-    lines.append(
-        f"  {counts[OK]} ok · {counts[WARN]} warn · {counts[FAIL]} fail"
-    )
+    lines.append(f"  {counts[OK]} ok · {counts[WARN]} warn · {counts[FAIL]} fail")
     lines.append("")
     for r in rows:
         lines.append(f"  {GLYPH[r.status]} {r.name}")
@@ -454,11 +462,7 @@ def render_text(today: datetime, rows: list[Row]) -> str:
 
 def render_html(today: datetime, rows: list[Row]) -> str:
     counts = _status_counts(rows)
-    header_color = (
-        COLOR[FAIL] if counts[FAIL]
-        else COLOR[WARN] if counts[WARN]
-        else COLOR[OK]
-    )
+    header_color = COLOR[FAIL] if counts[FAIL] else COLOR[WARN] if counts[WARN] else COLOR[OK]
     row_html = "".join(_render_row_html(r) for r in rows)
     return f"""\
 <!doctype html>
@@ -510,6 +514,7 @@ def _status_counts(rows: list[Row]) -> dict[str, int]:
 
 # ---- Send ------------------------------------------------------------------
 
+
 def send_email(subject: str, html: str, text: str) -> None:
     ses = boto3.client("ses", region_name=PRIMARY_REGION)
     ses.send_email(
@@ -537,7 +542,7 @@ def _subject(today: datetime, rows: list[Row]) -> str:
 
 
 def main() -> int:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     rows = [
         row_cost_report(now),
         row_channel_stats(now),

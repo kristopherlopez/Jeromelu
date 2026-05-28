@@ -94,4 +94,4 @@ class NrlcomPlayersRoster(BaseModel):
     selectedTeamId: int
 
 
-__all__ = ["NrlcomPlayersRoster", "ProfileGroup", "Profile"]
+__all__ = ["NrlcomPlayersRoster", "Profile", "ProfileGroup"]

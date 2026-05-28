@@ -5,9 +5,8 @@ import sys
 from pathlib import Path
 
 import yaml
-from sqlalchemy import text
-
 from jeromelu_shared.db import engine
+from sqlalchemy import text
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -35,17 +34,20 @@ def seed():
 
     with engine.begin() as conn:
         for src in sources:
-            result = conn.execute(UPSERT_SQL, {
-                "slug": src["id"],
-                "platform": src["type"],
-                "external_id": src.get("channel_id"),
-                "name": src["name"],
-                "url": src.get("url"),
-                "description": src.get("description"),
-                "quality_rating": src.get("quality_rating", 5),
-                "tags": src.get("tags", []),
-                "active": src.get("active", True),
-            })
+            result = conn.execute(
+                UPSERT_SQL,
+                {
+                    "slug": src["id"],
+                    "platform": src["type"],
+                    "external_id": src.get("channel_id"),
+                    "name": src["name"],
+                    "url": src.get("url"),
+                    "description": src.get("description"),
+                    "quality_rating": src.get("quality_rating", 5),
+                    "tags": src.get("tags", []),
+                    "active": src.get("active", True),
+                },
+            )
             if result.rowcount > 0:
                 inserted += 1
             else:

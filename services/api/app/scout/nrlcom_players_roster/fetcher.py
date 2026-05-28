@@ -6,7 +6,6 @@ from typing import Any
 
 import httpx
 
-
 PLAYERS_URL = "https://www.nrl.com/players/data"
 
 
@@ -15,7 +14,10 @@ class NrlcomPlayersFetchError(RuntimeError):
 
 
 def fetch_players_roster(
-    *, competition: int, team: int, timeout: float = 20.0,
+    *,
+    competition: int,
+    team: int,
+    timeout: float = 20.0,
 ) -> dict[str, Any]:
     r = httpx.get(
         PLAYERS_URL,
@@ -28,9 +30,9 @@ def fetch_players_roster(
     data = r.json()
     if not isinstance(data, dict) or "profileGroups" not in data:
         raise NrlcomPlayersFetchError(
-            f"Unexpected response: missing 'profileGroups' (keys: {list(data) if isinstance(data, dict) else type(data).__name__})"
+            f"Unexpected response: missing 'profileGroups' (keys: {list(data) if isinstance(data, dict) else type(data).__name__})"  # noqa: E501
         )
     return data
 
 
-__all__ = ["fetch_players_roster", "NrlcomPlayersFetchError"]
+__all__ = ["NrlcomPlayersFetchError", "fetch_players_roster"]

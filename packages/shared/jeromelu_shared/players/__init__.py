@@ -19,8 +19,8 @@ from jeromelu_shared.players.supercoach import (
 )
 
 __all__ = [
-    "NrlProfile",
     "SC_ABBREV_TO_TEAM_SLUG",
+    "NrlProfile",
     "RosterPreconditionError",
     "SuperCoachFetchError",
     "fetch_profile",

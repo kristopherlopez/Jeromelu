@@ -12,12 +12,11 @@ consulted — the backend roster is canonical.
 from __future__ import annotations
 
 import logging
-from typing import Iterable
+from collections.abc import Iterable
 
+from jeromelu_shared.db import Person, PersonRole, PlayerAttributes, Team
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-
-from jeromelu_shared.db import Person, PlayerAttributes, PersonRole, Team
 
 logger = logging.getLogger(__name__)
 
@@ -99,11 +98,7 @@ def build_keyterms(session: Session) -> list[str]:
         for alias in alias_list or []:
             aliases.append(alias)
 
-    team_stmt = (
-        select(Team.short_name, Team.aliases)
-        .where(Team.grade.in_(_NRL_GRADES))
-        .where(Team.active.is_(True))
-    )
+    team_stmt = select(Team.short_name, Team.aliases).where(Team.grade.in_(_NRL_GRADES)).where(Team.active.is_(True))
     team_short: list[str] = []
     team_aliases: list[str] = []
     for short_name, alias_list in session.execute(team_stmt).all():
@@ -120,12 +115,15 @@ def build_keyterms(session: Session) -> list[str]:
     ]
     combined = _truncate([t for band in bands for t in band], KEYTERM_CAP)
     logger.info(
-        "Built %d keyterms (surnames=%d/%d player_aliases=%d/%d "
-        "team_short=%d/%d team_aliases=%d/%d)",
+        "Built %d keyterms (surnames=%d/%d player_aliases=%d/%d team_short=%d/%d team_aliases=%d/%d)",
         len(combined),
-        len(bands[0]), len(surnames),
-        len(bands[3]), len(aliases),
-        len(bands[1]), len(team_short),
-        len(bands[2]), len(team_aliases),
+        len(bands[0]),
+        len(surnames),
+        len(bands[3]),
+        len(aliases),
+        len(bands[1]),
+        len(team_short),
+        len(bands[2]),
+        len(team_aliases),
     )
     return combined

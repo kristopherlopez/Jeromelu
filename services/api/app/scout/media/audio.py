@@ -19,12 +19,11 @@ import logging
 import tempfile
 from dataclasses import dataclass
 
+from jeromelu_shared.config import settings
+from jeromelu_shared.db import Source
 from sqlalchemy.orm import Session
 from youtube_utils import download_audio
 from youtube_utils.exceptions import DownloadError
-
-from jeromelu_shared.config import settings
-from jeromelu_shared.db import Source
 
 from .keys import youtube_audio_key
 from .s3 import media_object_exists, upload_media_file
@@ -36,6 +35,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Result + errors
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class AudioResult:
@@ -53,6 +53,7 @@ class AudioError(Exception):
 # Public API
 # ---------------------------------------------------------------------------
 
+
 def acquire_audio(session: Session, source: Source) -> AudioResult:
     """Pull audio for a single Source. Idempotent on the S3 object.
 
@@ -69,7 +70,8 @@ def acquire_audio(session: Session, source: Source) -> AudioResult:
         if media_object_exists(audio_key):
             logger.info(
                 "Audio already in S3: s3://%s/%s",
-                settings.s3_audio_bucket, audio_key,
+                settings.s3_audio_bucket,
+                audio_key,
             )
         else:
             with tempfile.TemporaryDirectory(prefix="jeromelu-audio-") as tmp:
@@ -80,9 +82,7 @@ def acquire_audio(session: Session, source: Source) -> AudioResult:
                         format="m4a",
                     )
                 except DownloadError as exc:
-                    raise AudioError(
-                        f"yt-dlp download failed for {media.video_id}: {exc}"
-                    ) from exc
+                    raise AudioError(f"yt-dlp download failed for {media.video_id}: {exc}") from exc
 
                 bytes_uploaded = local_path.stat().st_size
                 size_mb = bytes_uploaded / (1024 * 1024)
@@ -90,7 +90,8 @@ def acquire_audio(session: Session, source: Source) -> AudioResult:
                 upload_media_file(audio_key, str(local_path), content_type="audio/mp4")
                 logger.info(
                     "Uploaded to s3://%s/%s",
-                    settings.s3_audio_bucket, audio_key,
+                    settings.s3_audio_bucket,
+                    audio_key,
                 )
 
         source.audio_s3_key = audio_key
@@ -111,9 +112,7 @@ def acquire_audio(session: Session, source: Source) -> AudioResult:
             session.commit()
         except Exception:
             session.rollback()
-            logger.exception(
-                "Failed to mark ingestion_status='failed'; manual cleanup required"
-            )
+            logger.exception("Failed to mark ingestion_status='failed'; manual cleanup required")
         if isinstance(exc, AudioError):
             raise
         raise AudioError(str(exc)) from exc

@@ -5,20 +5,19 @@ change-only-storage change-detection predicate. The DB-backed cursor +
 enumeration + latest-metrics-loader logic belongs in integration/.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
-
 from app.scout.youtube.refresh import (
     _metrics_changed,
     _parse_published_at,
     _video_id_from_url,
 )
 
-
 # ---------------------------------------------------------------------------
 # _video_id_from_url
 # ---------------------------------------------------------------------------
+
 
 class TestVideoIdFromUrl:
     @pytest.mark.parametrize(
@@ -62,10 +61,11 @@ class TestVideoIdFromUrl:
 # _parse_published_at
 # ---------------------------------------------------------------------------
 
+
 class TestParsePublishedAt:
     def test_z_suffix_parsed_as_utc(self):
         result = _parse_published_at("2026-04-29T08:30:00Z")
-        assert result == datetime(2026, 4, 29, 8, 30, 0, tzinfo=timezone.utc)
+        assert result == datetime(2026, 4, 29, 8, 30, 0, tzinfo=UTC)
 
     def test_explicit_offset_preserved(self):
         result = _parse_published_at("2026-04-29T08:30:00+10:00")
@@ -90,6 +90,7 @@ class TestParsePublishedAt:
 # ---------------------------------------------------------------------------
 # _metrics_changed — change-only storage predicate
 # ---------------------------------------------------------------------------
+
 
 class TestMetricsChanged:
     def test_no_prior_snapshot_records(self):

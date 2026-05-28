@@ -6,8 +6,6 @@ deliberately split out of transcribe.py so this test never imports
 diarize → pyannote → torch.
 """
 
-import pytest
-
 from app.analyst.transcribe_helpers import (
     audio_duration,
     max_overlap_turn,
@@ -18,10 +16,10 @@ from app.analyst.transcribe_helpers import (
 )
 from jeromelu_shared.db import SourceSpeaker
 
-
 # ---------------------------------------------------------------------------
 # transcript_s3_key_from_audio
 # ---------------------------------------------------------------------------
+
 
 class TestTranscriptS3KeyFromAudio:
     def test_m4a_replaced_with_deepgram_json(self):
@@ -43,6 +41,7 @@ class TestTranscriptS3KeyFromAudio:
 # ---------------------------------------------------------------------------
 # safe_embedding
 # ---------------------------------------------------------------------------
+
 
 class TestSafeEmbedding:
     def test_none_passthrough(self):
@@ -74,6 +73,7 @@ class TestSafeEmbedding:
 # ---------------------------------------------------------------------------
 # max_overlap_turn
 # ---------------------------------------------------------------------------
+
 
 def _turn(start: float, end: float, label: str = "SPEAKER_00") -> SourceSpeaker:
     """Construct an in-memory SourceSpeaker with just the fields the
@@ -132,6 +132,7 @@ class TestMaxOverlapTurn:
 # ---------------------------------------------------------------------------
 # Deepgram dict accessors
 # ---------------------------------------------------------------------------
+
 
 class TestUtterances:
     def test_present(self):

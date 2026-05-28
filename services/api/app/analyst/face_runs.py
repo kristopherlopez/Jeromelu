@@ -27,10 +27,9 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
+from jeromelu_shared.db import SourceFaceCluster, SourceFaceDetection
 from sqlalchemy import func as sa_func
 from sqlalchemy.orm import Session
-
-from jeromelu_shared.db import SourceFaceCluster, SourceFaceDetection
 
 # Distance in source-frame pixels — two detections within this much of
 # each other's centre are "the same position". 120px is appropriate for
@@ -104,6 +103,7 @@ def _consolidate_positions(buckets: list[list[dict]]) -> list[list[dict]]:
     members. These are almost always edge-case detections from bumper
     shots / cutaways.
     """
+
     def centroid(bucket: list[dict]) -> tuple[float, float]:
         n = max(1, len(bucket))
         sx = sum(_bbox_centre(d["bbox"])[0] for d in bucket) / n
@@ -120,10 +120,7 @@ def _consolidate_positions(buckets: list[list[dict]]) -> list[list[dict]]:
         best_d = CONSOLIDATE_EPS
         for i in range(len(buckets)):
             for j in range(i + 1, len(buckets)):
-                d = (
-                    (cents[i][0] - cents[j][0]) ** 2
-                    + (cents[i][1] - cents[j][1]) ** 2
-                ) ** 0.5
+                d = ((cents[i][0] - cents[j][0]) ** 2 + (cents[i][1] - cents[j][1]) ** 2) ** 0.5
                 if d < best_d:
                     best_d, best_pair = d, (i, j)
         if best_pair is None:
@@ -217,10 +214,8 @@ def _smooth_flickers(
             if (
                 0 < i < len(runs) - 1
                 and length < SMOOTH_FLICKER_FRAMES
-                and detections[runs[i - 1][0]].get("person_id")
-                == detections[runs[i + 1][0]].get("person_id")
-                and detections[s].get("person_id")
-                != detections[runs[i - 1][0]].get("person_id")
+                and detections[runs[i - 1][0]].get("person_id") == detections[runs[i + 1][0]].get("person_id")
+                and detections[s].get("person_id") != detections[runs[i - 1][0]].get("person_id")
             ):
                 # Merge runs[i-1], runs[i], runs[i+1] into one.
                 prev_s, _ = out.pop()
@@ -239,11 +234,7 @@ def _smooth_flickers(
 def _run_from_slice(detections: list[dict], start_idx: int, end_idx: int) -> dict:
     start = detections[start_idx]
     end = detections[end_idx]
-    sims = [
-        d["similarity"]
-        for d in detections[start_idx : end_idx + 1]
-        if d.get("similarity") is not None
-    ]
+    sims = [d["similarity"] for d in detections[start_idx : end_idx + 1] if d.get("similarity") is not None]
     return {
         "person_id": start.get("person_id"),
         "start_ts": start["ts"],
@@ -301,7 +292,7 @@ def compute_face_runs(face_track: dict) -> dict:
     n_positions = max(pos_ids) + 1
 
     by_position: list[list[dict]] = [[] for _ in range(n_positions)]
-    for det, pid in zip(flat, pos_ids):
+    for det, pid in zip(flat, pos_ids, strict=False):
         by_position[pid].append(det)
 
     # Consolidation: merge positions whose centroids are within
@@ -412,9 +403,14 @@ def detections_exist(session: Session, source_id: UUID) -> bool:
     """Cheap check the endpoint uses to decide whether to take the
     detection-backed runs path or fall through to the legacy face-track
     JSON path."""
-    count = session.query(sa_func.count(SourceFaceDetection.detection_id)).filter(
-        SourceFaceDetection.source_id == source_id,
-    ).scalar() or 0
+    count = (
+        session.query(sa_func.count(SourceFaceDetection.detection_id))
+        .filter(
+            SourceFaceDetection.source_id == source_id,
+        )
+        .scalar()
+        or 0
+    )
     return count > 0
 
 
@@ -462,14 +458,8 @@ def compute_face_runs_from_detections(
     # Pull per-cluster metadata in one query — labels, kinds, exclusion
     # flags. NULL cluster_id (HDBSCAN noise) has no row here; treated as
     # the implicit Outliers bucket.
-    cluster_meta_rows = (
-        session.query(SourceFaceCluster)
-        .filter(SourceFaceCluster.source_id == source_id)
-        .all()
-    )
-    meta_by_cluster: dict[int, SourceFaceCluster] = {
-        m.cluster_id: m for m in cluster_meta_rows
-    }
+    cluster_meta_rows = session.query(SourceFaceCluster).filter(SourceFaceCluster.source_id == source_id).all()
+    meta_by_cluster: dict[int, SourceFaceCluster] = {m.cluster_id: m for m in cluster_meta_rows}
 
     by_cluster: dict[int | None, list[dict]] = {}
     for r in rows:
@@ -477,9 +467,7 @@ def compute_face_runs_from_detections(
             "ts": float(r.frame_ts),
             "bbox": [r.bbox_x1, r.bbox_y1, r.bbox_x2, r.bbox_y2],
             "person_id": str(r.matched_person_id) if r.matched_person_id else None,
-            "similarity": (
-                float(r.match_score) if r.match_score is not None else None
-            ),
+            "similarity": (float(r.match_score) if r.match_score is not None else None),
         }
         by_cluster.setdefault(r.cluster_id, []).append(det)
 
@@ -522,10 +510,7 @@ def compute_face_runs_from_detections(
         )
 
         # Label precedence: operator override > visible-position auto-label.
-        label = (
-            meta.label if meta is not None and meta.label
-            else _visible_label(cluster_id, visible_idx)
-        )
+        label = meta.label if meta is not None and meta.label else _visible_label(cluster_id, visible_idx)
 
         # Dominant person across the cluster's detections. Most clusters
         # are one identity, so the UI can drop per-row name labels and
@@ -540,39 +525,44 @@ def compute_face_runs_from_detections(
         dominant_share: float | None = None
         if person_counts:
             dom_pid, dom_count = max(
-                person_counts.items(), key=lambda kv: kv[1],
+                person_counts.items(),
+                key=lambda kv: kv[1],
             )
             dominant_person_id = dom_pid
             dominant_share = dom_count / len(bucket)
 
-        positions.append({
-            "position_id": pid,
-            "label": label,
-            "cluster_id": cluster_id,
-            "centroid": list(centroid),
-            "detection_count": len(bucket),
-            "runs": runs,
-            # Cluster-level attribution — UI uses this so each row doesn't
-            # have to repeat the Person name when the whole cluster is
-            # one identity. dominant_person_name resolved in the caller
-            # alongside the run-level person names.
-            "dominant_person_id": dominant_person_id,
-            "dominant_share": dominant_share,
-            # Slice B PR 2.5 — surface cluster metadata so the UI can
-            # render the kind tag + override controls. ``kind`` is the
-            # operator override (NULL if unreviewed); ``detected_kind``
-            # is the auto-tag the heuristic landed.
-            "kind": meta.kind if meta else None,
-            "detected_kind": meta.detected_kind if meta else None,
-            "excluded": bool(meta.excluded) if meta else False,
-            "label_override": meta.label if meta else None,
-            "notes": meta.notes if meta else None,
-            "stats": {
-                "mouth_open_std": meta.mouth_open_std if meta else None,
-                "centroid_std": meta.centroid_std if meta else None,
-                "temporal_density": meta.temporal_density if meta else None,
-            } if meta else None,
-        })
+        positions.append(
+            {
+                "position_id": pid,
+                "label": label,
+                "cluster_id": cluster_id,
+                "centroid": list(centroid),
+                "detection_count": len(bucket),
+                "runs": runs,
+                # Cluster-level attribution — UI uses this so each row doesn't
+                # have to repeat the Person name when the whole cluster is
+                # one identity. dominant_person_name resolved in the caller
+                # alongside the run-level person names.
+                "dominant_person_id": dominant_person_id,
+                "dominant_share": dominant_share,
+                # Slice B PR 2.5 — surface cluster metadata so the UI can
+                # render the kind tag + override controls. ``kind`` is the
+                # operator override (NULL if unreviewed); ``detected_kind``
+                # is the auto-tag the heuristic landed.
+                "kind": meta.kind if meta else None,
+                "detected_kind": meta.detected_kind if meta else None,
+                "excluded": bool(meta.excluded) if meta else False,
+                "label_override": meta.label if meta else None,
+                "notes": meta.notes if meta else None,
+                "stats": {
+                    "mouth_open_std": meta.mouth_open_std if meta else None,
+                    "centroid_std": meta.centroid_std if meta else None,
+                    "temporal_density": meta.temporal_density if meta else None,
+                }
+                if meta
+                else None,
+            }
+        )
         visible_idx += 1
 
     return {"positions": positions, "excluded_count": excluded_count}

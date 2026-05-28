@@ -5,12 +5,11 @@ import json
 import logging
 from dataclasses import dataclass
 
+from jeromelu_shared.config import settings
+from jeromelu_shared.s3 import download_raw, upload_raw
 from temporalio import activity
 from youtube_utils import fetch_transcript
 from youtube_utils.exceptions import NoTranscriptAvailable, RateLimitError
-
-from jeromelu_shared.config import settings
-from jeromelu_shared.s3 import download_raw, upload_raw
 
 logger = logging.getLogger(__name__)
 

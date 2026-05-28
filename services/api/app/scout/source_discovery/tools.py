@@ -13,12 +13,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from jeromelu_shared.db import Channel, ScoutCandidate, Source
+from jeromelu_shared.youtube import extract_youtube_id
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
-
-from jeromelu_shared.db import Channel, ScoutCandidate, Source
-from jeromelu_shared.youtube import extract_youtube_id
 
 logger = logging.getLogger(__name__)
 
@@ -113,19 +112,27 @@ PERSIST_CANDIDATE_TOOL: dict[str, Any] = {
             },
             "channel_external_id": {
                 "type": "string",
-                "description": (
-                    "For videos only: the parent channel's YouTube ID "
-                    "(UC...) if you can determine it."
-                ),
+                "description": ("For videos only: the parent channel's YouTube ID (UC...) if you can determine it."),
             },
             "content_categories": {
                 "type": "array",
                 "items": {
                     "type": "string",
                     "enum": [
-                        "match", "analysis", "news", "injury", "tactical",
-                        "opinion", "player-content", "classic", "rules-officiating",
-                        "supercoach", "nrlw", "origin", "international", "junior",
+                        "match",
+                        "analysis",
+                        "news",
+                        "injury",
+                        "tactical",
+                        "opinion",
+                        "player-content",
+                        "classic",
+                        "rules-officiating",
+                        "supercoach",
+                        "nrlw",
+                        "origin",
+                        "international",
+                        "junior",
                     ],
                 },
                 "description": "One or more category tags. See system prompt.",
@@ -155,8 +162,12 @@ PERSIST_CANDIDATE_TOOL: dict[str, Any] = {
             },
         },
         "required": [
-            "kind", "url", "title", "content_categories",
-            "score", "score_reasons",
+            "kind",
+            "url",
+            "title",
+            "content_categories",
+            "score",
+            "score_reasons",
         ],
     },
 }
@@ -377,9 +388,7 @@ def handle_dedupe_check(session: Session, *, kind: str, url: str) -> dict[str, A
     # 2. Already an ingested source (video URL match)?
     if kind == "video":
         existing_src = session.execute(
-            select(Source.source_id, Source.title).where(
-                Source.canonical_url == url
-            )
+            select(Source.source_id, Source.title).where(Source.canonical_url == url)
         ).first()
         if existing_src:
             return {
@@ -530,9 +539,7 @@ def handle_persist_candidate(
         # so Postgres auto-named it; the model's explicit `name=` doesn't match
         # the actual DB. index_elements lets Postgres resolve the constraint
         # by the columns it covers, working regardless of how it was named.
-        .on_conflict_do_nothing(
-            index_elements=["platform", "kind", "external_id"]
-        )
+        .on_conflict_do_nothing(index_elements=["platform", "kind", "external_id"])
         .returning(ScoutCandidate.id)
     )
     result = session.execute(stmt).first()
@@ -563,9 +570,7 @@ def handle_persist_candidate(
     }
 
 
-def handle_dedupe_check_bulk(
-    session: Session, *, items: list[dict[str, str]]
-) -> dict[str, Any]:
+def handle_dedupe_check_bulk(session: Session, *, items: list[dict[str, str]]) -> dict[str, Any]:
     """Batched dedupe — check many URLs in one tool call.
 
     Each item: {"kind": "channel"|"video", "url": "..."}.
@@ -576,9 +581,7 @@ def handle_dedupe_check_bulk(
         kind = item.get("kind", "")
         url = item.get("url", "")
         if kind not in ("channel", "video") or not url:
-            results.append(
-                {"input": item, "ok": False, "error": "invalid-item"}
-            )
+            results.append({"input": item, "ok": False, "error": "invalid-item"})
             continue
         verdict = handle_dedupe_check(session, kind=kind, url=url)
         results.append({"input": item, **verdict})
@@ -628,9 +631,7 @@ def summarise_known_sources(session: Session, *, max_lines: int = 200) -> str:
         lines.append("")
 
     if surfaced:
-        lines.append(
-            f"Previously surfaced as candidates ({len(surfaced)}, any status):"
-        )
+        lines.append(f"Previously surfaced as candidates ({len(surfaced)}, any status):")
         budget = max(0, max_lines - len(tracked))
         for row in surfaced[:budget]:
             lines.append(f"  - {row.title} — {row.external_id} [{row.status}]")
@@ -652,6 +653,7 @@ def summarise_known_sources(session: Session, *, max_lines: int = 200) -> str:
 # ---------------------------------------------------------------------------
 # YouTube Data API tools
 # ---------------------------------------------------------------------------
+
 
 def _known_channel_external_ids(session: Session) -> set[str]:
     """All YouTube channel external_ids we already know about — tracked
@@ -690,17 +692,13 @@ def _known_video_external_ids(session: Session) -> set[str]:
     }
 
 
-def handle_youtube_search_channels(
-    session: Session, *, query: str, max_results: int = 10
-) -> dict[str, Any]:
+def handle_youtube_search_channels(session: Session, *, query: str, max_results: int = 10) -> dict[str, Any]:
     """Channel search via the YouTube Data API. Pre-filters known channels."""
     from ..youtube.client import YouTubeAPIError, search_channels
 
     known = _known_channel_external_ids(session)
     try:
-        results = search_channels(
-            query, max_results=max_results, filter_known_external_ids=known
-        )
+        results = search_channels(query, max_results=max_results, filter_known_external_ids=known)
     except YouTubeAPIError as e:
         return {"ok": False, "error": str(e)}
     return {
@@ -741,9 +739,7 @@ def handle_youtube_search_videos(
     }
 
 
-def handle_youtube_channel_stats(
-    session: Session, *, channel_ids: list[str]
-) -> dict[str, Any]:
+def handle_youtube_channel_stats(session: Session, *, channel_ids: list[str]) -> dict[str, Any]:
     """Detailed metadata for one or more channels."""
     from ..youtube.client import YouTubeAPIError, get_channel_stats
 
@@ -754,9 +750,7 @@ def handle_youtube_channel_stats(
     return {"ok": True, "returned": len(results), "results": results}
 
 
-def handle_youtube_related_channels(
-    session: Session, *, channel_id: str
-) -> dict[str, Any]:
+def handle_youtube_related_channels(session: Session, *, channel_id: str) -> dict[str, Any]:
     """Channels that the given channel features in its 'channels' sections."""
     from ..youtube.client import YouTubeAPIError, get_channel_sections
 

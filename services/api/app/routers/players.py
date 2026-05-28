@@ -30,14 +30,13 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-
 from jeromelu_shared.players.nrlcom_refresh import refresh_from_nrlcom
 from jeromelu_shared.players.roster import (
     RosterPreconditionError,
     refresh_roster,
     seed_roster,
 )
+from sqlalchemy.orm import Session
 
 from ..deps import get_db
 from ..scout.supercoach_roster.routes import run_supercoach_roster
@@ -56,10 +55,7 @@ def _coerce_roster(payload: Any) -> list[dict[str, Any]]:
         return payload["players"]
     raise HTTPException(
         status_code=400,
-        detail=(
-            "Body must be a JSON array of SC players, or an object with a "
-            "'players' list."
-        ),
+        detail=("Body must be a JSON array of SC players, or an object with a 'players' list."),
     )
 
 
@@ -75,7 +71,7 @@ def seed_players(
     try:
         result = seed_roster(db, sc_players, source=source)
     except RosterPreconditionError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=409, detail=str(e)) from e
     return {"ok": True, **result}
 
 
@@ -91,7 +87,7 @@ def refresh_players(
     try:
         result = refresh_roster(db, sc_players, source=source)
     except RosterPreconditionError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=409, detail=str(e)) from e
     return {"ok": True, **result}
 
 

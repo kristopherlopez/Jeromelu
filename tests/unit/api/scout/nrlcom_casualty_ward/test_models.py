@@ -22,9 +22,8 @@ import json
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
-
 from app.scout.nrlcom_casualty_ward.models import NrlcomCasualtyWard
+from pydantic import ValidationError
 
 
 @pytest.fixture(scope="module")
@@ -42,9 +41,7 @@ def test_canonical_fixture_parses(fixture_casualty):
     """
     parsed = NrlcomCasualtyWard.model_validate(fixture_casualty)
     assert len(parsed.casualties) >= 1
-    assert all(
-        c.firstName and c.lastName and c.teamNickname for c in parsed.casualties
-    )
+    assert all(c.firstName and c.lastName and c.teamNickname for c in parsed.casualties)
 
 
 def test_unknown_top_level_field_raises(fixture_casualty):

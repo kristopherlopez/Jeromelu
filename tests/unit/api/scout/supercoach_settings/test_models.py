@@ -20,9 +20,8 @@ import json
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
-
 from app.scout.supercoach_settings.models import SuperCoachSettings
+from pydantic import ValidationError
 
 
 @pytest.fixture(scope="module")

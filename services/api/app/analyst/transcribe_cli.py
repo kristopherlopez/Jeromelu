@@ -15,9 +15,8 @@ import logging
 import sys
 from uuid import UUID
 
-from sqlalchemy.orm import joinedload
-
 from jeromelu_shared.db import SessionLocal, Source
+from sqlalchemy.orm import joinedload
 
 from app.analyst.transcribe import (
     MissingAudioError,

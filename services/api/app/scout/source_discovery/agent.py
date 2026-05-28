@@ -16,12 +16,10 @@ import logging
 import os
 import time
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from anthropic import Anthropic
-from sqlalchemy.orm import Session
-
 from jeromelu_shared.agent_audit import (
     AgentAuditLog,
     AgentBounds,
@@ -32,6 +30,7 @@ from jeromelu_shared.agent_audit import (
     record_agent_started,
 )
 from jeromelu_shared.config import settings
+from sqlalchemy.orm import Session
 
 from .prompt import SOURCE_DISCOVERY_SYSTEM_PROMPT, build_user_brief
 from .tools import CUSTOM_TOOL_HANDLERS, all_tools, summarise_known_sources
@@ -60,7 +59,7 @@ class SourceDiscoveryResult:
     cache_write_tokens: int
     estimated_cost_usd: float
     stop_reason: str
-    status: str                             # 'completed' | 'aborted' | 'failed'
+    status: str  # 'completed' | 'aborted' | 'failed'
     notes: list[str] = field(default_factory=list)
 
 
@@ -122,7 +121,7 @@ def run_source_discovery(
     bounds = bounds or AgentBounds()
     run_id = make_run_id(AGENT_ID)
     start_ts = time.time()
-    started_at = datetime.now(timezone.utc)
+    started_at = datetime.now(UTC)
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
@@ -152,9 +151,7 @@ def run_source_discovery(
     # system prompt) so the system-prompt cache stays warm across runs.
     known_set = summarise_known_sources(session)
     user_brief = f"{known_set}\n\n---\n\n{build_user_brief(brief)}"
-    messages: list[dict[str, Any]] = [
-        {"role": "user", "content": user_brief}
-    ]
+    messages: list[dict[str, Any]] = [{"role": "user", "content": user_brief}]
 
     turns = 0
     tool_calls = 0
@@ -267,9 +264,7 @@ def run_source_discovery(
             tool_calls += 1
 
             print(f"[tool] {_summarise_tool_input(name, block.input)}")
-            audit.tool_use(
-                turn=turns, name=name, id=block.id, input=dict(block.input)
-            )
+            audit.tool_use(turn=turns, name=name, id=block.id, input=dict(block.input))
 
             if name not in CUSTOM_TOOL_HANDLERS:
                 continue
@@ -361,11 +356,8 @@ def run_source_discovery(
 
         # Bounds
         elapsed = time.time() - start_ts
-        cost_so_far = (
-            estimate_token_cost(model, in_tok, out_tok, cache_r, cache_w)
-            + estimate_server_tool_cost(
-                {"web_search": web_searches_total, "web_fetch": web_fetches_total}
-            )
+        cost_so_far = estimate_token_cost(model, in_tok, out_tok, cache_r, cache_w) + estimate_server_tool_cost(
+            {"web_search": web_searches_total, "web_fetch": web_fetches_total}
         )
 
         if elapsed > bounds.max_wall_seconds:
@@ -384,11 +376,9 @@ def run_source_discovery(
             status = "aborted"
             break
 
-    ended_at = datetime.now(timezone.utc)
+    ended_at = datetime.now(UTC)
     token_cost = estimate_token_cost(model, in_tok, out_tok, cache_r, cache_w)
-    search_cost = estimate_server_tool_cost(
-        {"web_search": web_searches_total, "web_fetch": web_fetches_total}
-    )
+    search_cost = estimate_server_tool_cost({"web_search": web_searches_total, "web_fetch": web_fetches_total})
     final_cost = token_cost + search_cost
 
     result = SourceDiscoveryResult(
@@ -450,7 +440,7 @@ def run_source_discovery(
         detail=summary_dict,
     )
 
-    print(f"\n=== Source Discovery run done ===")
+    print("\n=== Source Discovery run done ===")
     print(f"  status: {status}")
     print(f"  turns: {turns}, tool_calls: {tool_calls}")
     print(f"  filed: {candidates_filed}, duplicates: {duplicates_skipped}")

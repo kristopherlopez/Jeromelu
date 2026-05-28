@@ -23,7 +23,6 @@ the docker network — the API is the only client.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import re
@@ -31,9 +30,7 @@ import shutil
 import subprocess
 import tempfile
 import threading
-import time
 from pathlib import Path
-from typing import Iterator
 from uuid import uuid4
 
 import boto3
@@ -53,9 +50,11 @@ logger = logging.getLogger("video-worker")
 # Config
 # ---------------------------------------------------------------------------
 
+
 class Settings(BaseSettings):
     """Worker config. Same names as the API where they overlap so a
     single ``/opt/jeromelu/.env`` covers both."""
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     s3_audio_bucket: str = "jeromelu-raw-audio"
@@ -160,9 +159,7 @@ def _yt_dlp_section(
         "logger": logger,
         "quiet": True,
         "noprogress": True,
-        "download_ranges": yt_dlp.utils.download_range_func(
-            None, [(start, end)]
-        ),
+        "download_ranges": yt_dlp.utils.download_range_func(None, [(start, end)]),
         "force_keyframes_at_cuts": True,
     }
     try:
@@ -278,24 +275,30 @@ def _ffmpeg_frame(
     if shutil.which("ffmpeg") is None:
         raise HTTPException(status_code=500, detail="ffmpeg not on PATH")
     cmd = [
-        "ffmpeg", "-y",
-        "-ss", f"{ts:.3f}",
-        "-i", str(video_path),
-        "-frames:v", "1",
-        "-q:v", "2",
+        "ffmpeg",
+        "-y",
+        "-ss",
+        f"{ts:.3f}",
+        "-i",
+        str(video_path),
+        "-frames:v",
+        "1",
+        "-q:v",
+        "2",
         # Force full-range JPEG colorspace. Without this, the mjpeg
         # encoder rejects the input with "Could not open encoder /
         # incorrect parameters" on YouTube clips whose YUV is non-full
         # range — a long-standing ffmpeg behaviour, not specific to our
         # pipeline.
-        "-pix_fmt", "yuvj420p",
+        "-pix_fmt",
+        "yuvj420p",
     ]
     if bbox is not None:
         x1, y1, x2, y2 = bbox
-        w = max(1, int(round(x2 - x1)))
-        h = max(1, int(round(y2 - y1)))
-        x = max(0, int(round(x1)))
-        y = max(0, int(round(y1)))
+        w = max(1, round(x2 - x1))
+        h = max(1, round(y2 - y1))
+        x = max(0, round(x1))
+        y = max(0, round(y1))
         cmd += ["-vf", f"crop={w}:{h}:{x}:{y}"]
     cmd.append(str(dest))
     proc = subprocess.run(cmd, capture_output=True)
@@ -357,7 +360,10 @@ def stage_video(body: StageVideoRequest) -> StageVideoResponse:
         )
         logger.info(
             "Staged video s3://%s/%s (%.1f MB) for %s",
-            settings.s3_audio_bucket, staging_key, size / (1024 * 1024), video_id,
+            settings.s3_audio_bucket,
+            staging_key,
+            size / (1024 * 1024),
+            video_id,
         )
 
     return StageVideoResponse(
@@ -426,9 +432,7 @@ def extract_frame(body: ExtractFrameRequest) -> Response:
         seek_ts = body.ts
         if body.prefer_section and body.canonical_url:
             video_id = _video_id_from_url(body.canonical_url)
-            video_path, section_start = _yt_dlp_section(
-                video_id, tmp_path, body.ts, quality
-            )
+            video_path, section_start = _yt_dlp_section(video_id, tmp_path, body.ts, quality)
             seek_ts = max(0.0, body.ts - section_start)
         elif body.persistent_video_s3_key:
             video_path = _cached_s3_download(body.persistent_video_s3_key)

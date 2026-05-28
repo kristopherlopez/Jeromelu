@@ -10,14 +10,14 @@ handle in external_id and would fail a single-channel refresh.
 Run with the api venv active:
     cd services/api && python scripts/canonicalise_handles.py
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
-from sqlalchemy import select
+from datetime import UTC, datetime
 
 from app.scout.youtube.client import validate_channel
 from jeromelu_shared.db import Channel, ChannelMetric, SessionLocal
+from sqlalchemy import select
 
 
 def main() -> None:
@@ -83,7 +83,7 @@ def main() -> None:
                     ChannelMetric(
                         channel_id=ch.channel_id,
                         platform="youtube",
-                        sampled_at=datetime.now(timezone.utc),
+                        sampled_at=datetime.now(UTC),
                         source="canonicalise_handles_backfill",
                         metrics=metrics_blob,
                     )

@@ -4,12 +4,11 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import desc
-from sqlalchemy.orm import Session
-
 from jeromelu_shared.db import KnowledgeBase, Source
 from jeromelu_shared.db.models import SourceDocument
 from jeromelu_shared.insights import ARTICLE_TYPES
+from sqlalchemy import desc
+from sqlalchemy.orm import Session
 
 from ..deps import get_db
 
@@ -26,7 +25,9 @@ def _strip_prefix(kb_type: str) -> str:
 
 @router.get("/insights")
 def list_insights(
-    article_type: str | None = Query(default=None, description="Filter by type: tips, totw, trades, captains, stocks, consensus"),
+    article_type: str | None = Query(
+        default=None, description="Filter by type: tips, totw, trades, captains, stocks, consensus"
+    ),
     round: int | None = Query(default=None, alias="round"),
     season: int = Query(default=2026),
     limit: int = Query(default=20, le=50),
@@ -56,16 +57,18 @@ def list_insights(
     items = []
     for e in entries:
         meta = e.metadata_json or {}
-        items.append({
-            "kb_id": str(e.kb_id),
-            "article_type": _strip_prefix(e.kb_type),
-            "title": e.title,
-            "summary": (e.content or "")[:200],
-            "effective_round": e.effective_round,
-            "season": e.season,
-            "created_at": e.created_at.isoformat(),
-            "player_count": meta.get("player_count", 0),
-        })
+        items.append(
+            {
+                "kb_id": str(e.kb_id),
+                "article_type": _strip_prefix(e.kb_type),
+                "title": e.title,
+                "summary": (e.content or "")[:200],
+                "effective_round": e.effective_round,
+                "season": e.season,
+                "created_at": e.created_at.isoformat(),
+                "player_count": meta.get("player_count", 0),
+            }
+        )
 
     next_before = entries[-1].created_at.isoformat() if entries else None
 
@@ -78,7 +81,7 @@ def get_insight(kb_id: str, db: Session = Depends(get_db)):
     try:
         uid = uuid.UUID(kb_id)
     except ValueError:
-        raise HTTPException(400, "Invalid kb_id")
+        raise HTTPException(400, "Invalid kb_id") from None
 
     entry = db.query(KnowledgeBase).filter(KnowledgeBase.kb_id == uid).first()
     if not entry or entry.kb_type not in _ARTICLE_KB_TYPES:
@@ -88,6 +91,7 @@ def get_insight(kb_id: str, db: Session = Depends(get_db)):
     sources = []
     if entry.source_claim_ids:
         from jeromelu_shared.db import Claim
+
         doc_ids = (
             db.query(Claim.document_id)
             .filter(Claim.claim_id.in_(entry.source_claim_ids), Claim.document_id.isnot(None))
@@ -98,20 +102,19 @@ def get_insight(kb_id: str, db: Session = Depends(get_db)):
 
         if doc_id_set:
             source_ids = (
-                db.query(SourceDocument.source_id)
-                .filter(SourceDocument.document_id.in_(doc_id_set))
-                .distinct()
-                .all()
+                db.query(SourceDocument.source_id).filter(SourceDocument.document_id.in_(doc_id_set)).distinct().all()
             )
             source_id_set = {row[0] for row in source_ids}
 
             if source_id_set:
                 for s in db.query(Source).filter(Source.source_id.in_(source_id_set)).all():
-                    sources.append({
-                        "source_id": str(s.source_id),
-                        "title": s.title,
-                        "creator_name": s.creator_name,
-                    })
+                    sources.append(
+                        {
+                            "source_id": str(s.source_id),
+                            "title": s.title,
+                            "creator_name": s.creator_name,
+                        }
+                    )
 
     return {
         "kb_id": str(entry.kb_id),

@@ -37,4 +37,4 @@ def fetch_strict(season: int | None = None, timeout: float = 30.0) -> list[Super
     return [SuperCoachPlayer.model_validate(p) for p in raw]
 
 
-__all__ = ["fetch_strict", "SuperCoachFetchError"]
+__all__ = ["SuperCoachFetchError", "fetch_strict"]

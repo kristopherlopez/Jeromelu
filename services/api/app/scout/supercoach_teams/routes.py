@@ -7,11 +7,10 @@ from datetime import date
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
 from jeromelu_shared.db.models import Team
 from jeromelu_shared.players.roster import SC_ABBREV_TO_TEAM_SLUG
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from ...deps import get_db
 from ...routers.admin import require_admin
@@ -28,9 +27,7 @@ router = APIRouter()
 PIPELINE = "supercoach-teams"
 
 
-def _upsert_team_supercoach_ids(
-    db: Session, sc_teams: list[SuperCoachTeam]
-) -> dict[str, Any]:
+def _upsert_team_supercoach_ids(db: Session, sc_teams: list[SuperCoachTeam]) -> dict[str, Any]:
     """Patch teams.metadata_json.supercoach for each matching team.
 
     Returns counts: matched (linked), unknown_abbrev (SC abbrev not in our
@@ -45,9 +42,7 @@ def _upsert_team_supercoach_ids(
         if not slug:
             unknown_abbrev.append(sc_team.abbrev)
             continue
-        team_row = db.execute(
-            select(Team).where(Team.slug == slug)
-        ).scalar_one_or_none()
+        team_row = db.execute(select(Team).where(Team.slug == slug)).scalar_one_or_none()
         if team_row is None:
             missing_team_row.append(slug)
             continue
@@ -104,22 +99,21 @@ def run_supercoach_teams(
         parsed = [SuperCoachTeam.model_validate(t) for t in raw_teams]
         logger.info(
             "scout/supercoach-teams: fetched %d teams (season=%s, run_id=%s)",
-            fetched, effective_season, run.run_id,
+            fetched,
+            effective_season,
+            run.run_id,
         )
         upsert_result = _upsert_team_supercoach_ids(db, parsed)
         detail.update({"fetched": fetched, **upsert_result})
     except SuperCoachTeamsFetchError as e:
         run.fail(e, summary_text=f"Upstream fetch failed: {e}")
-        raise HTTPException(status_code=502, detail=f"SC teams fetch failed: {e}")
+        raise HTTPException(status_code=502, detail=f"SC teams fetch failed: {e}") from e
     except Exception as e:
         run.fail(e, summary_text=f"Pipeline failed: {e}")
         raise
 
     run.complete(
-        summary_text=(
-            f"SuperCoach teams refresh: fetched={fetched}, "
-            f"matched={upsert_result.get('matched', 0)}"
-        ),
+        summary_text=(f"SuperCoach teams refresh: fetched={fetched}, matched={upsert_result.get('matched', 0)}"),
     )
 
     return {

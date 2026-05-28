@@ -2,11 +2,7 @@
 
 import logging
 import uuid
-from datetime import datetime, timezone
-
-from temporalio import activity
-
-from sqlalchemy.orm import joinedload
+from datetime import UTC, datetime
 
 from jeromelu_shared.db import (
     Claim,
@@ -21,6 +17,8 @@ from jeromelu_shared.db import (
     SourceDocument,
 )
 from jeromelu_shared.llm import chat_json, get_embeddings
+from sqlalchemy.orm import joinedload
+from temporalio import activity
 
 logger = logging.getLogger(__name__)
 
@@ -110,8 +108,7 @@ async def generate_player_summaries() -> dict:
             # supercoach_id was promoted to a column in mig 036; fall back to
             # legacy metadata_json keys for rows that pre-date the promotion sweep.
             player_id = person.supercoach_id or (
-                (person.metadata_json or {}).get("player_id")
-                or (person.metadata_json or {}).get("supercoach_id")
+                (person.metadata_json or {}).get("player_id") or (person.metadata_json or {}).get("supercoach_id")
             )
             stats_text = ""
             if player_id:
@@ -126,12 +123,13 @@ async def generate_player_summaries() -> dict:
                     stats_text = (
                         f"Latest stats (Rd {pr.round}, {pr.season}): "
                         f"Score {pr.score}, Price ${pr.price}, BE {pr.breakeven}, "
-                        f"PPM {pr.ppm:.2f}" if pr.ppm else ""
+                        f"PPM {pr.ppm:.2f}"
+                        if pr.ppm
+                        else ""
                     )
 
             claims_text = "\n".join(
-                f"- [{c.claim_type}] {c.claim_text} (strength: {c.strength}, polarity: {c.polarity})"
-                for c in claims
+                f"- [{c.claim_type}] {c.claim_text} (strength: {c.strength}, polarity: {c.polarity})" for c in claims
             )
 
             user_prompt = f"Player: {person.canonical_name}\n\n{stats_text}\n\nClaims:\n{claims_text}"
@@ -188,11 +186,7 @@ async def generate_round_briefs() -> dict:
         round_num, season = latest
 
         # Get all claims for this round
-        claims = (
-            session.query(Claim)
-            .filter(Claim.effective_round == round_num, Claim.season == season)
-            .all()
-        )
+        claims = session.query(Claim).filter(Claim.effective_round == round_num, Claim.season == season).all()
         if not claims:
             return {"round_briefs": 0}
 
@@ -218,9 +212,7 @@ async def generate_round_briefs() -> dict:
                 people_names[p.person_id] = p.canonical_name
 
         claims_text = "\n".join(
-            f"- [{c.claim_type}] "
-            f"{people_names.get(subject_person_by_claim.get(c.claim_id), 'Unknown')}: "
-            f"{c.claim_text}"
+            f"- [{c.claim_type}] {people_names.get(subject_person_by_claim.get(c.claim_id), 'Unknown')}: {c.claim_text}"
             for c in claims
         )
 
@@ -262,9 +254,7 @@ async def generate_decisions_log() -> dict:
     try:
         # Find action/prediction events not yet in KB
         existing_hashes = set(
-            r[0] for r in session.query(KnowledgeBase.title)
-            .filter(KnowledgeBase.kb_type == "decision")
-            .all()
+            r[0] for r in session.query(KnowledgeBase.title).filter(KnowledgeBase.kb_type == "decision").all()
         )
 
         events = (
@@ -380,8 +370,7 @@ async def generate_player_opinions() -> dict:
             )
 
             claims_text = "\n".join(
-                f"- [{c.claim_type}] {c.claim_text} (strength: {c.strength}, polarity: {c.polarity})"
-                for c in claims
+                f"- [{c.claim_type}] {c.claim_text} (strength: {c.strength}, polarity: {c.polarity})" for c in claims
             )
 
             user_prompt = f"Player: {person.canonical_name}\n\nClaims:\n{claims_text}"
@@ -423,7 +412,8 @@ async def generate_source_digests() -> dict:
     try:
         # Find sources with claims not yet digested
         existing_source_ids = set(
-            r[0] for r in session.query(KnowledgeBase.metadata_json["source_id"].astext)
+            r[0]
+            for r in session.query(KnowledgeBase.metadata_json["source_id"].astext)
             .filter(KnowledgeBase.kb_type == "source_digest")
             .filter(KnowledgeBase.metadata_json["source_id"].isnot(None))
             .all()
@@ -454,11 +444,7 @@ async def generate_source_digests() -> dict:
             if not doc_ids:
                 continue
 
-            claims = (
-                session.query(Claim)
-                .filter(Claim.document_id.in_(doc_ids))
-                .all()
-            )
+            claims = session.query(Claim).filter(Claim.document_id.in_(doc_ids)).all()
             if not claims:
                 continue
 
@@ -490,9 +476,7 @@ async def generate_source_digests() -> dict:
             )
 
             user_prompt = (
-                f"Source: {source.title}\n"
-                f"Creator: {source.creator_name or 'Unknown'}\n\n"
-                f"Claims:\n{claims_text}"
+                f"Source: {source.title}\nCreator: {source.creator_name or 'Unknown'}\n\nClaims:\n{claims_text}"
             )
 
             try:
@@ -528,11 +512,7 @@ async def embed_kb_entries() -> dict:
     """Batch embed all KB entries that are missing embeddings."""
     session = SessionLocal()
     try:
-        entries = (
-            session.query(KnowledgeBase)
-            .filter(KnowledgeBase.embedding.is_(None))
-            .all()
-        )
+        entries = session.query(KnowledgeBase).filter(KnowledgeBase.embedding.is_(None)).all()
 
         if not entries:
             return {"embedded": 0}
@@ -546,7 +526,7 @@ async def embed_kb_entries() -> dict:
 
             try:
                 embeddings = get_embeddings(texts)
-                for entry, emb in zip(batch, embeddings):
+                for entry, emb in zip(batch, embeddings, strict=False):
                     entry.embedding = emb
                 total += len(batch)
             except Exception:
@@ -569,6 +549,7 @@ async def embed_kb_entries() -> dict:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _upsert_kb_entry(
     session,
     kb_type: str,
@@ -580,12 +561,9 @@ def _upsert_kb_entry(
     season: int | None = None,
 ):
     """Insert or update a KB entry, matching on kb_type + person_id + effective_round."""
-    existing = (
-        session.query(KnowledgeBase)
-        .filter(
-            KnowledgeBase.kb_type == kb_type,
-            KnowledgeBase.person_id == person_id,
-        )
+    existing = session.query(KnowledgeBase).filter(
+        KnowledgeBase.kb_type == kb_type,
+        KnowledgeBase.person_id == person_id,
     )
     if effective_round is not None:
         existing = existing.filter(KnowledgeBase.effective_round == effective_round)
@@ -598,7 +576,7 @@ def _upsert_kb_entry(
         existing.source_claim_ids = [uuid.UUID(str(cid)) for cid in source_claim_ids]
         existing.effective_round = effective_round
         existing.season = season
-        existing.updated_at = datetime.now(timezone.utc)
+        existing.updated_at = datetime.now(UTC)
         existing.embedding = None  # Force re-embedding
     else:
         kb = KnowledgeBase(

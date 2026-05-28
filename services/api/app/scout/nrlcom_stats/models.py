@@ -130,4 +130,4 @@ class NrlcomStats(BaseModel):
     selectedSeasonId: int
 
 
-__all__ = ["NrlcomStats", "StatCategory", "StatSubgroup", "StatLeader"]
+__all__ = ["NrlcomStats", "StatCategory", "StatLeader", "StatSubgroup"]

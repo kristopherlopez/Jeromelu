@@ -58,7 +58,9 @@ def safe_embedding(medoid: list[float] | None) -> list[float] | None:
 
 
 def max_overlap_turn(
-    utt_start: float, utt_end: float, turn_rows: list[SourceSpeaker],
+    utt_start: float,
+    utt_end: float,
+    turn_rows: list[SourceSpeaker],
 ) -> SourceSpeaker | None:
     """Pick the SourceSpeaker turn with maximum temporal overlap with the
     utterance span. Linear scan — fine for the sample sizes here."""

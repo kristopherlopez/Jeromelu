@@ -19,10 +19,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID
 
+from jeromelu_shared.db import SourceChunk, SourceDocument, SourceSpeaker
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-
-from jeromelu_shared.db import SourceChunk, SourceDocument, SourceSpeaker
 
 #: Cap on medoid voiceprints written per cluster assign. Mirrors
 #: ``CLUSTER_EMBEDDING_SAMPLE_LIMIT=10`` on the face side — small enough
@@ -39,6 +38,7 @@ class TurnRow:
     object so the aggregation helper is trivially unit-testable without
     a DB session — the DB wrapper builds these from query results.
     """
+
     segment_id: UUID
     speaker_label: str
     start_ts: float
@@ -91,7 +91,8 @@ def aggregate_clusters(
         dominant_share: float | None = None
         if person_counts:
             dom_pid, dom_count = max(
-                person_counts.items(), key=lambda kv: kv[1],
+                person_counts.items(),
+                key=lambda kv: kv[1],
             )
             dominant_person_id = dom_pid
             dominant_share = dom_count / turn_count
@@ -109,9 +110,7 @@ def aggregate_clusters(
                 "start_ts": float(t.start_ts),
                 "end_ts": float(t.end_ts),
                 "duration": float(t.end_ts - t.start_ts),
-                "speaker_person_id": (
-                    str(t.speaker_person_id) if t.speaker_person_id else None
-                ),
+                "speaker_person_id": (str(t.speaker_person_id) if t.speaker_person_id else None),
                 "match_method": t.match_method,
                 "has_embedding": t.has_embedding,
                 "preview_text": preview_by_segment.get(t.segment_id, ""),
@@ -119,18 +118,20 @@ def aggregate_clusters(
             for t in chrono_turns
         ]
 
-        speakers.append({
-            "speaker_label": label,
-            "turn_count": turn_count,
-            "total_seconds": float(total_seconds),
-            "first_ts": float(first_ts),
-            "last_ts": float(last_ts),
-            "embedding_eligible_count": embedding_eligible,
-            "dominant_person_id": dominant_person_id,
-            "dominant_share": dominant_share,
-            "match_method_breakdown": breakdown,
-            "turns": turns_out,
-        })
+        speakers.append(
+            {
+                "speaker_label": label,
+                "turn_count": turn_count,
+                "total_seconds": float(total_seconds),
+                "first_ts": float(first_ts),
+                "last_ts": float(last_ts),
+                "embedding_eligible_count": embedding_eligible,
+                "dominant_person_id": dominant_person_id,
+                "dominant_share": dominant_share,
+                "match_method_breakdown": breakdown,
+                "turns": turns_out,
+            }
+        )
 
     speakers.sort(key=lambda s: -s["total_seconds"])
     return {"speakers": speakers}
@@ -153,11 +154,7 @@ def compute_voice_clusters(session: Session, source_id: UUID) -> dict:
     the turn, not just the opening utterance — so the Voices tab can
     show what was said. One indexed query, regardless of cluster count.
     """
-    doc = (
-        session.query(SourceDocument)
-        .filter(SourceDocument.source_id == source_id)
-        .first()
-    )
+    doc = session.query(SourceDocument).filter(SourceDocument.source_id == source_id).first()
     if not doc:
         return {"speakers": []}
 
@@ -172,7 +169,8 @@ def compute_voice_clusters(session: Session, source_id: UUID) -> dict:
     # so a partially-clustered source (HDBSCAN-noise turns) stays
     # navigable under its original pyannote grouping.
     effective_label = func.coalesce(
-        SourceSpeaker.cluster_label, SourceSpeaker.speaker_label,
+        SourceSpeaker.cluster_label,
+        SourceSpeaker.speaker_label,
     ).label("speaker_label")
     raw_rows = (
         session.query(
@@ -187,7 +185,8 @@ def compute_voice_clusters(session: Session, source_id: UUID) -> dict:
         .filter(SourceSpeaker.document_id == doc.document_id)
         .filter(
             func.coalesce(
-                SourceSpeaker.cluster_label, SourceSpeaker.speaker_label,
+                SourceSpeaker.cluster_label,
+                SourceSpeaker.speaker_label,
             ).isnot(None),
         )
         .order_by(SourceSpeaker.start_ts)
@@ -209,7 +208,9 @@ def compute_voice_clusters(session: Session, source_id: UUID) -> dict:
 
     spans = [(r.segment_id, r.start_ts, r.end_ts) for r in rows]
     preview_by_segment = fetch_full_turn_text(
-        session, spans, document_id=doc.document_id,
+        session,
+        spans,
+        document_id=doc.document_id,
     )
 
     return aggregate_clusters(rows, preview_by_segment)

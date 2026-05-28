@@ -15,7 +15,7 @@ from ...deps import get_db
 from ...routers.admin import require_admin
 from ..common.archive import archive_response
 from ..common.pipeline_run import start_deterministic_run
-from ..nrlcom_draw.fetcher import fetch_draw, NrlcomDrawFetchError
+from ..nrlcom_draw.fetcher import NrlcomDrawFetchError, fetch_draw
 from .fetcher import (
     NrlcomMatchCentreFetchError,
     extract_slug_from_match_centre_url,
@@ -48,9 +48,7 @@ def run_nrlcom_match_centre(
     validation_skipped:true` at the envelope level; `validation_failures`
     stays empty (no per-match strict-parse ran).
     """
-    brief = (
-        f"nrl.com match-centre walk (comp={competition} season={season} round={round})"
-    )
+    brief = f"nrl.com match-centre walk (comp={competition} season={season} round={round})"
     run = start_deterministic_run(
         db,
         pipeline=PIPELINE,
@@ -119,21 +117,27 @@ def run_nrlcom_match_centre(
         if archive_only:
             detail["validated"] = False
             detail["validation_skipped"] = True
-        detail.update({
-            "matches_archived": matches_archived,
-            "fetch_failures": fetch_failures,
-            "archive_failures": archive_failures,
-            "validation_failures": validation_failures,
-            "archive_keys": archive_keys[:5] + (["..."] if len(archive_keys) > 5 else []),
-        })
+        detail.update(
+            {
+                "matches_archived": matches_archived,
+                "fetch_failures": fetch_failures,
+                "archive_failures": archive_failures,
+                "validation_failures": validation_failures,
+                "archive_keys": archive_keys[:5] + (["..."] if len(archive_keys) > 5 else []),
+            }
+        )
         logger.info(
-            "scout/nrlcom-match-centre: comp=%s season=%s round=%s archive_only=%s "
-            "— archived %d/%d",
-            competition, season, round, archive_only, matches_archived, len(fixtures),
+            "scout/nrlcom-match-centre: comp=%s season=%s round=%s archive_only=%s — archived %d/%d",
+            competition,
+            season,
+            round,
+            archive_only,
+            matches_archived,
+            len(fixtures),
         )
     except NrlcomDrawFetchError as e:
         run.fail(e, summary_text=f"Could not discover fixtures: {e}")
-        raise HTTPException(status_code=502, detail=f"draw fetch failed: {e}")
+        raise HTTPException(status_code=502, detail=f"draw fetch failed: {e}") from e
     except Exception as e:
         run.fail(e, summary_text=f"Pipeline failed: {e}")
         raise
@@ -168,5 +172,9 @@ def nrlcom_match_centre_endpoint(
     `round` omitted → resolves the current round from the draw's `selectedRoundId`.
     """
     return run_nrlcom_match_centre(
-        db, competition=competition, season=season, round=round, archive_only=archive_only,
+        db,
+        competition=competition,
+        season=season,
+        round=round,
+        archive_only=archive_only,
     )

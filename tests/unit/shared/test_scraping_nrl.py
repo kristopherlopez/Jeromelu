@@ -5,7 +5,6 @@ deterministic player-id generation. All inputs are static — no IO.
 """
 
 import pytest
-
 from jeromelu_shared.scraping.nrl import (
     JQGRID_COLUMN_MAP,
     STAT_DB_COLUMNS,
@@ -19,10 +18,10 @@ from jeromelu_shared.scraping.nrl import (
     parse_int,
 )
 
-
 # ---------------------------------------------------------------------------
 # normalize_team
 # ---------------------------------------------------------------------------
+
 
 class TestNormalizeTeam:
     @pytest.mark.parametrize(
@@ -69,6 +68,7 @@ class TestNormalizeTeam:
 # clean_name
 # ---------------------------------------------------------------------------
 
+
 class TestCleanName:
     def test_plain_text_unchanged(self):
         assert clean_name("Tom Trbojevic") == "Tom Trbojevic"
@@ -95,6 +95,7 @@ class TestCleanName:
 # ---------------------------------------------------------------------------
 # normalize_name
 # ---------------------------------------------------------------------------
+
 
 class TestNormalizeName:
     def test_last_first_swapped_to_first_last(self):
@@ -124,6 +125,7 @@ class TestNormalizeName:
 # parse_int
 # ---------------------------------------------------------------------------
 
+
 class TestParseInt:
     @pytest.mark.parametrize(
         "value,expected",
@@ -150,6 +152,7 @@ class TestParseInt:
 # parse_float
 # ---------------------------------------------------------------------------
 
+
 class TestParseFloat:
     @pytest.mark.parametrize(
         "value,expected",
@@ -173,6 +176,7 @@ class TestParseFloat:
 # ---------------------------------------------------------------------------
 # generate_player_id
 # ---------------------------------------------------------------------------
+
 
 class TestGeneratePlayerId:
     def test_deterministic_same_input(self):
@@ -216,6 +220,7 @@ class TestGeneratePlayerId:
 # extract_all_stats / JQGRID_COLUMN_MAP
 # ---------------------------------------------------------------------------
 
+
 class TestJqgridColumnMap:
     def test_no_duplicate_db_columns(self):
         # Two jqGrid keys mapping to the same DB column would silently
@@ -240,7 +245,7 @@ class TestExtractAllStats:
     def test_extracts_mapped_keys_with_correct_parsers(self):
         row = {
             "Base": "42",
-            "TR": "34",            # 2 tries × 17pts
+            "TR": "34",  # 2 tries × 17pts
             "PPM": "1.23",
             "StartPrice": "$523,400",
             "Venue": "  Suncorp Stadium  ",

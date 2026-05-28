@@ -33,28 +33,34 @@ from app.analyst.voice_cluster_runner import recluster_source_voice
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Re-cluster per-turn wespeaker medoids with HDBSCAN and write "
-            "labels to source_speakers.cluster_label."
+            "Re-cluster per-turn wespeaker medoids with HDBSCAN and write labels to source_speakers.cluster_label."
         ),
     )
     parser.add_argument("source_id", type=str, help="UUID of the sources row")
     parser.add_argument(
-        "--min-cluster-size", type=int, default=DEFAULT_MIN_CLUSTER_SIZE,
+        "--min-cluster-size",
+        type=int,
+        default=DEFAULT_MIN_CLUSTER_SIZE,
         help=f"HDBSCAN min_cluster_size (default {DEFAULT_MIN_CLUSTER_SIZE})",
     )
     parser.add_argument(
-        "--min-samples", type=int, default=DEFAULT_MIN_SAMPLES,
+        "--min-samples",
+        type=int,
+        default=DEFAULT_MIN_SAMPLES,
         help=f"HDBSCAN min_samples (default {DEFAULT_MIN_SAMPLES})",
     )
     parser.add_argument(
-        "--noise-threshold", type=float, default=DEFAULT_NOISE_THRESHOLD,
+        "--noise-threshold",
+        type=float,
+        default=DEFAULT_NOISE_THRESHOLD,
         help=(
             "Cosine similarity floor for inclusion; below this the turn is "
             f"labelled noise (default {DEFAULT_NOISE_THRESHOLD})"
         ),
     )
     parser.add_argument(
-        "--log-level", default="INFO",
+        "--log-level",
+        default="INFO",
         choices=("DEBUG", "INFO", "WARNING", "ERROR"),
     )
     args = parser.parse_args()
@@ -71,11 +77,7 @@ def main() -> int:
         return 2
 
     with SessionLocal() as session:
-        source = (
-            session.query(Source)
-            .filter(Source.source_id == source_id)
-            .one_or_none()
-        )
+        source = session.query(Source).filter(Source.source_id == source_id).one_or_none()
         if source is None:
             print(f"No source with id {source_id}", file=sys.stderr)
             return 2

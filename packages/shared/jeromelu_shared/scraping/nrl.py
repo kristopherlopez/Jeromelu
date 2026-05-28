@@ -12,18 +12,42 @@ from collections.abc import Callable
 
 # Map every known 3-letter team code to its canonical name.
 TEAM_CODE_MAP = {
-    "BRO": "Broncos", "BUL": "Bulldogs", "CBR": "Raiders",
-    "DOL": "Dolphins", "DRA": "Dragons", "EEL": "Eels",
-    "KNI": "Knights", "COW": "Cowboys", "MAN": "Sea Eagles",
-    "MEL": "Storm", "PAN": "Panthers", "PAR": "Eels",
-    "RAB": "Rabbitohs", "ROO": "Roosters", "SHA": "Sharks",
-    "TIG": "Tigers", "TIT": "Titans", "WAR": "Warriors",
-    "NQL": "Cowboys", "NEW": "Knights", "CRO": "Sharks",
-    "SOU": "Rabbitohs", "SYD": "Roosters", "GLD": "Titans",
-    "NZL": "Warriors", "WES": "Tigers", "CAN": "Raiders",
-    "STG": "Dragons", "PEN": "Panthers", "BRI": "Broncos",
-    "WST": "Tigers", "GCT": "Titans", "MNL": "Sea Eagles",
-    "NQC": "Cowboys", "PTH": "Panthers", "STH": "Rabbitohs",
+    "BRO": "Broncos",
+    "BUL": "Bulldogs",
+    "CBR": "Raiders",
+    "DOL": "Dolphins",
+    "DRA": "Dragons",
+    "EEL": "Eels",
+    "KNI": "Knights",
+    "COW": "Cowboys",
+    "MAN": "Sea Eagles",
+    "MEL": "Storm",
+    "PAN": "Panthers",
+    "PAR": "Eels",
+    "RAB": "Rabbitohs",
+    "ROO": "Roosters",
+    "SHA": "Sharks",
+    "TIG": "Tigers",
+    "TIT": "Titans",
+    "WAR": "Warriors",
+    "NQL": "Cowboys",
+    "NEW": "Knights",
+    "CRO": "Sharks",
+    "SOU": "Rabbitohs",
+    "SYD": "Roosters",
+    "GLD": "Titans",
+    "NZL": "Warriors",
+    "WES": "Tigers",
+    "CAN": "Raiders",
+    "STG": "Dragons",
+    "PEN": "Panthers",
+    "BRI": "Broncos",
+    "WST": "Tigers",
+    "GCT": "Titans",
+    "MNL": "Sea Eagles",
+    "NQC": "Cowboys",
+    "PTH": "Panthers",
+    "STH": "Rabbitohs",
 }
 
 
@@ -159,7 +183,7 @@ def extract_all_stats(row: dict) -> dict:
             stats[db_col] = str(val).strip()
         else:
             parsed = parser(val)
-            stats[db_col] = parsed if parsed != 0 else parsed  # keep explicit zeros
+            stats[db_col] = parsed  # explicit zeros preserved by the parser
     return stats
 
 

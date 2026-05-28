@@ -20,7 +20,6 @@ import logging
 from pathlib import Path
 
 import httpx
-
 from jeromelu_shared.config import settings
 
 logger = logging.getLogger(__name__)
@@ -54,9 +53,7 @@ def fetch_frame_to(
     pulling the full file — single-frame fast path used by reassign.
     """
     if not canonical_url and not persistent_video_s3_key:
-        raise VideoWorkerError(
-            "Supply at least one of canonical_url or persistent_video_s3_key"
-        )
+        raise VideoWorkerError("Supply at least one of canonical_url or persistent_video_s3_key")
 
     payload: dict[str, object] = {"ts": ts}
     if canonical_url:
@@ -77,9 +74,7 @@ def fetch_frame_to(
         raise VideoWorkerError(f"video-worker unreachable: {exc}") from exc
 
     if r.status_code != 200:
-        raise VideoWorkerError(
-            f"video-worker /extract-frame returned {r.status_code}: {r.text[:300]}"
-        )
+        raise VideoWorkerError(f"video-worker /extract-frame returned {r.status_code}: {r.text[:300]}")
 
     dest.write_bytes(r.content)
 
@@ -104,9 +99,7 @@ def stage_video(
         raise VideoWorkerError(f"video-worker unreachable: {exc}") from exc
 
     if r.status_code != 200:
-        raise VideoWorkerError(
-            f"video-worker /stage-video returned {r.status_code}: {r.text[:300]}"
-        )
+        raise VideoWorkerError(f"video-worker /stage-video returned {r.status_code}: {r.text[:300]}")
     return r.json()["staging_key"]
 
 
@@ -119,7 +112,8 @@ def delete_staging(staging_key: str, *, timeout: float = 30.0) -> None:
         if r.status_code != 200:
             logger.warning(
                 "video-worker /staging delete returned %d: %s",
-                r.status_code, r.text[:300],
+                r.status_code,
+                r.text[:300],
             )
     except httpx.HTTPError as exc:
         logger.warning("delete_staging unreachable: %s", exc)

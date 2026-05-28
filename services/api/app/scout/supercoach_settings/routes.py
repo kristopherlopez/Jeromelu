@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from ...deps import get_db
@@ -41,6 +40,7 @@ def _upsert_sc_settings(
         RETURNING id
     """)
     import json
+
     result = db.execute(
         stmt,
         {"season": season, "mode": mode, "payload": json.dumps(payload), "s3_key": s3_key},
@@ -77,10 +77,7 @@ def run_supercoach_settings(
         archive_key = archive_response(
             source="supercoach",
             pipeline=f"{mode}/settings",
-            identity_path=(
-                f"{effective_season}/"
-                f"{datetime.now(timezone.utc).strftime('%Y%m%d')}.json"
-            ),
+            identity_path=(f"{effective_season}/{datetime.now(UTC).strftime('%Y%m%d')}.json"),
             payload=raw_settings,
         )
         set_archive_detail(detail, archive_key)
@@ -89,23 +86,21 @@ def run_supercoach_settings(
         SuperCoachSettings.model_validate(raw_settings)
 
         upsert_result = _upsert_sc_settings(
-            db, season=effective_season, mode=mode,
-            payload=raw_settings, s3_key=archive_key,
+            db,
+            season=effective_season,
+            mode=mode,
+            payload=raw_settings,
+            s3_key=archive_key,
         )
         detail.update(upsert_result)
     except SuperCoachSettingsFetchError as e:
         run.fail(e, summary_text=f"Upstream fetch failed: {e}")
-        raise HTTPException(status_code=502, detail=f"SC settings fetch failed: {e}")
+        raise HTTPException(status_code=502, detail=f"SC settings fetch failed: {e}") from e
     except Exception as e:
         run.fail(e, summary_text=f"Pipeline failed: {e}")
         raise
 
-    run.complete(
-        summary_text=(
-            f"SuperCoach settings snapshot: season={effective_season} "
-            f"mode={mode}"
-        )
-    )
+    run.complete(summary_text=(f"SuperCoach settings snapshot: season={effective_season} mode={mode}"))
 
     return {
         "run_id": run.run_id,

@@ -59,9 +59,7 @@ TRANSITION_PATTERNS = [
 _TRANSITION_RE = re.compile("|".join(TRANSITION_PATTERNS), re.IGNORECASE)
 
 # Round number extraction
-_ROUND_RE = re.compile(
-    r"(?:round|rd?|r)\s*(\d{1,2})\b", re.IGNORECASE
-)
+_ROUND_RE = re.compile(r"(?:round|rd?|r)\s*(\d{1,2})\b", re.IGNORECASE)
 
 
 @dataclass
@@ -116,10 +114,7 @@ class LocalContext:
         # Detect transitions — reset context on game/topic change
         if _TRANSITION_RE.search(text):
             # Don't clear entirely, but accelerate decay by shifting timestamps back
-            self._team_mentions = [
-                (t, max(0, idx - self.TEAM_DECAY // 2))
-                for t, idx in self._team_mentions
-            ]
+            self._team_mentions = [(t, max(0, idx - self.TEAM_DECAY // 2)) for t, idx in self._team_mentions]
 
     def active_teams(self, current_idx: int) -> list[str]:
         """Return teams mentioned within decay window, most recent first."""

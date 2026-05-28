@@ -1,7 +1,5 @@
 """DeepEval configuration for Ask Me evaluations."""
 
-import os
-
 import pytest
 
 # DeepEval uses OpenAI for its evaluation metrics by default.

@@ -65,7 +65,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -80,6 +80,7 @@ logger = logging.getLogger(__name__)
 # Standard bounds
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class AgentBounds:
     """Hard caps every agent should respect.
@@ -88,9 +89,10 @@ class AgentBounds:
     of these trip. If a run regularly hits a bound, that's a sign the prompt
     or tools need work.
     """
+
     max_turns: int = 20
     max_tool_calls: int = 60
-    max_wall_seconds: int = 900            # 15 min
+    max_wall_seconds: int = 900  # 15 min
     max_budget_usd: float = 1.00
 
 
@@ -142,8 +144,8 @@ def estimate_token_cost(
 
 # Server-side tools are billed separately from tokens. Verify periodically.
 SERVER_TOOL_PRICING_USD: dict[str, float] = {
-    "web_search": 0.01,    # $10 per 1,000 searches (Anthropic-managed)
-    "web_fetch": 0.00,     # token cost only — no per-fetch charge
+    "web_search": 0.01,  # $10 per 1,000 searches (Anthropic-managed)
+    "web_fetch": 0.00,  # token cost only — no per-fetch charge
 }
 
 
@@ -153,15 +155,13 @@ def estimate_server_tool_cost(tool_counts: dict[str, int]) -> float:
     Pass a dict like {"web_search": 12, "web_fetch": 3}. Unknown tool names
     contribute 0 — better to under-report than to crash a run on a new tool.
     """
-    return sum(
-        n * SERVER_TOOL_PRICING_USD.get(name, 0.0)
-        for name, n in (tool_counts or {}).items()
-    )
+    return sum(n * SERVER_TOOL_PRICING_USD.get(name, 0.0) for name, n in (tool_counts or {}).items())
 
 
 # ---------------------------------------------------------------------------
 # Run identity
 # ---------------------------------------------------------------------------
+
 
 def make_run_id(agent_id: str) -> str:
     """Uniform run id across agents: '{agent_id}-{YYYYMMDDTHHMMSS}-{nonce}'.
@@ -170,12 +170,13 @@ def make_run_id(agent_id: str) -> str:
     parsing JSON. The timestamp keeps runs sortable by name. The nonce avoids
     collisions from same-second triggers.
     """
-    return f"{agent_id}-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}-{uuid4().hex[:6]}"
+    return f"{agent_id}-{datetime.now(UTC).strftime('%Y%m%dT%H%M%S')}-{uuid4().hex[:6]}"
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _truncate(value: Any, limit: int = 5000) -> Any:
     """Trim large values to keep stored events manageable."""
@@ -191,6 +192,7 @@ def _truncate(value: Any, limit: int = 5000) -> Any:
 # ---------------------------------------------------------------------------
 # AgentAuditLog — DB-backed event trail with S3 bundle at end
 # ---------------------------------------------------------------------------
+
 
 class AgentAuditLog:
     """Per-event audit log. Writes each event into `agent_events` (queryable
@@ -225,7 +227,7 @@ class AgentAuditLog:
     # ------------------------------------------------------------------
     def _write(self, event_type: str, **fields: Any) -> None:
         sequence = self.event_count
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         turn = fields.get("turn")  # convenience denorm; stays in payload too
 
         # Truncate payload values to keep rows small. event_type/turn are
@@ -262,7 +264,10 @@ class AgentAuditLog:
         except Exception:
             logger.exception(
                 "AgentAuditLog DB write failed agent=%s run=%s seq=%s type=%s",
-                self.agent_id, self.run_id, sequence, event_type,
+                self.agent_id,
+                self.run_id,
+                sequence,
+                event_type,
             )
             try:
                 self.session.rollback()
@@ -373,12 +378,10 @@ class AgentAuditLog:
             logger.exception("Agent audit %s: failed to import S3 client", self.agent_id)
             return None
 
-        body_str = "\n".join(
-            json.dumps(rec, default=str, ensure_ascii=False) for rec in self._buffer
-        )
+        body_str = "\n".join(json.dumps(rec, default=str, ensure_ascii=False) for rec in self._buffer)
         body = body_str.encode("utf-8")
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         key = f"agent-logs/{self.agent_id}/{now:%Y/%m/%d}/{self.run_id}.jsonl"
         try:
             client = get_s3_client()
@@ -390,7 +393,11 @@ class AgentAuditLog:
             )
             logger.info(
                 "Agent audit %s: uploaded %d events (%d bytes) to s3://%s/%s",
-                self.agent_id, self.event_count, len(body), self.s3_bucket, key,
+                self.agent_id,
+                self.event_count,
+                len(body),
+                self.s3_bucket,
+                key,
             )
             return key
         except Exception:
@@ -404,6 +411,7 @@ class AgentAuditLog:
 # ---------------------------------------------------------------------------
 # AgentRun helpers — agent-agnostic run-level summary rows
 # ---------------------------------------------------------------------------
+
 
 def record_agent_started(
     session: Session,
@@ -428,14 +436,11 @@ def record_agent_started(
         agent_id=agent_id,
         agent_name=agent_name,
         status="running",
-        started_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
         model=model,
         brief_preview=brief[:500] if brief else None,
         bounds_json=bounds,
-        summary=(
-            f"{agent_name} run started — model={model}, "
-            f"budget=${bounds.get('max_budget_usd', '?')}"
-        ),
+        summary=(f"{agent_name} run started — model={model}, budget=${bounds.get('max_budget_usd', '?')}"),
     )
     session.add(row)
     session.commit()
@@ -471,27 +476,20 @@ def record_agent_ended(
     mid-run, though the typical pattern is start -> end).
     """
     server_tool_counts = server_tool_counts or {}
-    token_cost = estimate_token_cost(
-        model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens
-    )
+    token_cost = estimate_token_cost(model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens)
     server_tool_cost = estimate_server_tool_cost(server_tool_counts)
     total_cost = token_cost + server_tool_cost
 
-    row = (
-        session.query(AgentRun)
-        .filter(AgentRun.run_id == run_id)
-        .one_or_none()
-    )
+    row = session.query(AgentRun).filter(AgentRun.run_id == run_id).one_or_none()
     if row is None:
         logger.error(
-            "record_agent_ended: no agent_runs row for run_id=%s; "
-            "did record_agent_started run? Skipping update.",
+            "record_agent_ended: no agent_runs row for run_id=%s; did record_agent_started run? Skipping update.",
             run_id,
         )
         return
 
     row.status = status
-    row.ended_at = datetime.now(timezone.utc)
+    row.ended_at = datetime.now(UTC)
     row.summary = summary_text
     row.detail_json = detail or {}
     row.s3_log_key = s3_log_key

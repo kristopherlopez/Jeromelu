@@ -5,14 +5,9 @@ import json
 import logging
 import uuid
 
-from temporalio import activity
-
-from sqlalchemy.orm import joinedload
-
 from jeromelu_shared.db import (
     Claim,
     ClaimAssociation,
-    ClaimChunk,
     Event,
     Person,
     SessionLocal,
@@ -20,6 +15,8 @@ from jeromelu_shared.db import (
     SourceDocument,
 )
 from jeromelu_shared.llm import chat_json
+from sqlalchemy.orm import joinedload
+from temporalio import activity
 
 logger = logging.getLogger(__name__)
 
@@ -82,18 +79,14 @@ async def fetch_unprocessed_claims() -> dict:
     try:
         # Get all claim IDs already referenced by events
         from sqlalchemy import func
-        processed_ids_sq = (
-            session.query(func.unnest(Event.related_claim_ids).label("cid"))
-            .subquery()
-        )
+
+        processed_ids_sq = session.query(func.unnest(Event.related_claim_ids).label("cid")).subquery()
 
         # Find unprocessed claims (with subject person via claim_associations).
         unprocessed = (
             session.query(Claim)
             .join(ClaimAssociation, ClaimAssociation.claim_id == Claim.claim_id)
-            .filter(~Claim.claim_id.in_(
-                session.query(processed_ids_sq.c.cid)
-            ))
+            .filter(~Claim.claim_id.in_(session.query(processed_ids_sq.c.cid)))
             .filter(
                 ClaimAssociation.role == "subject",
                 ClaimAssociation.person_id.isnot(None),
@@ -142,20 +135,22 @@ async def fetch_unprocessed_claims() -> dict:
         for c in unprocessed:
             doc_info = source_map.get(str(c.document_id), {})
             subject_pid = subject_person_by_claim.get(c.claim_id)
-            claims_data.append({
-                "claim_id": str(c.claim_id),
-                "claim_type": c.claim_type,
-                "claim_text": c.claim_text,
-                "polarity": c.polarity,
-                "strength": c.strength,
-                "player_name": entity_map.get(str(subject_pid), "Unknown") if subject_pid else "Unknown",
-                "entity_id": str(subject_pid) if subject_pid else None,
-                "source_id": doc_info.get("source_id"),
-                "source_title": doc_info.get("title"),
-                "source_creator": doc_info.get("creator_name"),
-                "effective_round": c.effective_round,
-                "season": c.season,
-            })
+            claims_data.append(
+                {
+                    "claim_id": str(c.claim_id),
+                    "claim_type": c.claim_type,
+                    "claim_text": c.claim_text,
+                    "polarity": c.polarity,
+                    "strength": c.strength,
+                    "player_name": entity_map.get(str(subject_pid), "Unknown") if subject_pid else "Unknown",
+                    "entity_id": str(subject_pid) if subject_pid else None,
+                    "source_id": doc_info.get("source_id"),
+                    "source_title": doc_info.get("title"),
+                    "source_creator": doc_info.get("creator_name"),
+                    "effective_round": c.effective_round,
+                    "season": c.season,
+                }
+            )
 
         logger.info("Found %d unprocessed claims", len(claims_data))
         return {
@@ -221,15 +216,17 @@ async def generate_feed_events(
         name_to_id = {v: k for k, v in entity_map.items()}
         related_entity_ids = [name_to_id[n] for n in entity_names if n in name_to_id]
 
-        validated.append({
-            "event_type": event_type,
-            "display_text": display_text,
-            "display_mode": event_type,  # display_mode = event_type in new schema
-            "related_entity_ids": related_entity_ids,
-            "related_claim_ids": ev.get("related_claim_ids", []),
-            "related_source_id": ev.get("related_source_id"),
-            "metadata": ev.get("metadata", {}),
-        })
+        validated.append(
+            {
+                "event_type": event_type,
+                "display_text": display_text,
+                "display_mode": event_type,  # display_mode = event_type in new schema
+                "related_entity_ids": related_entity_ids,
+                "related_claim_ids": ev.get("related_claim_ids", []),
+                "related_source_id": ev.get("related_source_id"),
+                "metadata": ev.get("metadata", {}),
+            }
+        )
 
     logger.info("LLM generated %d valid events from %d raw", len(validated), len(events))
     return validated
@@ -253,9 +250,7 @@ async def persist_events(events: list[dict]) -> dict:
             hash_val = _compute_hash(ev)
 
             # Dedup check
-            exists = session.query(Event.event_id).filter(
-                Event.immutable_hash == hash_val
-            ).first()
+            exists = session.query(Event.event_id).filter(Event.immutable_hash == hash_val).first()
             if exists:
                 skipped += 1
                 continue
@@ -288,9 +283,12 @@ async def persist_events(events: list[dict]) -> dict:
 def _compute_hash(ev: dict) -> str:
     """Deterministic hash for deduplication."""
     claim_ids = sorted(ev.get("related_claim_ids", []))
-    payload = json.dumps({
-        "event_type": ev["event_type"],
-        "display_text": ev["display_text"],
-        "related_claim_ids": claim_ids,
-    }, sort_keys=True)
+    payload = json.dumps(
+        {
+            "event_type": ev["event_type"],
+            "display_text": ev["display_text"],
+            "related_claim_ids": claim_ids,
+        },
+        sort_keys=True,
+    )
     return hashlib.sha256(payload.encode()).hexdigest()

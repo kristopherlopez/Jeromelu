@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from botocore.exceptions import ClientError
-
 from jeromelu_shared.config import settings
 from jeromelu_shared.s3 import get_s3_client
 
@@ -26,13 +25,9 @@ def media_object_exists(key: str) -> bool:
     except ClientError as exc:
         if _is_not_found(exc):
             return False
-        raise MediaStorageError(
-            f"failed to check s3://{settings.s3_audio_bucket}/{key}: {exc}"
-        ) from exc
+        raise MediaStorageError(f"failed to check s3://{settings.s3_audio_bucket}/{key}: {exc}") from exc
     except Exception as exc:
-        raise MediaStorageError(
-            f"failed to check s3://{settings.s3_audio_bucket}/{key}: {exc}"
-        ) from exc
+        raise MediaStorageError(f"failed to check s3://{settings.s3_audio_bucket}/{key}: {exc}") from exc
 
 
 def upload_media_file(key: str, file_path: str, *, content_type: str) -> None:
@@ -45,6 +40,4 @@ def upload_media_file(key: str, file_path: str, *, content_type: str) -> None:
             ExtraArgs={"ContentType": content_type},
         )
     except Exception as exc:
-        raise MediaStorageError(
-            f"failed to upload s3://{settings.s3_audio_bucket}/{key}: {exc}"
-        ) from exc
+        raise MediaStorageError(f"failed to upload s3://{settings.s3_audio_bucket}/{key}: {exc}") from exc

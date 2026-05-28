@@ -29,7 +29,6 @@ correction is folded into TASK-36 doc sweep.
 
 from __future__ import annotations
 
-
 #: 17 NRL clubs' nrl.com internal team_id values + theme.key short name.
 #: Sorted by short_name for stable iteration order (cron logs reproduce
 #: deterministically).

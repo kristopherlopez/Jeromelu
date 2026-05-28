@@ -62,10 +62,12 @@ def run_nrlcom_draw(
             payload=data,
         )
         set_archive_detail(detail, archive_key)
-        detail.update({
-            "fixtures": n_fixtures,
-            "selected_round": round_for_path,
-        })
+        detail.update(
+            {
+                "fixtures": n_fixtures,
+                "selected_round": round_for_path,
+            }
+        )
         # D8: strict-parse the archived response so upstream shape drift
         # surfaces as a failed run. The raw payload is already in S3 above,
         # so a validation failure never loses the capture. In archive_only
@@ -77,24 +79,32 @@ def run_nrlcom_draw(
             logger.info(
                 "scout/nrlcom-draw: archive_only=true; strict-parse skipped "
                 "(comp=%s season=%s round=%s fixtures=%d s3=%s)",
-                competition, season, round_for_path, n_fixtures, archive_key,
+                competition,
+                season,
+                round_for_path,
+                n_fixtures,
+                archive_key,
             )
         else:
             NrlcomDraw.model_validate(data)
             detail["validated"] = True
             logger.info(
                 "scout/nrlcom-draw: comp=%s season=%s round=%s fixtures=%d s3=%s",
-                competition, season, round_for_path, n_fixtures, archive_key,
+                competition,
+                season,
+                round_for_path,
+                n_fixtures,
+                archive_key,
             )
     except NrlcomDrawFetchError as e:
         run.fail(e, summary_text=f"Upstream fetch failed: {e}")
-        raise HTTPException(status_code=502, detail=f"nrl.com draw fetch failed: {e}")
+        raise HTTPException(status_code=502, detail=f"nrl.com draw fetch failed: {e}") from e
     except ValidationError as e:
         run.fail(
             e,
             summary_text=f"Draw response failed strict validation (drift): {e}",
         )
-        raise HTTPException(status_code=500, detail=f"nrl.com draw drift: {e}")
+        raise HTTPException(status_code=500, detail=f"nrl.com draw drift: {e}") from e
     except Exception as e:
         run.fail(e, summary_text=f"Pipeline failed: {e}")
         raise
@@ -124,5 +134,9 @@ def nrlcom_draw_endpoint(
 ):
     """Fetch nrl.com /draw/data and archive to S3."""
     return run_nrlcom_draw(
-        db, competition=competition, season=season, round=round, archive_only=archive_only,
+        db,
+        competition=competition,
+        season=season,
+        round=round,
+        archive_only=archive_only,
     )

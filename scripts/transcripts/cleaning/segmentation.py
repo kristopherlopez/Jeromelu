@@ -43,9 +43,7 @@ _TRANSITION_PATTERNS = [
 _TRANSITION_RE = re.compile("|".join(_TRANSITION_PATTERNS), re.IGNORECASE)
 
 # Game-specific phrases (e.g. "Broncos vs Eels", "that game", "in that match")
-_GAME_PHRASES = re.compile(
-    r"\b(?:vs?\.?|versus|against|v)\b", re.IGNORECASE
-)
+_GAME_PHRASES = re.compile(r"\b(?:vs?\.?|versus|against|v)\b", re.IGNORECASE)
 
 
 @dataclass
@@ -191,7 +189,7 @@ def _find_boundaries(
             continue
         # Must be a local max (or tied) within a window
         window = 10
-        local_max = max(boundary_scores[max(0, i - window):min(n, i + window + 1)])
+        local_max = max(boundary_scores[max(0, i - window) : min(n, i + window + 1)])
         if boundary_scores[i] >= local_max:
             # Don't place boundaries too close together
             if boundaries and i - boundaries[-1] < MIN_BLOCK_SIZE:
@@ -342,12 +340,22 @@ def _merge_pass(
             # even 1 team mention is significant
             prev_min = 1 if prev_size < 50 else 2
             curr_min = 1 if curr_size < 50 else 2
-            prev_teams = set(_find_dominant_teams(
-                team_mentions, prev.start_idx, prev.end_idx, min_mentions=prev_min,
-            ))
-            curr_teams = set(_find_dominant_teams(
-                team_mentions, block.start_idx, block.end_idx, min_mentions=curr_min,
-            ))
+            prev_teams = set(
+                _find_dominant_teams(
+                    team_mentions,
+                    prev.start_idx,
+                    prev.end_idx,
+                    min_mentions=prev_min,
+                )
+            )
+            curr_teams = set(
+                _find_dominant_teams(
+                    team_mentions,
+                    block.start_idx,
+                    block.end_idx,
+                    min_mentions=curr_min,
+                )
+            )
             shared_teams = prev_teams & curr_teams
 
             if len(shared_teams) >= 2:
@@ -362,7 +370,10 @@ def _merge_pass(
             combined_start = prev.start_idx
             combined_end = block.end_idx
             block_type, label, teams, positions = _classify_block(
-                team_mentions, pos_mentions, combined_start, combined_end,
+                team_mentions,
+                pos_mentions,
+                combined_start,
+                combined_end,
             )
             merged[-1] = TopicBlock(
                 start_idx=combined_start,
@@ -414,17 +425,22 @@ def segment_transcript(
         end = boundaries[b_idx + 1] if b_idx + 1 < len(boundaries) else len(segments)
 
         block_type, label, teams, positions = _classify_block(
-            team_mentions, pos_mentions, start, end,
+            team_mentions,
+            pos_mentions,
+            start,
+            end,
         )
 
-        raw_blocks.append(TopicBlock(
-            start_idx=start,
-            end_idx=end,
-            block_type=block_type,
-            label=label,
-            teams=teams,
-            positions=positions,
-        ))
+        raw_blocks.append(
+            TopicBlock(
+                start_idx=start,
+                end_idx=end,
+                block_type=block_type,
+                label=label,
+                teams=teams,
+                positions=positions,
+            )
+        )
 
     # Merge pass: adjacent blocks that share dominant teams belong to
     # the same game discussion (e.g. small position/general fragments

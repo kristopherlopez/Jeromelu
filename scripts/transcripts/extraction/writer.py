@@ -1,9 +1,8 @@
 """DB persistence for processed transcripts — Source, SourceDocument, SourceChunks, Claims."""
 
 import hashlib
-import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from jeromelu_shared.db import (
     Claim,
@@ -47,9 +46,7 @@ def _find_chunks_for_claim(claim_text: str, chunks: list[SourceChunk]) -> list[S
 
     claim_lower = claim_text.lower()
     claim_word_set = set(
-        _normalize(w)
-        for w in claim_lower.replace("...", " ").replace("\u2014", " ").split()
-        if len(_normalize(w)) >= 3
+        _normalize(w) for w in claim_lower.replace("...", " ").replace("\u2014", " ").split() if len(_normalize(w)) >= 3
     )
 
     if not claim_word_set:
@@ -92,8 +89,7 @@ def _find_chunks_for_claim(claim_text: str, chunks: list[SourceChunk]) -> list[S
                 gap += 1
             j += 1
 
-        matching_covs = [coverages[k] for k in range(run_start, run_end + 1)
-                         if coverages[k] >= COVERAGE_THRESHOLD]
+        matching_covs = [coverages[k] for k in range(run_start, run_end + 1) if coverages[k] >= COVERAGE_THRESHOLD]
         run_count = len(matching_covs)
         run_avg = sum(matching_covs) / run_count if run_count else 0
         composite = run_avg * run_count
@@ -108,16 +104,14 @@ def _find_chunks_for_claim(claim_text: str, chunks: list[SourceChunk]) -> list[S
     if best_start < 0 or best_score < 1.0:
         return []
 
-    return chunks[best_start: best_end + 1]
+    return chunks[best_start : best_end + 1]
 
 
 def source_exists(canonical_url: str) -> bool:
     """Check if a Source with this canonical_url already exists."""
     session = SessionLocal()
     try:
-        exists = session.query(Source.source_id).filter(
-            Source.canonical_url == canonical_url
-        ).first() is not None
+        exists = session.query(Source.source_id).filter(Source.canonical_url == canonical_url).first() is not None
         return exists
     finally:
         session.close()
@@ -141,9 +135,7 @@ def write_transcript(
     session = SessionLocal()
     try:
         # Idempotency check
-        existing = session.query(Source).filter(
-            Source.canonical_url == canonical_url
-        ).first()
+        existing = session.query(Source).filter(Source.canonical_url == canonical_url).first()
         if existing:
             return {
                 "already_processed": True,
@@ -166,7 +158,7 @@ def write_transcript(
             approved_flag=True,
             ingestion_status="completed",
             published_at=pub_dt,
-            ingested_at=datetime.now(timezone.utc),
+            ingested_at=datetime.now(UTC),
         )
         session.add(source)
         session.flush()
@@ -208,9 +200,7 @@ def write_transcript(
             # Resolve player entity
             player_entity = None
             if claim_data.get("player_name"):
-                player_entity = resolve_entity(
-                    session, claim_data["player_name"], "player"
-                )
+                player_entity = resolve_entity(session, claim_data["player_name"], "player")
 
             # Resolve team entity (if provided)
             if claim_data.get("team_name"):

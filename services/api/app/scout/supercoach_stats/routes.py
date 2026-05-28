@@ -17,11 +17,10 @@ from datetime import date
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.orm import Session
-
 from jeromelu_shared.db.models import PlayerRound
 from jeromelu_shared.scraping.nrl import STAT_DB_COLUMNS
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.orm import Session
 
 from ...deps import get_db
 from ...routers.admin import require_admin
@@ -46,14 +45,20 @@ _IDENTITY = ("player_id", "player_name", "team", "position", "round", "season")
 _BASE = ("score", "price", "breakeven", "minutes")
 # On conflict, refresh everything except the identity PK fields.
 _UPDATE_COLUMNS = (
-    "player_name", "team", "position",
+    "player_name",
+    "team",
+    "position",
     *_BASE,
     *STAT_DB_COLUMNS,
 )
 
 
 def _upsert_player_rounds(
-    db: Session, *, players: list[dict[str, Any]], round: int, season: int,
+    db: Session,
+    *,
+    players: list[dict[str, Any]],
+    round: int,
+    season: int,
 ) -> int:
     """Bulk upsert to player_rounds. Returns the row count upserted.
 
@@ -121,9 +126,7 @@ def run_supercoach_stats(
         # Fetch raw paginated jqGrid rows, archive to S3 (D10), then extract+strict-parse.
         raw_rows = fetch_stats_raw(season=season, round=round)
         if not raw_rows:
-            raise SuperCoachStatsFetchError(
-                f"Empty response for season={season} round={round}"
-            )
+            raise SuperCoachStatsFetchError(f"Empty response for season={season} round={round}")
 
         archive_key = archive_response(
             source="nrlsupercoachstats",
@@ -142,26 +145,30 @@ def run_supercoach_stats(
             logger.info(
                 "scout/supercoach-stats: archive_only=true; strict-parse + upsert "
                 "skipped (season=%s round=%s raw_rows=%d s3=%s)",
-                season, round, len(raw_rows), archive_key,
+                season,
+                round,
+                len(raw_rows),
+                archive_key,
             )
         else:
             extracted = extract_rows(raw_rows)
             if not extracted:
-                raise SuperCoachStatsFetchError(
-                    f"Zero parseable rows after extraction (raw: {len(raw_rows)})"
-                )
+                raise SuperCoachStatsFetchError(f"Zero parseable rows after extraction (raw: {len(raw_rows)})")
             # Strict-parse per D8 — drift in any field raises ValidationError.
             players = [SuperCoachPlayerStats.model_validate(p) for p in extracted]
             fetched = len(players)
             as_dicts = [p.model_dump() for p in players]
             upserted = _upsert_player_rounds(
-                db, players=as_dicts, round=round, season=season,
+                db,
+                players=as_dicts,
+                round=round,
+                season=season,
             )
             detail.update({"fetched": fetched, "upserted": upserted})
     except SuperCoachStatsFetchError as e:
         detail["fetched"] = fetched
         run.fail(e, summary_text=f"Upstream fetch failed: {e}")
-        raise HTTPException(status_code=502, detail=f"SC stats fetch failed: {e}")
+        raise HTTPException(status_code=502, detail=f"SC stats fetch failed: {e}") from e
     except Exception as e:
         detail["fetched"] = fetched
         run.fail(e, summary_text=f"Pipeline failed: {e}")
@@ -203,7 +210,7 @@ def supercoach_stats_endpoint(
     ),
     archive_only: bool = Query(
         default=False,
-        description="Phase 5 historical-backfill mode: skip strict-parse + DB upsert (S3 only). Daily cron leaves false.",
+        description="Phase 5 historical-backfill mode: skip strict-parse + DB upsert (S3 only). Daily cron leaves false.",  # noqa: E501
     ),
     db: Session = Depends(get_db),
 ):
@@ -217,5 +224,8 @@ def supercoach_stats_endpoint(
     """
     effective_season = season or date.today().year
     return run_supercoach_stats(
-        db, season=effective_season, round=round, archive_only=archive_only,
+        db,
+        season=effective_season,
+        round=round,
+        archive_only=archive_only,
     )

@@ -1,7 +1,7 @@
 import hashlib
 import json
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
@@ -24,7 +24,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _new_uuid() -> uuid.UUID:
@@ -135,9 +135,7 @@ class SourceDocument(Base):
     chunks: Mapped[list["SourceChunk"]] = relationship(back_populates="document", cascade="all, delete-orphan")
     quotes: Mapped[list["Quote"]] = relationship(back_populates="document")
 
-    __table_args__ = (
-        Index("idx_source_documents_source", "source_id"),
-    )
+    __table_args__ = (Index("idx_source_documents_source", "source_id"),)
 
 
 class SourceChunk(Base):
@@ -217,11 +215,13 @@ class SourceSpeaker(Base):
     embedding = mapped_column(Vector(256))
     embedding_model: Mapped[str | None] = mapped_column(Text)
     audio_match_person_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("people.person_id", ondelete="SET NULL"),
+        UUID(as_uuid=True),
+        ForeignKey("people.person_id", ondelete="SET NULL"),
     )
     audio_match_score: Mapped[float | None] = mapped_column(Float)
     visual_match_person_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("people.person_id", ondelete="SET NULL"),
+        UUID(as_uuid=True),
+        ForeignKey("people.person_id", ondelete="SET NULL"),
     )
     visual_match_score: Mapped[float | None] = mapped_column(Float)
     match_method: Mapped[str | None] = mapped_column(Text)
@@ -269,21 +269,27 @@ class PersonFaceEmbedding(Base):
     __tablename__ = "person_face_embeddings"
 
     face_embedding_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=_new_uuid,
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=_new_uuid,
     )
     person_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("people.person_id", ondelete="CASCADE"),
+        UUID(as_uuid=True),
+        ForeignKey("people.person_id", ondelete="CASCADE"),
         nullable=False,
     )
     source_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("sources.source_id", ondelete="SET NULL"),
+        UUID(as_uuid=True),
+        ForeignKey("sources.source_id", ondelete="SET NULL"),
     )
     frame_ts: Mapped[float | None] = mapped_column(Float)
     embedding = mapped_column(Vector(512), nullable=False)
     embedding_model: Mapped[str] = mapped_column(Text, nullable=False)
     created_by: Mapped[str] = mapped_column(Text, nullable=False, default="manual")
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=_utcnow,
+        DateTime(timezone=True),
+        nullable=False,
+        default=_utcnow,
     )
 
     __table_args__ = (
@@ -319,10 +325,13 @@ class SourceFaceDetection(Base):
     __tablename__ = "source_face_detections"
 
     detection_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=_new_uuid,
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=_new_uuid,
     )
     source_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("sources.source_id", ondelete="CASCADE"),
+        UUID(as_uuid=True),
+        ForeignKey("sources.source_id", ondelete="CASCADE"),
         nullable=False,
     )
     frame_ts: Mapped[float] = mapped_column(Float, nullable=False)
@@ -337,14 +346,17 @@ class SourceFaceDetection(Base):
     embedding_model: Mapped[str] = mapped_column(Text, nullable=False)
     mouth_opening: Mapped[float | None] = mapped_column(Float)
     matched_person_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("people.person_id", ondelete="SET NULL"),
+        UUID(as_uuid=True),
+        ForeignKey("people.person_id", ondelete="SET NULL"),
     )
     match_score: Mapped[float | None] = mapped_column(Float)
     # Populated by the per-source clustering pass (Slice B PR 2). NULL
     # = not yet clustered; expected initial state for fresh detections.
     cluster_id: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=_utcnow,
+        DateTime(timezone=True),
+        nullable=False,
+        default=_utcnow,
     )
 
     __table_args__ = (
@@ -353,7 +365,8 @@ class SourceFaceDetection(Base):
         Index("idx_source_face_detections_source_ts", "source_id", "frame_ts"),
         Index(
             "idx_source_face_detections_source_cluster",
-            "source_id", "cluster_id",
+            "source_id",
+            "cluster_id",
             postgresql_where="cluster_id IS NOT NULL",
         ),
     )
@@ -375,7 +388,8 @@ class SourceFaceCluster(Base):
     __tablename__ = "source_face_clusters"
 
     source_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("sources.source_id", ondelete="CASCADE"),
+        UUID(as_uuid=True),
+        ForeignKey("sources.source_id", ondelete="CASCADE"),
         primary_key=True,
     )
     cluster_id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -389,13 +403,18 @@ class SourceFaceCluster(Base):
     temporal_density: Mapped[float | None] = mapped_column(Float)
     detected_kind: Mapped[str | None] = mapped_column(Text)
     attributed_person_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("people.person_id", ondelete="SET NULL"),
+        UUID(as_uuid=True),
+        ForeignKey("people.person_id", ondelete="SET NULL"),
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=_utcnow,
+        DateTime(timezone=True),
+        nullable=False,
+        default=_utcnow,
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=_utcnow,
+        DateTime(timezone=True),
+        nullable=False,
+        default=_utcnow,
     )
 
     __table_args__ = (
@@ -430,14 +449,18 @@ class PersonVoiceprint(Base):
     __tablename__ = "person_voiceprints"
 
     voiceprint_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=_new_uuid,
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=_new_uuid,
     )
     person_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("people.person_id", ondelete="CASCADE"),
+        UUID(as_uuid=True),
+        ForeignKey("people.person_id", ondelete="CASCADE"),
         nullable=False,
     )
     source_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("sources.source_id", ondelete="SET NULL"),
+        UUID(as_uuid=True),
+        ForeignKey("sources.source_id", ondelete="SET NULL"),
     )
     start_ts: Mapped[float] = mapped_column(Float, nullable=False)
     end_ts: Mapped[float] = mapped_column(Float, nullable=False)
@@ -445,7 +468,9 @@ class PersonVoiceprint(Base):
     embedding_model: Mapped[str] = mapped_column(Text, nullable=False)
     created_by: Mapped[str] = mapped_column(Text, nullable=False, default="manual")
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=_utcnow,
+        DateTime(timezone=True),
+        nullable=False,
+        default=_utcnow,
     )
 
     __table_args__ = (
@@ -522,7 +547,9 @@ class Team(Base):
     metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )
 
     parent: Mapped["Team | None"] = relationship("Team", remote_side=[team_id], backref="feeders")
 
@@ -609,7 +636,9 @@ class PlayerAttributes(Base):
     is_current: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     source: Mapped[str] = mapped_column(Text, nullable=False, default="seed")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )
 
     __table_args__ = (
         CheckConstraint(
@@ -646,7 +675,9 @@ class PersonRole(Base):
     metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     source: Mapped[str] = mapped_column(Text, nullable=False, default="seed")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )
 
     __table_args__ = (
         CheckConstraint(
@@ -672,11 +703,11 @@ class Quote(Base):
     __tablename__ = "quotes"
 
     quote_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
-    document_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("source_documents.document_id"), nullable=False)
-    chunk_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("source_chunks.chunk_id"))
-    speaker_person_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("people.person_id")
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("source_documents.document_id"), nullable=False
     )
+    chunk_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("source_chunks.chunk_id"))
+    speaker_person_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("people.person_id"))
     quoted_text: Mapped[str] = mapped_column(Text, nullable=False)
     start_offset: Mapped[int | None] = mapped_column(Integer)
     end_offset: Mapped[int | None] = mapped_column(Integer)
@@ -696,23 +727,27 @@ class Quote(Base):
 class ClaimChunk(Base):
     __tablename__ = "claim_chunks"
 
-    claim_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("claims.claim_id", ondelete="CASCADE"), primary_key=True)
-    chunk_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("source_chunks.chunk_id", ondelete="CASCADE"), primary_key=True)
+    claim_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("claims.claim_id", ondelete="CASCADE"), primary_key=True
+    )
+    chunk_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("source_chunks.chunk_id", ondelete="CASCADE"), primary_key=True
+    )
     ordinal: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     claim: Mapped["Claim"] = relationship(back_populates="chunk_links")
     chunk: Mapped["SourceChunk"] = relationship(back_populates="claim_links")
 
-    __table_args__ = (
-        Index("idx_claim_chunks_chunk", "chunk_id"),
-    )
+    __table_args__ = (Index("idx_claim_chunks_chunk", "chunk_id"),)
 
 
 class Claim(Base):
     __tablename__ = "claims"
 
     claim_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
-    document_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("source_documents.document_id"))
+    document_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("source_documents.document_id")
+    )
     quote_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("quotes.quote_id"))
     claim_type: Mapped[str] = mapped_column(Text, nullable=False)
     claim_text: Mapped[str | None] = mapped_column(Text)
@@ -728,9 +763,7 @@ class Claim(Base):
     document: Mapped["SourceDocument | None"] = relationship()
     quote: Mapped["Quote | None"] = relationship(back_populates="claims")
     chunk_links: Mapped[list["ClaimChunk"]] = relationship(back_populates="claim", cascade="all, delete-orphan")
-    associations: Mapped[list["ClaimAssociation"]] = relationship(
-        back_populates="claim", cascade="all, delete-orphan"
-    )
+    associations: Mapped[list["ClaimAssociation"]] = relationship(back_populates="claim", cascade="all, delete-orphan")
 
     __table_args__ = (
         CheckConstraint(
@@ -789,7 +822,13 @@ class ClaimAssociation(Base):
             name="ck_claim_associations_one_subject",
         ),
         UniqueConstraint(
-            "claim_id", "role", "person_id", "team_id", "match_id", "venue_id", "round_id",
+            "claim_id",
+            "role",
+            "person_id",
+            "team_id",
+            "match_id",
+            "venue_id",
+            "round_id",
             name="uq_claim_associations",
             postgresql_nulls_not_distinct=True,
         ),
@@ -806,9 +845,7 @@ class Prediction(Base):
     __tablename__ = "predictions"
 
     prediction_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
-    predictor_person_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("people.person_id")
-    )
+    predictor_person_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("people.person_id"))
     prediction_type: Mapped[str | None] = mapped_column(Text)
     predicted_value_text: Mapped[str | None] = mapped_column(Text)
     event_window: Mapped[str | None] = mapped_column(Text)
@@ -821,9 +858,7 @@ class Prediction(Base):
         back_populates="prediction", cascade="all, delete-orphan"
     )
 
-    __table_args__ = (
-        Index("idx_predictions_predictor", "predictor_person_id"),
-    )
+    __table_args__ = (Index("idx_predictions_predictor", "predictor_person_id"),)
 
 
 class PredictionAssociation(Base):
@@ -864,7 +899,13 @@ class PredictionAssociation(Base):
             name="ck_prediction_associations_one_subject",
         ),
         UniqueConstraint(
-            "prediction_id", "role", "person_id", "team_id", "match_id", "venue_id", "round_id",
+            "prediction_id",
+            "role",
+            "person_id",
+            "team_id",
+            "match_id",
+            "venue_id",
+            "round_id",
             name="uq_prediction_associations",
             postgresql_nulls_not_distinct=True,
         ),
@@ -969,7 +1010,13 @@ class DecisionAssociation(Base):
             name="ck_decision_associations_one_subject",
         ),
         UniqueConstraint(
-            "decision_id", "role", "person_id", "team_id", "match_id", "venue_id", "round_id",
+            "decision_id",
+            "role",
+            "person_id",
+            "team_id",
+            "match_id",
+            "venue_id",
+            "round_id",
             name="uq_decision_associations",
             postgresql_nulls_not_distinct=True,
         ),
@@ -991,7 +1038,9 @@ class Plan(Base):
     plan_summary: Mapped[str | None] = mapped_column(Text)
     scenario_json: Mapped[dict] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )
 
 
 class Event(Base):
@@ -1000,8 +1049,12 @@ class Event(Base):
     event_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
     event_type: Mapped[str] = mapped_column(Text, nullable=False)
     related_entity_ids: Mapped[list[uuid.UUID]] = mapped_column(ARRAY(UUID(as_uuid=True)), default=list)
-    related_decision_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("decisions.decision_id"))
-    related_prediction_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("predictions.prediction_id"))
+    related_decision_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("decisions.decision_id")
+    )
+    related_prediction_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("predictions.prediction_id")
+    )
     related_claim_ids: Mapped[list[uuid.UUID]] = mapped_column(ARRAY(UUID(as_uuid=True)), default=list)
     related_source_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("sources.source_id"))
     display_text: Mapped[str] = mapped_column(Text, nullable=False)
@@ -1012,7 +1065,10 @@ class Event(Base):
     immutable_hash: Mapped[str | None] = mapped_column(Text)
 
     __table_args__ = (
-        CheckConstraint("display_mode IN ('watching', 'signal', 'thinking', 'prediction', 'action', 'review', 'sys', 'question', 'answer')", name="ck_display_mode"),
+        CheckConstraint(
+            "display_mode IN ('watching', 'signal', 'thinking', 'prediction', 'action', 'review', 'sys', 'question', 'answer')",  # noqa: E501  # SQL CHECK constraint — keep on one line for grep'ability
+            name="ck_display_mode",
+        ),
         CheckConstraint("visibility IN ('public', 'private')", name="ck_visibility"),
         Index("idx_events_type", "event_type"),
         Index("idx_events_created", "created_at"),
@@ -1020,12 +1076,15 @@ class Event(Base):
     )
 
     def compute_hash(self) -> str:
-        payload = json.dumps({
-            "event_id": str(self.event_id),
-            "event_type": self.event_type,
-            "display_text": self.display_text,
-            "created_at": self.created_at.isoformat() if self.created_at else "",
-        }, sort_keys=True)
+        payload = json.dumps(
+            {
+                "event_id": str(self.event_id),
+                "event_type": self.event_type,
+                "display_text": self.display_text,
+                "created_at": self.created_at.isoformat() if self.created_at else "",
+            },
+            sort_keys=True,
+        )
         return hashlib.sha256(payload.encode()).hexdigest()
 
 
@@ -1178,7 +1237,9 @@ class Venue(Base):
     metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )
 
     __table_args__ = (
         CheckConstraint(
@@ -1270,7 +1331,9 @@ class Match(Base):
 
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )
 
     __table_args__ = (
         CheckConstraint(
@@ -1286,8 +1349,7 @@ class Match(Base):
             name="ck_matches_status",
         ),
         CheckConstraint(
-            "(status='bye' AND away_team_id IS NULL) "
-            "OR (status<>'bye' AND away_team_id IS NOT NULL)",
+            "(status='bye' AND away_team_id IS NULL) OR (status<>'bye' AND away_team_id IS NOT NULL)",
             name="ck_matches_bye_no_opponent",
         ),
         CheckConstraint(
@@ -1295,8 +1357,7 @@ class Match(Base):
             name="ck_matches_distinct_teams",
         ),
         CheckConstraint(
-            "(home_score IS NULL AND away_score IS NULL) "
-            "OR (home_score IS NOT NULL AND away_score IS NOT NULL)",
+            "(home_score IS NULL AND away_score IS NULL) OR (home_score IS NOT NULL AND away_score IS NOT NULL)",
             name="ck_matches_score_paired",
         ),
         Index(
@@ -1356,8 +1417,7 @@ class MatchTeamList(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "status IN ('named', 'late_change_in', 'late_change_out', "
-            "'19th_man', 'reserve', 'withdrawn')",
+            "status IN ('named', 'late_change_in', 'late_change_out', '19th_man', 'reserve', 'withdrawn')",
             name="ck_match_team_lists_status",
         ),
         CheckConstraint(
@@ -1464,7 +1524,9 @@ class KnowledgeBase(Base):
     season: Mapped[int | None] = mapped_column(Integer)
     source_claim_ids: Mapped[list[uuid.UUID]] = mapped_column(ARRAY(UUID(as_uuid=True)), default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
@@ -1504,7 +1566,9 @@ class WikiPage(Base):
     metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
     status: Mapped[str] = mapped_column(Text, nullable=False, default="stub")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )
 
     revisions: Mapped[list["WikiRevision"]] = relationship(back_populates="page", cascade="all, delete-orphan")
 
@@ -1532,7 +1596,9 @@ class WikiRevision(Base):
     __tablename__ = "wiki_revisions"
 
     revision_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
-    page_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("wiki_pages.page_id", ondelete="CASCADE"), nullable=False)
+    page_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("wiki_pages.page_id", ondelete="CASCADE"), nullable=False
+    )
     section_heading: Mapped[str | None] = mapped_column(Text)
     summary: Mapped[str] = mapped_column(Text, nullable=False)
     content_snapshot: Mapped[str | None] = mapped_column(Text)
@@ -1556,6 +1622,7 @@ class AgentEvent(Base):
     at run end. One row per event; dense `sequence` per run for ordered replay.
     See `docs/agents/system/agent-audit.md` for the standard event types.
     """
+
     __tablename__ = "agent_events"
 
     event_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
@@ -1586,6 +1653,7 @@ class AgentRun(Base):
     columns are estimated via `jeromelu_shared.agent_audit.estimate_*` — used
     for budget gates and observability, not invoicing.
     """
+
     __tablename__ = "agent_runs"
 
     run_id: Mapped[str] = mapped_column(Text, primary_key=True)
@@ -1653,7 +1721,9 @@ class SquadSlot(Base):
     season: Mapped[int] = mapped_column(Integer, default=2026)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )
 
     __table_args__ = (
         CheckConstraint("conviction IN ('low', 'medium', 'high')", name="ck_squad_conviction"),
@@ -1739,7 +1809,9 @@ class ScoutCandidate(Base):
             name="ck_scout_candidates_status",
         ),
         UniqueConstraint(
-            "platform", "kind", "external_id",
+            "platform",
+            "kind",
+            "external_id",
             name="uq_scout_candidates_platform_kind_external",
         ),
         Index("idx_scout_candidates_status", "status"),

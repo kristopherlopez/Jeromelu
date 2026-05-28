@@ -26,13 +26,9 @@ Not Temporal-driven — sync, in-process. Matches the rest of Scout.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
-
-from sqlalchemy import Integer, distinct, func, select, update
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.orm import Session
 
 from jeromelu_shared.db import (
     Channel,
@@ -44,6 +40,9 @@ from jeromelu_shared.db import (
     VideoMetric,
 )
 from jeromelu_shared.youtube import extract_video_id
+from sqlalchemy import Integer, distinct, func, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.orm import Session
 
 from . import client as youtube_api
 
@@ -103,6 +102,7 @@ def _parse_published_at(raw: str | None) -> datetime | None:
 #     cutoff), never "the row at exactly N days ago"; gaps are expected.
 # ---------------------------------------------------------------------------
 
+
 def _metrics_changed(previous: dict | None, current: dict) -> bool:
     """True when `current` should be recorded — i.e. there is no prior snapshot,
     or the payload differs from the most recent stored one.
@@ -142,6 +142,7 @@ def _latest_channel_metrics(session: Session) -> dict[UUID, dict]:
 # Per-channel video enumeration
 # ---------------------------------------------------------------------------
 
+
 def refresh_channel_videos(
     session: Session,
     channel: Channel,
@@ -162,9 +163,7 @@ def refresh_channel_videos(
     if channel.platform != "youtube" or not channel.external_id:
         return {"channel_id": str(channel.channel_id), "skipped": "not_youtube"}
 
-    cursor_video_id = (
-        None if full_backfill else _most_recent_known_video_id(session, channel.channel_id)
-    )
+    cursor_video_id = None if full_backfill else _most_recent_known_video_id(session, channel.channel_id)
 
     videos = youtube_api.list_channel_videos(
         channel.external_id,
@@ -211,7 +210,7 @@ def refresh_channel_videos(
     metrics_recorded = 0
     if inserted_source_ids:
         stats = youtube_api.get_video_stats(list(inserted_source_ids.keys()))
-        sampled_at = datetime.now(timezone.utc)
+        sampled_at = datetime.now(UTC)
         for video_id, source_id in inserted_source_ids.items():
             entry = stats.get(video_id)
             if not entry:
@@ -220,11 +219,7 @@ def refresh_channel_videos(
             # didn't (duration in particular).
             duration = entry.get("duration_seconds")
             if duration is not None:
-                session.execute(
-                    update(Source)
-                    .where(Source.source_id == source_id)
-                    .values(duration_seconds=duration)
-                )
+                session.execute(update(Source).where(Source.source_id == source_id).values(duration_seconds=duration))
             metric_payload = {k: entry[k] for k in _METRIC_FIELDS if k in entry}
             if metric_payload:
                 session.add(
@@ -259,6 +254,7 @@ def refresh_channel_videos(
 # ---------------------------------------------------------------------------
 # All-video daily stats refresh
 # ---------------------------------------------------------------------------
+
 
 def refresh_all_video_stats(session: Session) -> dict[str, Any]:
     """Snapshot views/likes/comments for every active YouTube source AND
@@ -306,7 +302,7 @@ def refresh_all_video_stats(session: Session) -> dict[str, Any]:
     # re-recording an unchanged snapshot (change-only storage).
     latest = _latest_video_metrics(session)
 
-    sampled_at = datetime.now(timezone.utc)
+    sampled_at = datetime.now(UTC)
     refreshed = 0
     unchanged = 0
     sources_synced = 0
@@ -334,11 +330,7 @@ def refresh_all_video_stats(session: Session) -> dict[str, Any]:
                 if api_key in entry:
                     source_updates[src_col] = entry[api_key]
             if source_updates:
-                session.execute(
-                    update(Source)
-                    .where(Source.source_id == source_id)
-                    .values(**source_updates)
-                )
+                session.execute(update(Source).where(Source.source_id == source_id).values(**source_updates))
                 sources_synced += 1
 
             metric_payload = {k: entry[k] for k in _METRIC_FIELDS if k in entry}
@@ -358,8 +350,7 @@ def refresh_all_video_stats(session: Session) -> dict[str, Any]:
 
     session.commit()
     logger.info(
-        "Refreshed video stats: %d recorded, %d unchanged in %d API batches, "
-        "%d sources synced with identity fields",
+        "Refreshed video stats: %d recorded, %d unchanged in %d API batches, %d sources synced with identity fields",
         refreshed,
         unchanged,
         batches,
@@ -379,6 +370,7 @@ def refresh_all_video_stats(session: Session) -> dict[str, Any]:
 # Daily channel stats refresh
 # ---------------------------------------------------------------------------
 
+
 def refresh_all_channel_stats(session: Session) -> dict[str, Any]:
     """Snapshot subscriber / video / view counts for every active YouTube
     channel and append a row to `channel_metrics`.
@@ -397,12 +389,14 @@ def refresh_all_channel_stats(session: Session) -> dict[str, Any]:
          row when the API returns them — keeps the wiki UI in sync without
          a separate fetch. Independent of the metric skip — identity always syncs.
     """
-    channels = list(session.scalars(
-        select(Channel)
-        .where(Channel.platform == "youtube")
-        .where(Channel.active.is_(True))
-        .where(Channel.external_id.is_not(None))
-    ))
+    channels = list(
+        session.scalars(
+            select(Channel)
+            .where(Channel.platform == "youtube")
+            .where(Channel.active.is_(True))
+            .where(Channel.external_id.is_not(None))
+        )
+    )
     if not channels:
         return {
             "channels_total": 0,
@@ -417,7 +411,7 @@ def refresh_all_channel_stats(session: Session) -> dict[str, Any]:
 
     by_external_id = {c.external_id: c for c in channels}
     external_ids = list(by_external_id.keys())
-    sampled_at = datetime.now(timezone.utc)
+    sampled_at = datetime.now(UTC)
 
     metrics_recorded = 0
     unchanged = 0
@@ -445,9 +439,7 @@ def refresh_all_channel_stats(session: Session) -> dict[str, Any]:
                 channel_updates["logo_url"] = new_avatar
             if channel_updates:
                 session.execute(
-                    update(Channel)
-                    .where(Channel.channel_id == channel.channel_id)
-                    .values(**channel_updates)
+                    update(Channel).where(Channel.channel_id == channel.channel_id).values(**channel_updates)
                 )
                 channels_synced += 1
 
@@ -484,8 +476,7 @@ def refresh_all_channel_stats(session: Session) -> dict[str, Any]:
 
     session.commit()
     logger.info(
-        "Refreshed channel stats: %d recorded, %d unchanged in %d API batches, "
-        "%d identity-synced",
+        "Refreshed channel stats: %d recorded, %d unchanged in %d API batches, %d identity-synced",
         metrics_recorded,
         unchanged,
         batches,
@@ -504,6 +495,7 @@ def refresh_all_channel_stats(session: Session) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Coverage audit — reported vs ingested
 # ---------------------------------------------------------------------------
+
 
 def audit_channel_coverage(session: Session) -> dict[str, Any]:
     """Per-channel funnel — how far each channel's videos have travelled
@@ -559,9 +551,7 @@ def audit_channel_coverage(session: Session) -> dict[str, Any]:
         select(
             Source.channel_id,
             func.count(distinct(Source.source_id)).label("chunked_videos"),
-            func.coalesce(func.sum(SourceDocument.chunk_count), 0).label(
-                "chunks_total"
-            ),
+            func.coalesce(func.sum(SourceDocument.chunk_count), 0).label("chunks_total"),
         )
         .join(SourceDocument, SourceDocument.source_id == Source.source_id)
         .where(Source.source_type == "youtube")
@@ -652,22 +642,24 @@ def audit_channel_coverage(session: Session) -> dict[str, Any]:
         if gap is not None and gap > 0:
             total_gap += gap
             channels_with_gap += 1
-        per_channel.append({
-            "channel_id": str(r.channel_id),
-            "slug": r.slug,
-            "name": r.name,
-            "external_id": r.external_id,
-            "reported_videos": reported,
-            "tracked_videos": tracked,
-            "transcribed_videos": transcribed,
-            "chunked_videos": chunked,
-            "cleaned_videos": cleaned,
-            "extracted_videos": extracted,
-            "chunks_total": chunks_total,
-            "claims_total": claims_total,
-            "gap": gap,
-            "metrics_sampled_at": r.sampled_at.isoformat() if r.sampled_at else None,
-        })
+        per_channel.append(
+            {
+                "channel_id": str(r.channel_id),
+                "slug": r.slug,
+                "name": r.name,
+                "external_id": r.external_id,
+                "reported_videos": reported,
+                "tracked_videos": tracked,
+                "transcribed_videos": transcribed,
+                "chunked_videos": chunked,
+                "cleaned_videos": cleaned,
+                "extracted_videos": extracted,
+                "chunks_total": chunks_total,
+                "claims_total": claims_total,
+                "gap": gap,
+                "metrics_sampled_at": r.sampled_at.isoformat() if r.sampled_at else None,
+            }
+        )
 
     return {
         "channels_total": len(per_channel),
@@ -681,11 +673,7 @@ def refresh_all_channels_incremental(session: Session) -> dict[str, Any]:
     """Walk every active YouTube channel and pull any new videos. Cheap:
     ~1 quota unit per channel for incremental (most weeks, no new videos
     means a single playlistItems page that hits the cursor immediately)."""
-    stmt = (
-        select(Channel)
-        .where(Channel.platform == "youtube")
-        .where(Channel.active.is_(True))
-    )
+    stmt = select(Channel).where(Channel.platform == "youtube").where(Channel.active.is_(True))
     channels = list(session.scalars(stmt))
 
     per_channel: list[dict[str, Any]] = []
@@ -694,14 +682,14 @@ def refresh_all_channels_incremental(session: Session) -> dict[str, Any]:
         try:
             result = refresh_channel_videos(session, channel)
         except Exception as e:
-            logger.warning(
-                "refresh_channel_videos failed for %s: %s", channel.external_id, e
+            logger.warning("refresh_channel_videos failed for %s: %s", channel.external_id, e)
+            per_channel.append(
+                {
+                    "channel_id": str(channel.channel_id),
+                    "external_id": channel.external_id,
+                    "error": str(e),
+                }
             )
-            per_channel.append({
-                "channel_id": str(channel.channel_id),
-                "external_id": channel.external_id,
-                "error": str(e),
-            })
             continue
         total_inserted += result.get("videos_inserted", 0)
         per_channel.append(result)

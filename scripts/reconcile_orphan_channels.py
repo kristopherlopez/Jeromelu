@@ -24,7 +24,6 @@ import urllib.request
 
 from sqlalchemy import create_engine, text
 
-
 DRY_RUN = "--apply" not in sys.argv
 
 DB_URL = os.environ["DATABASE_URL"]
@@ -37,10 +36,7 @@ URL_VID_RE = re.compile(r"[?&]v=([A-Za-z0-9_-]{11})")
 def yt_channel_for_video(video_id: str) -> str | None:
     if not YT_KEY:
         return None
-    url = (
-        "https://www.googleapis.com/youtube/v3/videos"
-        f"?part=snippet&id={video_id}&key={YT_KEY}"
-    )
+    url = f"https://www.googleapis.com/youtube/v3/videos?part=snippet&id={video_id}&key={YT_KEY}"
     with urllib.request.urlopen(url, timeout=10) as resp:
         data = json.load(resp)
     items = data.get("items") or []
@@ -58,7 +54,8 @@ def main() -> None:
         channel_map = {ext: cid for cid, ext in channel_rows}
         print(f"Loaded {len(channel_map)} channels with external_id")
 
-        orphan_rows = conn.execute(text("""
+        orphan_rows = conn.execute(
+            text("""
             SELECT s.source_id, s.canonical_url,
                    (SELECT sd.s3_key
                       FROM source_documents sd
@@ -68,7 +65,8 @@ def main() -> None:
               FROM sources s
              WHERE s.channel_id IS NULL
                AND s.source_type = 'youtube'
-        """)).all()
+        """)
+        ).all()
         print(f"Found {len(orphan_rows)} orphan youtube sources")
 
         from_s3: list[tuple] = []
@@ -107,7 +105,7 @@ def main() -> None:
 
         matched: list[tuple] = []
         unmatched: dict[str, list] = {}
-        for src_id, ext, url in from_s3:
+        for src_id, ext, _url in from_s3:
             cid = channel_map.get(ext)
             if cid:
                 matched.append((src_id, cid, ext))

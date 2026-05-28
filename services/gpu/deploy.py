@@ -21,11 +21,9 @@ from __future__ import annotations
 import os
 import sys
 import time
-from typing import Any
 
 import boto3
 from botocore.exceptions import ClientError
-
 from jeromelu_shared.config import settings
 
 # Windows' default stdout codepage (cp1252) can't encode the em-dashes and
@@ -59,8 +57,7 @@ def _image_uri(account: str, region: str, repo: str, tag: str = "latest") -> str
 def _ensure_role_arn() -> str:
     if not settings.lineup_sagemaker_role_arn:
         raise SystemExit(
-            "LINEUP_SAGEMAKER_ROLE_ARN is empty — see services/gpu/SETUP.md "
-            "for one-time IAM role creation."
+            "LINEUP_SAGEMAKER_ROLE_ARN is empty — see services/gpu/SETUP.md for one-time IAM role creation."
         )
     return settings.lineup_sagemaker_role_arn
 
@@ -127,7 +124,11 @@ def _create_or_update_model(sm, *, model_name: str, image: str, role: str, hf_to
 
 
 def _create_or_update_endpoint_config(
-    sm, *, config_name: str, model_name: str, region: str,
+    sm,
+    *,
+    config_name: str,
+    model_name: str,
+    region: str,
 ) -> None:
     try:
         sm.describe_endpoint_config(EndpointConfigName=config_name)
@@ -150,9 +151,7 @@ def _create_or_update_endpoint_config(
         ],
         AsyncInferenceConfig={
             "OutputConfig": {
-                "S3OutputPath": (
-                    f"s3://{settings.lineup_staging_bucket}/{settings.lineup_output_prefix}/"
-                ),
+                "S3OutputPath": (f"s3://{settings.lineup_staging_bucket}/{settings.lineup_output_prefix}/"),
             },
             "ClientConfig": {
                 # One source at a time per endpoint instance — confirmed
@@ -211,10 +210,17 @@ def main(argv: list[str]) -> int:
     sm = boto3.client("sagemaker", region_name=region)
 
     _create_or_update_model(
-        sm, model_name=model_name, image=image, role=role, hf_token=hf_token,
+        sm,
+        model_name=model_name,
+        image=image,
+        role=role,
+        hf_token=hf_token,
     )
     _create_or_update_endpoint_config(
-        sm, config_name=config_name, model_name=model_name, region=region,
+        sm,
+        config_name=config_name,
+        model_name=model_name,
+        region=region,
     )
     _create_or_update_endpoint(sm, endpoint=endpoint, config_name=config_name)
     _wait_in_service(sm, endpoint)

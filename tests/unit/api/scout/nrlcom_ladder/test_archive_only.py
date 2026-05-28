@@ -12,7 +12,6 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from app.scout.nrlcom_ladder.routes import run_nrlcom_ladder
 
 
@@ -45,15 +44,19 @@ def drift_payload(canonical_payload: dict) -> dict:
 
 def _patched_run(fixture_payload: dict, *, archive_only: bool):
     fake_run = _FakeRun()
-    with patch(
-        "app.scout.nrlcom_ladder.routes.fetch_ladder",
-        return_value=fixture_payload,
-    ), patch(
-        "app.scout.nrlcom_ladder.routes.archive_response",
-        return_value="scout/nrlcom/ladder/111/2026/round-12.json",
-    ), patch(
-        "app.scout.nrlcom_ladder.routes.start_deterministic_run",
-        return_value=fake_run,
+    with (
+        patch(
+            "app.scout.nrlcom_ladder.routes.fetch_ladder",
+            return_value=fixture_payload,
+        ),
+        patch(
+            "app.scout.nrlcom_ladder.routes.archive_response",
+            return_value="scout/nrlcom/ladder/111/2026/round-12.json",
+        ),
+        patch(
+            "app.scout.nrlcom_ladder.routes.start_deterministic_run",
+            return_value=fake_run,
+        ),
     ):
         response = run_nrlcom_ladder(
             db=MagicMock(),

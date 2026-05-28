@@ -72,6 +72,28 @@ jobs:
         run: npm run typecheck
         working-directory: services/web
 
+  ruff:
+    # Python lint + format check. Hard-fail. Scope: services packages
+    # scripts tests. Config in pyproject.toml [tool.ruff].
+    name: ruff check + format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - name: Install ruff (pinned)
+        # requirements-dev.txt allows >=0.15,<1 so devs auto-pick up
+        # newer ruff releases. CI pins the exact version so a sudden
+        # ruff release doesn't flip the build red on a new rule.
+        run: pip install ruff==0.15.14
+      - name: Ruff check
+        run: ruff check services packages scripts tests
+      - name: Ruff format --check
+        run: ruff format --check services packages scripts tests
+
   pyright:
     # Python typecheck. Hard-fail. Scope is narrow to
     # packages/shared/jeromelu_shared/ per pyproject.toml [tool.pyright].

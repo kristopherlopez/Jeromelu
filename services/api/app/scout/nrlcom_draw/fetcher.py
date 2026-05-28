@@ -6,7 +6,6 @@ from typing import Any
 
 import httpx
 
-
 DRAW_URL = "https://www.nrl.com/draw/data"
 
 
@@ -39,9 +38,9 @@ def fetch_draw(
     data = r.json()
     if not isinstance(data, dict) or "fixtures" not in data:
         raise NrlcomDrawFetchError(
-            f"Unexpected response: missing 'fixtures' key (keys: {list(data) if isinstance(data, dict) else type(data).__name__})"
+            f"Unexpected response: missing 'fixtures' key (keys: {list(data) if isinstance(data, dict) else type(data).__name__})"  # noqa: E501
         )
     return data
 
 
-__all__ = ["fetch_draw", "NrlcomDrawFetchError"]
+__all__ = ["NrlcomDrawFetchError", "fetch_draw"]

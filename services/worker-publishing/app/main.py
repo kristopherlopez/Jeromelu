@@ -1,9 +1,8 @@
 import asyncio
 import logging
 
+from jeromelu_shared.temporal import PUBLISHING_QUEUE, get_temporal_client
 from temporalio.worker import Worker
-
-from jeromelu_shared.temporal import get_temporal_client, PUBLISHING_QUEUE
 
 from app.activities.generate_events import (
     fetch_unprocessed_claims,
@@ -11,12 +10,12 @@ from app.activities.generate_events import (
     persist_events,
 )
 from app.activities.generate_kb import (
-    generate_player_summaries,
-    generate_round_briefs,
+    embed_kb_entries,
     generate_decisions_log,
     generate_player_opinions,
+    generate_player_summaries,
+    generate_round_briefs,
     generate_source_digests,
-    embed_kb_entries,
 )
 from app.activities.generate_reviews import generate_review_data
 from app.activities.update_consensus import update_consensus_snapshots

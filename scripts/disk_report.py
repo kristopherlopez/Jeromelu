@@ -21,11 +21,10 @@ import os
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import boto3
 from botocore.exceptions import ClientError
-
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -61,7 +60,9 @@ def df_root() -> DfRow:
     """Run `df -h /` and parse the single data row."""
     result = subprocess.run(
         ["df", "-h", "--output=target,size,used,avail,pcent", "/"],
-        capture_output=True, text=True, check=True,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     # Skip the header line.
     line = result.stdout.strip().splitlines()[-1].split()
@@ -81,7 +82,9 @@ def log_dir_size() -> str:
         return "-"
     result = subprocess.run(
         ["du", "-sh", path],
-        capture_output=True, text=True, check=False,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     return result.stdout.split()[0] if result.returncode == 0 else "-"
 
@@ -91,22 +94,32 @@ def _psql(query: str) -> str:
     db = os.environ.get("POSTGRES_DB", "jeromelu")
     result = subprocess.run(
         [
-            "docker", "exec", "-i", "jeromelu-postgres",
-            "psql", "-U", user, "-d", db,
-            "-t", "-A", "-F", "\t",
-            "-c", query,
+            "docker",
+            "exec",
+            "-i",
+            "jeromelu-postgres",
+            "psql",
+            "-U",
+            user,
+            "-d",
+            db,
+            "-t",
+            "-A",
+            "-F",
+            "\t",
+            "-c",
+            query,
         ],
-        capture_output=True, text=True, check=True,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     return result.stdout.strip()
 
 
 def db_total_size() -> tuple[str, int]:
     """Returns (pretty, bytes) for the current database."""
-    out = _psql(
-        "SELECT pg_size_pretty(pg_database_size(current_database())), "
-        "pg_database_size(current_database());"
-    )
+    out = _psql("SELECT pg_size_pretty(pg_database_size(current_database())), pg_database_size(current_database());")
     pretty, bytes_str = out.split("\t")
     return pretty, int(bytes_str)
 
@@ -129,16 +142,19 @@ def top_tables_by_size(limit: int = 10) -> list[TableRow]:
         parts = line.split("\t")
         if len(parts) != 4:
             continue
-        rows.append(TableRow(
-            name=parts[0],
-            total_pretty=parts[1],
-            total_bytes=int(parts[2]),
-            row_count=int(parts[3]),
-        ))
+        rows.append(
+            TableRow(
+                name=parts[0],
+                total_pretty=parts[1],
+                total_bytes=int(parts[2]),
+                row_count=int(parts[3]),
+            )
+        )
     return rows
 
 
 # ---- Rendering -------------------------------------------------------------
+
 
 def _status_color(pct: int) -> str:
     if pct >= FAIL_PCT:
@@ -148,8 +164,9 @@ def _status_color(pct: int) -> str:
     return "#1a7f37"
 
 
-def render_text(today: datetime, df: DfRow, db_pretty: str, db_bytes: int,
-                tables: list[TableRow], log_size: str) -> str:
+def render_text(
+    today: datetime, df: DfRow, db_pretty: str, db_bytes: int, tables: list[TableRow], log_size: str
+) -> str:
     lines = [
         f"Jeromelu capacity report — {today.date().isoformat()}",
         "=" * 60,
@@ -169,15 +186,16 @@ def render_text(today: datetime, df: DfRow, db_pretty: str, db_bytes: int,
     return "\n".join(lines)
 
 
-def render_html(today: datetime, df: DfRow, db_pretty: str, db_bytes: int,
-                tables: list[TableRow], log_size: str) -> str:
+def render_html(
+    today: datetime, df: DfRow, db_pretty: str, db_bytes: int, tables: list[TableRow], log_size: str
+) -> str:
     color = _status_color(df.use_pct)
     rows_html = "".join(
         f'<tr style="border-top:1px solid #eee">'
         f'<td style="padding:4px 12px 4px 0;font-family:ui-monospace,Menlo,monospace">{t.total_pretty}</td>'
         f'<td style="padding:4px 12px 4px 0;font-family:ui-monospace,Menlo,monospace;text-align:right">{t.row_count:,}</td>'
         f'<td style="padding:4px 0">{t.name}</td>'
-        f'</tr>'
+        f"</tr>"
         for t in tables
     )
     return f"""\
@@ -222,6 +240,7 @@ def render_html(today: datetime, df: DfRow, db_pretty: str, db_bytes: int,
 
 # ---- Send ------------------------------------------------------------------
 
+
 def send_email(subject: str, html: str, text: str) -> None:
     ses = boto3.client("ses", region_name=PRIMARY_REGION)
     ses.send_email(
@@ -238,7 +257,7 @@ def send_email(subject: str, html: str, text: str) -> None:
 
 
 def main() -> int:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     df = df_root()
     db_pretty, db_bytes = db_total_size()
     tables = top_tables_by_size()

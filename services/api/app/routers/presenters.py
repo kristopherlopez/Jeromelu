@@ -19,22 +19,21 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Header, Query
-from pydantic import BaseModel
-from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
-
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from jeromelu_shared.db import (
     Channel,
     Person,
     ScoutPresenterCandidate,
     SourcePresenter,
 )
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from ..deps import get_db
 from ..scout.presenter_research.agent import run_presenter_research
@@ -60,9 +59,7 @@ def _unique_person_slug(session: Session, base: str) -> str:
     candidate = base
     n = 2
     while True:
-        hit = session.execute(
-            select(Person.person_id).where(Person.slug == candidate).limit(1)
-        ).first()
+        hit = session.execute(select(Person.person_id).where(Person.slug == candidate).limit(1)).first()
         if hit is None:
             return candidate
         candidate = f"{base}-{n}"
@@ -88,9 +85,7 @@ def _candidate_to_dict(c: ScoutPresenterCandidate) -> dict[str, Any]:
     }
 
 
-def _confirmed_to_dict(
-    sp: SourcePresenter, person_name: str
-) -> dict[str, Any]:
+def _confirmed_to_dict(sp: SourcePresenter, person_name: str) -> dict[str, Any]:
     return {
         "id": str(sp.id),
         "channel_id": str(sp.channel_id),
@@ -109,6 +104,7 @@ def _confirmed_to_dict(
 # POST /admin/presenters/research/{channel_id} — run the agent
 # ---------------------------------------------------------------------------
 
+
 class PresenterResearchTriggerBody(BaseModel):
     model: str | None = None
     dry_run: bool = False
@@ -117,9 +113,7 @@ class PresenterResearchTriggerBody(BaseModel):
 @router.post("/admin/presenters/research/{channel_id}")
 def trigger_presenter_research(
     channel_id: UUID,
-    body: PresenterResearchTriggerBody = Body(
-        default_factory=PresenterResearchTriggerBody
-    ),
+    body: PresenterResearchTriggerBody = Body(default_factory=PresenterResearchTriggerBody),
     db: Session = Depends(get_db),
 ):
     """Run Presenter Research for one channel. Synchronous — typical
@@ -137,7 +131,7 @@ def trigger_presenter_research(
         )
     except RuntimeError as e:
         # Most likely "ANTHROPIC_API_KEY not set"
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
     return {
         "ok": True,
@@ -158,6 +152,7 @@ def trigger_presenter_research(
 # GET /admin/presenters/candidates — list filed candidates
 # ---------------------------------------------------------------------------
 
+
 @router.get("/admin/presenters/candidates")
 def list_candidates(
     channel_id: UUID | None = Query(default=None),
@@ -165,9 +160,7 @@ def list_candidates(
     limit: int = Query(default=200, le=500),
     db: Session = Depends(get_db),
 ):
-    stmt = select(ScoutPresenterCandidate).order_by(
-        ScoutPresenterCandidate.discovered_at.desc()
-    )
+    stmt = select(ScoutPresenterCandidate).order_by(ScoutPresenterCandidate.discovered_at.desc())
     if channel_id is not None:
         stmt = stmt.where(ScoutPresenterCandidate.channel_id == channel_id)
     if status:
@@ -184,6 +177,7 @@ def list_candidates(
 # GET /admin/presenters/by-channel/{channel_id} — confirmed + pending side-by-side
 # ---------------------------------------------------------------------------
 
+
 @router.get("/admin/presenters/by-channel/{channel_id}")
 def by_channel(
     channel_id: UUID,
@@ -193,27 +187,35 @@ def by_channel(
     if channel is None:
         raise HTTPException(status_code=404, detail="channel not found")
 
-    pending_rows = db.execute(
-        select(ScoutPresenterCandidate)
-        .where(
-            ScoutPresenterCandidate.channel_id == channel_id,
-            ScoutPresenterCandidate.status == "pending",
+    pending_rows = (
+        db.execute(
+            select(ScoutPresenterCandidate)
+            .where(
+                ScoutPresenterCandidate.channel_id == channel_id,
+                ScoutPresenterCandidate.status == "pending",
+            )
+            .order_by(
+                ScoutPresenterCandidate.role,
+                ScoutPresenterCandidate.llm_confidence.desc().nullslast(),
+            )
         )
-        .order_by(
-            ScoutPresenterCandidate.role,
-            ScoutPresenterCandidate.llm_confidence.desc().nullslast(),
-        )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
-    rejected_rows = db.execute(
-        select(ScoutPresenterCandidate)
-        .where(
-            ScoutPresenterCandidate.channel_id == channel_id,
-            ScoutPresenterCandidate.status == "rejected",
+    rejected_rows = (
+        db.execute(
+            select(ScoutPresenterCandidate)
+            .where(
+                ScoutPresenterCandidate.channel_id == channel_id,
+                ScoutPresenterCandidate.status == "rejected",
+            )
+            .order_by(ScoutPresenterCandidate.reviewed_at.desc().nullslast())
+            .limit(50)
         )
-        .order_by(ScoutPresenterCandidate.reviewed_at.desc().nullslast())
-        .limit(50)
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     confirmed_join = db.execute(
         select(SourcePresenter, Person.canonical_name)
@@ -230,9 +232,7 @@ def by_channel(
             "platform": channel.platform,
             "url": channel.url,
         },
-        "confirmed": [
-            _confirmed_to_dict(sp, name) for (sp, name) in confirmed_join
-        ],
+        "confirmed": [_confirmed_to_dict(sp, name) for (sp, name) in confirmed_join],
         "pending": [_candidate_to_dict(c) for c in pending_rows],
         "rejected": [_candidate_to_dict(c) for c in rejected_rows],
     }
@@ -241,6 +241,7 @@ def by_channel(
 # ---------------------------------------------------------------------------
 # POST /admin/presenters/candidates/{id}/confirm
 # ---------------------------------------------------------------------------
+
 
 class ConfirmBody(BaseModel):
     existing_person_id: UUID | None = None
@@ -285,11 +286,7 @@ def confirm_candidate(
             "candidate": _candidate_to_dict(candidate),
             "person_id": str(candidate.confirmed_person_id),
             "person_name": person.canonical_name if person else None,
-            "association": (
-                _confirmed_to_dict(existing_sp, person.canonical_name)
-                if existing_sp and person
-                else None
-            ),
+            "association": (_confirmed_to_dict(existing_sp, person.canonical_name) if existing_sp and person else None),
         }
 
     role = body.role_override or candidate.role
@@ -348,7 +345,7 @@ def confirm_candidate(
 
     candidate.status = "confirmed"
     candidate.confirmed_person_id = person_id
-    candidate.reviewed_at = datetime.now(timezone.utc)
+    candidate.reviewed_at = datetime.now(UTC)
     candidate.reviewed_by = body.reviewed_by or body.confirmed_by
     db.commit()
 
@@ -369,6 +366,7 @@ def confirm_candidate(
 # ---------------------------------------------------------------------------
 # POST /admin/presenters/candidates/{id}/reject
 # ---------------------------------------------------------------------------
+
 
 class RejectBody(BaseModel):
     note: str | None = None
@@ -392,12 +390,10 @@ def reject_candidate(
         )
 
     candidate.status = "rejected"
-    candidate.reviewed_at = datetime.now(timezone.utc)
+    candidate.reviewed_at = datetime.now(UTC)
     candidate.reviewed_by = body.reviewed_by
     if body.note:
-        candidate.notes = (
-            f"{candidate.notes}\n[reviewer] {body.note}" if candidate.notes else f"[reviewer] {body.note}"
-        )
+        candidate.notes = f"{candidate.notes}\n[reviewer] {body.note}" if candidate.notes else f"[reviewer] {body.note}"
     db.commit()
     db.refresh(candidate)
     return {"ok": True, "candidate": _candidate_to_dict(candidate)}

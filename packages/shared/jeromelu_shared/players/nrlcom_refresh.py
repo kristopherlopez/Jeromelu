@@ -115,7 +115,9 @@ def refresh_from_nrlcom(
                 # Surface upstream errors but don't blow up the whole run.
                 logger.warning(
                     "nrlcom fetch error for %s (%s): %s",
-                    person.canonical_name, team_short, e,
+                    person.canonical_name,
+                    team_short,
+                    e,
                 )
                 _mark_status(person, today, "error", str(e), tried_url=None)
                 continue
@@ -124,15 +126,19 @@ def refresh_from_nrlcom(
                 counts["missing_profile"] += 1
                 logger.warning(
                     "nrlcom profile 404: %s (%s) tried=%s",
-                    person.canonical_name, team_short, tried_url,
+                    person.canonical_name,
+                    team_short,
+                    tried_url,
                 )
                 _mark_status(person, today, "404", None, tried_url=tried_url)
-                mismatches.append({
-                    "canonical_name": person.canonical_name,
-                    "supercoach_id": person.supercoach_id,
-                    "team_short": team_short,
-                    "tried_url": tried_url,
-                })
+                mismatches.append(
+                    {
+                        "canonical_name": person.canonical_name,
+                        "supercoach_id": person.supercoach_id,
+                        "team_short": team_short,
+                        "tried_url": tried_url,
+                    }
+                )
                 continue
 
             people_changed = _promote_lifetime(person, profile)
@@ -147,13 +153,16 @@ def refresh_from_nrlcom(
 
             if rate_limit_sleep:
                 import time
+
                 time.sleep(rate_limit_sleep)
 
     session.commit()
     logger.info(
         "nrlcom refresh complete: scanned=%d enriched=%d missing=%d skipped=%d",
-        counts["scanned"], counts["enriched"],
-        counts["missing_profile"], counts["skipped_override"],
+        counts["scanned"],
+        counts["enriched"],
+        counts["missing_profile"],
+        counts["skipped_override"],
     )
     return {"counts": counts, "mismatches": mismatches}
 

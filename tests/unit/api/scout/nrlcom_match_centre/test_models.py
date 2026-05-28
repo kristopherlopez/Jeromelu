@@ -21,9 +21,8 @@ import json
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
-
 from app.scout.nrlcom_match_centre.models import NrlcomMatchCentre
+from pydantic import ValidationError
 
 
 @pytest.fixture(scope="module")

@@ -6,7 +6,6 @@ from typing import Any
 
 import httpx
 
-
 STATS_URL = "https://www.nrl.com/stats/data"
 
 
@@ -15,7 +14,10 @@ class NrlcomStatsFetchError(RuntimeError):
 
 
 def fetch_stats(
-    *, competition: int, season: int, timeout: float = 30.0,
+    *,
+    competition: int,
+    season: int,
+    timeout: float = 30.0,
 ) -> dict[str, Any]:
     r = httpx.get(
         STATS_URL,
@@ -28,9 +30,9 @@ def fetch_stats(
     data = r.json()
     if not isinstance(data, dict) or "playerStats" not in data:
         raise NrlcomStatsFetchError(
-            f"Unexpected response: missing 'playerStats' (keys: {list(data) if isinstance(data, dict) else type(data).__name__})"
+            f"Unexpected response: missing 'playerStats' (keys: {list(data) if isinstance(data, dict) else type(data).__name__})"  # noqa: E501
         )
     return data
 
 
-__all__ = ["fetch_stats", "NrlcomStatsFetchError"]
+__all__ = ["NrlcomStatsFetchError", "fetch_stats"]

@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import sys
 from typing import Any
 
@@ -36,6 +35,7 @@ logging.basicConfig(
 # ---------------------------------------------------------------------------
 # SageMaker entrypoints
 # ---------------------------------------------------------------------------
+
 
 def model_fn(model_dir: str):
     """Pre-warm the heavyweight models on container startup.
@@ -82,17 +82,21 @@ def output_fn(prediction: dict[str, Any], accept: str) -> tuple[str, str]:
 # Task handlers
 # ---------------------------------------------------------------------------
 
+
 def _handle_diarize(payload: dict[str, Any]) -> dict[str, Any]:
     audio_s3_key = payload["audio_s3_key"]
     force = bool(payload.get("force", False))
     logger.info("[Lineup] diarize start: %s force=%s", audio_s3_key, force)
 
     from app.analyst.diarize import diarize as run_diarize
+
     result = run_diarize(audio_s3_key, force=force)
 
     logger.info(
         "[Lineup] diarize ok: %d turns, %d speakers, skipped=%s",
-        result.turns_count, result.distinct_speakers, result.skipped,
+        result.turns_count,
+        result.distinct_speakers,
+        result.skipped,
     )
     return {
         "status": "ok",
@@ -115,8 +119,9 @@ def _handle_visual_identify(payload: dict[str, Any]) -> dict[str, Any]:
     Postgres and ships it in the request body. The container does the
     cv2/InsightFace heavy lifting and returns a per-turn match list.
     """
-    import numpy as np
     from uuid import UUID
+
+    import numpy as np
 
     audio_s3_key = payload["audio_s3_key"]
     video_s3_key = payload["video_s3_key"]
@@ -128,7 +133,8 @@ def _handle_visual_identify(payload: dict[str, Any]) -> dict[str, Any]:
     raw_registry = payload.get("face_registry") or []
     if raw_registry:
         registry_matrix = np.array(
-            [r["embedding"] for r in raw_registry], dtype=np.float32,
+            [r["embedding"] for r in raw_registry],
+            dtype=np.float32,
         )
         person_ids = [UUID(r["person_id"]) for r in raw_registry]
     else:
@@ -137,10 +143,13 @@ def _handle_visual_identify(payload: dict[str, Any]) -> dict[str, Any]:
 
     logger.info(
         "[Lineup] visual_identify start: %s registry=%d turns=%d",
-        video_s3_key, len(person_ids), len(pyannote_turns),
+        video_s3_key,
+        len(person_ids),
+        len(pyannote_turns),
     )
 
     from app.analyst.visual_id import visual_identify
+
     result = visual_identify(
         session=None,
         audio_s3_key=audio_s3_key,
@@ -159,7 +168,9 @@ def _handle_visual_identify(payload: dict[str, Any]) -> dict[str, Any]:
 
     logger.info(
         "[Lineup] visual_identify ok: %d/%d turns matched, format=%s, detections=%s",
-        result.turns_visually_matched, len(pyannote_turns), result.video_format,
+        result.turns_visually_matched,
+        len(pyannote_turns),
+        result.video_format,
         result.face_detections_s3_key or "(none)",
     )
     return {
@@ -179,7 +190,9 @@ def _handle_visual_identify(payload: dict[str, Any]) -> dict[str, Any]:
                 "similarity": m.similarity,
                 "agreement": m.agreement,
                 "face_count": m.face_count,
-            } if m else None
+            }
+            if m
+            else None
             for m in result.per_turn
         ],
     }

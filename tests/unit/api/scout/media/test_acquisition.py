@@ -1,9 +1,8 @@
 from types import SimpleNamespace
 
 import pytest
-from youtube_utils.exceptions import DownloadError
-
 from app.scout.media import audio, persistent_video
+from youtube_utils.exceptions import DownloadError
 
 
 class FakeSession:

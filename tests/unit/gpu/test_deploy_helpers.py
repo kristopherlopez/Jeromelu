@@ -8,8 +8,6 @@ integration/ if it ever lands.
 import sys
 from pathlib import Path
 
-import pytest
-
 # services/gpu isn't on the default pythonpath (it's a deploy script, not a
 # package). Splice it in for this test file only.
 GPU_DIR = Path(__file__).resolve().parents[3] / "services" / "gpu"
@@ -17,10 +15,10 @@ sys.path.insert(0, str(GPU_DIR))
 
 from deploy import _config_name, _image_uri, _model_name  # noqa: E402
 
-
 # ---------------------------------------------------------------------------
 # _image_uri
 # ---------------------------------------------------------------------------
+
 
 class TestImageUri:
     def test_canonical_format(self):
@@ -51,6 +49,7 @@ class TestImageUri:
 # ---------------------------------------------------------------------------
 # _model_name and _config_name
 # ---------------------------------------------------------------------------
+
 
 class TestModelName:
     def test_combines_endpoint_and_tag(self):

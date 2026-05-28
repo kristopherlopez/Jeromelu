@@ -13,9 +13,8 @@ import logging
 import sys
 from uuid import UUID
 
-from sqlalchemy.orm import joinedload
-
 from jeromelu_shared.db import SessionLocal, Source
+from sqlalchemy.orm import joinedload
 
 from ..persistent_video import (
     DEFAULT_QUALITY,
@@ -36,7 +35,8 @@ def main() -> int:
         help=f"Max video height (default {DEFAULT_QUALITY}). 240/360/480/720.",
     )
     parser.add_argument(
-        "--log-level", default="INFO",
+        "--log-level",
+        default="INFO",
         choices=("DEBUG", "INFO", "WARNING", "ERROR"),
     )
     args = parser.parse_args()
@@ -80,7 +80,7 @@ def main() -> int:
     if result.bytes_uploaded is not None:
         print(f"  bytes_uploaded:  {result.bytes_uploaded:,}")
     else:
-        print(f"  bytes_uploaded:  (existing object — skipped)")
+        print("  bytes_uploaded:  (existing object — skipped)")
     return 0
 
 

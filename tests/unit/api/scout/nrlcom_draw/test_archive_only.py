@@ -23,7 +23,6 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from app.scout.nrlcom_draw.routes import run_nrlcom_draw
 
 
@@ -65,15 +64,19 @@ def drift_payload(canonical_payload: dict) -> dict:
 def _patched_run(fixture_payload: dict, *, archive_only: bool):
     """Run the route's pure function with module-level deps mocked."""
     fake_run = _FakeRun()
-    with patch(
-        "app.scout.nrlcom_draw.routes.fetch_draw",
-        return_value=fixture_payload,
-    ), patch(
-        "app.scout.nrlcom_draw.routes.archive_response",
-        return_value="scout/nrlcom/draw/111/2026/round-13.json",
-    ), patch(
-        "app.scout.nrlcom_draw.routes.start_deterministic_run",
-        return_value=fake_run,
+    with (
+        patch(
+            "app.scout.nrlcom_draw.routes.fetch_draw",
+            return_value=fixture_payload,
+        ),
+        patch(
+            "app.scout.nrlcom_draw.routes.archive_response",
+            return_value="scout/nrlcom/draw/111/2026/round-13.json",
+        ),
+        patch(
+            "app.scout.nrlcom_draw.routes.start_deterministic_run",
+            return_value=fake_run,
+        ),
     ):
         response = run_nrlcom_draw(
             db=MagicMock(),
@@ -118,15 +121,19 @@ def test_archive_only_default_false_unchanged_modern(canonical_payload):
 
 def test_archive_response_called_under_archive_only(drift_payload):
     """Capture is preserved even on drift in archive_only mode."""
-    with patch(
-        "app.scout.nrlcom_draw.routes.fetch_draw",
-        return_value=drift_payload,
-    ), patch(
-        "app.scout.nrlcom_draw.routes.archive_response",
-        return_value="scout/nrlcom/draw/111/1995/round-01.json",
-    ) as mock_archive, patch(
-        "app.scout.nrlcom_draw.routes.start_deterministic_run",
-        return_value=_FakeRun(),
+    with (
+        patch(
+            "app.scout.nrlcom_draw.routes.fetch_draw",
+            return_value=drift_payload,
+        ),
+        patch(
+            "app.scout.nrlcom_draw.routes.archive_response",
+            return_value="scout/nrlcom/draw/111/1995/round-01.json",
+        ) as mock_archive,
+        patch(
+            "app.scout.nrlcom_draw.routes.start_deterministic_run",
+            return_value=_FakeRun(),
+        ),
     ):
         run_nrlcom_draw(
             db=MagicMock(),

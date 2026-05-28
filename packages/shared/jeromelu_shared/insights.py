@@ -2,7 +2,7 @@
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
@@ -73,11 +73,7 @@ ARTICLE_PROMPTS = {
 
 def get_current_round(db: Session, season: int) -> int:
     """Determine the current round from the latest claim data."""
-    return (
-        db.query(func.max(Claim.effective_round))
-        .filter(Claim.season == season)
-        .scalar()
-    ) or 0
+    return (db.query(func.max(Claim.effective_round)).filter(Claim.season == season).scalar()) or 0
 
 
 # NOTE: query_round_claims / query_claim_consensus reference Claim.subject_entity_id
@@ -109,14 +105,16 @@ def query_round_claims(
     grouped: dict[str, list[dict]] = {}
     for c in claims:
         eid = str(c.subject_entity_id)  # pyright: ignore[reportAttributeAccessIssue]  # Claim.subject_entity_id removed in migration 036 → TASK-53
-        grouped.setdefault(eid, []).append({
-            "claim_id": str(c.claim_id),
-            "claim_type": c.claim_type,
-            "claim_text": c.claim_text,
-            "strength": c.strength,
-            "polarity": c.polarity,
-            "source_document_id": str(c.document_id) if c.document_id else None,
-        })
+        grouped.setdefault(eid, []).append(
+            {
+                "claim_id": str(c.claim_id),
+                "claim_type": c.claim_type,
+                "claim_text": c.claim_text,
+                "strength": c.strength,
+                "polarity": c.polarity,
+                "source_document_id": str(c.document_id) if c.document_id else None,
+            }
+        )
 
     return grouped
 
@@ -168,12 +166,16 @@ def query_top_players(
 
     Returns list of dicts with player stats and person info.
     """
-    q = db.query(PlayerRound, Person).outerjoin(
-        Person,
-        Person.canonical_name == PlayerRound.player_name,
-    ).filter(
-        PlayerRound.round == round_num,
-        PlayerRound.season == season,
+    q = (
+        db.query(PlayerRound, Person)
+        .outerjoin(
+            Person,
+            Person.canonical_name == PlayerRound.player_name,
+        )
+        .filter(
+            PlayerRound.round == round_num,
+            PlayerRound.season == season,
+        )
     )
 
     if position:
@@ -187,25 +189,27 @@ def query_top_players(
 
     results = []
     for pr, person in q.all():
-        results.append({
-            "entity_id": str(person.person_id) if person else None,
-            "player_name": pr.player_name,
-            "team": pr.team,
-            "position": pr.position,
-            "score": pr.score,
-            "price": pr.price,
-            "breakeven": pr.breakeven,
-            "season_avg": pr.season_avg,
-            "three_rd_avg": pr.three_rd_avg,
-            "five_rd_avg": pr.five_rd_avg,
-            "round_price_change": pr.round_price_change,
-            "season_price_change": pr.season_price_change,
-            "magic_number": pr.magic_number,
-            "base": pr.base,
-            "ppm": pr.ppm,
-            "minutes": pr.minutes,
-            "opposition": pr.opposition,
-        })
+        results.append(
+            {
+                "entity_id": str(person.person_id) if person else None,
+                "player_name": pr.player_name,
+                "team": pr.team,
+                "position": pr.position,
+                "score": pr.score,
+                "price": pr.price,
+                "breakeven": pr.breakeven,
+                "season_avg": pr.season_avg,
+                "three_rd_avg": pr.three_rd_avg,
+                "five_rd_avg": pr.five_rd_avg,
+                "round_price_change": pr.round_price_change,
+                "season_price_change": pr.season_price_change,
+                "magic_number": pr.magic_number,
+                "base": pr.base,
+                "ppm": pr.ppm,
+                "minutes": pr.minutes,
+                "opposition": pr.opposition,
+            }
+        )
 
     return results
 
@@ -236,21 +240,14 @@ def resolve_sources_from_claims(db: Session, claim_ids: list[uuid.UUID]) -> list
 
     # SourceDocument -> Source
     from jeromelu_shared.db import SourceDocument
-    source_ids = (
-        db.query(SourceDocument.source_id)
-        .filter(SourceDocument.document_id.in_(doc_id_set))
-        .distinct()
-        .all()
-    )
+
+    source_ids = db.query(SourceDocument.source_id).filter(SourceDocument.document_id.in_(doc_id_set)).distinct().all()
     source_id_set = {row[0] for row in source_ids}
     if not source_id_set:
         return []
 
     sources = db.query(Source).filter(Source.source_id.in_(source_id_set)).all()
-    return [
-        {"source_id": str(s.source_id), "title": s.title, "creator_name": s.creator_name}
-        for s in sources
-    ]
+    return [{"source_id": str(s.source_id), "title": s.title, "creator_name": s.creator_name} for s in sources]
 
 
 # ---------------------------------------------------------------------------
@@ -371,7 +368,7 @@ def store_article(
         existing.embedding = embedding
         existing.metadata_json = metadata
         existing.source_claim_ids = claim_ids
-        existing.updated_at = datetime.now(timezone.utc)
+        existing.updated_at = datetime.now(UTC)
         db.commit()
         return existing
 

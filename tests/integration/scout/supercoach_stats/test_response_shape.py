@@ -12,13 +12,11 @@ import os
 from datetime import date
 
 import pytest
-from pydantic import ValidationError
-
 from app.scout.supercoach_stats.fetcher import (
     SuperCoachStatsFetchError,
     fetch_strict,
 )
-
+from pydantic import ValidationError
 
 LIVE_FLAG = os.environ.get("SCOUT_DRIFT_LIVE") == "1"
 

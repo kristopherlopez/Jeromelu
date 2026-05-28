@@ -16,14 +16,12 @@ from __future__ import annotations
 import os
 
 import pytest
-from pydantic import ValidationError
-
 from app.scout.nrlcom_players_roster.fetcher import (
     NrlcomPlayersFetchError,
     fetch_players_roster,
 )
 from app.scout.nrlcom_players_roster.models import NrlcomPlayersRoster
-
+from pydantic import ValidationError
 
 LIVE_FLAG = os.environ.get("SCOUT_DRIFT_LIVE") == "1"
 

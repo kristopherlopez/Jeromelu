@@ -11,7 +11,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT / "packages" / "shared"))
 
-from jeromelu_shared.s3 import upload_asset, get_asset_url
+from jeromelu_shared.s3 import get_asset_url, upload_asset  # noqa: E402  # sys.path manipulation above must run first
 
 CLIPS_DIR = REPO_ROOT / "services" / "web" / "public" / "avatar" / "clips"
 

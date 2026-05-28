@@ -25,12 +25,11 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from sqlalchemy.orm import Session
 import yt_dlp
-from youtube_utils.exceptions import DownloadError
-
 from jeromelu_shared.config import settings
 from jeromelu_shared.db import Source
+from sqlalchemy.orm import Session
+from youtube_utils.exceptions import DownloadError
 
 from .keys import youtube_persistent_video_key
 from .s3 import media_object_exists, upload_media_file
@@ -42,6 +41,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Result + errors
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class PersistentVideoResult:
@@ -97,9 +97,7 @@ def _yt_dlp_low_res_video(video_id: str, output_dir: Path, quality: str) -> Path
     # at <video_id>.<ext> where ext is whatever the chosen format used.
     candidates = list(output_dir.glob(f"{video_id}.*"))
     if not candidates:
-        raise DownloadError(
-            f"yt-dlp produced no output in {output_dir} for {video_id}"
-        )
+        raise DownloadError(f"yt-dlp produced no output in {output_dir} for {video_id}")
     # Prefer mp4 if multiple; otherwise the first match.
     mp4s = [c for c in candidates if c.suffix == ".mp4"]
     return mp4s[0] if mp4s else candidates[0]
@@ -108,6 +106,7 @@ def _yt_dlp_low_res_video(video_id: str, output_dir: Path, quality: str) -> Path
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def acquire_persistent_video(
     session: Session,
@@ -128,27 +127,29 @@ def acquire_persistent_video(
     if media_object_exists(video_key):
         logger.info(
             "Video already in S3: s3://%s/%s",
-            settings.s3_audio_bucket, video_key,
+            settings.s3_audio_bucket,
+            video_key,
         )
     else:
         with tempfile.TemporaryDirectory(prefix="jeromelu-video-") as tmp:
             try:
                 local_path = _yt_dlp_low_res_video(media.video_id, Path(tmp), quality)
             except DownloadError as exc:
-                raise PersistentVideoError(
-                    f"yt-dlp video download failed for {media.video_id}: {exc}"
-                ) from exc
+                raise PersistentVideoError(f"yt-dlp video download failed for {media.video_id}: {exc}") from exc
 
             bytes_uploaded = local_path.stat().st_size
             size_mb = bytes_uploaded / (1024 * 1024)
             logger.info(
                 "Downloaded video: %s (%.1f MB, quality<=%s)",
-                local_path.name, size_mb, quality,
+                local_path.name,
+                size_mb,
+                quality,
             )
             upload_media_file(video_key, str(local_path), content_type="video/mp4")
             logger.info(
                 "Uploaded to s3://%s/%s",
-                settings.s3_audio_bucket, video_key,
+                settings.s3_audio_bucket,
+                video_key,
             )
 
     source.video_s3_key = video_key

@@ -15,10 +15,9 @@ import json
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
-
 from app.scout.supercoach_stats.fetcher import extract_rows
 from app.scout.supercoach_stats.models import SuperCoachPlayerStats
+from pydantic import ValidationError
 
 
 @pytest.fixture(scope="module")
@@ -40,10 +39,7 @@ def extracted(raw_rows) -> list[dict]:
 
 def test_extraction_produces_one_dict_per_input_row(raw_rows, extracted):
     """Sanity: every raw row that has a name produces one extracted row."""
-    rows_with_name = sum(
-        1 for r in raw_rows
-        if str(r.get("Name2", "")).strip() or str(r.get("Name", "")).strip()
-    )
+    rows_with_name = sum(1 for r in raw_rows if str(r.get("Name2", "")).strip() or str(r.get("Name", "")).strip())
     assert len(extracted) == rows_with_name
 
 

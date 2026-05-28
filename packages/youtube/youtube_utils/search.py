@@ -41,9 +41,7 @@ def search_channels(
 
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
-            results = ydl.extract_info(
-                f"ytsearch{search_count}:{query}", download=False
-            )
+            results = ydl.extract_info(f"ytsearch{search_count}:{query}", download=False)
     except Exception as e:
         raise SearchError(f"Failed to search YouTube: {e}") from e
 
@@ -57,11 +55,13 @@ def search_channels(
         if not channel_id or channel_id in seen:
             continue
         seen.add(channel_id)
-        channels.append({
-            "channel_id": channel_id,
-            "title": entry.get("channel") or entry.get("uploader") or "",
-            "channel_url": entry.get("channel_url") or f"https://www.youtube.com/channel/{channel_id}",
-        })
+        channels.append(
+            {
+                "channel_id": channel_id,
+                "title": entry.get("channel") or entry.get("uploader") or "",
+                "channel_url": entry.get("channel_url") or f"https://www.youtube.com/channel/{channel_id}",
+            }
+        )
         if len(channels) >= max_results:
             break
 

@@ -20,6 +20,7 @@ from __future__ import annotations
 def _major_version() -> int:
     """Return the major version of the installed pyannote.audio (e.g. 3 or 4)."""
     import pyannote.audio
+
     # Versions like "4.0.4" or "3.4.0" — split on dot, parse first segment.
     raw = pyannote.audio.__version__.split(".")[0]
     try:
@@ -41,8 +42,4 @@ def token_kwargs(hf_token: str | None) -> dict:
     """
     if not hf_token:
         return {}
-    return (
-        {"token": hf_token}
-        if _major_version() >= 4
-        else {"use_auth_token": hf_token}
-    )
+    return {"token": hf_token} if _major_version() >= 4 else {"use_auth_token": hf_token}

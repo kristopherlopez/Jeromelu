@@ -36,7 +36,7 @@ import argparse
 import json
 import logging
 import uuid
-from typing import Iterable
+from collections.abc import Iterable
 
 from jeromelu_shared.db import (
     SessionLocal,
@@ -58,7 +58,8 @@ log = logging.getLogger("regen-face-track")
 
 
 def _candidate_sources(
-    session, only: list[uuid.UUID] | None,
+    session,
+    only: list[uuid.UUID] | None,
 ) -> list[Source]:
     """Sources that have an audio key (so a face-track JSON could exist)."""
     q = session.query(Source).filter(Source.audio_s3_key.isnot(None))
@@ -138,15 +139,19 @@ def main(argv: Iterable[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
-        "source_ids", nargs="*", default=[],
+        "source_ids",
+        nargs="*",
+        default=[],
         help="Explicit source UUIDs to regenerate.",
     )
     group.add_argument(
-        "--all", action="store_true",
+        "--all",
+        action="store_true",
         help="Walk every source with audio_s3_key set.",
     )
     parser.add_argument(
-        "--stale-only", action="store_true",
+        "--stale-only",
+        action="store_true",
         help=(
             "Only regenerate sources whose cached JSON's distinct "
             "person_ids differ from the DB's. Recommended with --all."
@@ -173,7 +178,9 @@ def main(argv: Iterable[str] | None = None) -> int:
             before = len(sources)
             sources = [s for s in sources if _is_stale(session, s)]
             log.info(
-                "Stale filter: %d / %d sources need regen", len(sources), before,
+                "Stale filter: %d / %d sources need regen",
+                len(sources),
+                before,
             )
             if not sources:
                 return 0

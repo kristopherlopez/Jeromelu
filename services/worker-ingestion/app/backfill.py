@@ -3,28 +3,24 @@
 Usage: python -m app.backfill
 """
 
-import asyncio
 import json
 import logging
 import subprocess
-import sys
+from datetime import UTC, datetime
 
 from jeromelu_shared.config import settings
 from jeromelu_shared.db import SessionLocal, Source, SourceDocument
 from jeromelu_shared.s3 import get_s3_client, upload_raw
-
 from youtube_utils import fetch_transcript
 from youtube_utils.exceptions import NoTranscriptAvailable, RateLimitError
 
 from app.activities.collection import (
     _build_s3_json,
-    _segments_to_plain_text,
     _compute_checksum,
+    _segments_to_plain_text,
 )
 from app.activities.discovery import load_channels
-from app.activities.indexing import _parse_published_at, _checksum_exists
-
-from datetime import datetime, timezone
+from app.activities.indexing import _checksum_exists, _parse_published_at
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -38,7 +34,8 @@ def discover_all_videos(channel_id: str) -> list[dict]:
     result = subprocess.run(
         [
             "yt-dlp",
-            "--print", "%(id)s\t%(title)s\t%(upload_date)s",
+            "--print",
+            "%(id)s\t%(title)s\t%(upload_date)s",
             "--skip-download",
             channel_url,
         ],
@@ -64,11 +61,13 @@ def discover_all_videos(channel_id: str) -> list[dict]:
         if upload_date and upload_date != "NA" and len(upload_date) == 8:
             published_at = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:8]}T00:00:00Z"
 
-        videos.append({
-            "video_id": video_id,
-            "title": title,
-            "published_at": published_at,
-        })
+        videos.append(
+            {
+                "video_id": video_id,
+                "title": title,
+                "published_at": published_at,
+            }
+        )
 
     return videos
 
@@ -99,13 +98,13 @@ def main():
         all_urls = [f"https://www.youtube.com/watch?v={v['video_id']}" for v in all_videos]
         existing = set()
         if all_urls:
-            results = session.query(Source.canonical_url).filter(
-                Source.canonical_url.in_(all_urls)
-            ).all()
+            results = session.query(Source.canonical_url).filter(Source.canonical_url.in_(all_urls)).all()
             existing = {r[0] for r in results}
 
         new_videos = [v for v in all_videos if f"https://www.youtube.com/watch?v={v['video_id']}" not in existing]
-        logger.info("Need to backfill %d videos (%d already ingested)", len(new_videos), len(all_videos) - len(new_videos))
+        logger.info(
+            "Need to backfill %d videos (%d already ingested)", len(new_videos), len(all_videos) - len(new_videos)
+        )
 
         collected = 0
         indexed = 0
@@ -118,7 +117,7 @@ def main():
             video["url"] = f"https://www.youtube.com/watch?v={video['video_id']}"
 
             video_id = video["video_id"]
-            progress = f"[{i+1}/{len(new_videos)}]"
+            progress = f"[{i + 1}/{len(new_videos)}]"
 
             # Collect transcript
             try:
@@ -160,7 +159,7 @@ def main():
                 approved_flag=True,
                 ingestion_status="completed",
                 published_at=_parse_published_at(video.get("published_at", "")),
-                ingested_at=datetime.now(timezone.utc),
+                ingested_at=datetime.now(UTC),
             )
             session.add(source)
             session.flush()
@@ -181,7 +180,7 @@ def main():
         session.close()
 
         logger.info(
-            "\nBackfill complete for %s:\n  Total: %d\n  Already ingested: %d\n  Collected: %d\n  Indexed: %d\n  Skipped (no transcript/dupe): %d\n  Errors: %d",
+            "\nBackfill complete for %s:\n  Total: %d\n  Already ingested: %d\n  Collected: %d\n  Indexed: %d\n  Skipped (no transcript/dupe): %d\n  Errors: %d",  # noqa: E501
             channel_name,
             len(all_videos),
             len(all_videos) - len(new_videos),

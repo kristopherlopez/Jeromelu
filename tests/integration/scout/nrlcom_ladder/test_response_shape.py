@@ -16,11 +16,9 @@ import os
 from datetime import date
 
 import pytest
-from pydantic import ValidationError
-
 from app.scout.nrlcom_ladder.fetcher import NrlcomLadderFetchError, fetch_ladder
 from app.scout.nrlcom_ladder.models import NrlcomLadder
-
+from pydantic import ValidationError
 
 LIVE_FLAG = os.environ.get("SCOUT_DRIFT_LIVE") == "1"
 
@@ -53,6 +51,4 @@ def test_live_nrlcom_ladder_shape():
         )
     # Sanity gate on a healthy live response
     assert len(parsed.positions) >= 1, "Live ladder returned no positions"
-    assert all(
-        p.teamNickname for p in parsed.positions
-    ), "A position is missing its teamNickname"
+    assert all(p.teamNickname for p in parsed.positions), "A position is missing its teamNickname"

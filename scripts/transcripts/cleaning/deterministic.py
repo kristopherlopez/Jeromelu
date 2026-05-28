@@ -19,11 +19,7 @@ def load_corrections(path: Path | None = None) -> list[tuple[str, str]]:
     with open(path, encoding="utf-8") as f:
         raw: dict[str, str] = yaml.safe_load(f)
 
-    pairs = [
-        (old, new)
-        for old, new in raw.items()
-        if len(old) >= 5 and old != new
-    ]
+    pairs = [(old, new) for old, new in raw.items() if len(old) >= 5 and old != new]
     pairs.sort(key=lambda x: -len(x[0]))
     return pairs
 
@@ -42,12 +38,14 @@ def apply_deterministic(
         for old, new in corrections:
             if old in text:
                 text = text.replace(old, new)
-                records.append({
-                    "segment_idx": seg_idx,
-                    "original": old,
-                    "corrected": new,
-                    "confidence": "HIGH",
-                    "method": "deterministic",
-                })
+                records.append(
+                    {
+                        "segment_idx": seg_idx,
+                        "original": old,
+                        "corrected": new,
+                        "confidence": "HIGH",
+                        "method": "deterministic",
+                    }
+                )
         seg["text"] = text
     return records

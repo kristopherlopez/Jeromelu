@@ -18,12 +18,11 @@ from __future__ import annotations
 
 import calendar
 import sys
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import boto3
 from botocore.exceptions import ClientError
-
 
 # Windows-style stdout fix is harmless on Linux runners; keeps parity with
 # services/gpu/deploy.py so a local run from a Windows shell doesn't crash
@@ -47,6 +46,7 @@ SPEND_FLOOR = 0.005
 
 # ---- Cost Explorer ---------------------------------------------------------
 
+
 def fetch_mtd_by_service(today: date) -> tuple[float, list[tuple[str, float]]]:
     """Returns (mtd_total_usd, [(service, usd) sorted desc])."""
     ce = boto3.client("ce", region_name="us-east-1")
@@ -61,10 +61,7 @@ def fetch_mtd_by_service(today: date) -> tuple[float, list[tuple[str, float]]]:
     if not resp["ResultsByTime"]:
         return 0.0, []
     groups = resp["ResultsByTime"][0]["Groups"]
-    rows = [
-        (g["Keys"][0], float(g["Metrics"]["UnblendedCost"]["Amount"]))
-        for g in groups
-    ]
+    rows = [(g["Keys"][0], float(g["Metrics"]["UnblendedCost"]["Amount"])) for g in groups]
     rows = [r for r in rows if r[1] >= SPEND_FLOOR]
     rows.sort(key=lambda x: -x[1])
     total = sum(usd for _, usd in rows)
@@ -130,6 +127,7 @@ def project_month_end(mtd: float, daily_rate: float, today: date) -> float:
 
 # ---- Resource descriptions -------------------------------------------------
 
+
 def describe_lightsail() -> dict[str, Any]:
     ls = boto3.client("lightsail", region_name=PRIMARY_REGION)
     inst = ls.get_instance(instanceName=LIGHTSAIL_INSTANCE)["instance"]
@@ -181,6 +179,7 @@ def describe_s3_buckets() -> list[str]:
 
 # ---- Rendering -------------------------------------------------------------
 
+
 def _fmt_money(usd: float) -> str:
     return f"${usd:,.2f}"
 
@@ -204,7 +203,9 @@ def render_text(
     lines.append("SPEND")
     lines.append(f"  MTD             {_fmt_money(mtd_total)}")
     lines.append(f"  Yesterday       {_fmt_money(daily_rate)}  (run-rate basis)")
-    lines.append(f"  Projected EOM   {_fmt_money(projected)}  = MTD + ({_fmt_money(daily_rate)} x {days_remaining} days)")
+    lines.append(
+        f"  Projected EOM   {_fmt_money(projected)}  = MTD + ({_fmt_money(daily_rate)} x {days_remaining} days)"
+    )
     lines.append(f"  Last month      {_fmt_money(last_month)}")
     lines.append("")
     lines.append("BY SERVICE (MTD)")
@@ -284,7 +285,7 @@ def render_html(
 <h3 style="margin:16px 0 4px 0">Resources</h3>
 <table style="border-collapse:collapse">
   <tr><td style="padding:2px 16px 2px 0;vertical-align:top">Lightsail</td>
-      <td>{lightsail['bundle']} · {lightsail['ram_gb']} GB · {lightsail['vcpus']} vCPU · {lightsail['state']} · {lightsail['public_ip']}</td></tr>
+      <td>{lightsail["bundle"]} · {lightsail["ram_gb"]} GB · {lightsail["vcpus"]} vCPU · {lightsail["state"]} · {lightsail["public_ip"]}</td></tr>
   <tr><td style="padding:2px 16px 2px 0;vertical-align:top">SageMaker</td><td>{sm_line}</td></tr>
   <tr><td style="padding:2px 16px 2px 0;vertical-align:top">S3 buckets ({len(s3_buckets)})</td><td><ul style="margin:0;padding-left:20px">{buckets_li}</ul></td></tr>
 </table>
@@ -299,6 +300,7 @@ def render_html(
 
 
 # ---- Send ------------------------------------------------------------------
+
 
 def send_email(subject: str, html: str, text: str) -> None:
     ses = boto3.client("ses", region_name=PRIMARY_REGION)
@@ -316,7 +318,7 @@ def send_email(subject: str, html: str, text: str) -> None:
 
 
 def main() -> int:
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
 
     mtd_total, mtd_breakdown = fetch_mtd_by_service(today)
     last_month = fetch_last_month_total(today)
@@ -327,12 +329,26 @@ def main() -> int:
     s3_buckets = describe_s3_buckets()
 
     text = render_text(
-        today, mtd_total, mtd_breakdown, last_month, daily_rate, projected,
-        lightsail, sagemaker, s3_buckets,
+        today,
+        mtd_total,
+        mtd_breakdown,
+        last_month,
+        daily_rate,
+        projected,
+        lightsail,
+        sagemaker,
+        s3_buckets,
     )
     html = render_html(
-        today, mtd_total, mtd_breakdown, last_month, daily_rate, projected,
-        lightsail, sagemaker, s3_buckets,
+        today,
+        mtd_total,
+        mtd_breakdown,
+        last_month,
+        daily_rate,
+        projected,
+        lightsail,
+        sagemaker,
+        s3_buckets,
     )
 
     subject = f"[Jeromelu] AWS — {today.isoformat()} · MTD {_fmt_money(mtd_total)} · proj {_fmt_money(projected)}"

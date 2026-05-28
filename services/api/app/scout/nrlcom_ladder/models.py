@@ -105,4 +105,4 @@ class NrlcomLadder(BaseModel):
     showPredictor: bool
 
 
-__all__ = ["NrlcomLadder", "LadderPosition", "LadderStats"]
+__all__ = ["LadderPosition", "LadderStats", "NrlcomLadder"]

@@ -9,7 +9,6 @@ pgvector.
 from uuid import UUID, uuid4
 
 import pytest
-
 from app.analyst.voice_clusters import (
     TurnRow,
     aggregate_clusters,
@@ -58,9 +57,9 @@ class TestAggregateClusters:
 
     def test_sorted_by_total_seconds_desc(self):
         rows = [
-            _turn("SPEAKER_QUIET", start=0, end=5),       # 5 s
-            _turn("SPEAKER_LOUD", start=0, end=100),      # 100 s
-            _turn("SPEAKER_MID", start=0, end=20),        # 20 s
+            _turn("SPEAKER_QUIET", start=0, end=5),  # 5 s
+            _turn("SPEAKER_LOUD", start=0, end=100),  # 100 s
+            _turn("SPEAKER_MID", start=0, end=20),  # 20 s
         ]
         result = aggregate_clusters(rows)
         labels = [s["speaker_label"] for s in result["speakers"]]
@@ -151,8 +150,7 @@ class TestAggregateClusters:
     def test_turns_contains_every_turn_not_a_sample(self):
         # Comprehensive view: every turn in the cluster must appear.
         # The previous 5-sample preview behaviour is gone.
-        rows = [_turn("SPEAKER_00", start=i * 10, end=i * 10 + 5)
-                for i in range(20)]
+        rows = [_turn("SPEAKER_00", start=i * 10, end=i * 10 + 5) for i in range(20)]
         result = aggregate_clusters(rows)
         assert len(result["speakers"][0]["turns"]) == 20
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Protocol
 
-
 YOUTUBE_MEDIA_PREFIX = "youtube"
 AUDIO_SUFFIX = ".m4a"
 PERSISTENT_VIDEO_SUFFIX = ".video.mp4"

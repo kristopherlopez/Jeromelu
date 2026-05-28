@@ -21,11 +21,10 @@ if sys.stdout.encoding != "utf-8":
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "packages" / "shared"))
 
+from jeromelu_shared.db import Claim, ClaimChunk, SessionLocal, Source, SourceChunk, SourceDocument
 from scripts.extraction.chunker import chunk_segments
 from scripts.extraction.stitcher import stitch_segments
 from scripts.extraction.writer import source_exists, write_transcript
-
-from jeromelu_shared.db import Claim, ClaimChunk, SessionLocal, Source, SourceChunk, SourceDocument
 
 
 def _find_raw_path(clean_path: Path) -> Path | None:
@@ -49,11 +48,15 @@ def cmd_prepare(args: argparse.Namespace) -> None:
 
     # Idempotency check
     if source_exists(canonical_url):
-        print(json.dumps({
-            "already_processed": True,
-            "video_id": video_id,
-            "canonical_url": canonical_url,
-        }))
+        print(
+            json.dumps(
+                {
+                    "already_processed": True,
+                    "video_id": video_id,
+                    "canonical_url": canonical_url,
+                }
+            )
+        )
         return
 
     clean_segments = data.get("segments", [])
@@ -154,9 +157,7 @@ def cmd_update_transcript(args: argparse.Namespace) -> None:
             print(json.dumps({"error": f"No source found for {canonical_url}"}))
             sys.exit(1)
 
-        doc = session.query(SourceDocument).filter(
-            SourceDocument.source_id == source.source_id
-        ).first()
+        doc = session.query(SourceDocument).filter(SourceDocument.source_id == source.source_id).first()
         if not doc:
             print(json.dumps({"error": f"No document found for source {source.source_id}"}))
             sys.exit(1)
@@ -176,10 +177,14 @@ def cmd_update_transcript(args: argparse.Namespace) -> None:
                 updated += 1
 
         session.commit()
-        print(json.dumps({
-            "source_id": str(source.source_id),
-            "chunks_updated": updated,
-        }))
+        print(
+            json.dumps(
+                {
+                    "source_id": str(source.source_id),
+                    "chunks_updated": updated,
+                }
+            )
+        )
     except Exception:
         session.rollback()
         raise
@@ -197,13 +202,17 @@ def cmd_reset(_args: argparse.Namespace) -> None:
         doc_count = session.query(SourceDocument).delete()
         src_count = session.query(Source).delete()
         session.commit()
-        print(json.dumps({
-            "claim_chunks_deleted": cc_count,
-            "claims_deleted": c_count,
-            "source_chunks_deleted": sc_count,
-            "source_documents_deleted": doc_count,
-            "sources_deleted": src_count,
-        }))
+        print(
+            json.dumps(
+                {
+                    "claim_chunks_deleted": cc_count,
+                    "claims_deleted": c_count,
+                    "source_chunks_deleted": sc_count,
+                    "source_documents_deleted": doc_count,
+                    "sources_deleted": src_count,
+                }
+            )
+        )
     except Exception:
         session.rollback()
         raise
@@ -226,7 +235,9 @@ def main() -> None:
     write.add_argument("--claims-file", help="Path to claims JSON file")
 
     # update-transcript subcommand
-    update = subparsers.add_parser("update-transcript", help="Backfill clean_text on existing chunks from a clean transcript")
+    update = subparsers.add_parser(
+        "update-transcript", help="Backfill clean_text on existing chunks from a clean transcript"
+    )
     update.add_argument("path", help="Path to clean transcript JSON file")
 
     # reset subcommand

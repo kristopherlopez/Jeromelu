@@ -101,7 +101,7 @@ def download_video(
     url = _normalise_url(video_id_or_url)
 
     if quality == "best":
-        fmt = f"bestvideo+bestaudio/best"
+        fmt = "bestvideo+bestaudio/best"
     elif quality == "worst":
         fmt = "worstvideo+worstaudio/worst"
     else:

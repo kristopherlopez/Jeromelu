@@ -5,9 +5,6 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func
-from sqlalchemy.orm import Session
-
 from jeromelu_shared.db import (
     Channel,
     Match,
@@ -20,6 +17,8 @@ from jeromelu_shared.db import (
     WikiPage,
     WikiRevision,
 )
+from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from ..deps import get_db
 
@@ -70,9 +69,7 @@ def _channel_meta_for_pages(
     return {pid: (logo, platform, url) for pid, logo, platform, url in rows}
 
 
-def _team_logos_for_pages(
-    db: Session, pages: list[WikiPage]
-) -> dict[uuid.UUID, str | None]:
+def _team_logos_for_pages(db: Session, pages: list[WikiPage]) -> dict[uuid.UUID, str | None]:
     """Bulk-load logo_url for team-backed pages. One query regardless of count."""
     team_page_ids = [p.page_id for p in pages if p.team_id]
     if not team_page_ids:
@@ -86,9 +83,7 @@ def _team_logos_for_pages(
     return {pid: logo for pid, logo in rows}
 
 
-def _person_logos_for_pages(
-    db: Session, pages: list[WikiPage]
-) -> dict[uuid.UUID, str | None]:
+def _person_logos_for_pages(db: Session, pages: list[WikiPage]) -> dict[uuid.UUID, str | None]:
     """Bulk-load image_url for person-backed pages.
 
     Sources nrl.com headshots populated by the
@@ -106,9 +101,7 @@ def _person_logos_for_pages(
     return {pid: img for pid, img in rows}
 
 
-def _person_meta_for_pages(
-    db: Session, pages: list[WikiPage]
-) -> dict[uuid.UUID, dict[str, str | None]]:
+def _person_meta_for_pages(db: Session, pages: list[WikiPage]) -> dict[uuid.UUID, dict[str, str | None]]:
     """Bulk-load current team + position for person-backed pages.
 
     Joins ``WikiPage → player_attributes (is_current) → teams`` so the
@@ -252,30 +245,12 @@ def get_page(slug: str, db: Session = Depends(get_db)):
     # FKs (person_id, team_id, match_id, venue_id, round_id) alongside the legacy
     # entity_id (dropped in mig 037). Build a uniform `entity` response from
     # whichever typed row is loaded.
-    person = (
-        db.query(Person).filter(Person.person_id == page.person_id).first()
-        if page.person_id else None
-    )
-    team = (
-        db.query(Team).filter(Team.team_id == page.team_id).first()
-        if page.team_id else None
-    )
-    match = (
-        db.query(Match).filter(Match.match_id == page.match_id).first()
-        if page.match_id else None
-    )
-    venue = (
-        db.query(Venue).filter(Venue.venue_id == page.venue_id).first()
-        if page.venue_id else None
-    )
-    round_row = (
-        db.query(Round).filter(Round.round_id == page.round_id).first()
-        if page.round_id else None
-    )
-    channel = (
-        db.query(Channel).filter(Channel.channel_id == page.channel_id).first()
-        if page.channel_id else None
-    )
+    person = db.query(Person).filter(Person.person_id == page.person_id).first() if page.person_id else None
+    team = db.query(Team).filter(Team.team_id == page.team_id).first() if page.team_id else None
+    match = db.query(Match).filter(Match.match_id == page.match_id).first() if page.match_id else None
+    venue = db.query(Venue).filter(Venue.venue_id == page.venue_id).first() if page.venue_id else None
+    round_row = db.query(Round).filter(Round.round_id == page.round_id).first() if page.round_id else None
+    channel = db.query(Channel).filter(Channel.channel_id == page.channel_id).first() if page.channel_id else None
 
     if person:
         entity_block = {
@@ -325,9 +300,7 @@ def get_page(slug: str, db: Session = Depends(get_db)):
     )
 
     revision_count = (
-        db.query(func.count(WikiRevision.revision_id))
-        .filter(WikiRevision.page_id == page.page_id)
-        .scalar()
+        db.query(func.count(WikiRevision.revision_id)).filter(WikiRevision.page_id == page.page_id).scalar()
     )
 
     # Resolve [[slug]] links in content to {slug: {title, page_type}}
@@ -335,14 +308,9 @@ def get_page(slug: str, db: Session = Depends(get_db)):
     linked_pages = {}
     if linked_slugs:
         linked = (
-            db.query(WikiPage.slug, WikiPage.title, WikiPage.page_type)
-            .filter(WikiPage.slug.in_(linked_slugs))
-            .all()
+            db.query(WikiPage.slug, WikiPage.title, WikiPage.page_type).filter(WikiPage.slug.in_(linked_slugs)).all()
         )
-        linked_pages = {
-            lp.slug: {"title": lp.title, "page_type": lp.page_type}
-            for lp in linked
-        }
+        linked_pages = {lp.slug: {"title": lp.title, "page_type": lp.page_type} for lp in linked}
 
     return {
         "page": {
@@ -367,7 +335,9 @@ def get_page(slug: str, db: Session = Depends(get_db)):
                 "active": channel.active,
                 "logo_url": channel.logo_url,
                 "last_polled_at": channel.last_polled_at.isoformat() if channel.last_polled_at else None,
-            } if channel else None,
+            }
+            if channel
+            else None,
             "updated_at": page.updated_at.isoformat(),
             "revision_count": revision_count or 0,
         },
@@ -389,11 +359,7 @@ def get_channel_episodes(
     ingestion status — even un-transcribed videos count as catalogued
     episodes for the listing.
     """
-    page = (
-        db.query(WikiPage)
-        .filter(WikiPage.slug == slug, WikiPage.page_type == "channel")
-        .first()
-    )
+    page = db.query(WikiPage).filter(WikiPage.slug == slug, WikiPage.page_type == "channel").first()
     if not page or not page.channel_id:
         raise HTTPException(status_code=404, detail="Channel page not found")
 
@@ -438,11 +404,7 @@ def get_page_revisions(
     if not page:
         raise HTTPException(status_code=404, detail="Wiki page not found")
 
-    query = (
-        db.query(WikiRevision)
-        .filter(WikiRevision.page_id == page.page_id)
-        .order_by(WikiRevision.created_at.desc())
-    )
+    query = db.query(WikiRevision).filter(WikiRevision.page_id == page.page_id).order_by(WikiRevision.created_at.desc())
 
     if before:
         query = query.filter(WikiRevision.created_at < before)

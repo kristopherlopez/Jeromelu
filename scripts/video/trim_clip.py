@@ -23,12 +23,17 @@ def get_video_info(path: str) -> dict:
     """Get video dimensions and duration via ffprobe."""
     result = subprocess.run(
         [
-            "ffprobe", "-v", "quiet",
-            "-print_format", "json",
-            "-show_streams", "-show_format",
+            "ffprobe",
+            "-v",
+            "quiet",
+            "-print_format",
+            "json",
+            "-show_streams",
+            "-show_format",
             path,
         ],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     data = json.loads(result.stdout)
     video_stream = next(s for s in data["streams"] if s["codec_type"] == "video")
@@ -73,12 +78,18 @@ def trim_clip(
 
     cmd += [
         "-an",  # strip audio
-        "-vf", vf,
-        "-c:v", "libx264",
-        "-crf", str(crf),
-        "-preset", "slow",
-        "-movflags", "+faststart",
-        "-pix_fmt", "yuv420p",
+        "-vf",
+        vf,
+        "-c:v",
+        "libx264",
+        "-crf",
+        str(crf),
+        "-preset",
+        "slow",
+        "-movflags",
+        "+faststart",
+        "-pix_fmt",
+        "yuv420p",
         output_path,
     ]
 

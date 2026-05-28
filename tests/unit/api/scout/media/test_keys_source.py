@@ -1,7 +1,6 @@
 from types import SimpleNamespace
 
 import pytest
-
 from app.scout.media.keys import (
     AUDIO_SUFFIX,
     PERSISTENT_VIDEO_SUFFIX,
@@ -51,7 +50,4 @@ def test_builds_media_keys():
 
     assert youtube_media_key(media, ".json") == "youtube/UCabc123/dQw4w9WgXcQ.json"
     assert youtube_audio_key(media) == f"youtube/UCabc123/dQw4w9WgXcQ{AUDIO_SUFFIX}"
-    assert (
-        youtube_persistent_video_key(media)
-        == f"youtube/UCabc123/dQw4w9WgXcQ{PERSISTENT_VIDEO_SUFFIX}"
-    )
+    assert youtube_persistent_video_key(media) == f"youtube/UCabc123/dQw4w9WgXcQ{PERSISTENT_VIDEO_SUFFIX}"

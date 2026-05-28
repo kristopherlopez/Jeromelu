@@ -25,14 +25,12 @@ import os
 from datetime import date
 
 import pytest
-from pydantic import ValidationError
-
 from app.scout.supercoach_settings.fetcher import (
     SuperCoachSettingsFetchError,
     fetch_supercoach_settings,
 )
 from app.scout.supercoach_settings.models import SuperCoachSettings
-
+from pydantic import ValidationError
 
 LIVE_FLAG = os.environ.get("SCOUT_DRIFT_LIVE") == "1"
 

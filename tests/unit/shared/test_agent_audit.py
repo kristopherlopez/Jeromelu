@@ -8,7 +8,6 @@ AgentAuditLog class itself touches DB+S3 and belongs in integration/.
 import re
 
 import pytest
-
 from jeromelu_shared.agent_audit import (
     MODEL_PRICING,
     SERVER_TOOL_PRICING_USD,
@@ -18,10 +17,10 @@ from jeromelu_shared.agent_audit import (
     make_run_id,
 )
 
-
 # ---------------------------------------------------------------------------
 # estimate_token_cost
 # ---------------------------------------------------------------------------
+
 
 class TestEstimateTokenCost:
     def test_zero_tokens_costs_zero(self):
@@ -81,6 +80,7 @@ class TestEstimateTokenCost:
 # estimate_server_tool_cost
 # ---------------------------------------------------------------------------
 
+
 class TestEstimateServerToolCost:
     def test_empty_dict_returns_zero(self):
         assert estimate_server_tool_cost({}) == 0.0
@@ -101,17 +101,20 @@ class TestEstimateServerToolCost:
         assert estimate_server_tool_cost({"made_up_tool": 500}) == 0.0
 
     def test_mixed_tools_only_billable_count(self):
-        cost = estimate_server_tool_cost({
-            "web_search": 5,
-            "web_fetch": 100,
-            "future_tool": 10,
-        })
+        cost = estimate_server_tool_cost(
+            {
+                "web_search": 5,
+                "web_fetch": 100,
+                "future_tool": 10,
+            }
+        )
         assert cost == pytest.approx(5 * SERVER_TOOL_PRICING_USD["web_search"])
 
 
 # ---------------------------------------------------------------------------
 # make_run_id
 # ---------------------------------------------------------------------------
+
 
 class TestMakeRunId:
     RUN_ID_PATTERN = re.compile(r"^([a-z_]+)-(\d{8})T(\d{6})-([0-9a-f]{6})$")
@@ -137,6 +140,7 @@ class TestMakeRunId:
 # ---------------------------------------------------------------------------
 # _truncate
 # ---------------------------------------------------------------------------
+
 
 class TestTruncate:
     def test_short_string_unchanged(self):

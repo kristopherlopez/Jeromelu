@@ -1,10 +1,7 @@
 """Consensus snapshot activity — aggregate claim sentiment per person subject."""
 
 import logging
-from datetime import datetime, timezone
-
-from sqlalchemy.orm import joinedload
-from temporalio import activity
+from datetime import UTC, datetime
 
 from jeromelu_shared.db import (
     Claim,
@@ -13,6 +10,8 @@ from jeromelu_shared.db import (
     Person,
     SessionLocal,
 )
+from sqlalchemy.orm import joinedload
+from temporalio import activity
 
 logger = logging.getLogger(__name__)
 
@@ -30,15 +29,13 @@ async def update_consensus_snapshots() -> list[dict]:
     """
     session = SessionLocal()
     try:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Get the latest snapshot time to find new claims since then
         latest_snapshot = (
-            session.query(ConsensusSnapshot.time_bucket)
-            .order_by(ConsensusSnapshot.time_bucket.desc())
-            .first()
+            session.query(ConsensusSnapshot.time_bucket).order_by(ConsensusSnapshot.time_bucket.desc()).first()
         )
-        since = latest_snapshot[0] if latest_snapshot else datetime.min.replace(tzinfo=timezone.utc)
+        since = latest_snapshot[0] if latest_snapshot else datetime.min.replace(tzinfo=UTC)
 
         # Get claims with person subjects extracted since last snapshot.
         new_claims = (
@@ -70,9 +67,7 @@ async def update_consensus_snapshots() -> list[dict]:
         person_ids = list(person_claims.keys())
         people = {
             str(p.person_id): p.canonical_name
-            for p in session.query(Person).filter(
-                Person.person_id.in_(person_ids)
-            ).all()
+            for p in session.query(Person).filter(Person.person_id.in_(person_ids)).all()
         }
 
         # Load previous snapshots for comparison (matched on person_id, the new typed FK)
@@ -115,17 +110,19 @@ async def update_consensus_snapshots() -> list[dict]:
                 old_dominant = _dominant(prev.buy_count, prev.sell_count, prev.hold_count)
                 new_dominant = _dominant(buy_count, sell_count, hold_count)
                 if old_dominant != new_dominant and old_dominant and new_dominant:
-                    flipped.append({
-                        "entity_id": pid,
-                        "canonical_name": people.get(pid, "Unknown"),
-                        "old_dominant": old_dominant,
-                        "new_dominant": new_dominant,
-                    })
+                    flipped.append(
+                        {
+                            "entity_id": pid,
+                            "canonical_name": people.get(pid, "Unknown"),
+                            "old_dominant": old_dominant,
+                            "new_dominant": new_dominant,
+                        }
+                    )
 
         session.commit()
         logger.info(
             "Updated %d consensus snapshots, %d sentiment flips detected",
-            len(entity_claims),
+            len(person_claims),
             len(flipped),
         )
         return flipped

@@ -2,9 +2,6 @@
 
 import logging
 
-from sqlalchemy.orm import joinedload
-from temporalio import activity
-
 from jeromelu_shared.db import (
     Event,
     Person,
@@ -13,6 +10,8 @@ from jeromelu_shared.db import (
     PredictionAssociation,
     SessionLocal,
 )
+from sqlalchemy.orm import joinedload
+from temporalio import activity
 
 logger = logging.getLogger(__name__)
 
@@ -59,12 +58,7 @@ async def generate_review_data() -> list[dict]:
             return []
 
         # Load subject persons
-        person_ids = {
-            a.person_id
-            for p in unreviewed
-            for a in p.associations
-            if a.role == "subject" and a.person_id
-        }
+        person_ids = {a.person_id for p in unreviewed for a in p.associations if a.role == "subject" and a.person_id}
         people = {}
         if person_ids:
             for person in session.query(Person).filter(Person.person_id.in_(person_ids)).all():
@@ -87,8 +81,7 @@ async def generate_review_data() -> list[dict]:
             # metadata_json keys (player_id / supercoach_id) for rows that predate
             # the promotion sweep.
             player_id = person.supercoach_id or (
-                (person.metadata_json or {}).get("player_id")
-                or (person.metadata_json or {}).get("supercoach_id")
+                (person.metadata_json or {}).get("player_id") or (person.metadata_json or {}).get("supercoach_id")
             )
 
             if not player_id:
@@ -106,17 +99,19 @@ async def generate_review_data() -> list[dict]:
             if not player_round:
                 continue
 
-            reviews.append({
-                "prediction_id": str(pred.prediction_id),
-                "prediction_text": pred.predicted_value_text or "",
-                "prediction_type": pred.prediction_type or "",
-                "player_name": player_name,
-                "entity_id": str(person.person_id),
-                "actual_score": player_round.score,
-                "actual_round": player_round.round,
-                "actual_season": player_round.season,
-                "claim_ids": [str(cid) for cid in (pred.evidence_claim_ids or [])],
-            })
+            reviews.append(
+                {
+                    "prediction_id": str(pred.prediction_id),
+                    "prediction_text": pred.predicted_value_text or "",
+                    "prediction_type": pred.prediction_type or "",
+                    "player_name": player_name,
+                    "entity_id": str(person.person_id),
+                    "actual_score": player_round.score,
+                    "actual_round": player_round.round,
+                    "actual_season": player_round.season,
+                    "claim_ids": [str(cid) for cid in (pred.evidence_claim_ids or [])],
+                }
+            )
 
         logger.info("Found %d predictions ready for review", len(reviews))
         return reviews

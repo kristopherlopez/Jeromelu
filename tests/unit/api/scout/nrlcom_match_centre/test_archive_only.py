@@ -25,7 +25,6 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from app.scout.nrlcom_match_centre.routes import run_nrlcom_match_centre
 
 
@@ -73,22 +72,28 @@ def single_fixture_draw() -> dict:
 
 def _patched_walk(*, draw_payload: dict, match_payload: dict, archive_only: bool):
     fake_run = _FakeRun()
-    with patch(
-        "app.scout.nrlcom_match_centre.routes.fetch_draw",
-        return_value=draw_payload,
-    ), patch(
-        "app.scout.nrlcom_match_centre.routes.fetch_match_centre",
-        return_value=match_payload,
-    ), patch(
-        "app.scout.nrlcom_match_centre.routes.archive_response",
-        return_value="scout/nrlcom/match-centre/111/2026/round-12/raiders-v-dolphins.json",
-    ), patch(
-        "app.scout.nrlcom_match_centre.routes.start_deterministic_run",
-        return_value=fake_run,
-    ), patch(
-        # Skip the per-match 1-second rate-limit sleep in unit tests
-        "app.scout.nrlcom_match_centre.routes.time.sleep",
-        return_value=None,
+    with (
+        patch(
+            "app.scout.nrlcom_match_centre.routes.fetch_draw",
+            return_value=draw_payload,
+        ),
+        patch(
+            "app.scout.nrlcom_match_centre.routes.fetch_match_centre",
+            return_value=match_payload,
+        ),
+        patch(
+            "app.scout.nrlcom_match_centre.routes.archive_response",
+            return_value="scout/nrlcom/match-centre/111/2026/round-12/raiders-v-dolphins.json",
+        ),
+        patch(
+            "app.scout.nrlcom_match_centre.routes.start_deterministic_run",
+            return_value=fake_run,
+        ),
+        patch(
+            # Skip the per-match 1-second rate-limit sleep in unit tests
+            "app.scout.nrlcom_match_centre.routes.time.sleep",
+            return_value=None,
+        ),
     ):
         response = run_nrlcom_match_centre(
             db=MagicMock(),
@@ -101,7 +106,8 @@ def _patched_walk(*, draw_payload: dict, match_payload: dict, archive_only: bool
 
 
 def test_archive_only_true_skips_per_match_validation_on_drift(
-    single_fixture_draw, drift_match_centre,
+    single_fixture_draw,
+    drift_match_centre,
 ):
     """Drift on the per-match payload + archive_only=True → archived but not validated."""
     response, fake_run = _patched_walk(
@@ -119,7 +125,8 @@ def test_archive_only_true_skips_per_match_validation_on_drift(
 
 
 def test_archive_only_true_modern_payload_still_archives(
-    single_fixture_draw, canonical_match_centre,
+    single_fixture_draw,
+    canonical_match_centre,
 ):
     """Valid payload + archive_only=True → still skipped (flag is unconditional)."""
     response, fake_run = _patched_walk(
@@ -136,7 +143,8 @@ def test_archive_only_true_modern_payload_still_archives(
 
 
 def test_archive_only_default_false_unchanged_modern(
-    single_fixture_draw, canonical_match_centre,
+    single_fixture_draw,
+    canonical_match_centre,
 ):
     """Default path: valid match payload, no archive_only — existing behaviour."""
     response, fake_run = _patched_walk(

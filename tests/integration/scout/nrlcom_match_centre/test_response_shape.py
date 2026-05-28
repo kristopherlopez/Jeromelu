@@ -17,15 +17,13 @@ import os
 from datetime import date
 
 import pytest
-from pydantic import ValidationError
-
 from app.scout.nrlcom_draw.fetcher import NrlcomDrawFetchError, fetch_draw
 from app.scout.nrlcom_match_centre.fetcher import (
     NrlcomMatchCentreFetchError,
     fetch_match_centre,
 )
 from app.scout.nrlcom_match_centre.models import NrlcomMatchCentre
-
+from pydantic import ValidationError
 
 LIVE_FLAG = os.environ.get("SCOUT_DRIFT_LIVE") == "1"
 

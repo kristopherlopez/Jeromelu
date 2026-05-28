@@ -27,7 +27,6 @@ from typing import Any
 
 import httpx
 
-
 PROFILE_URL = "https://www.nrl.com/players/nrl-premiership/{team_short}/{slug}/"
 USER_AGENT = "Mozilla/5.0 (compatible; jeromelu-roster/1.0)"
 
@@ -40,13 +39,14 @@ _JSONLD_RE = re.compile(
 @dataclass
 class NrlProfile:
     """Subset of the JSON-LD ``Person`` block we promote into the DB."""
+
     canonical_name: str
     dob: date | None
-    birthplace_text: str | None     # raw e.g. "Sydney, NSW" — no normalisation in v1
+    birthplace_text: str | None  # raw e.g. "Sydney, NSW" — no normalisation in v1
     image_url: str | None
     height_cm: int | None
     weight_kg: int | None
-    job_title: str | None           # raw e.g. "Captain - Halfback" — captaincy ignored
+    job_title: str | None  # raw e.g. "Captain - Halfback" — captaincy ignored
 
 
 _APOSTROPHE_OR_DOT_RE = re.compile(r"[\.‘’']")
@@ -78,7 +78,7 @@ def slugify_name(name: str) -> str:
 # against the live league — see comments in
 # `docs/agents/system/player-roster.md`.
 NRLCOM_TEAM_OVERRIDES: dict[str, str] = {
-    "tigers":    "wests-tigers",
+    "tigers": "wests-tigers",
     "rabbitohs": "south-sydney-rabbitohs",
 }
 
@@ -183,6 +183,6 @@ def _qv(node: Any, *, expected_unit: str) -> int | None:
     if v is None:
         return None
     try:
-        return int(round(float(v)))
+        return round(float(v))
     except (TypeError, ValueError):
         return None

@@ -13,12 +13,10 @@ The actual fetch/persist logic is shared with the legacy
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-
 from jeromelu_shared.players.roster import (
     RosterPreconditionError,
     refresh_roster,
@@ -27,6 +25,7 @@ from jeromelu_shared.players.supercoach import (
     SuperCoachFetchError,
     fetch_supercoach_roster,
 )
+from sqlalchemy.orm import Session
 
 from ...deps import get_db
 from ...routers.admin import require_admin
@@ -54,10 +53,7 @@ def run_supercoach_roster(
     Returns the run summary including run_id, ok flag, fetched count, and
     the refresh_roster counts (players_seen, transitions, etc.).
     """
-    brief = (
-        f"SuperCoach roster fetch + SCD-2 refresh (season={season or 'current'}, "
-        f"source={source})"
-    )
+    brief = f"SuperCoach roster fetch + SCD-2 refresh (season={season or 'current'}, source={source})"
     run = start_deterministic_run(
         db,
         pipeline=PIPELINE,
@@ -78,10 +74,7 @@ def run_supercoach_roster(
         archive_key = archive_response(
             source="supercoach",
             pipeline="classic/players-cf",
-            identity_path=(
-                f"{effective_season}/"
-                f"{datetime.now(timezone.utc).strftime('%Y%m%d')}.json"
-            ),
+            identity_path=(f"{effective_season}/{datetime.now(UTC).strftime('%Y%m%d')}.json"),
             payload=raw_players,
         )
         set_archive_detail(detail, archive_key)
@@ -93,7 +86,11 @@ def run_supercoach_roster(
         sc_players_dicts = [p.model_dump() for p in players]
         logger.info(
             "scout/supercoach-roster: fetched %d players (season=%s, source=%s, run_id=%s, s3=%s)",
-            fetched, season, source, run.run_id, archive_key,
+            fetched,
+            season,
+            source,
+            run.run_id,
+            archive_key,
         )
         refresh_result = refresh_roster(db, sc_players_dicts, source=source)
         detail.update({"fetched": fetched, **refresh_result})
@@ -107,11 +104,11 @@ def run_supercoach_roster(
         detail["fetched"] = fetched
         run.fail(e, summary_text=f"Upstream fetch failed: {e}")
         # 502: upstream looked wrong; don't run the diff against a bad payload.
-        raise HTTPException(status_code=502, detail=f"SC fetch failed: {e}")
+        raise HTTPException(status_code=502, detail=f"SC fetch failed: {e}") from e
     except RosterPreconditionError as e:
         detail["fetched"] = fetched
         run.fail(e, summary_text=f"Roster precondition failed: {e}")
-        raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=409, detail=str(e)) from e
     except Exception as e:
         detail["fetched"] = fetched
         run.fail(e, summary_text=f"Pipeline failed: {e}")

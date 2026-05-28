@@ -45,15 +45,18 @@ def main() -> int:
 
     src = parser.add_argument_group("Source of the image")
     src.add_argument(
-        "--image", type=str,
+        "--image",
+        type=str,
         help="Path to a local image file (jpg/png).",
     )
     src.add_argument(
-        "--source-id", type=str,
+        "--source-id",
+        type=str,
         help="UUID of the sources row to extract a frame from",
     )
     src.add_argument(
-        "--frame-ts", type=float,
+        "--frame-ts",
+        type=float,
         help="Frame timestamp in seconds (used with --source-id)",
     )
 
@@ -63,7 +66,8 @@ def main() -> int:
         default="manual",
     )
     parser.add_argument(
-        "--log-level", default="INFO",
+        "--log-level",
+        default="INFO",
         choices=("DEBUG", "INFO", "WARNING", "ERROR"),
     )
     args = parser.parse_args()

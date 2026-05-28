@@ -30,11 +30,13 @@ def stitch_segments(segments: list[dict]) -> tuple[str, list[dict]]:
             if end <= last_end:
                 continue
             # Keep it but note the overlap
-        deduped.append({
-            "start": start,
-            "end": end,
-            "text": text,
-        })
+        deduped.append(
+            {
+                "start": start,
+                "end": end,
+                "text": text,
+            }
+        )
         last_end = max(last_end, end)
 
     # Build stitched text

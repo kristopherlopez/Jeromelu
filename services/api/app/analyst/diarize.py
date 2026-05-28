@@ -35,7 +35,6 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-
 from jeromelu_shared.config import settings
 from jeromelu_shared.s3 import download_raw, get_s3_client, upload_raw
 
@@ -96,21 +95,20 @@ def _get_pipeline():
         from pyannote.audio import Pipeline
     except ImportError as exc:
         raise DiarizationError(
-            f"pyannote.audio not installed: {exc}. "
-            "Run `pip install -r services/api/requirements.txt`."
+            f"pyannote.audio not installed: {exc}. Run `pip install -r services/api/requirements.txt`."
         ) from exc
     try:
         from ._pyannote_compat import token_kwargs
+
         pipeline = Pipeline.from_pretrained(
             settings.pyannote_model,
             **token_kwargs(settings.huggingface_api_key),
         )
     except Exception as exc:
-        raise DiarizationError(
-            f"Failed to load pyannote pipeline ({type(exc).__name__}): {exc}"
-        ) from exc
+        raise DiarizationError(f"Failed to load pyannote pipeline ({type(exc).__name__}): {exc}") from exc
     try:
         import torch
+
         if torch.cuda.is_available():
             pipeline.to(torch.device("cuda"))
             logger.info("pyannote pipeline loaded on CUDA")
@@ -132,16 +130,16 @@ def _get_emb_inference():
         raise DiarizationError(f"pyannote.audio missing: {exc}") from exc
     try:
         from ._pyannote_compat import token_kwargs
+
         emb_model = Model.from_pretrained(
             EMBEDDING_MODEL,
             **token_kwargs(settings.huggingface_api_key),
         )
     except Exception as exc:
-        raise DiarizationError(
-            f"Failed to load embedding model ({type(exc).__name__}): {exc}"
-        ) from exc
+        raise DiarizationError(f"Failed to load embedding model ({type(exc).__name__}): {exc}") from exc
     try:
         import torch
+
         if torch.cuda.is_available():
             emb_model = emb_model.to(torch.device("cuda"))
     except Exception:
@@ -153,6 +151,7 @@ def _get_emb_inference():
 # ---------------------------------------------------------------------------
 # Result + errors
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class DiarizeResult:
@@ -174,6 +173,7 @@ class DiarizationError(Exception):
 # Helpers — S3 + ffmpeg
 # ---------------------------------------------------------------------------
 
+
 def _pyannote_s3_key_from_audio(audio_s3_key: str) -> str:
     if audio_s3_key.endswith(".m4a"):
         return audio_s3_key[: -len(".m4a")] + ".pyannote.json"
@@ -194,9 +194,7 @@ def _convert_to_wav(src: Path, dst: Path) -> None:
         capture_output=True,
     )
     if proc.returncode != 0:
-        raise DiarizationError(
-            f"ffmpeg conversion failed: {proc.stderr.decode('utf-8', errors='replace')}"
-        )
+        raise DiarizationError(f"ffmpeg conversion failed: {proc.stderr.decode('utf-8', errors='replace')}")
 
 
 def _raw_object_exists(key: str) -> bool:
@@ -211,6 +209,7 @@ def _raw_object_exists(key: str) -> bool:
 # ---------------------------------------------------------------------------
 # Helpers — embeddings
 # ---------------------------------------------------------------------------
+
 
 def _sliding_windows(start: float, end: float) -> list[tuple[float, float]]:
     """Generate (window_start, window_end) pairs for a turn.
@@ -291,14 +290,15 @@ def _extract_turn_embeddings(
             except Exception as exc:
                 logger.debug(
                     "Embedding extraction failed for turn %d window %.2f-%.2f: %s",
-                    i, w_start, w_end, exc,
+                    i,
+                    w_start,
+                    w_end,
+                    exc,
                 )
                 continue
             emb = np.asarray(emb).reshape(-1)  # 1-D vector
             if emb.shape[0] != EMBEDDING_DIM:
-                raise DiarizationError(
-                    f"Unexpected embedding dim {emb.shape[0]} (expected {EMBEDDING_DIM})"
-                )
+                raise DiarizationError(f"Unexpected embedding dim {emb.shape[0]} (expected {EMBEDDING_DIM})")
             if not np.all(np.isfinite(emb)):
                 # Degenerate audio span — embedder returned NaN/inf. Skip
                 # this window; if all windows are bad we'll write a NULL
@@ -306,22 +306,26 @@ def _extract_turn_embeddings(
                 skipped_nan += 1
                 continue
             emb_vectors.append(emb)
-            window_embs.append({
-                "start": float(w_start),
-                "end": float(w_end),
-                "embedding": emb.tolist(),
-            })
+            window_embs.append(
+                {
+                    "start": float(w_start),
+                    "end": float(w_end),
+                    "embedding": emb.tolist(),
+                }
+            )
 
         if not emb_vectors:
             enriched.append({**turn, "embedding_medoid": None, "embedding_windows": []})
             continue
 
         medoid = _medoid(np.vstack(emb_vectors))
-        enriched.append({
-            **turn,
-            "embedding_medoid": medoid.tolist(),
-            "embedding_windows": window_embs,
-        })
+        enriched.append(
+            {
+                **turn,
+                "embedding_medoid": medoid.tolist(),
+                "embedding_windows": window_embs,
+            }
+        )
 
         if (i + 1) % 50 == 0:
             logger.info("Embedded %d / %d turns", i + 1, len(turns))
@@ -329,7 +333,9 @@ def _extract_turn_embeddings(
     if skipped_short or skipped_nan:
         logger.info(
             "Embedding done. Skipped %d sub-%.2fs turns + %d NaN windows",
-            skipped_short, MIN_TURN_DURATION, skipped_nan,
+            skipped_short,
+            MIN_TURN_DURATION,
+            skipped_nan,
         )
     return enriched
 
@@ -337,6 +343,7 @@ def _extract_turn_embeddings(
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def diarize(audio_s3_key: str, *, force: bool = False) -> DiarizeResult:
     """Run pyannote diarization + per-turn embedding extraction.
@@ -353,6 +360,7 @@ def diarize(audio_s3_key: str, *, force: bool = False) -> DiarizeResult:
     """
     if settings.lineup_remote:
         from .remote import diarize_remote
+
         return diarize_remote(audio_s3_key, force=force)
 
     if not settings.huggingface_api_key:
@@ -371,7 +379,8 @@ def diarize(audio_s3_key: str, *, force: bool = False) -> DiarizeResult:
         if existing.get("json_version", 1) >= JSON_VERSION:
             logger.info(
                 "pyannote JSON already at version %d at %s — skipping",
-                JSON_VERSION, pyannote_key,
+                JSON_VERSION,
+                pyannote_key,
             )
             return DiarizeResult(
                 audio_s3_key=audio_s3_key,
@@ -401,7 +410,8 @@ def diarize(audio_s3_key: str, *, force: bool = False) -> DiarizeResult:
 
         logger.info(
             "Downloading audio from s3://%s/%s",
-            settings.s3_audio_bucket, audio_s3_key,
+            settings.s3_audio_bucket,
+            audio_s3_key,
         )
         _download_audio(audio_s3_key, m4a_path)
 
@@ -419,7 +429,9 @@ def diarize(audio_s3_key: str, *, force: bool = False) -> DiarizeResult:
         # the WAV format is fixed (16 kHz mono PCM16) since
         # ``_convert_to_wav`` writes it.
         import wave as _wave
+
         import torch as _torch
+
         with _wave.open(str(wav_path), "rb") as _wf:
             _sample_rate = _wf.getframerate()
             _n_channels = _wf.getnchannels()
@@ -427,10 +439,7 @@ def diarize(audio_s3_key: str, *, force: bool = False) -> DiarizeResult:
             _sampwidth = _wf.getsampwidth()
             _raw = _wf.readframes(_n_frames)
         if _sampwidth != 2:
-            raise DiarizationError(
-                f"unexpected WAV sample width {_sampwidth}B; "
-                "ffmpeg should write 16-bit PCM"
-            )
+            raise DiarizationError(f"unexpected WAV sample width {_sampwidth}B; ffmpeg should write 16-bit PCM")
         # int16 → float32 in [-1, 1], shape (channels, frames)
         _waveform_np = np.frombuffer(_raw, dtype=np.int16).astype(np.float32) / 32768.0
         _waveform_np = _waveform_np.reshape(-1, _n_channels).T
@@ -445,11 +454,13 @@ def diarize(audio_s3_key: str, *, force: bool = False) -> DiarizeResult:
 
         turns: list[dict[str, Any]] = []
         for segment, _, speaker in diarization.itertracks(yield_label=True):
-            turns.append({
-                "start": float(segment.start),
-                "end": float(segment.end),
-                "speaker": speaker,  # 'SPEAKER_00', 'SPEAKER_01', ...
-            })
+            turns.append(
+                {
+                    "start": float(segment.start),
+                    "end": float(segment.end),
+                    "speaker": speaker,  # 'SPEAKER_00', 'SPEAKER_01', ...
+                }
+            )
         turns.sort(key=lambda t: t["start"])
 
         logger.info(
@@ -464,7 +475,8 @@ def diarize(audio_s3_key: str, *, force: bool = False) -> DiarizeResult:
 
         distinct_speakers = len({t["speaker"] for t in enriched_turns})
         duration_seconds = max(
-            (t["end"] for t in enriched_turns), default=None,
+            (t["end"] for t in enriched_turns),
+            default=None,
         )
 
         payload = {
@@ -486,7 +498,8 @@ def diarize(audio_s3_key: str, *, force: bool = False) -> DiarizeResult:
         )
         logger.info(
             "Stored pyannote JSON: s3://%s/%s",
-            settings.s3_raw_bucket, pyannote_key,
+            settings.s3_raw_bucket,
+            pyannote_key,
         )
 
     return DiarizeResult(

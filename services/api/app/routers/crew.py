@@ -8,9 +8,6 @@ have moved off the `/crew/...` prefix.
 """
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, desc, distinct
-from sqlalchemy.orm import Session
-
 from jeromelu_shared.db import (
     AgentRun,
     Claim,
@@ -19,6 +16,9 @@ from jeromelu_shared.db import (
     Source,
     SourceDocument,
 )
+from sqlalchemy import desc, distinct, func
+from sqlalchemy.orm import Session
+
 from ..deps import get_db
 
 router = APIRouter()
@@ -33,11 +33,7 @@ def jaromelu_status(db: Session = Depends(get_db)):
     in the action string — never as a separate agent identity in the response.
     """
 
-    latest = (
-        db.query(AgentRun)
-        .order_by(desc(AgentRun.started_at))
-        .first()
-    )
+    latest = db.query(AgentRun).order_by(desc(AgentRun.started_at)).first()
 
     status = "active" if (latest and latest.status == "running") else "dormant"
 
@@ -52,11 +48,7 @@ def jaromelu_status(db: Session = Depends(get_db)):
     action = latest.summary if status == "active" and latest else None
 
     # Current round comes from claims — agent_runs is round-agnostic.
-    latest_round = (
-        db.query(func.max(Claim.effective_round))
-        .filter(Claim.effective_round.isnot(None))
-        .scalar()
-    )
+    latest_round = db.query(func.max(Claim.effective_round)).filter(Claim.effective_round.isnot(None)).scalar()
 
     return {
         "status": status,
@@ -84,10 +76,7 @@ def round_overview(
 
     # Round status: claims exist => 'complete' (the round has signal); else 'pending'.
     has_claims = (
-        db.query(Claim.claim_id)
-        .filter(Claim.effective_round == round_num, Claim.season == season)
-        .first()
-        is not None
+        db.query(Claim.claim_id).filter(Claim.effective_round == round_num, Claim.season == season).first() is not None
     )
     round_status = "complete" if has_claims else "pending"
 
@@ -117,8 +106,13 @@ def round_overview(
             player_consensus[name] = {
                 "entity_id": str(entity_id),
                 "name": name,
-                "buy": 0, "sell": 0, "hold": 0, "captain": 0,
-                "avoid": 0, "breakout": 0, "matchup_edge": 0,
+                "buy": 0,
+                "sell": 0,
+                "hold": 0,
+                "captain": 0,
+                "avoid": 0,
+                "breakout": 0,
+                "matchup_edge": 0,
             }
         if claim_type in player_consensus[name]:
             player_consensus[name][claim_type] += cnt
@@ -162,7 +156,10 @@ def round_overview(
         "status": round_status,
         "signal": {
             "total_claims": sum(type_totals.values()),
-            **{k: type_totals.get(k, 0) for k in ["buy", "sell", "hold", "captain", "avoid", "breakout", "matchup_edge"]},
+            **{
+                k: type_totals.get(k, 0)
+                for k in ["buy", "sell", "hold", "captain", "avoid", "breakout", "matchup_edge"]
+            },
         },
         "consensus": consensus,
         "sources": sources,

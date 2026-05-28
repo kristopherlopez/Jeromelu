@@ -1,4 +1,8 @@
 pytest>=8.0
+# Ruff: Python lint + format + import-sort. Range here; CI tests.yml ruff
+# job pins the exact version after `pip install` for determinism (ruff
+# ships frequent releases with rule-set additions that can flip CI red).
+ruff>=0.15,<1
 # Pyright. Scope is configured in the root pyproject.toml [tool.pyright]
 # block (narrow to packages/shared). Range here; CI tests.yml pyright job
 # pins the exact version after `pip install -r requirements-*.txt` for

@@ -10,15 +10,14 @@ import asyncio
 import logging
 from datetime import timedelta
 
+from jeromelu_shared.temporal import INGESTION_QUEUE, get_temporal_client
 from temporalio.client import (
     Schedule,
     ScheduleActionStartWorkflow,
-    ScheduleSpec,
     ScheduleCalendarSpec,
     ScheduleRange,
+    ScheduleSpec,
 )
-
-from jeromelu_shared.temporal import get_temporal_client, INGESTION_QUEUE
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

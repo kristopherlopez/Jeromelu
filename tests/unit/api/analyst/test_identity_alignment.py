@@ -8,7 +8,6 @@ loads from SQLAlchemy is covered by the integration tier when added.
 from uuid import UUID, uuid4
 
 import pytest
-
 from app.analyst.identity_alignment import (
     DISAGREEMENT_LIMIT,
     MIN_ACTIVE_MOUTH_OPENING,
@@ -92,9 +91,7 @@ class TestCompute:
         assert order == ["SPEAKER_01", "SPEAKER_02", "SPEAKER_00"]
 
     def test_null_cluster_excluded_from_face_clusters(self):
-        dets = [
-            _det(float(i), cluster=0) for i in range(10)
-        ] + [_det(99.0, cluster=None) for _ in range(20)]
+        dets = [_det(float(i), cluster=0) for i in range(10)] + [_det(99.0, cluster=None) for _ in range(20)]
         result = compute_alignment(dets, [])
         cluster_ids = {c["cluster_id"] for c in result["face_clusters"]}
         assert cluster_ids == {0}
@@ -110,10 +107,7 @@ class TestCompute:
 
     def test_overlap_count_matches_frames_inside_turns(self):
         # 30 frames inside SPEAKER_00's turn (0..30s), 10 outside.
-        dets = (
-            [_det(float(i), cluster=0) for i in range(30)]
-            + [_det(float(i), cluster=0) for i in range(40, 50)]
-        )
+        dets = [_det(float(i), cluster=0) for i in range(30)] + [_det(float(i), cluster=0) for i in range(40, 50)]
         turns = [
             _turn(0, 30, label="SPEAKER_00"),
         ]
@@ -130,9 +124,7 @@ class TestCompute:
         # half below.
         active_val = MIN_ACTIVE_MOUTH_OPENING + 0.01
         passive_val = MIN_ACTIVE_MOUTH_OPENING - 0.01
-        dets = [
-            _det(float(i), cluster=0, mouth=active_val) for i in range(15)
-        ] + [
+        dets = [_det(float(i), cluster=0, mouth=active_val) for i in range(15)] + [
             _det(float(i), cluster=0, mouth=passive_val) for i in range(15, 30)
         ]
         turns = [_turn(0, 30, label="SPEAKER_00")]
@@ -153,12 +145,12 @@ class TestCompute:
         # frame isn't ambiguous (both turn endpoints are inclusive — see
         # the interval walk in compute_alignment).
         dets = (
-            [_det(float(i), cluster=0) for i in range(30)]   # 0..29 → SPEAKER_00
+            [_det(float(i), cluster=0) for i in range(30)]  # 0..29 → SPEAKER_00
             + [_det(float(40 + i), cluster=0) for i in range(70)]  # 40..109 → SPEAKER_01
         )
         turns = [
-            _turn(0, 29.5, label="SPEAKER_00"),     # ≈ 30 s
-            _turn(39.5, 110, label="SPEAKER_01"),   # ≈ 70 s
+            _turn(0, 29.5, label="SPEAKER_00"),  # ≈ 30 s
+            _turn(39.5, 110, label="SPEAKER_01"),  # ≈ 70 s
         ]
         result = compute_alignment(dets, turns)
         by_label = {r["speaker_label"]: r for r in result["alignment"]}
@@ -198,7 +190,7 @@ class TestCompute:
         # If cluster 0 is the best match for both SPEAKER_00 and SPEAKER_01,
         # only the first pair wins; cluster 0 doesn't claim both voices.
         dets = (
-            [_det(float(i), cluster=0) for i in range(40)]    # in SPEAKER_00
+            [_det(float(i), cluster=0) for i in range(40)]  # in SPEAKER_00
             + [_det(float(60 + i), cluster=0) for i in range(40)]  # in SPEAKER_01
         )
         turns = [
@@ -215,9 +207,7 @@ class TestCompute:
         # Cluster 0 dominantly matched to Person B via detections.
         # All cluster-0 detections fall in the SPEAKER_00 turn.
         # → expect one disagreement.
-        dets = [
-            _det(float(i), cluster=0, matched=PERSON_B) for i in range(30)
-        ]
+        dets = [_det(float(i), cluster=0, matched=PERSON_B) for i in range(30)]
         turns = [_turn(0, 30, label="SPEAKER_00", person=PERSON_A)]
         result = compute_alignment(dets, turns)
         assert len(result["disagreements"]) == 1
@@ -256,10 +246,7 @@ class TestCompute:
             _turn(50, 90, label="SPEAKER_01", person=PERSON_A),
             _turn(200, 280, label="SPEAKER_02", person=PERSON_A),
         ]
-        labels = [
-            d["speaker_label"]
-            for d in compute_alignment(dets, turns)["disagreements"]
-        ]
+        labels = [d["speaker_label"] for d in compute_alignment(dets, turns)["disagreements"]]
         # 80 s > 40 s > 20 s
         assert labels == ["SPEAKER_02", "SPEAKER_01", "SPEAKER_00"]
 
@@ -275,10 +262,7 @@ class TestCompute:
             start = float(i * 2)  # turns at 0, 2, 4, ...
             # Place MIN_OVERLAP_COUNT detections in each, all in cluster 0
             # matched to PERSON_B.
-            dets.extend(
-                _det(start + j * 0.1, cluster=0, matched=PERSON_B)
-                for j in range(MIN_OVERLAP_COUNT)
-            )
+            dets.extend(_det(start + j * 0.1, cluster=0, matched=PERSON_B) for j in range(MIN_OVERLAP_COUNT))
             turns.append(_turn(start, start + 1.0, label=f"SPEAKER_{i:02d}", person=PERSON_A))
         result = compute_alignment(dets, turns)
         assert len(result["disagreements"]) == DISAGREEMENT_LIMIT
@@ -309,8 +293,11 @@ class TestTimeline:
 
     def test_timeline_row_carries_required_fields(self):
         t = _turn(
-            10.5, 14.2, label="SPEAKER_00",
-            person=PERSON_A, match_method="voice+face",
+            10.5,
+            14.2,
+            label="SPEAKER_00",
+            person=PERSON_A,
+            match_method="voice+face",
         )
         # Add per-modality + confidence fields the wrapper would fill.
         t = TurnRow(
@@ -385,10 +372,9 @@ class TestTimeline:
     def test_timeline_face_counts_per_turn(self):
         active_val = 0.06  # above MIN_ACTIVE_MOUTH_OPENING=0.045
         passive_val = 0.02  # below
-        dets = (
-            [_det(float(i), cluster=0, mouth=active_val) for i in range(7)]
-            + [_det(float(i), cluster=0, mouth=passive_val) for i in range(7, 10)]
-        )
+        dets = [_det(float(i), cluster=0, mouth=active_val) for i in range(7)] + [
+            _det(float(i), cluster=0, mouth=passive_val) for i in range(7, 10)
+        ]
         turns = [_turn(0, 10, label="SPEAKER_00")]
         row = compute_alignment(dets, turns)["timeline"][0]
         assert row["total_face_count"] == 10
@@ -397,10 +383,7 @@ class TestTimeline:
     def test_timeline_face_cluster_is_dominant_in_turn(self):
         # Two clusters overlap with the turn; the one with more frames
         # is the dominant face cluster for that timeline row.
-        dets = (
-            [_det(float(i), cluster=1) for i in range(2)]
-            + [_det(float(i + 3), cluster=0) for i in range(7)]
-        )
+        dets = [_det(float(i), cluster=1) for i in range(2)] + [_det(float(i + 3), cluster=0) for i in range(7)]
         turns = [_turn(0, 10, label="SPEAKER_00")]
         row = compute_alignment(dets, turns)["timeline"][0]
         # Cluster 0 had 7 frames, cluster 1 had 2 — dominant is 0.
@@ -439,10 +422,7 @@ class TestFaceTranscript:
             _chunk(10, 15, "three"),
         ]
         # Detections placing cluster 0 inside each chunk window.
-        dets = [
-            _det(float(i), cluster=0)
-            for i in range(15)
-        ]
+        dets = [_det(float(i), cluster=0) for i in range(15)]
         result = compute_alignment(dets, [], chunks=chunks)
         runs = result["face_transcript"]
         assert len(runs) == 1
@@ -458,10 +438,7 @@ class TestFaceTranscript:
             _chunk(10, 15, "tyson A"),
             _chunk(15, 20, "tyson B"),
         ]
-        dets = (
-            [_det(float(i), cluster=0) for i in range(10)]
-            + [_det(float(i + 10), cluster=1) for i in range(10)]
-        )
+        dets = [_det(float(i), cluster=0) for i in range(10)] + [_det(float(i + 10), cluster=1) for i in range(10)]
         result = compute_alignment(dets, [], chunks=chunks)
         runs = result["face_transcript"]
         assert len(runs) == 2
@@ -478,10 +455,7 @@ class TestFaceTranscript:
             _chunk(0, 10, "denan"),
             _chunk(10, 20, "tyson"),
         ]
-        dets = (
-            [_det(float(i), cluster=0) for i in range(10)]
-            + [_det(float(i + 10), cluster=1) for i in range(10)]
-        )
+        dets = [_det(float(i), cluster=0) for i in range(10)] + [_det(float(i + 10), cluster=1) for i in range(10)]
         turn = _turn(0, 20, label="SPEAKER_00")
         result = compute_alignment(dets, [turn], chunks=chunks)
         assert result["conflated_turn_ids"] == [str(turn.segment_id)]
@@ -492,10 +466,7 @@ class TestFaceTranscript:
             _chunk(0, 10, "denan"),
             _chunk(10, 20, "tyson"),
         ]
-        dets = (
-            [_det(float(i), cluster=0) for i in range(10)]
-            + [_det(float(i + 10), cluster=1) for i in range(10)]
-        )
+        dets = [_det(float(i), cluster=0) for i in range(10)] + [_det(float(i + 10), cluster=1) for i in range(10)]
         turns = [
             _turn(0, 10, label="SPEAKER_00"),
             _turn(10, 20, label="SPEAKER_01"),

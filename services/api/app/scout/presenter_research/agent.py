@@ -20,15 +20,11 @@ import os
 import re
 import time
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
 from anthropic import Anthropic
-from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.orm import Session
-
 from jeromelu_shared.agent_audit import (
     AgentAuditLog,
     AgentBounds,
@@ -46,6 +42,9 @@ from jeromelu_shared.db import (
     Source,
     SourcePresenter,
 )
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.orm import Session
 
 # Persisted DB/audit identity. Keep this value until the agent_runs CHECK
 # constraint is migrated; use Presenter Research for new code-facing names.
@@ -152,16 +151,14 @@ PERSIST_PRESENTER_CANDIDATE_TOOL: dict[str, Any] = {
                         "snippet": {
                             "type": "string",
                             "description": (
-                                "1–2 sentence quote from the source page that "
-                                "names this person in the relevant role."
+                                "1–2 sentence quote from the source page that names this person in the relevant role."
                             ),
                         },
                     },
                     "required": ["url", "snippet"],
                 },
                 "description": (
-                    "At least 1 evidence item. The snippet must mention the "
-                    "person's name. No evidence = no file."
+                    "At least 1 evidence item. The snippet must mention the person's name. No evidence = no file."
                 ),
                 "minItems": 1,
             },
@@ -204,9 +201,8 @@ def all_tools() -> list[dict[str, Any]]:
 # Tool handlers
 # ---------------------------------------------------------------------------
 
-def handle_lookup_existing_people(
-    session: Session, *, name: str
-) -> dict[str, Any]:
+
+def handle_lookup_existing_people(session: Session, *, name: str) -> dict[str, Any]:
     """Best-effort name match against `people`. Case-insensitive prefix on
     canonical_name + alias array contains. Caps at 5 hits — enough for the
     reviewer signal, not enough to flood context."""
@@ -217,10 +213,7 @@ def handle_lookup_existing_people(
     # Prefix match on canonical_name, plus alias-array contains.
     rows = session.execute(
         select(Person.person_id, Person.canonical_name, Person.aliases)
-        .where(
-            (Person.canonical_name.ilike(f"{needle}%"))
-            | (Person.aliases.contains([needle]))
-        )
+        .where((Person.canonical_name.ilike(f"{needle}%")) | (Person.aliases.contains([needle])))
         .limit(5)
     ).all()
 
@@ -285,8 +278,7 @@ def handle_persist_presenter_candidate(
             }
 
     stmt = (
-        pg_insert(ScoutPresenterCandidate)
-        .values(
+        pg_insert(ScoutPresenterCandidate).values(
             channel_id=channel_id,
             name=name_clean,
             role=role,
@@ -310,7 +302,9 @@ def handle_persist_presenter_candidate(
         if result is not None:
             logger.info(
                 "Filed presenter candidate channel=%s name=%s role=%s",
-                channel_id, name_clean, role,
+                channel_id,
+                name_clean,
+                role,
             )
             return {
                 "ok": True,
@@ -338,9 +332,7 @@ def handle_persist_presenter_candidate(
     return {"ok": False, "error": "insert-failed-and-no-conflict-row"}
 
 
-def _evidence_mentions_name(
-    evidence: list[dict[str, str]], name: str
-) -> bool:
+def _evidence_mentions_name(evidence: list[dict[str, str]], name: str) -> bool:
     """True if any snippet contains the full name OR every name token (case-
     insensitive). Forgiving enough for "Denan" vs "Denan Kemp"; strict enough
     to reject "the host says it's a great show" (no name)."""
@@ -410,6 +402,7 @@ Before filing any presenter, call lookup_existing_people with their name. If a c
 After filing, end with one short sentence: "Filed N presenters: [name (role), …]. Notable: [one line, optional]."
 """
 
+
 def build_brief(
     channel: Channel,
     *,
@@ -423,7 +416,7 @@ def build_brief(
     so the agent doesn't re-file them.
     """
     lines = [
-        f"Channel to research:",
+        "Channel to research:",
         f"  name: {channel.name}",
         f"  platform: {channel.platform}",
     ]
@@ -461,6 +454,7 @@ def build_brief(
 # ---------------------------------------------------------------------------
 # Run loop
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class PresenterResearchResult:
@@ -530,9 +524,7 @@ def resolve_channel_from_source(session: Session, source_id: UUID) -> UUID:
     return src.channel_id
 
 
-def _existing_presenters(
-    session: Session, channel_id: UUID
-) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+def _existing_presenters(session: Session, channel_id: UUID) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
     """Returns (confirmed, pending) — each as a list of (name, role)."""
     confirmed = session.execute(
         select(Person.canonical_name, SourcePresenter.role)
@@ -566,7 +558,7 @@ def run_presenter_research(
     bounds = bounds or DEFAULT_BOUNDS
     run_id = make_run_id(AGENT_ID)
     start_ts = time.time()
-    started_at = datetime.now(timezone.utc)
+    started_at = datetime.now(UTC)
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
@@ -780,11 +772,8 @@ def run_presenter_research(
             break
 
         elapsed = time.time() - start_ts
-        cost_so_far = (
-            estimate_token_cost(model, in_tok, out_tok, cache_r, cache_w)
-            + estimate_server_tool_cost(
-                {"web_search": web_searches_total, "web_fetch": web_fetches_total}
-            )
+        cost_so_far = estimate_token_cost(model, in_tok, out_tok, cache_r, cache_w) + estimate_server_tool_cost(
+            {"web_search": web_searches_total, "web_fetch": web_fetches_total}
         )
 
         if elapsed > bounds.max_wall_seconds:
@@ -803,11 +792,9 @@ def run_presenter_research(
             status = "aborted"
             break
 
-    ended_at = datetime.now(timezone.utc)
+    ended_at = datetime.now(UTC)
     token_cost = estimate_token_cost(model, in_tok, out_tok, cache_r, cache_w)
-    search_cost = estimate_server_tool_cost(
-        {"web_search": web_searches_total, "web_fetch": web_fetches_total}
-    )
+    search_cost = estimate_server_tool_cost({"web_search": web_searches_total, "web_fetch": web_fetches_total})
     final_cost = token_cost + search_cost
 
     if status == "completed" and candidates_filed == 0:
@@ -877,7 +864,7 @@ def run_presenter_research(
         detail=summary_dict,
     )
 
-    print(f"\n=== Presenter Research run done ===")
+    print("\n=== Presenter Research run done ===")
     print(f"  status: {status}")
     print(f"  filed: {candidates_filed}, dupes: {duplicates_skipped}")
     print(f"  turns: {turns}, tool_calls: {tool_calls}")

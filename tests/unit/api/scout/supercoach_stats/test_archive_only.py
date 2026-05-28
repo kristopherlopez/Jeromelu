@@ -23,7 +23,6 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from app.scout.supercoach_stats.routes import run_supercoach_stats
 
 
@@ -61,19 +60,24 @@ def valid_raw_rows() -> list[dict[str, Any]]:
 def _patched_run(raw_rows: list[dict[str, Any]], *, archive_only: bool):
     """Run the SC stats route with module-level deps mocked."""
     fake_run = _FakeRun()
-    with patch(
-        "app.scout.supercoach_stats.routes.fetch_stats_raw",
-        return_value=raw_rows,
-    ), patch(
-        "app.scout.supercoach_stats.routes.archive_response",
-        return_value="scout/nrlsupercoachstats/stats/2026/round-12.json",
-    ) as mock_archive, patch(
-        "app.scout.supercoach_stats.routes.start_deterministic_run",
-        return_value=fake_run,
-    ), patch(
-        "app.scout.supercoach_stats.routes._upsert_player_rounds",
-        return_value=1,
-    ) as mock_upsert:
+    with (
+        patch(
+            "app.scout.supercoach_stats.routes.fetch_stats_raw",
+            return_value=raw_rows,
+        ),
+        patch(
+            "app.scout.supercoach_stats.routes.archive_response",
+            return_value="scout/nrlsupercoachstats/stats/2026/round-12.json",
+        ) as mock_archive,
+        patch(
+            "app.scout.supercoach_stats.routes.start_deterministic_run",
+            return_value=fake_run,
+        ),
+        patch(
+            "app.scout.supercoach_stats.routes._upsert_player_rounds",
+            return_value=1,
+        ) as mock_upsert,
+    ):
         response = run_supercoach_stats(
             db=MagicMock(),
             season=2026,
@@ -86,7 +90,8 @@ def _patched_run(raw_rows: list[dict[str, Any]], *, archive_only: bool):
 def test_archive_only_true_skips_validation_and_upsert(valid_raw_rows):
     """archive_only=True skips BOTH strict-parse and inline DB upsert."""
     response, fake_run, mock_archive, mock_upsert = _patched_run(
-        valid_raw_rows, archive_only=True,
+        valid_raw_rows,
+        archive_only=True,
     )
     assert response["ok"] is True
     assert response["validated"] is False
@@ -103,8 +108,9 @@ def test_archive_only_true_skips_validation_and_upsert(valid_raw_rows):
 
 def test_archive_only_true_valid_payload_still_skips(valid_raw_rows):
     """archive_only=True is unconditional — valid payload also skips."""
-    response, fake_run, mock_archive, mock_upsert = _patched_run(
-        valid_raw_rows, archive_only=True,
+    response, fake_run, _mock_archive, mock_upsert = _patched_run(
+        valid_raw_rows,
+        archive_only=True,
     )
     assert response["validated"] is False
     assert response["validation_skipped"] is True
@@ -114,8 +120,9 @@ def test_archive_only_true_valid_payload_still_skips(valid_raw_rows):
 
 def test_archive_only_default_false_runs_upsert(valid_raw_rows):
     """Default path: validation runs, DB upsert is called."""
-    response, fake_run, mock_archive, mock_upsert = _patched_run(
-        valid_raw_rows, archive_only=False,
+    response, fake_run, _mock_archive, mock_upsert = _patched_run(
+        valid_raw_rows,
+        archive_only=False,
     )
     assert response["ok"] is True
     # No validation_skipped key on the default path (regression check).

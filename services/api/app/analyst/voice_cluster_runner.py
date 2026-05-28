@@ -21,15 +21,13 @@ import logging
 from dataclasses import dataclass
 from uuid import UUID
 
+from jeromelu_shared.db import SourceDocument, SourceSpeaker
 from sqlalchemy import update
 from sqlalchemy.orm import Session
-
-from jeromelu_shared.db import SourceDocument, SourceSpeaker
 
 from .voice_cluster_hdbscan import (
     TurnEmbedding,
     VoiceClusterParams,
-    VoiceClusterStats,
     cluster_voice_turns,
 )
 
@@ -45,6 +43,7 @@ class ReclusterResult:
     ``cluster_label`` stays NULL and the aggregator falls back to
     ``speaker_label`` for them — same behaviour as HDBSCAN noise.
     """
+
     source_id: UUID
     n_turns_total: int
     n_turns_with_embedding: int
@@ -57,7 +56,7 @@ def recluster_source_voice(
     session: Session,
     source_id: UUID,
     *,
-    params: VoiceClusterParams = VoiceClusterParams(),
+    params: VoiceClusterParams = VoiceClusterParams(),  # noqa: B008  # frozen dataclass — immutable, safely shareable across calls
 ) -> ReclusterResult:
     """Re-run HDBSCAN over per-turn medoids and update ``cluster_label``.
 
@@ -75,11 +74,7 @@ def recluster_source_voice(
     Returns a :class:`ReclusterResult` summary suitable for the
     endpoint response payload.
     """
-    doc = (
-        session.query(SourceDocument)
-        .filter(SourceDocument.source_id == source_id)
-        .first()
-    )
+    doc = session.query(SourceDocument).filter(SourceDocument.source_id == source_id).first()
     if not doc:
         return ReclusterResult(
             source_id=source_id,
@@ -108,16 +103,17 @@ def recluster_source_voice(
         )
 
     clusterable = [
-        TurnEmbedding(turn_id=r.segment_id, embedding=list(r.embedding))
-        for r in rows
-        if r.embedding is not None
+        TurnEmbedding(turn_id=r.segment_id, embedding=list(r.embedding)) for r in rows if r.embedding is not None
     ]
     n_clusterable = len(clusterable)
     logger.info(
-        "Re-clustering source %s — %d turns total, %d with embedding "
-        "(min_cluster=%d, min_samples=%d, noise=%.2f)",
-        source_id, n_total, n_clusterable,
-        params.min_cluster_size, params.min_samples, params.noise_threshold,
+        "Re-clustering source %s — %d turns total, %d with embedding (min_cluster=%d, min_samples=%d, noise=%.2f)",
+        source_id,
+        n_total,
+        n_clusterable,
+        params.min_cluster_size,
+        params.min_samples,
+        params.noise_threshold,
     )
 
     assignments, stats = cluster_voice_turns(clusterable, params=params)
@@ -126,9 +122,7 @@ def recluster_source_voice(
     # params must not leave stale H-labels around. The subsequent
     # per-cluster UPDATEs then re-apply the new labels.
     session.execute(
-        update(SourceSpeaker)
-        .where(SourceSpeaker.document_id == doc.document_id)
-        .values(cluster_label=None),
+        update(SourceSpeaker).where(SourceSpeaker.document_id == doc.document_id).values(cluster_label=None),
     )
 
     by_label: dict[str, list[UUID]] = {}
@@ -138,15 +132,14 @@ def recluster_source_voice(
         by_label.setdefault(label, []).append(turn_id)
     for label, ids in by_label.items():
         session.execute(
-            update(SourceSpeaker)
-            .where(SourceSpeaker.segment_id.in_(ids))
-            .values(cluster_label=label),
+            update(SourceSpeaker).where(SourceSpeaker.segment_id.in_(ids)).values(cluster_label=label),
         )
     session.commit()
 
     logger.info(
         "Re-cluster done — %d clusters, %d noise turns",
-        stats.n_clusters, stats.n_noise,
+        stats.n_clusters,
+        stats.n_noise,
     )
     return ReclusterResult(
         source_id=source_id,

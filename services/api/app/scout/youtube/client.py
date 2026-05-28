@@ -49,10 +49,10 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 import httpx
-
 from jeromelu_shared.config import settings
 
 logger = logging.getLogger(__name__)
@@ -84,9 +84,7 @@ class YouTubeAPIError(RuntimeError):
 def _api_key() -> str:
     key = settings.youtube_api_key
     if not key:
-        raise YouTubeAPIError(
-            "YOUTUBE_API_KEY is not set — Scout's YouTube tools cannot run"
-        )
+        raise YouTubeAPIError("YOUTUBE_API_KEY is not set — Scout's YouTube tools cannot run")
     return key
 
 
@@ -101,15 +99,14 @@ def _get(path: str, params: dict[str, Any]) -> dict[str, Any]:
     if r.status_code >= 400:
         # Bubble up the API's own error message — usually informative
         # (quota exceeded, key revoked, etc.).
-        raise YouTubeAPIError(
-            f"YouTube API {path} returned {r.status_code}: {r.text[:500]}"
-        )
+        raise YouTubeAPIError(f"YouTube API {path} returned {r.status_code}: {r.text[:500]}")
     return r.json()
 
 
 # ---------------------------------------------------------------------------
 # search.list (100 units per call)
 # ---------------------------------------------------------------------------
+
 
 def _paginated_search(base_params: dict[str, Any], max_results: int) -> list[dict[str, Any]]:
     """Loop search.list with nextPageToken until we have `max_results` items
@@ -156,12 +153,14 @@ def search_channels(
         if not cid or cid in known:
             continue
         snip = item["snippet"]
-        out.append({
-            "channel_id": cid,
-            "title": snip.get("channelTitle") or snip.get("title", ""),
-            "description": snip.get("description", ""),
-            "channel_url": f"https://www.youtube.com/channel/{cid}",
-        })
+        out.append(
+            {
+                "channel_id": cid,
+                "title": snip.get("channelTitle") or snip.get("title", ""),
+                "description": snip.get("description", ""),
+                "channel_url": f"https://www.youtube.com/channel/{cid}",
+            }
+        )
     return out
 
 
@@ -189,15 +188,17 @@ def search_videos(
         if not vid or vid in known:
             continue
         snip = item["snippet"]
-        out.append({
-            "video_id": vid,
-            "channel_id": snip.get("channelId", ""),
-            "channel_title": snip.get("channelTitle", ""),
-            "title": snip.get("title", ""),
-            "description": snip.get("description", ""),
-            "published_at": snip.get("publishedAt", ""),
-            "url": f"https://www.youtube.com/watch?v={vid}",
-        })
+        out.append(
+            {
+                "video_id": vid,
+                "channel_id": snip.get("channelId", ""),
+                "channel_title": snip.get("channelTitle", ""),
+                "title": snip.get("title", ""),
+                "description": snip.get("description", ""),
+                "published_at": snip.get("publishedAt", ""),
+                "url": f"https://www.youtube.com/watch?v={vid}",
+            }
+        )
     return out
 
 
@@ -211,6 +212,7 @@ def search_videos(
 #   - Cover specific events (round, match, player) and rank on those terms
 #   - Are too small to win a channel-search relevance battle
 # ---------------------------------------------------------------------------
+
 
 def harvest_channels_from_videos(
     query: str,
@@ -247,6 +249,7 @@ def harvest_channels_from_videos(
 # channels.list (1 unit per call regardless of how many ids passed, up to 50)
 # ---------------------------------------------------------------------------
 
+
 def get_channel_stats(channel_ids: list[str]) -> list[dict[str, Any]]:
     """Detailed metadata for up to 50 channels in one call. Cheap (1 unit).
 
@@ -271,21 +274,23 @@ def get_channel_stats(channel_ids: list[str]) -> list[dict[str, Any]]:
         stats = item.get("statistics", {}) or {}
         cd = item.get("contentDetails", {}) or {}
         related = cd.get("relatedPlaylists", {}) or {}
-        out.append({
-            "channel_id": item["id"],
-            "title": snip.get("title", ""),
-            "description": snip.get("description", ""),
-            "country": snip.get("country", ""),
-            "default_language": snip.get("defaultLanguage", ""),
-            "published_at": snip.get("publishedAt", ""),
-            "subs": int(stats.get("subscriberCount", 0)) if not stats.get("hiddenSubscriberCount") else None,
-            "video_count": int(stats.get("videoCount", 0)) if stats.get("videoCount") else 0,
-            "view_count": int(stats.get("viewCount", 0)) if stats.get("viewCount") else 0,
-            # Free wins from snippet/contentDetails — cost the same call.
-            "handle": snip.get("customUrl") or None,
-            "avatar_url": _best_thumbnail_url(snip.get("thumbnails")),
-            "uploads_playlist_id": related.get("uploads") or None,
-        })
+        out.append(
+            {
+                "channel_id": item["id"],
+                "title": snip.get("title", ""),
+                "description": snip.get("description", ""),
+                "country": snip.get("country", ""),
+                "default_language": snip.get("defaultLanguage", ""),
+                "published_at": snip.get("publishedAt", ""),
+                "subs": int(stats.get("subscriberCount", 0)) if not stats.get("hiddenSubscriberCount") else None,
+                "video_count": int(stats.get("videoCount", 0)) if stats.get("videoCount") else 0,
+                "view_count": int(stats.get("viewCount", 0)) if stats.get("viewCount") else 0,
+                # Free wins from snippet/contentDetails — cost the same call.
+                "handle": snip.get("customUrl") or None,
+                "avatar_url": _best_thumbnail_url(snip.get("thumbnails")),
+                "uploads_playlist_id": related.get("uploads") or None,
+            }
+        )
     return out
 
 
@@ -294,6 +299,7 @@ def get_channel_stats(channel_ids: list[str]) -> list[dict[str, Any]]:
 # Returns the canonical YouTube item dict (with snippet+statistics) or None.
 # 1 quota unit per call.
 # ---------------------------------------------------------------------------
+
 
 def validate_channel(external_id: str | None) -> dict[str, Any] | None:
     """Verify a channel exists on YouTube. Accepts UC… ids and @handles.
@@ -327,6 +333,7 @@ def validate_video(video_id: str | None) -> dict[str, Any] | None:
 # ---------------------------------------------------------------------------
 # channelSections.list (1 unit) — featured channels surface
 # ---------------------------------------------------------------------------
+
 
 def get_channel_sections(channel_id: str) -> list[str]:
     """Return channel_ids that the given channel features in any 'channels' section.
@@ -383,9 +390,7 @@ def _uploads_playlist_id(channel_external_id: str) -> str:
     if not channel_external_id.startswith("UC"):
         # Defensive: if the convention ever breaks for legacy channels, the
         # caller will get a 404 from the API and we can fall back then.
-        raise YouTubeAPIError(
-            f"Channel external_id does not start with 'UC': {channel_external_id!r}"
-        )
+        raise YouTubeAPIError(f"Channel external_id does not start with 'UC': {channel_external_id!r}")
     return "UU" + channel_external_id[2:]
 
 
@@ -434,14 +439,16 @@ def list_channel_videos(
             if after_video_id and vid == after_video_id:
                 hit_known = True
                 break
-            out.append({
-                "video_id": vid,
-                "title": snip.get("title", ""),
-                "description": snip.get("description", ""),
-                "thumbnail_url": _best_thumbnail_url(snip.get("thumbnails")),
-                "published_at": cd.get("videoPublishedAt") or snip.get("publishedAt", ""),
-                "url": f"https://www.youtube.com/watch?v={vid}",
-            })
+            out.append(
+                {
+                    "video_id": vid,
+                    "title": snip.get("title", ""),
+                    "description": snip.get("description", ""),
+                    "thumbnail_url": _best_thumbnail_url(snip.get("thumbnails")),
+                    "published_at": cd.get("videoPublishedAt") or snip.get("publishedAt", ""),
+                    "url": f"https://www.youtube.com/watch?v={vid}",
+                }
+            )
         if hit_known:
             break
         page_token = raw.get("nextPageToken")

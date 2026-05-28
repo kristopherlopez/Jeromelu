@@ -35,10 +35,13 @@ def main() -> int:
     parser.add_argument("start_ts", type=float, help="Span start (seconds)")
     parser.add_argument("end_ts", type=float, help="Span end (seconds)")
     parser.add_argument(
-        "--created-by", choices=("manual", "auto-confirmed"), default="manual",
+        "--created-by",
+        choices=("manual", "auto-confirmed"),
+        default="manual",
     )
     parser.add_argument(
-        "--log-level", default="INFO",
+        "--log-level",
+        default="INFO",
         choices=("DEBUG", "INFO", "WARNING", "ERROR"),
     )
     args = parser.parse_args()
@@ -65,8 +68,9 @@ def main() -> int:
         print(f"Enrolling voiceprint for person {person_id}")
         print(f"  name:          {full_name}")
         print(f"  source_id:     {source_id}")
-        print(f"  span:          {args.start_ts:.2f}s - {args.end_ts:.2f}s "
-              f"(duration {args.end_ts - args.start_ts:.2f}s)")
+        print(
+            f"  span:          {args.start_ts:.2f}s - {args.end_ts:.2f}s (duration {args.end_ts - args.start_ts:.2f}s)"
+        )
         print(f"  created_by:    {args.created_by}")
         print()
 

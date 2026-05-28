@@ -33,8 +33,8 @@ from uuid import UUID
 @dataclass
 class FusedMatch:
     person_id: UUID
-    method: str          # 'voice' | 'face' | 'voice+face'
-    confidence: float    # 0..1, normalised across modalities
+    method: str  # 'voice' | 'face' | 'voice+face'
+    confidence: float  # 0..1, normalised across modalities
 
 
 def fuse_per_turn(

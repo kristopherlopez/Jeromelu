@@ -36,7 +36,6 @@ Usage:
 
 import argparse
 import json
-import os
 import subprocess
 import sys
 import time
@@ -184,9 +183,11 @@ def post_process(raw_path: Path, output_path: Path, keep_audio: bool = False) ->
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     cmd = [
-        sys.executable, str(TRIM_SCRIPT),
+        sys.executable,
+        str(TRIM_SCRIPT),
         str(raw_path),
-        "--out", str(output_path),
+        "--out",
+        str(output_path),
     ]
 
     print(f"Post-processing: {raw_path.name} -> {output_path.name}")
@@ -233,9 +234,7 @@ def update_manifest(
         entry["script"] = script_text
 
     # Replace existing entry or append
-    existing_idx = next(
-        (i for i, c in enumerate(manifest["clips"]) if c["id"] == clip_id), None
-    )
+    existing_idx = next((i for i, c in enumerate(manifest["clips"]) if c["id"] == clip_id), None)
     if existing_idx is not None:
         manifest["clips"][existing_idx] = entry
         print(f"  Updated manifest entry: {clip_id}")
@@ -247,14 +246,14 @@ def update_manifest(
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Generate avatar clips via Replicate video APIs"
-    )
+    parser = argparse.ArgumentParser(description="Generate avatar clips via Replicate video APIs")
     parser.add_argument("clip_id", help="Clip ID (e.g. idle-2, confident-1)")
     parser.add_argument("--prompt", required=True, help="Generation prompt")
     parser.add_argument(
-        "--model", default=DEFAULT_MODEL, choices=list(MODELS.keys()),
-        help=f"Video model to use (default: {DEFAULT_MODEL})"
+        "--model",
+        default=DEFAULT_MODEL,
+        choices=list(MODELS.keys()),
+        help=f"Video model to use (default: {DEFAULT_MODEL})",
     )
     parser.add_argument("--start-image", default=None, help="First frame image for image-to-video mode")
     parser.add_argument("--end-image", default=None, help="Last frame image (requires --start-image)")
@@ -358,7 +357,7 @@ def main():
     if not args.no_upload:
         try:
             sys.path.insert(0, str(REPO_ROOT / "packages" / "shared"))
-            from jeromelu_shared.s3 import upload_asset, get_asset_url
+            from jeromelu_shared.s3 import get_asset_url, upload_asset
 
             s3_key = f"avatar/clips/{args.clip_id}.mp4"
             upload_asset(s3_key, str(output_path))

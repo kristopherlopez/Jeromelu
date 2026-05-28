@@ -7,18 +7,11 @@ POST /api/admin/ingest to write everything to the database.
 import hashlib
 import json
 import logging
-from datetime import datetime, timezone
-
+from datetime import UTC, date, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Header, Query
-from pydantic import BaseModel
-from sqlalchemy import desc, distinct, func, nullslast, or_, select
-from sqlalchemy.orm import Session
-
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from jeromelu_shared.config import settings
-from datetime import date
-
 from jeromelu_shared.db import (
     Channel,
     Claim,
@@ -33,6 +26,9 @@ from jeromelu_shared.db import (
 )
 from jeromelu_shared.s3 import get_s3_client
 from jeromelu_shared.scraping.nrl import TEAM_CODE_MAP, normalize_name
+from pydantic import BaseModel
+from sqlalchemy import desc, distinct, func, nullslast, or_, select
+from sqlalchemy.orm import Session
 
 from ..deps import get_db
 
@@ -43,6 +39,7 @@ router = APIRouter()
 # Auth
 # ---------------------------------------------------------------------------
 
+
 def require_admin(x_admin_key: str = Header(...)):
     if x_admin_key != settings.admin_api_key:
         raise HTTPException(status_code=403, detail="Invalid admin key")
@@ -51,6 +48,7 @@ def require_admin(x_admin_key: str = Header(...)):
 # ---------------------------------------------------------------------------
 # Helpers (inlined from scripts/extraction to avoid cross-package dependency)
 # ---------------------------------------------------------------------------
+
 
 def _stitch_segments(segments: list[dict]) -> tuple[str, list[dict]]:
     if not segments:
@@ -72,23 +70,23 @@ def _stitch_segments(segments: list[dict]) -> tuple[str, list[dict]]:
     return full_text, deduped
 
 
-def _chunk_segments(
-    raw_segments: list[dict], clean_segments: list[dict] | None = None
-) -> list[dict]:
+def _chunk_segments(raw_segments: list[dict], clean_segments: list[dict] | None = None) -> list[dict]:
     chunks: list[dict] = []
     offset = 0
     for i, seg in enumerate(raw_segments):
         raw = seg["text"]
         clean = clean_segments[i]["text"] if clean_segments and i < len(clean_segments) else None
-        chunks.append({
-            "chunk_index": i,
-            "raw_text": raw,
-            "clean_text": clean,
-            "start_ts": seg["start"],
-            "end_ts": seg["end"],
-            "start_offset": offset,
-            "end_offset": offset + len(raw),
-        })
+        chunks.append(
+            {
+                "chunk_index": i,
+                "raw_text": raw,
+                "clean_text": clean,
+                "start_ts": seg["start"],
+                "end_ts": seg["end"],
+                "start_offset": offset,
+                "end_offset": offset + len(raw),
+            }
+        )
         offset += len(raw) + 1
     return chunks
 
@@ -116,26 +114,36 @@ def _resolve_person(session: Session, name: str) -> Person:
     Replaces the post-mig-038 player branch of the old `_resolve_entity` helper.
     """
     normalized = normalize_name(name).strip()
-    person = session.query(Person).filter(
-        func.lower(Person.canonical_name) == normalized.lower(),
-    ).first()
+    person = (
+        session.query(Person)
+        .filter(
+            func.lower(Person.canonical_name) == normalized.lower(),
+        )
+        .first()
+    )
     if person:
         return person
-    person = session.query(Person).filter(
-        Person.aliases.any(normalized),
-    ).first()
+    person = (
+        session.query(Person)
+        .filter(
+            Person.aliases.any(normalized),
+        )
+        .first()
+    )
     if person:
         return person
     person = Person(canonical_name=normalized, aliases=[])
     session.add(person)
     session.flush()
     # Open a current player role row for the person.
-    session.add(PersonRole(
-        person_id=person.person_id,
-        role="player",
-        effective_from=date.today(),
-        is_primary=True,
-    ))
+    session.add(
+        PersonRole(
+            person_id=person.person_id,
+            role="player",
+            effective_from=date.today(),
+            is_primary=True,
+        )
+    )
     session.flush()
     return person
 
@@ -144,14 +152,22 @@ def _resolve_team(session: Session, name: str) -> Team | None:
     """Resolve a team name to a Team row. Returns None if no match."""
     normalized = normalize_name(name).strip()
     canonical = _TEAM_NAMES.get(normalized.lower(), normalized)
-    team = session.query(Team).filter(
-        func.lower(Team.name) == canonical.lower(),
-    ).first()
+    team = (
+        session.query(Team)
+        .filter(
+            func.lower(Team.name) == canonical.lower(),
+        )
+        .first()
+    )
     if team:
         return team
-    team = session.query(Team).filter(
-        Team.aliases.any(canonical),
-    ).first()
+    team = (
+        session.query(Team)
+        .filter(
+            Team.aliases.any(canonical),
+        )
+        .first()
+    )
     return team
 
 
@@ -160,9 +176,7 @@ def _find_chunks_for_claim(claim_text: str, chunks: list[SourceChunk]) -> list[S
         return []
     claim_lower = claim_text.lower()
     claim_word_set = set(
-        _normalize(w)
-        for w in claim_lower.replace("...", " ").replace("\u2014", " ").split()
-        if len(_normalize(w)) >= 3
+        _normalize(w) for w in claim_lower.replace("...", " ").replace("\u2014", " ").split() if len(_normalize(w)) >= 3
     )
     if not claim_word_set:
         return []
@@ -200,12 +214,13 @@ def _find_chunks_for_claim(claim_text: str, chunks: list[SourceChunk]) -> list[S
         i = run_end + 1
     if best_start < 0 or best_score < 1.0:
         return []
-    return chunks[best_start: best_end + 1]
+    return chunks[best_start : best_end + 1]
 
 
 # ---------------------------------------------------------------------------
 # S3 helpers
 # ---------------------------------------------------------------------------
+
 
 def _download_json(bucket: str, key: str) -> dict:
     client = get_s3_client()
@@ -216,6 +231,7 @@ def _download_json(bucket: str, key: str) -> dict:
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 class IngestRawRequest(BaseModel):
     video_id: str
@@ -240,7 +256,7 @@ def ingest_raw(req: IngestRawRequest, db: Session = Depends(get_db)):
     try:
         raw_data = _download_json(settings.s3_raw_bucket, prefix)
     except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Raw transcript not found: {e}")
+        raise HTTPException(status_code=404, detail=f"Raw transcript not found: {e}") from e
 
     raw_segments = raw_data.get("segments", [])
     stitched_text, deduped_raw = _stitch_segments(raw_segments)
@@ -261,7 +277,7 @@ def ingest_raw(req: IngestRawRequest, db: Session = Depends(get_db)):
             approved_flag=True,
             ingestion_status="completed",
             published_at=pub_dt,
-            ingested_at=datetime.now(timezone.utc),
+            ingested_at=datetime.now(UTC),
         )
         db.add(source)
         db.flush()
@@ -279,15 +295,17 @@ def ingest_raw(req: IngestRawRequest, db: Session = Depends(get_db)):
         db.flush()
 
         for cd in chunk_dicts:
-            db.add(SourceChunk(
-                document_id=doc.document_id,
-                chunk_index=cd["chunk_index"],
-                raw_text=cd["raw_text"],
-                start_offset=cd.get("start_offset"),
-                end_offset=cd.get("end_offset"),
-                start_ts=cd.get("start_ts"),
-                end_ts=cd.get("end_ts"),
-            ))
+            db.add(
+                SourceChunk(
+                    document_id=doc.document_id,
+                    chunk_index=cd["chunk_index"],
+                    raw_text=cd["raw_text"],
+                    start_offset=cd.get("start_offset"),
+                    end_offset=cd.get("end_offset"),
+                    start_ts=cd.get("start_ts"),
+                    end_ts=cd.get("end_ts"),
+                )
+            )
         db.commit()
 
         return {
@@ -334,7 +352,9 @@ def ingest(req: IngestRequest, db: Session = Depends(get_db)):
     try:
         raw_data = _download_json(settings.s3_raw_bucket, prefix)
     except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Raw transcript not found at s3://{settings.s3_raw_bucket}/{prefix}: {e}")
+        raise HTTPException(
+            status_code=404, detail=f"Raw transcript not found at s3://{settings.s3_raw_bucket}/{prefix}: {e}"
+        ) from e
 
     # Load clean transcript
     try:
@@ -347,7 +367,9 @@ def ingest(req: IngestRequest, db: Session = Depends(get_db)):
     try:
         claims_json = _download_json(settings.s3_clean_bucket, claims_key)
     except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Claims not found at s3://{settings.s3_clean_bucket}/{claims_key}: {e}")
+        raise HTTPException(
+            status_code=404, detail=f"Claims not found at s3://{settings.s3_clean_bucket}/{claims_key}: {e}"
+        ) from e
 
     # Stitch segments
     raw_segments = raw_data.get("segments", [])
@@ -381,7 +403,7 @@ def ingest(req: IngestRequest, db: Session = Depends(get_db)):
             approved_flag=True,
             ingestion_status="completed",
             published_at=pub_dt,
-            ingested_at=datetime.now(timezone.utc),
+            ingested_at=datetime.now(UTC),
         )
         db.add(source)
         db.flush()
@@ -446,24 +468,30 @@ def ingest(req: IngestRequest, db: Session = Depends(get_db)):
 
             # Subject association — player if present, otherwise team
             if player_person:
-                db.add(ClaimAssociation(
-                    claim_id=claim.claim_id,
-                    role="subject",
-                    person_id=player_person.person_id,
-                ))
+                db.add(
+                    ClaimAssociation(
+                        claim_id=claim.claim_id,
+                        role="subject",
+                        person_id=player_person.person_id,
+                    )
+                )
             elif team:
-                db.add(ClaimAssociation(
-                    claim_id=claim.claim_id,
-                    role="subject",
-                    team_id=team.team_id,
-                ))
+                db.add(
+                    ClaimAssociation(
+                        claim_id=claim.claim_id,
+                        role="subject",
+                        team_id=team.team_id,
+                    )
+                )
 
             for ordinal, matched_chunk in enumerate(matched_chunks):
-                db.add(ClaimChunk(
-                    claim_id=claim.claim_id,
-                    chunk_id=matched_chunk.chunk_id,
-                    ordinal=ordinal,
-                ))
+                db.add(
+                    ClaimChunk(
+                        claim_id=claim.claim_id,
+                        chunk_id=matched_chunk.chunk_id,
+                        ordinal=ordinal,
+                    )
+                )
             claims_created += 1
 
         db.commit()
@@ -546,26 +574,24 @@ def pipeline_summary(db: Session = Depends(get_db)):
     claim_count_sq = _claim_count_subquery()
 
     total = db.scalar(select(func.count()).select_from(Source)) or 0
-    transcribed = db.scalar(
-        select(func.count(distinct(Source.source_id)))
-        .join(SourceDocument, SourceDocument.source_id == Source.source_id)
-        .where(SourceDocument.s3_key.is_not(None))
-    ) or 0
-    chunked = db.scalar(
-        select(func.count(distinct(Source.source_id)))
-        .join(SourceDocument, SourceDocument.source_id == Source.source_id)
-        .where(SourceDocument.chunk_count > 0)
-    ) or 0
-    cleaned = db.scalar(
-        select(func.count())
-        .select_from(has_clean_sq)
-        .where(has_clean_sq.c.has_clean.is_(True))
-    ) or 0
-    extracted = db.scalar(
-        select(func.count())
-        .select_from(claim_count_sq)
-        .where(claim_count_sq.c.claim_count > 0)
-    ) or 0
+    transcribed = (
+        db.scalar(
+            select(func.count(distinct(Source.source_id)))
+            .join(SourceDocument, SourceDocument.source_id == Source.source_id)
+            .where(SourceDocument.s3_key.is_not(None))
+        )
+        or 0
+    )
+    chunked = (
+        db.scalar(
+            select(func.count(distinct(Source.source_id)))
+            .join(SourceDocument, SourceDocument.source_id == Source.source_id)
+            .where(SourceDocument.chunk_count > 0)
+        )
+        or 0
+    )
+    cleaned = db.scalar(select(func.count()).select_from(has_clean_sq).where(has_clean_sq.c.has_clean.is_(True))) or 0
+    extracted = db.scalar(select(func.count()).select_from(claim_count_sq).where(claim_count_sq.c.claim_count > 0)) or 0
 
     return {
         "total": total,
@@ -658,11 +684,11 @@ def pipeline_items(
         has_transcript_expr = SourceDocument.s3_key.is_not(None)
         has_clean_expr = func.coalesce(has_clean_sq.c.has_clean, False)
         stage_filters: dict[str, list] = {
-            "registered":  [~has_transcript_expr],
+            "registered": [~has_transcript_expr],
             "transcribed": [has_transcript_expr, chunk_count_expr == 0],
-            "chunked":     [chunk_count_expr > 0, has_clean_expr.is_(False)],
-            "cleaned":     [has_clean_expr.is_(True), claim_count_expr == 0],
-            "extracted":   [claim_count_expr > 0],
+            "chunked": [chunk_count_expr > 0, has_clean_expr.is_(False)],
+            "cleaned": [has_clean_expr.is_(True), claim_count_expr == 0],
+            "extracted": [claim_count_expr > 0],
         }
         for predicate in stage_filters[stage]:
             base = base.where(predicate)
@@ -682,11 +708,7 @@ def pipeline_items(
     # query via COUNT(*) OVER (). Empty page (e.g. offset past end after
     # a filter shrinks the set) loses the count, so re-issue a cheap
     # COUNT-only query in that fallback case to keep "page X of Y" honest.
-    rows = db.execute(
-        base.add_columns(func.count().over().label("filtered_total"))
-            .limit(limit)
-            .offset(offset)
-    ).all()
+    rows = db.execute(base.add_columns(func.count().over().label("filtered_total")).limit(limit).offset(offset)).all()
 
     if rows:
         total = rows[0].filtered_total
@@ -706,22 +728,24 @@ def pipeline_items(
         video_id = None
         if src.canonical_url and "v=" in src.canonical_url:
             video_id = src.canonical_url.split("v=")[-1].split("&")[0]
-        items.append({
-            "source_id": str(src.source_id),
-            "title": src.title,
-            "channel_name": channel_name,
-            "video_id": video_id,
-            "published_at": src.published_at.isoformat() if src.published_at else None,
-            "stages": {
-                "registered": True,
-                "transcribed": s3_key is not None,
-                "chunked": chunk_count > 0,
-                "cleaned": has_clean,
-                "extracted": claim_count > 0,
-            },
-            "chunk_count": chunk_count,
-            "claim_count": claim_count,
-        })
+        items.append(
+            {
+                "source_id": str(src.source_id),
+                "title": src.title,
+                "channel_name": channel_name,
+                "video_id": video_id,
+                "published_at": src.published_at.isoformat() if src.published_at else None,
+                "stages": {
+                    "registered": True,
+                    "transcribed": s3_key is not None,
+                    "chunked": chunk_count > 0,
+                    "cleaned": has_clean,
+                    "extracted": claim_count > 0,
+                },
+                "chunk_count": chunk_count,
+                "claim_count": claim_count,
+            }
+        )
 
     return {
         "items": items,
@@ -841,15 +865,14 @@ def update_clean_text(req: UpdateCleanTextRequest, db: Session = Depends(get_db)
     try:
         clean_data = _download_json(settings.s3_clean_bucket, key)
     except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Clean transcript not found at s3://{settings.s3_clean_bucket}/{key}: {e}")
+        raise HTTPException(
+            status_code=404, detail=f"Clean transcript not found at s3://{settings.s3_clean_bucket}/{key}: {e}"
+        ) from e
 
     _, deduped_clean = _stitch_segments(clean_data.get("segments", []))
 
     chunks = (
-        db.query(SourceChunk)
-        .filter(SourceChunk.document_id == doc.document_id)
-        .order_by(SourceChunk.chunk_index)
-        .all()
+        db.query(SourceChunk).filter(SourceChunk.document_id == doc.document_id).order_by(SourceChunk.chunk_index).all()
     )
 
     updated = 0
@@ -866,9 +889,11 @@ def update_clean_text(req: UpdateCleanTextRequest, db: Session = Depends(get_db)
 # Transcript diff viewer (test files)
 # ---------------------------------------------------------------------------
 
+
 def _transcript_base() -> str:
     """Resolve transcript directory — works in Docker and local dev."""
     import os
+
     from_env = os.environ.get("TRANSCRIPT_DIR")
     if from_env and os.path.isdir(from_env):
         return from_env
@@ -883,8 +908,8 @@ def _transcript_base() -> str:
 @router.get("/admin/transcript-test-files")
 def list_test_files():
     """List transcript files in the test directory with their raw counterparts."""
-    import os
     import glob as globmod
+    import os
 
     transcript_base = _transcript_base()
     test_dir = os.path.join(transcript_base, "test")
@@ -897,9 +922,7 @@ def list_test_files():
     files = []
     for path in sorted(globmod.glob(os.path.join(test_dir, "*.json"))):
         fname = os.path.basename(path)
-        has_raw = os.path.isfile(os.path.join(raw_dir, fname)) or os.path.isfile(
-            os.path.join(archive_raw_dir, fname)
-        )
+        has_raw = os.path.isfile(os.path.join(raw_dir, fname)) or os.path.isfile(os.path.join(archive_raw_dir, fname))
         # Read title from test file
         try:
             with open(path, encoding="utf-8") as f:
@@ -948,12 +971,14 @@ def transcript_diff(filename: str):
         raw_text = raw_segs[i].get("text", "")
         test_text = test_segs[i].get("text", "")
         if raw_text != test_text:
-            diffs.append({
-                "index": i,
-                "start": raw_segs[i].get("start", 0),
-                "raw": raw_text,
-                "test": test_text,
-            })
+            diffs.append(
+                {
+                    "index": i,
+                    "start": raw_segs[i].get("start", 0),
+                    "raw": raw_text,
+                    "test": test_text,
+                }
+            )
 
     return {
         "title": raw_data.get("title", filename),

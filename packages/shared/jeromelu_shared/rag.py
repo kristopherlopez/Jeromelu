@@ -149,11 +149,13 @@ def ask_jeromelu(
 
     if source_ids_from_meta:
         for s in db.query(Source).filter(Source.source_id.in_(source_ids_from_meta)).all():
-            sources.append({
-                "source_id": str(s.source_id),
-                "title": s.title,
-                "creator_name": s.creator_name,
-            })
+            sources.append(
+                {
+                    "source_id": str(s.source_id),
+                    "title": s.title,
+                    "creator_name": s.creator_name,
+                }
+            )
 
     return {
         "answer": answer,

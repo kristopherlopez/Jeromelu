@@ -17,16 +17,15 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from jeromelu_shared.db import Channel, ChannelMetric, ScoutCandidate, Source, WikiPage
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
-
-from jeromelu_shared.db import Channel, ChannelMetric, ScoutCandidate, Source, WikiPage
 
 from ..deps import get_db
 from ..scout.youtube.refresh import (
@@ -114,6 +113,7 @@ def _channel_wiki_content(name: str, description: str | None, tags: list[str]) -
 # GET — list candidates
 # ---------------------------------------------------------------------------
 
+
 @router.get("/admin/recon/candidates", dependencies=[Depends(require_admin)])
 def list_candidates(
     status: str | None = Query(default="pending"),
@@ -130,10 +130,14 @@ def list_candidates(
         q = q.filter(ScoutCandidate.kind == kind)
     if min_score is not None:
         q = q.filter(ScoutCandidate.score >= min_score)
-    rows = q.order_by(
-        ScoutCandidate.score.desc().nullslast(),
-        ScoutCandidate.discovered_at.desc(),
-    ).limit(limit).all()
+    rows = (
+        q.order_by(
+            ScoutCandidate.score.desc().nullslast(),
+            ScoutCandidate.discovered_at.desc(),
+        )
+        .limit(limit)
+        .all()
+    )
     return {
         "count": len(rows),
         "candidates": [
@@ -159,9 +163,7 @@ def list_candidates(
     }
 
 
-@router.get(
-    "/admin/recon/candidates/{candidate_id}", dependencies=[Depends(require_admin)]
-)
+@router.get("/admin/recon/candidates/{candidate_id}", dependencies=[Depends(require_admin)])
 def get_candidate(candidate_id: UUID, db: Session = Depends(get_db)):
     row = db.get(ScoutCandidate, candidate_id)
     if not row:
@@ -185,9 +187,7 @@ def get_candidate(candidate_id: UUID, db: Session = Depends(get_db)):
         "reviewed_at": row.reviewed_at.isoformat() if row.reviewed_at else None,
         "reviewed_by": row.reviewed_by,
         "reviewed_note": row.reviewed_note,
-        "promoted_channel_id": (
-            str(row.promoted_channel_id) if row.promoted_channel_id else None
-        ),
+        "promoted_channel_id": (str(row.promoted_channel_id) if row.promoted_channel_id else None),
         "run_id": row.run_id,
     }
 
@@ -195,6 +195,7 @@ def get_candidate(candidate_id: UUID, db: Session = Depends(get_db)):
 # ---------------------------------------------------------------------------
 # POST — approve
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/admin/recon/candidates/{candidate_id}/approve",
@@ -244,7 +245,7 @@ def approve_candidate(
                 name=row.title,
                 url=row.url,
                 description=row.description,
-                quality_rating=int(round((row.score or 0.5) * 10)),
+                quality_rating=round((row.score or 0.5) * 10),
                 tags=row.content_categories or [],
                 active=True,
                 logo_url=logo_url,
@@ -267,19 +268,15 @@ def approve_candidate(
 
         # Wiki page (one per channel) — idempotent on (channel_id)
         if channel_id:
-            existing_wp = db.execute(
-                select(WikiPage.page_id).where(WikiPage.channel_id == channel_id)
-            ).first()
+            existing_wp = db.execute(select(WikiPage.page_id).where(WikiPage.channel_id == channel_id)).first()
             if not existing_wp:
                 wiki_slug = _unique_slug(db, WikiPage, WikiPage.slug, slug_base)
-                content = _channel_wiki_content(
-                    row.title, row.description, row.content_categories or []
-                )
+                content = _channel_wiki_content(row.title, row.description, row.content_categories or [])
                 summary = (row.description or row.title)[:280]
                 metadata = {
                     "platform": row.platform,
                     "url": row.url,
-                    "quality_rating": int(round((row.score or 0.5) * 10)),
+                    "quality_rating": round((row.score or 0.5) * 10),
                     "tags": row.content_categories or [],
                 }
                 db.add(
@@ -306,14 +303,14 @@ def approve_candidate(
                         ChannelMetric(
                             channel_id=channel_id,
                             platform=row.platform,
-                            sampled_at=datetime.now(timezone.utc),
+                            sampled_at=datetime.now(UTC),
                             source="youtube_api",
                             metrics=normalised,
                         )
                     )
 
         row.status = "approved"
-        row.reviewed_at = datetime.now(timezone.utc)
+        row.reviewed_at = datetime.now(UTC)
         row.reviewed_by = reviewed_by
         row.reviewed_note = note
         row.promoted_channel_id = channel_id
@@ -328,10 +325,8 @@ def approve_candidate(
             channel_obj = db.get(Channel, channel_id)
             if channel_obj is not None:
                 try:
-                    enumerate_result = refresh_channel_videos(
-                        db, channel_obj, full_backfill=True
-                    )
-                except Exception as e:  # noqa: BLE001
+                    enumerate_result = refresh_channel_videos(db, channel_obj, full_backfill=True)
+                except Exception as e:
                     logger.warning(
                         "Post-approval video enumeration failed for channel %s: %s",
                         channel_id,
@@ -379,7 +374,7 @@ def approve_candidate(
         source_id = src_result[0] if src_result else None
 
         row.status = "approved"
-        row.reviewed_at = datetime.now(timezone.utc)
+        row.reviewed_at = datetime.now(UTC)
         row.reviewed_by = reviewed_by
         row.reviewed_note = note
         db.commit()
@@ -389,20 +384,17 @@ def approve_candidate(
             "status": "approved",
             "candidate_id": str(row.id),
             "promoted_source_id": str(source_id) if source_id else None,
-            "linked_channel_id": (
-                str(parent_channel_id) if parent_channel_id else None
-            ),
+            "linked_channel_id": (str(parent_channel_id) if parent_channel_id else None),
         }
 
     else:
-        raise HTTPException(
-            status_code=400, detail=f"Unsupported candidate kind: {row.kind}"
-        )
+        raise HTTPException(status_code=400, detail=f"Unsupported candidate kind: {row.kind}")
 
 
 # ---------------------------------------------------------------------------
 # POST — reject
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/admin/recon/candidates/{candidate_id}/reject",
@@ -418,7 +410,7 @@ def reject_candidate(
         raise HTTPException(status_code=404, detail="Candidate not found")
 
     row.status = "rejected"
-    row.reviewed_at = datetime.now(timezone.utc)
+    row.reviewed_at = datetime.now(UTC)
     row.reviewed_by = body.get("reviewed_by") or "admin"
     row.reviewed_note = body.get("note")
     db.commit()
@@ -433,6 +425,7 @@ def reject_candidate(
 # ---------------------------------------------------------------------------
 # Small stats helper for sanity checks
 # ---------------------------------------------------------------------------
+
 
 @router.get("/admin/recon/stats", dependencies=[Depends(require_admin)])
 def stats(db: Session = Depends(get_db)):
@@ -450,6 +443,7 @@ def stats(db: Session = Depends(get_db)):
 # ---------------------------------------------------------------------------
 # POST — daily Scout refresh job
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/admin/scout/refresh-videos",
@@ -490,6 +484,7 @@ def refresh_videos(
 # POST — per-channel ad-hoc refresh
 # ---------------------------------------------------------------------------
 
+
 def _resolve_channel(db: Session, channel_ref: str) -> Channel:
     """Resolve a channel by UUID or slug; 404 if neither matches."""
     try:
@@ -498,13 +493,9 @@ def _resolve_channel(db: Session, channel_ref: str) -> Channel:
             return ch
     except ValueError:
         pass
-    ch = db.execute(
-        select(Channel).where(Channel.slug == channel_ref)
-    ).scalar_one_or_none()
+    ch = db.execute(select(Channel).where(Channel.slug == channel_ref)).scalar_one_or_none()
     if not ch:
-        raise HTTPException(
-            status_code=404, detail=f"Channel not found: {channel_ref}"
-        )
+        raise HTTPException(status_code=404, detail=f"Channel not found: {channel_ref}")
     return ch
 
 
@@ -526,15 +517,14 @@ def refresh_one_channel_videos(
     sized for broadcaster archives).
     """
     channel = _resolve_channel(db, channel_ref)
-    result = refresh_channel_videos(
-        db, channel, max_results=max_results, full_backfill=full_backfill
-    )
+    result = refresh_channel_videos(db, channel, max_results=max_results, full_backfill=full_backfill)
     return {"ok": True, **result}
 
 
 # ---------------------------------------------------------------------------
 # POST — daily channel stats refresh
 # ---------------------------------------------------------------------------
+
 
 @router.post(
     "/admin/scout/refresh-channel-stats",
@@ -554,6 +544,7 @@ def refresh_channel_stats(db: Session = Depends(get_db)):
 # ---------------------------------------------------------------------------
 # GET — channel coverage audit
 # ---------------------------------------------------------------------------
+
 
 @router.get("/admin/scout/channel-coverage")
 def channel_coverage(

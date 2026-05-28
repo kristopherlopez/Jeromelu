@@ -1,10 +1,10 @@
 """Manual CLI for Source Discovery. Usage from services/api with venv active:
 
-    python -m app.scout.source_discovery.cli                       # default brief, sonnet 4.6
-    python -m app.scout.source_discovery.cli --dry-run             # don't persist; just print
-    python -m app.scout.source_discovery.cli --model claude-opus-4-7
-    python -m app.scout.source_discovery.cli --max-turns 5 --budget 0.50
-    python -m app.scout.source_discovery.cli --brief "Find injury-focused NRL podcasts only"
+python -m app.scout.source_discovery.cli                       # default brief, sonnet 4.6
+python -m app.scout.source_discovery.cli --dry-run             # don't persist; just print
+python -m app.scout.source_discovery.cli --model claude-opus-4-7
+python -m app.scout.source_discovery.cli --max-turns 5 --budget 0.50
+python -m app.scout.source_discovery.cli --brief "Find injury-focused NRL podcasts only"
 """
 
 from __future__ import annotations
@@ -13,8 +13,8 @@ import argparse
 import logging
 import sys
 
-from jeromelu_shared.db import SessionLocal
 from jeromelu_shared.agent_audit import AgentBounds
+from jeromelu_shared.db import SessionLocal
 
 from .agent import run_source_discovery
 

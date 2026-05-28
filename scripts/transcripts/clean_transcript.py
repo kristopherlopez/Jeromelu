@@ -38,13 +38,13 @@ if sys.platform == "win32":
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
-from cleaning.context import (
+from cleaning.context import (  # noqa: E402  # sys.path manipulation above must run first
     build_local_context,
     build_round_context,
 )
-from cleaning.deterministic import apply_deterministic, load_corrections
-from cleaning.report import build_report, print_summary, write_report
-from cleaning.segmentation import segment_transcript
+from cleaning.deterministic import apply_deterministic, load_corrections  # noqa: E402
+from cleaning.report import build_report, print_summary, write_report  # noqa: E402
+from cleaning.segmentation import segment_transcript  # noqa: E402
 
 DATA_DIR = PROJECT_ROOT / "data"
 RAW_DIR = DATA_DIR / "transcripts" / "raw"
@@ -76,8 +76,7 @@ def clean_transcript(
     # Step 0: Resolve round context
     round_context = build_round_context(title)
     print(f"Round: {round_context.round_num} ({round_context.confidence})")
-    print(f"Primary players: {len(round_context.primary_players)}, "
-          f"Secondary: {len(round_context.secondary_players)}")
+    print(f"Primary players: {len(round_context.primary_players)}, Secondary: {len(round_context.secondary_players)}")
 
     # Layer 1: Deterministic corrections (exact match, 100% confidence)
     corrections = load_corrections()
@@ -85,21 +84,25 @@ def clean_transcript(
     print(f"Layer 1 (deterministic): {len(det_records)} corrections applied")
 
     # Step 0b: Build local context tracker
-    local_context, team_lookup = build_local_context()
+    _local_context, team_lookup = build_local_context()
 
     # Layer 1.5: Topic segmentation (after deterministic fixes clean up team names)
     topic_blocks = segment_transcript(segments, round_context, team_lookup)
     game_blocks = sum(1 for b in topic_blocks if b.block_type == "game")
     pos_blocks = sum(1 for b in topic_blocks if b.block_type == "position")
     gen_blocks = sum(1 for b in topic_blocks if b.block_type == "general")
-    print(f"Layer 1.5 (segmentation): {len(topic_blocks)} blocks "
-          f"({game_blocks} game, {pos_blocks} position, {gen_blocks} general)")
+    print(
+        f"Layer 1.5 (segmentation): {len(topic_blocks)} blocks "
+        f"({game_blocks} game, {pos_blocks} position, {gen_blocks} general)"
+    )
     for block in topic_blocks:
         seg_count = block.end_idx - block.start_idx
         primary_count = sum(1 for p in (block.player_pool or []) if p.is_primary)
-        print(f"  [{block.start_idx:4d}-{block.end_idx:4d}] "
-              f"{block.block_type:8s} | {block.label:40s} | "
-              f"{seg_count:4d} segs, {primary_count:3d} primary players")
+        print(
+            f"  [{block.start_idx:4d}-{block.end_idx:4d}] "
+            f"{block.block_type:8s} | {block.label:40s} | "
+            f"{seg_count:4d} segs, {primary_count:3d} primary players"
+        )
 
     # Build report (no phonetic records — fuzzy matching deferred to Phase 3)
     report = build_report(round_context, det_records, [], topic_blocks)
@@ -125,9 +128,7 @@ def clean_transcript(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Context-aware transcript cleaner"
-    )
+    parser = argparse.ArgumentParser(description="Context-aware transcript cleaner")
     parser.add_argument(
         "path",
         nargs="?",

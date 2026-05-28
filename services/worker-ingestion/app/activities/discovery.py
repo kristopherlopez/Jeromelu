@@ -1,12 +1,11 @@
 """Discovery activity — find new videos on whitelisted YouTube channels."""
 
 import logging
-from datetime import datetime, timezone
-
-from temporalio import activity
-from youtube_utils import list_channel_videos
+from datetime import UTC, datetime
 
 from jeromelu_shared.db import Channel, SessionLocal, Source
+from temporalio import activity
+from youtube_utils import list_channel_videos
 
 logger = logging.getLogger(__name__)
 
@@ -16,20 +15,22 @@ MAX_VIDEOS_PER_CHANNEL = 15
 
 def _load_youtube_channels(session) -> list[Channel]:
     """Load active YouTube channels with an external_id from the DB."""
-    return session.query(Channel).filter(
-        Channel.platform == "youtube",
-        Channel.active == True,  # noqa: E712
-        Channel.external_id.isnot(None),
-    ).all()
+    return (
+        session.query(Channel)
+        .filter(
+            Channel.platform == "youtube",
+            Channel.active == True,  # noqa: E712
+            Channel.external_id.isnot(None),
+        )
+        .all()
+    )
 
 
 def _get_existing_video_urls(session, urls: list[str]) -> set[str]:
     """Check which video URLs already exist in the DB."""
     if not urls:
         return set()
-    results = session.query(Source.canonical_url).filter(
-        Source.canonical_url.in_(urls)
-    ).all()
+    results = session.query(Source.canonical_url).filter(Source.canonical_url.in_(urls)).all()
     return {r[0] for r in results}
 
 
@@ -61,7 +62,7 @@ async def discover_new_videos() -> list[dict]:
                 all_videos.extend(videos)
 
                 # Update last_polled_at
-                ch.last_polled_at = datetime.now(timezone.utc)
+                ch.last_polled_at = datetime.now(UTC)
 
             except Exception:
                 logger.exception("Failed to discover videos for channel %s", channel_name)
@@ -77,7 +78,7 @@ async def discover_new_videos() -> list[dict]:
         new_videos = [v for v in all_videos if v["url"] not in existing_urls]
 
         # Only ingest content published from 2026-01-01 onwards
-        cutoff = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        cutoff = datetime(2026, 1, 1, tzinfo=UTC)
         filtered = []
         for v in new_videos:
             pub = v.get("published_at", "")
@@ -96,7 +97,8 @@ async def discover_new_videos() -> list[dict]:
         new_videos = filtered
         logger.info(
             "Discovered %d new videos (%d already ingested)",
-            len(new_videos), len(all_videos) - len(new_videos),
+            len(new_videos),
+            len(all_videos) - len(new_videos),
         )
 
         session.commit()

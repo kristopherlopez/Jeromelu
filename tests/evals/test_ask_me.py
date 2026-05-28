@@ -20,7 +20,6 @@ from deepeval.metrics import (
     HallucinationMetric,
 )
 from deepeval.test_case import LLMTestCase
-
 from jeromelu_shared.rag import ask_jeromelu, build_context, embed_query, retrieve_kb
 
 # ---------------------------------------------------------------------------
@@ -154,6 +153,4 @@ def test_ask_me_must_not_contain(example: dict, db):
     result = ask_jeromelu(db, example["question"], example.get("temperature", "sharp"))
 
     for forbidden in example["must_not_contain"]:
-        assert forbidden.lower() not in result["answer"].lower(), (
-            f"Answer contains forbidden term: {forbidden}"
-        )
+        assert forbidden.lower() not in result["answer"].lower(), f"Answer contains forbidden term: {forbidden}"

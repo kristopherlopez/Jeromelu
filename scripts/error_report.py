@@ -27,11 +27,10 @@ import subprocess
 import sys
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import boto3
 from botocore.exceptions import ClientError
-
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -64,11 +63,11 @@ EXCEPTION_CLASS = re.compile(r"\b([A-Z][A-Za-z0-9_]*(?:Error|Exception|Warning))
 @dataclass
 class ContainerReport:
     name: str
-    available: bool                # docker exec succeeded
+    available: bool  # docker exec succeeded
     error_count: int = 0
     class_counts: Counter = field(default_factory=Counter)
     samples: list[str] = field(default_factory=list)
-    note: str = ""                 # e.g. "container not running"
+    note: str = ""  # e.g. "container not running"
 
 
 def fetch_logs(container: str) -> tuple[bool, list[str], str]:
@@ -76,7 +75,9 @@ def fetch_logs(container: str) -> tuple[bool, list[str], str]:
     try:
         result = subprocess.run(
             ["docker", "logs", container, "--since", SINCE],
-            capture_output=True, text=True, timeout=60,
+            capture_output=True,
+            text=True,
+            timeout=60,
             errors="replace",
         )
     except subprocess.TimeoutExpired:
@@ -157,14 +158,20 @@ def collect() -> list[ContainerReport]:
             reports.append(ContainerReport(name=name, available=False, note=note))
             continue
         count, classes, samples = analyze(lines)
-        reports.append(ContainerReport(
-            name=name, available=True,
-            error_count=count, class_counts=classes, samples=samples,
-        ))
+        reports.append(
+            ContainerReport(
+                name=name,
+                available=True,
+                error_count=count,
+                class_counts=classes,
+                samples=samples,
+            )
+        )
     return reports
 
 
 # ---- Rendering -------------------------------------------------------------
+
 
 def render_text(today: datetime, reports: list[ContainerReport]) -> str:
     total = sum(r.error_count for r in reports)
@@ -256,12 +263,11 @@ def _render_container_html(r: ContainerReport) -> str:
 
 
 def _html_escape(s: str) -> str:
-    return (
-        s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    )
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 # ---- Send ------------------------------------------------------------------
+
 
 def send_email(subject: str, html: str, text: str) -> None:
     ses = boto3.client("ses", region_name=PRIMARY_REGION)
@@ -288,7 +294,7 @@ def _subject(today: datetime, reports: list[ContainerReport]) -> str:
 
 
 def main() -> int:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     reports = collect()
     text = render_text(now, reports)
     html = render_html(now, reports)

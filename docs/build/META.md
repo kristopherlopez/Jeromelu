@@ -74,6 +74,10 @@ New AWS resources go through Terraform in `infra/terraform/`. Never `aws` CLI to
 
 Never commit `.env*`, tokens, API keys, prod credentials, or any high-entropy string that looks like a secret. Redact secrets from logs, issue comments, PR descriptions, and run reports. Enforced by Gitleaks in CI (`gitleaks` job in `.github/workflows/tests.yml`) against the working tree + PR diff; CI fails on any finding. False positives go in `.gitleaks.toml` with a `description` rationale — never inline `# gitleaks:allow` comments. Local check: `gitleaks detect --no-git --source=. --no-banner --redact --exit-code 1`.
 
+### Datetime / timezone
+
+Use timezone-aware datetimes. Store and compare UTC at DB/API boundaries. Never `datetime.utcnow()` — prefer `datetime.now(UTC)`. Pure-data fixtures under `tests/` are exempt. Enforced by Ruff's `DTZ` rule set in `pyproject.toml` (DTZ011 `call-date-today` is excluded — `date.today()` is the right call for naive-date contexts like round numbers); CI fails on violation. Local check: `make lint-python`.
+
 ### Heavy ML deps stay isolated
 
 `pyannote`, `torch`, GPU-bound code stays in `services/gpu` or workers, behind RPC. The API container stays lean — lazy imports don't fix image bloat because pip runs at build time. Split helpers into `*_helpers.py` so CI and unit tests run without the GPU stack.

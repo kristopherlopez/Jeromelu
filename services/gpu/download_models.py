@@ -31,6 +31,7 @@ def main() -> int:
 
     print("[bake] Downloading pyannote speaker-diarization-community-1 …")
     from pyannote.audio import Pipeline
+
     Pipeline.from_pretrained(
         "pyannote/speaker-diarization-community-1",
         token=token,
@@ -40,6 +41,7 @@ def main() -> int:
     # for matching. community-1 may or may not transitively pull this,
     # so download explicitly.
     from pyannote.audio import Model
+
     print("[bake] Downloading pyannote wespeaker-voxceleb-resnet34-LM …")
     Model.from_pretrained(
         "pyannote/wespeaker-voxceleb-resnet34-LM",
@@ -48,6 +50,7 @@ def main() -> int:
 
     print("[bake] Downloading InsightFace buffalo_l …")
     from insightface.app import FaceAnalysis
+
     fa = FaceAnalysis(name="buffalo_l", providers=["CPUExecutionProvider"])
     fa.prepare(ctx_id=-1, det_size=(640, 640))
 

@@ -15,9 +15,8 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException
-from sqlalchemy.orm import Session
-
 from jeromelu_shared.teams import seed_teams
+from sqlalchemy.orm import Session
 
 from ..deps import get_db
 from .admin import require_admin

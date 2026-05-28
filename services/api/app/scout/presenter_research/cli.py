@@ -1,9 +1,9 @@
 """CLI for Presenter Research. Run from services/api with venv active:
 
-    python -m app.scout.presenter_research.cli --channel-id <uuid>
-    python -m app.scout.presenter_research.cli --source-id <uuid>          # resolves to channel
-    python -m app.scout.presenter_research.cli --channel-id <uuid> --dry-run
-    python -m app.scout.presenter_research.cli --channel-id <uuid> --model claude-opus-4-7
+python -m app.scout.presenter_research.cli --channel-id <uuid>
+python -m app.scout.presenter_research.cli --source-id <uuid>          # resolves to channel
+python -m app.scout.presenter_research.cli --channel-id <uuid> --dry-run
+python -m app.scout.presenter_research.cli --channel-id <uuid> --model claude-opus-4-7
 """
 
 from __future__ import annotations

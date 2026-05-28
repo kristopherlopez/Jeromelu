@@ -11,14 +11,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy.orm import Session
-
 from jeromelu_shared.agent_audit import (
     AgentBounds,
     make_run_id,
     record_agent_ended,
     record_agent_started,
 )
+from sqlalchemy.orm import Session
 
 SCOUT_AGENT_ID = "scout"
 SCOUT_AGENT_NAME = "Scout"

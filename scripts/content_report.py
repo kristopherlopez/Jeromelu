@@ -23,11 +23,10 @@ import os
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import boto3
 from botocore.exceptions import ClientError
-
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -43,17 +42,31 @@ def _psql(query: str) -> str:
     db = os.environ.get("POSTGRES_DB", "jeromelu")
     result = subprocess.run(
         [
-            "docker", "exec", "-i", "jeromelu-postgres",
-            "psql", "-U", user, "-d", db,
-            "-t", "-A", "-F", "\t",
-            "-c", query,
+            "docker",
+            "exec",
+            "-i",
+            "jeromelu-postgres",
+            "psql",
+            "-U",
+            user,
+            "-d",
+            db,
+            "-t",
+            "-A",
+            "-F",
+            "\t",
+            "-c",
+            query,
         ],
-        capture_output=True, text=True, check=True,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     return result.stdout.strip()
 
 
 # ---- Data structs ----------------------------------------------------------
+
 
 @dataclass
 class Headline:
@@ -84,6 +97,7 @@ class ClaimTypeRow:
 
 
 # ---- Queries ---------------------------------------------------------------
+
 
 def fetch_headline() -> Headline:
     out = _psql("""
@@ -205,13 +219,19 @@ def fetch_predictions_resolved() -> list[tuple[str, int]]:
 
 # ---- Rendering -------------------------------------------------------------
 
+
 def _trunc(s: str, n: int) -> str:
     return s if len(s) <= n else s[: n - 1] + "…"
 
 
-def render_text(today: datetime, h: Headline, videos: list[VideoRow],
-                channels: list[ChannelDelta], claims: list[ClaimTypeRow],
-                preds: list[tuple[str, int]]) -> str:
+def render_text(
+    today: datetime,
+    h: Headline,
+    videos: list[VideoRow],
+    channels: list[ChannelDelta],
+    claims: list[ClaimTypeRow],
+    preds: list[tuple[str, int]],
+) -> str:
     L: list[str] = [
         f"Jeromelu content digest — week ending {today.date().isoformat()}",
         "=" * 60,
@@ -259,9 +279,14 @@ def _esc(s: str) -> str:
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def render_html(today: datetime, h: Headline, videos: list[VideoRow],
-                channels: list[ChannelDelta], claims: list[ClaimTypeRow],
-                preds: list[tuple[str, int]]) -> str:
+def render_html(
+    today: datetime,
+    h: Headline,
+    videos: list[VideoRow],
+    channels: list[ChannelDelta],
+    claims: list[ClaimTypeRow],
+    preds: list[tuple[str, int]],
+) -> str:
     def _kpi(num: str, label: str) -> str:
         return f"""
 <div style="display:inline-block;margin-right:24px;vertical-align:top">
@@ -269,40 +294,52 @@ def render_html(today: datetime, h: Headline, videos: list[VideoRow],
   <div style="font-size:12px;color:#666;text-transform:uppercase;letter-spacing:.04em">{label}</div>
 </div>"""
 
-    videos_rows = "".join(
-        f'<tr style="border-top:1px solid #eee">'
-        f'<td style="padding:4px 12px 4px 0;text-align:right;font-family:ui-monospace,Menlo,monospace">{v.views:,}</td>'
-        f'<td style="padding:4px 12px 4px 0">{_esc(_trunc(v.title, 70))}</td>'
-        f'<td style="padding:4px 0;color:#666">{_esc(_trunc(v.channel, 30))}</td>'
-        f'</tr>'
-        for v in videos
-    ) or '<tr><td colspan="3" style="padding:8px 0;color:#888">No new videos this week</td></tr>'
+    videos_rows = (
+        "".join(
+            f'<tr style="border-top:1px solid #eee">'
+            f'<td style="padding:4px 12px 4px 0;text-align:right;font-family:ui-monospace,Menlo,monospace">{v.views:,}</td>'
+            f'<td style="padding:4px 12px 4px 0">{_esc(_trunc(v.title, 70))}</td>'
+            f'<td style="padding:4px 0;color:#666">{_esc(_trunc(v.channel, 30))}</td>'
+            f"</tr>"
+            for v in videos
+        )
+        or '<tr><td colspan="3" style="padding:8px 0;color:#888">No new videos this week</td></tr>'
+    )
 
-    channel_rows = "".join(
-        f'<tr style="border-top:1px solid #eee">'
-        f'<td style="padding:4px 12px 4px 0;text-align:right;font-family:ui-monospace,Menlo,monospace;color:{"#1a7f37" if c.delta >= 0 else "#cf222e"}">'
-        f'{"+" if c.delta >= 0 else ""}{c.delta:,}</td>'
-        f'<td style="padding:4px 12px 4px 0">{_esc(_trunc(c.name, 50))}</td>'
-        f'<td style="padding:4px 0;color:#666">now {c.subs_now:,}</td>'
-        f'</tr>'
-        for c in channels
-    ) or '<tr><td colspan="3" style="padding:8px 0;color:#888">No channel-velocity data</td></tr>'
+    channel_rows = (
+        "".join(
+            f'<tr style="border-top:1px solid #eee">'
+            f'<td style="padding:4px 12px 4px 0;text-align:right;font-family:ui-monospace,Menlo,monospace;color:{"#1a7f37" if c.delta >= 0 else "#cf222e"}">'
+            f"{'+' if c.delta >= 0 else ''}{c.delta:,}</td>"
+            f'<td style="padding:4px 12px 4px 0">{_esc(_trunc(c.name, 50))}</td>'
+            f'<td style="padding:4px 0;color:#666">now {c.subs_now:,}</td>'
+            f"</tr>"
+            for c in channels
+        )
+        or '<tr><td colspan="3" style="padding:8px 0;color:#888">No channel-velocity data</td></tr>'
+    )
 
-    claims_rows = "".join(
-        f'<tr style="border-top:1px solid #eee">'
-        f'<td style="padding:4px 12px 4px 0;text-align:right;font-family:ui-monospace,Menlo,monospace">{c.count}</td>'
-        f'<td style="padding:4px 0">{_esc(c.claim_type)}</td>'
-        f'</tr>'
-        for c in claims
-    ) or '<tr><td colspan="2" style="padding:8px 0;color:#888">No claims extracted this week</td></tr>'
+    claims_rows = (
+        "".join(
+            f'<tr style="border-top:1px solid #eee">'
+            f'<td style="padding:4px 12px 4px 0;text-align:right;font-family:ui-monospace,Menlo,monospace">{c.count}</td>'
+            f'<td style="padding:4px 0">{_esc(c.claim_type)}</td>'
+            f"</tr>"
+            for c in claims
+        )
+        or '<tr><td colspan="2" style="padding:8px 0;color:#888">No claims extracted this week</td></tr>'
+    )
 
-    preds_rows = "".join(
-        f'<tr style="border-top:1px solid #eee">'
-        f'<td style="padding:4px 12px 4px 0;text-align:right;font-family:ui-monospace,Menlo,monospace">{n}</td>'
-        f'<td style="padding:4px 0">{_esc(s)}</td>'
-        f'</tr>'
-        for s, n in preds
-    ) or '<tr><td colspan="2" style="padding:8px 0;color:#888">None resolved this week</td></tr>'
+    preds_rows = (
+        "".join(
+            f'<tr style="border-top:1px solid #eee">'
+            f'<td style="padding:4px 12px 4px 0;text-align:right;font-family:ui-monospace,Menlo,monospace">{n}</td>'
+            f'<td style="padding:4px 0">{_esc(s)}</td>'
+            f"</tr>"
+            for s, n in preds
+        )
+        or '<tr><td colspan="2" style="padding:8px 0;color:#888">None resolved this week</td></tr>'
+    )
 
     return f"""\
 <!doctype html>
@@ -356,6 +393,7 @@ def render_html(today: datetime, h: Headline, videos: list[VideoRow],
 
 # ---- Send ------------------------------------------------------------------
 
+
 def send_email(subject: str, html: str, text: str) -> None:
     ses = boto3.client("ses", region_name=PRIMARY_REGION)
     ses.send_email(
@@ -372,7 +410,7 @@ def send_email(subject: str, html: str, text: str) -> None:
 
 
 def main() -> int:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     h = fetch_headline()
     videos = fetch_top_new_videos()
     channels = fetch_channel_velocity()

@@ -22,15 +22,17 @@ def chunk_segments(
     for i, seg in enumerate(raw_segments):
         raw = seg["text"]
         clean = clean_segments[i]["text"] if clean_segments and i < len(clean_segments) else None
-        chunks.append({
-            "chunk_index": i,
-            "raw_text": raw,
-            "clean_text": clean,
-            "start_ts": seg["start"],
-            "end_ts": seg["end"],
-            "start_offset": text_offset,
-            "end_offset": text_offset + len(raw),
-        })
+        chunks.append(
+            {
+                "chunk_index": i,
+                "raw_text": raw,
+                "clean_text": clean,
+                "start_ts": seg["start"],
+                "end_ts": seg["end"],
+                "start_offset": text_offset,
+                "end_offset": text_offset + len(raw),
+            }
+        )
         text_offset += len(raw) + 1  # +1 for inter-segment space
 
     return chunks

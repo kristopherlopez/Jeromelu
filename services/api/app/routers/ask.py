@@ -1,10 +1,9 @@
 """Ask Me API — chat with JeromeLu."""
 
 from fastapi import APIRouter, Depends
+from jeromelu_shared.rag import ask_jeromelu
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-
-from jeromelu_shared.rag import ask_jeromelu
 
 from ..deps import get_db
 

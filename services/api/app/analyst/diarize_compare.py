@@ -31,10 +31,10 @@ from uuid import UUID
 from jeromelu_shared.db import SessionLocal, Source
 from jeromelu_shared.s3 import download_raw
 
-
 # ---------------------------------------------------------------------------
 # Types
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class Turn:
@@ -46,6 +46,7 @@ class Turn:
 # ---------------------------------------------------------------------------
 # Loaders
 # ---------------------------------------------------------------------------
+
 
 def _deepgram_turns(deepgram: dict[str, Any]) -> list[Turn]:
     """Group consecutive same-speaker Deepgram utterances into turns."""
@@ -66,10 +67,7 @@ def _deepgram_turns(deepgram: dict[str, Any]) -> list[Turn]:
 
 
 def _pyannote_turns(pyannote: dict[str, Any]) -> list[Turn]:
-    return [
-        Turn(float(t["start"]), float(t["end"]), t["speaker"])
-        for t in pyannote.get("turns", [])
-    ]
+    return [Turn(float(t["start"]), float(t["end"]), t["speaker"]) for t in pyannote.get("turns", [])]
 
 
 def _speaker_at(turns: list[Turn], ts: float) -> str | None:
@@ -91,8 +89,12 @@ def _load_json(s3_key: str) -> dict[str, Any] | None:
 # Comparison
 # ---------------------------------------------------------------------------
 
+
 def _confusion(
-    dg: list[Turn], pa: list[Turn], duration: float, interval: float,
+    dg: list[Turn],
+    pa: list[Turn],
+    duration: float,
+    interval: float,
 ) -> dict[tuple[str, str], int]:
     """Sample at `interval` and count co-occurrence of (pyannote, deepgram)
     speaker labels. Returns sample counts (multiply by interval for seconds)."""
@@ -157,21 +159,27 @@ def _print_confusion_matrix(
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Compare Deepgram vs pyannote diarization for one source.",
     )
     parser.add_argument("source_id", type=str)
     parser.add_argument(
-        "--interval", type=float, default=2.0,
+        "--interval",
+        type=float,
+        default=2.0,
         help="Sampling interval in seconds (default 2.0)",
     )
     parser.add_argument(
-        "--max-disagreements", type=int, default=30,
+        "--max-disagreements",
+        type=int,
+        default=30,
         help="How many disagreement rows to print (default 30)",
     )
     parser.add_argument(
-        "--show-all-rows", action="store_true",
+        "--show-all-rows",
+        action="store_true",
         help="Print every sample row, not just disagreements after alignment",
     )
     args = parser.parse_args()
@@ -183,11 +191,7 @@ def main() -> int:
         return 2
 
     with SessionLocal() as session:
-        source = (
-            session.query(Source)
-            .filter(Source.source_id == source_id)
-            .one_or_none()
-        )
+        source = session.query(Source).filter(Source.source_id == source_id).one_or_none()
         if source is None:
             print(f"No source with id {source_id}", file=sys.stderr)
             return 2

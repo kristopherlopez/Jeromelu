@@ -28,7 +28,7 @@ def get_chat_client() -> OpenAI:
 
 
 def get_embedding_client() -> OpenAI:
-    """Get an OpenAI client for embeddings (always OpenAI direct — OpenRouter doesn't support embedding models reliably)."""
+    """Get an OpenAI client for embeddings (always OpenAI direct — OpenRouter doesn't support embedding models reliably)."""  # noqa: E501  # single-line docstring
     global _embedding_client
     if _embedding_client is None:
         _embedding_client = OpenAI(api_key=settings.openai_api_key)

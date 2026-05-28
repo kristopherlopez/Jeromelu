@@ -30,19 +30,19 @@ from __future__ import annotations
 import argparse
 import logging
 import uuid
-from typing import Iterable
+from collections.abc import Iterable
 
-from sqlalchemy import func as sa_func
-
-from app.analyst.video_staging import staged_video
-from app.analyst.visual_id import VisualIdError, visual_identify
 from jeromelu_shared.db import (
+    SessionLocal,
     Source,
     SourceDocument,
     SourceFaceDetection,
     SourceSpeaker,
-    SessionLocal,
 )
+from sqlalchemy import func as sa_func
+
+from app.analyst.video_staging import staged_video
+from app.analyst.visual_id import VisualIdError, visual_identify
 
 logging.basicConfig(
     level=logging.INFO,
@@ -59,9 +59,13 @@ def _pyannote_turns_for_source(session, source_id: uuid.UUID) -> list[dict]:
     needed for the visual pass. We rebuild the list from source_speakers,
     which is faster than re-fetching the pyannote JSON from S3.
     """
-    doc = session.query(SourceDocument).filter(
-        SourceDocument.source_id == source_id,
-    ).first()
+    doc = (
+        session.query(SourceDocument)
+        .filter(
+            SourceDocument.source_id == source_id,
+        )
+        .first()
+    )
     if not doc:
         return []
     turns = (
@@ -70,10 +74,7 @@ def _pyannote_turns_for_source(session, source_id: uuid.UUID) -> list[dict]:
         .order_by(SourceSpeaker.start_ts)
         .all()
     )
-    return [
-        {"start": float(t.start_ts), "end": float(t.end_ts), "speaker": t.speaker_label}
-        for t in turns
-    ]
+    return [{"start": float(t.start_ts), "end": float(t.end_ts), "speaker": t.speaker_label} for t in turns]
 
 
 def _sources_to_backfill(session, only: list[uuid.UUID] | None) -> list[Source]:
@@ -83,16 +84,8 @@ def _sources_to_backfill(session, only: list[uuid.UUID] | None) -> list[Source]:
     zero ``source_face_detections`` rows. If ``only`` is supplied, we
     intersect with that set so the operator can target specific sources.
     """
-    populated_subq = (
-        session.query(SourceFaceDetection.source_id)
-        .distinct()
-        .subquery()
-    )
-    q = (
-        session.query(Source)
-        .filter(Source.audio_s3_key.isnot(None))
-        .filter(~Source.source_id.in_(populated_subq))
-    )
+    populated_subq = session.query(SourceFaceDetection.source_id).distinct().subquery()
+    q = session.query(Source).filter(Source.audio_s3_key.isnot(None)).filter(~Source.source_id.in_(populated_subq))
     if only:
         q = q.filter(Source.source_id.in_(only))
     return q.order_by(Source.published_at.desc().nullslast()).all()
@@ -109,7 +102,8 @@ def backfill_one(session, source: Source) -> int:
     if not source.video_s3_key and source.source_type != "youtube":
         log.warning(
             "Skip %s (%s): no video_s3_key and not YouTube — visual ID needs pixels",
-            source.source_id, source.title,
+            source.source_id,
+            source.title,
         )
         return 0
 
@@ -117,13 +111,16 @@ def backfill_one(session, source: Source) -> int:
     if not pyannote_turns:
         log.warning(
             "Skip %s (%s): no source_speakers rows — visual ID needs turns to vote against",
-            source.source_id, source.title,
+            source.source_id,
+            source.title,
         )
         return 0
 
     log.info(
         "Backfilling %s (%s) — %d turns, video=%s",
-        source.source_id, source.title, len(pyannote_turns),
+        source.source_id,
+        source.title,
+        len(pyannote_turns),
         source.video_s3_key or "(yt-dlp on demand)",
     )
 
@@ -134,7 +131,8 @@ def backfill_one(session, source: Source) -> int:
         ) as video_key:
             if video_key is None:
                 log.warning(
-                    "Skip %s: video staging returned no key", source.source_id,
+                    "Skip %s: video staging returned no key",
+                    source.source_id,
                 )
                 return 0
             visual_identify(
@@ -155,9 +153,14 @@ def backfill_one(session, source: Source) -> int:
         log.error("Visual ID failed for %s: %s", source.source_id, exc)
         return 0
 
-    written = session.query(sa_func.count(SourceFaceDetection.detection_id)).filter(
-        SourceFaceDetection.source_id == source.source_id,
-    ).scalar() or 0
+    written = (
+        session.query(sa_func.count(SourceFaceDetection.detection_id))
+        .filter(
+            SourceFaceDetection.source_id == source.source_id,
+        )
+        .scalar()
+        or 0
+    )
     log.info("Wrote %d detections for %s", written, source.source_id)
     return written
 
@@ -165,7 +168,8 @@ def backfill_one(session, source: Source) -> int:
 def main(argv: Iterable[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "source_ids", nargs="*",
+        "source_ids",
+        nargs="*",
         help="Optional explicit source UUIDs. If omitted, every source missing detections is processed.",
     )
     args = parser.parse_args(list(argv) if argv is not None else None)

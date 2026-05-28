@@ -25,7 +25,11 @@ PIPELINE = "nrlcom-stats"
 
 
 def run_nrlcom_stats(
-    db: Session, *, competition: int, season: int, archive_only: bool = False,
+    db: Session,
+    *,
+    competition: int,
+    season: int,
+    archive_only: bool = False,
 ) -> dict[str, Any]:
     """Fetch /stats/data + archive to S3.
 
@@ -49,10 +53,12 @@ def run_nrlcom_stats(
             payload=data,
         )
         set_archive_detail(detail, archive_key)
-        detail.update({
-            "player_stat_groups": len(data.get("playerStats", [])),
-            "team_stat_groups": len(data.get("teamStats", [])),
-        })
+        detail.update(
+            {
+                "player_stat_groups": len(data.get("playerStats", [])),
+                "team_stat_groups": len(data.get("teamStats", [])),
+            }
+        )
         # D8: strict-parse the archived response so upstream shape drift
         # surfaces as a failed run. The raw payload is already in S3 above,
         # so a validation failure never loses the capture. archive_only=True
@@ -61,24 +67,24 @@ def run_nrlcom_stats(
             detail["validated"] = False
             detail["validation_skipped"] = True
             logger.info(
-                "scout/nrlcom-stats: archive_only=true; strict-parse skipped "
-                "(comp=%s season=%s s3=%s)",
-                competition, season, archive_key,
+                "scout/nrlcom-stats: archive_only=true; strict-parse skipped (comp=%s season=%s s3=%s)",
+                competition,
+                season,
+                archive_key,
             )
         else:
             NrlcomStats.model_validate(data)
             detail["validated"] = True
-            logger.info("scout/nrlcom-stats: comp=%s season=%s s3=%s",
-                        competition, season, archive_key)
+            logger.info("scout/nrlcom-stats: comp=%s season=%s s3=%s", competition, season, archive_key)
     except NrlcomStatsFetchError as e:
         run.fail(e, summary_text=f"Upstream fetch failed: {e}")
-        raise HTTPException(status_code=502, detail=f"stats fetch failed: {e}")
+        raise HTTPException(status_code=502, detail=f"stats fetch failed: {e}") from e
     except ValidationError as e:
         run.fail(
             e,
             summary_text=f"Stats response failed strict validation (drift): {e}",
         )
-        raise HTTPException(status_code=500, detail=f"nrl.com stats drift: {e}")
+        raise HTTPException(status_code=500, detail=f"nrl.com stats drift: {e}") from e
     except Exception as e:
         run.fail(e, summary_text=f"Pipeline failed: {e}")
         raise
@@ -104,5 +110,8 @@ def nrlcom_stats_endpoint(
 ):
     """Fetch nrl.com /stats/data and archive to S3."""
     return run_nrlcom_stats(
-        db, competition=competition, season=season, archive_only=archive_only,
+        db,
+        competition=competition,
+        season=season,
+        archive_only=archive_only,
     )

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 from typing import Any
 
 import httpx
@@ -56,7 +55,7 @@ def extract_slug_from_match_centre_url(match_centre_url: str) -> str:
 
 
 __all__ = [
-    "fetch_match_centre",
-    "extract_slug_from_match_centre_url",
     "NrlcomMatchCentreFetchError",
+    "extract_slug_from_match_centre_url",
+    "fetch_match_centre",
 ]

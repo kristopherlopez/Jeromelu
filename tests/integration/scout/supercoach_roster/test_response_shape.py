@@ -19,13 +19,11 @@ from __future__ import annotations
 import os
 
 import pytest
-from pydantic import ValidationError
-
 from app.scout.supercoach_roster.fetcher import (
     SuperCoachFetchError,
     fetch_strict,
 )
-
+from pydantic import ValidationError
 
 LIVE_FLAG = os.environ.get("SCOUT_DRIFT_LIVE") == "1"
 

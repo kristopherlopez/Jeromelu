@@ -6,7 +6,6 @@ from typing import Any
 
 import httpx
 
-
 CASUALTY_URL = "https://www.nrl.com/casualty-ward/data"
 
 
@@ -37,9 +36,9 @@ def fetch_casualty_ward(
     data = r.json()
     if not isinstance(data, dict) or "casualties" not in data:
         raise NrlcomCasualtyFetchError(
-            f"Unexpected response: missing 'casualties' (keys: {list(data) if isinstance(data, dict) else type(data).__name__})"
+            f"Unexpected response: missing 'casualties' (keys: {list(data) if isinstance(data, dict) else type(data).__name__})"  # noqa: E501
         )
     return data
 
 
-__all__ = ["fetch_casualty_ward", "NrlcomCasualtyFetchError"]
+__all__ = ["NrlcomCasualtyFetchError", "fetch_casualty_ward"]

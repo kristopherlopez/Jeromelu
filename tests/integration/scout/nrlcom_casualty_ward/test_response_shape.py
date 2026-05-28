@@ -15,14 +15,12 @@ from __future__ import annotations
 import os
 
 import pytest
-from pydantic import ValidationError
-
 from app.scout.nrlcom_casualty_ward.fetcher import (
     NrlcomCasualtyFetchError,
     fetch_casualty_ward,
 )
 from app.scout.nrlcom_casualty_ward.models import NrlcomCasualtyWard
-
+from pydantic import ValidationError
 
 LIVE_FLAG = os.environ.get("SCOUT_DRIFT_LIVE") == "1"
 
@@ -54,6 +52,6 @@ def test_live_nrlcom_casualty_ward_shape():
         )
     # Sanity gate on a healthy live response
     assert len(parsed.casualties) >= 1, "Live casualty-ward returned no casualties"
-    assert all(
-        c.firstName and c.lastName and c.teamNickname for c in parsed.casualties
-    ), "A casualty is missing a load-bearing identity field"
+    assert all(c.firstName and c.lastName and c.teamNickname for c in parsed.casualties), (
+        "A casualty is missing a load-bearing identity field"
+    )

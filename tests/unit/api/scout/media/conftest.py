@@ -36,9 +36,7 @@ def _install_youtube_stubs() -> None:
             """Stand-in for ``youtube_utils.exceptions.DownloadError``."""
 
         def download_audio(*_args, **_kwargs):  # pragma: no cover - always patched
-            raise RuntimeError(
-                "youtube_utils.download_audio stub called; monkeypatch it in the test"
-            )
+            raise RuntimeError("youtube_utils.download_audio stub called; monkeypatch it in the test")
 
         exceptions.DownloadError = DownloadError
         youtube_utils.exceptions = exceptions

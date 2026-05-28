@@ -13,8 +13,6 @@ from __future__ import annotations
 import uuid
 
 import numpy as np
-import pytest
-
 from app.analyst.voice_cluster_hdbscan import (
     TurnEmbedding,
     VoiceClusterParams,
@@ -22,8 +20,7 @@ from app.analyst.voice_cluster_hdbscan import (
 )
 
 
-def _vec(seed: int, dim: int = 16, base: np.ndarray | None = None,
-         jitter: float = 0.05) -> list[float]:
+def _vec(seed: int, dim: int = 16, base: np.ndarray | None = None, jitter: float = 0.05) -> list[float]:
     """Produce a unit-ish vector either fresh from ``seed`` or as a
     small perturbation around ``base`` (same speaker, different turn)."""
     rng = np.random.default_rng(seed)
@@ -131,7 +128,9 @@ def test_outlier_caught_by_noise_threshold_filter():
     out, stats = cluster_voice_turns(
         rows,
         params=VoiceClusterParams(
-            min_cluster_size=3, min_samples=2, noise_threshold=0.85,
+            min_cluster_size=3,
+            min_samples=2,
+            noise_threshold=0.85,
         ),
     )
     # The loose tail point should be ejected by the centroid filter.
@@ -197,6 +196,7 @@ def test_params_clamped_for_tiny_inputs():
 def test_label_format_two_digits():
     """H-prefix labels pad to two digits up to H99; safe past that."""
     from app.analyst.voice_cluster_hdbscan import _label_from_index
+
     assert _label_from_index(0) == "H00"
     assert _label_from_index(1) == "H01"
     assert _label_from_index(9) == "H09"

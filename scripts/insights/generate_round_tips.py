@@ -12,22 +12,22 @@ from __future__ import annotations
 
 import argparse
 import logging
-import uuid
 import sys
+import uuid
 
 # Ensure packages are importable when running from repo root
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "packages" / "shared"))
 
 from jeromelu_shared.db.session import SessionLocal
 from jeromelu_shared.insights import (
+    build_player_context,
+    generate_article,
     get_current_round,
     query_claim_consensus,
     query_round_claims,
     query_top_players,
-    resolve_entity_names,
-    build_player_context,
-    generate_article,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")

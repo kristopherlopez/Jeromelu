@@ -27,11 +27,13 @@ def main() -> int:
     )
     parser.add_argument("source_id", type=str, help="UUID of the sources row")
     parser.add_argument(
-        "--force", action="store_true",
+        "--force",
+        action="store_true",
         help="Re-run even if pyannote JSON already exists in S3.",
     )
     parser.add_argument(
-        "--log-level", default="INFO",
+        "--log-level",
+        default="INFO",
         choices=("DEBUG", "INFO", "WARNING", "ERROR"),
     )
     args = parser.parse_args()
@@ -48,18 +50,13 @@ def main() -> int:
         return 2
 
     with SessionLocal() as session:
-        source = (
-            session.query(Source)
-            .filter(Source.source_id == source_id)
-            .one_or_none()
-        )
+        source = session.query(Source).filter(Source.source_id == source_id).one_or_none()
         if source is None:
             print(f"No source with id {source_id}", file=sys.stderr)
             return 2
         if not source.audio_s3_key:
             print(
-                f"Source {source.source_id} has no audio_s3_key — run "
-                "`make collect-audio SOURCE_ID=...` first.",
+                f"Source {source.source_id} has no audio_s3_key — run `make collect-audio SOURCE_ID=...` first.",
                 file=sys.stderr,
             )
             return 1

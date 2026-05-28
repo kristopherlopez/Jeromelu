@@ -33,12 +33,11 @@ from sqlalchemy.orm import Session
 
 from jeromelu_shared.db.models import (
     Person,
-    PlayerAttributes,
     PersonRole,
+    PlayerAttributes,
     Team,
     WikiPage,
 )
-
 
 # ---------------------------------------------------------------------------
 # SuperCoach abbrev → ``teams.slug`` for the parent NRL clubs. Slugs match
@@ -78,6 +77,7 @@ def _slugify(name: str) -> str:
 # Team lookup — teams must already be seeded by scripts/data/seed_teams.py
 # ---------------------------------------------------------------------------
 
+
 class RosterPreconditionError(RuntimeError):
     """Raised when a precondition (e.g. teams seeded) is not met."""
 
@@ -95,9 +95,7 @@ def load_nrl_teams_by_abbrev(session: Session) -> dict[str, Team]:
     missing = [slug for slug in slugs if slug not in by_slug]
     if missing:
         raise RosterPreconditionError(
-            "teams not seeded yet — missing slugs: "
-            + ", ".join(sorted(missing))
-            + ". Run `make seed-teams` first."
+            "teams not seeded yet — missing slugs: " + ", ".join(sorted(missing)) + ". Run `make seed-teams` first."
         )
     return {abbrev: by_slug[slug] for abbrev, slug in SC_ABBREV_TO_TEAM_SLUG.items()}
 
@@ -132,13 +130,9 @@ def _ensure_player_entity(session: Session, sc_player: dict[str, Any]) -> Person
 
     person = None
     if sc_id is not None:
-        person = session.execute(
-            select(Person).where(Person.supercoach_id == sc_id)
-        ).scalar_one_or_none()
+        person = session.execute(select(Person).where(Person.supercoach_id == sc_id)).scalar_one_or_none()
     if person is None:
-        person = session.execute(
-            select(Person).where(Person.canonical_name == name)
-        ).scalar_one_or_none()
+        person = session.execute(select(Person).where(Person.canonical_name == name)).scalar_one_or_none()
 
     if person is None:
         person = Person(
@@ -237,6 +231,7 @@ def _ensure_player_wiki_page(
 # ---------------------------------------------------------------------------
 # Public: seed (first-run) and refresh (diff-and-transition)
 # ---------------------------------------------------------------------------
+
 
 def seed_roster(
     session: Session,
@@ -369,12 +364,14 @@ def refresh_roster(
                 )
             )
             counts["new_players"] += 1
-            transitions.append({
-                "kind": "new_player",
-                "entity_id": str(entity.person_id),
-                "name": entity.canonical_name,
-                "team_slug": team.slug,
-            })
+            transitions.append(
+                {
+                    "kind": "new_player",
+                    "entity_id": str(entity.person_id),
+                    "name": entity.canonical_name,
+                    "team_slug": team.slug,
+                }
+            )
             continue
 
         team_changed = current.team_id != team.team_id
@@ -408,22 +405,26 @@ def refresh_roster(
 
         if team_changed:
             counts["team_changes"] += 1
-            transitions.append({
-                "kind": "team_change",
-                "entity_id": str(entity.person_id),
-                "name": entity.canonical_name,
-                "from_team_slug": prior_team_slug,
-                "to_team_slug": team.slug,
-            })
+            transitions.append(
+                {
+                    "kind": "team_change",
+                    "entity_id": str(entity.person_id),
+                    "name": entity.canonical_name,
+                    "from_team_slug": prior_team_slug,
+                    "to_team_slug": team.slug,
+                }
+            )
         if position_changed:
             counts["position_changes"] += 1
-            transitions.append({
-                "kind": "position_change",
-                "entity_id": str(entity.person_id),
-                "name": entity.canonical_name,
-                "from_position": prior_position,
-                "to_position": primary,
-            })
+            transitions.append(
+                {
+                    "kind": "position_change",
+                    "entity_id": str(entity.person_id),
+                    "name": entity.canonical_name,
+                    "from_position": prior_position,
+                    "to_position": primary,
+                }
+            )
 
     session.commit()
     return {"counts": counts, "transitions": transitions}

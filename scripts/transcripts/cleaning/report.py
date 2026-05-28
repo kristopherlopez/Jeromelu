@@ -54,16 +54,18 @@ def build_report(
     if topic_blocks:
         for block in topic_blocks:
             primary_count = sum(1 for p in (block.player_pool or []) if p.is_primary)
-            segments_summary.append({
-                "start_idx": block.start_idx,
-                "end_idx": block.end_idx,
-                "block_type": block.block_type,
-                "label": block.label,
-                "teams": block.teams,
-                "positions": block.positions,
-                "segment_count": block.end_idx - block.start_idx,
-                "primary_players": primary_count,
-            })
+            segments_summary.append(
+                {
+                    "start_idx": block.start_idx,
+                    "end_idx": block.end_idx,
+                    "block_type": block.block_type,
+                    "label": block.label,
+                    "teams": block.teams,
+                    "positions": block.positions,
+                    "segment_count": block.end_idx - block.start_idx,
+                    "primary_players": primary_count,
+                }
+            )
 
     return {
         "context": {
@@ -91,23 +93,22 @@ def print_summary(report: dict) -> None:
     stats = report["stats"]
     ctx = report["context"]
 
-    print(f"\n{'='*60}")
-    print(f"CLEANING REPORT")
-    print(f"{'='*60}")
+    print(f"\n{'=' * 60}")
+    print("CLEANING REPORT")
+    print(f"{'=' * 60}")
 
     if ctx["round"]:
         print(f"Round: {ctx['round']} ({ctx['confidence']} confidence)")
         print(f"Teams: {len(ctx['teams_playing'])} playing, {len(ctx['byes'])} on bye")
     else:
-        print(f"Round: not identified (fallback mode)")
+        print("Round: not identified (fallback mode)")
 
     if report.get("topic_segments"):
         segs = report["topic_segments"]
         game_count = sum(1 for s in segs if s["block_type"] == "game")
         pos_count = sum(1 for s in segs if s["block_type"] == "position")
         gen_count = sum(1 for s in segs if s["block_type"] == "general")
-        print(f"\nTopic segments: {len(segs)} blocks "
-              f"({game_count} game, {pos_count} position, {gen_count} general)")
+        print(f"\nTopic segments: {len(segs)} blocks ({game_count} game, {pos_count} position, {gen_count} general)")
 
     print(f"\nCorrections applied: {stats['total_applied']}")
     print(f"  HIGH (deterministic): {stats['high']}")
@@ -116,7 +117,7 @@ def print_summary(report: dict) -> None:
     print(f"  LOW (near threshold): {stats['low']}")
 
     if report["corrections_applied"]:
-        print(f"\n--- Top corrections ---")
+        print("\n--- Top corrections ---")
         # Show unique corrections sorted by count
         sorted_corrs = sorted(
             report["corrections_applied"],
@@ -129,10 +130,10 @@ def print_summary(report: dict) -> None:
             print(f"  [{conf}] {rec['original']!r} → {rec.get('corrected', '?')!r} (×{count})")
 
     if report["flagged_for_review"]:
-        print(f"\n--- Flagged for review ---")
+        print("\n--- Flagged for review ---")
         for rec in report["flagged_for_review"][:10]:
             best = rec.get("best_match", "?")
             score = rec.get("score", 0)
             print(f"  {rec['original']!r} → {best!r}? (score: {score:.3f})")
 
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")

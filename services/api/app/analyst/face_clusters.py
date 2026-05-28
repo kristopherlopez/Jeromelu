@@ -24,15 +24,14 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 import numpy as np
+from jeromelu_shared.db import SourceFaceCluster, SourceFaceDetection
 from sklearn.cluster import HDBSCAN
 from sqlalchemy import update
 from sqlalchemy.orm import Session
-
-from jeromelu_shared.db import SourceFaceCluster, SourceFaceDetection
 
 logger = logging.getLogger(__name__)
 
@@ -68,10 +67,11 @@ CENTROID_NOISE_THRESHOLD = 0.35
 @dataclass
 class ClusterStats:
     """Return shape from :func:`cluster_source_detections`."""
+
     source_id: UUID
     n_detections: int
     n_clusters: int
-    n_noise: int       # detections labelled cluster_id = NULL (HDBSCAN's -1)
+    n_noise: int  # detections labelled cluster_id = NULL (HDBSCAN's -1)
     cluster_sizes: list[int]  # sorted descending, one entry per real cluster
 
 
@@ -140,9 +140,12 @@ def cluster_source_detections(
         cluster_min = min_cluster_size
         sample_min = min_samples
         logger.info(
-            "Clustering %d detections for source %s via %d-row sample "
-            "(min_cluster=%d, min_samples=%d)",
-            n_total, source_id, CLUSTER_SAMPLE_MAX, cluster_min, sample_min,
+            "Clustering %d detections for source %s via %d-row sample (min_cluster=%d, min_samples=%d)",
+            n_total,
+            source_id,
+            CLUSTER_SAMPLE_MAX,
+            cluster_min,
+            sample_min,
         )
     else:
         sample_idx = None
@@ -153,7 +156,10 @@ def cluster_source_detections(
         sample_min = min(min_samples, cluster_min)
         logger.info(
             "Clustering %d detections for source %s (min_cluster=%d, min_samples=%d)",
-            n_total, source_id, cluster_min, sample_min,
+            n_total,
+            source_id,
+            cluster_min,
+            sample_min,
         )
 
     clusterer = HDBSCAN(
@@ -208,8 +214,7 @@ def cluster_source_detections(
             nearest = sims.argmax(axis=1)
             best_sim = sims.max(axis=1)
             per_detection_cluster = [
-                int(nearest[i]) if best_sim[i] >= CENTROID_NOISE_THRESHOLD else None
-                for i in range(n_total)
+                int(nearest[i]) if best_sim[i] >= CENTROID_NOISE_THRESHOLD else None for i in range(n_total)
             ]
 
     # Group detection_ids by final cluster_id so we issue one UPDATE per
@@ -218,16 +223,14 @@ def cluster_source_detections(
     # round-trips to Postgres.
     by_cluster: dict[int | None, list] = {}
     n_noise = 0
-    for det_id, cid in zip(detection_ids, per_detection_cluster):
+    for det_id, cid in zip(detection_ids, per_detection_cluster, strict=False):
         if cid is None:
             n_noise += 1
         by_cluster.setdefault(cid, []).append(det_id)
 
     for cluster_id, ids in by_cluster.items():
         session.execute(
-            update(SourceFaceDetection)
-            .where(SourceFaceDetection.detection_id.in_(ids))
-            .values(cluster_id=cluster_id),
+            update(SourceFaceDetection).where(SourceFaceDetection.detection_id.in_(ids)).values(cluster_id=cluster_id),
         )
     session.commit()
 
@@ -243,7 +246,10 @@ def cluster_source_detections(
 
     logger.info(
         "Clustered %d detections for source %s → %d cluster(s), %d noise. Sizes: %s",
-        len(rows), source_id, len(cluster_sizes_final), n_noise,
+        len(rows),
+        source_id,
+        len(cluster_sizes_final),
+        n_noise,
         cluster_sizes_final[:10] + (["..."] if len(cluster_sizes_final) > 10 else []),
     )
 
@@ -402,16 +408,20 @@ def analyse_clusters(session: Session, source_id: UUID) -> list[ClusterAnalysis]
     max_x2 = 1.0
     max_y2 = 1.0
     for r in rows:
-        bucket = by_cluster.setdefault(r.cluster_id, {
-            "ts": [], "cx": [], "cy": [], "mouth": [], "area": [],
-        })
+        bucket = by_cluster.setdefault(
+            r.cluster_id,
+            {
+                "ts": [],
+                "cx": [],
+                "cy": [],
+                "mouth": [],
+                "area": [],
+            },
+        )
         bucket["ts"].append(float(r.frame_ts))
         bucket["cx"].append((float(r.bbox_x1) + float(r.bbox_x2)) / 2.0)
         bucket["cy"].append((float(r.bbox_y1) + float(r.bbox_y2)) / 2.0)
-        bucket["area"].append(
-            (float(r.bbox_x2) - float(r.bbox_x1))
-            * (float(r.bbox_y2) - float(r.bbox_y1))
-        )
+        bucket["area"].append((float(r.bbox_x2) - float(r.bbox_x1)) * (float(r.bbox_y2) - float(r.bbox_y1)))
         if r.mouth_opening is not None:
             bucket["mouth"].append(float(r.mouth_opening))
         if float(r.bbox_x2) > max_x2:
@@ -427,31 +437,28 @@ def analyse_clusters(session: Session, source_id: UUID) -> list[ClusterAnalysis]
             # definition. Skip the heuristic to avoid divide-by-zero on
             # tiny spans.
             cnt = len(data["ts"])
-            analyses.append(ClusterAnalysis(
-                cluster_id=-1,  # use -1 sentinel; not stored — see below
-                detection_count=cnt,
-                mouth_open_std=0.0,
-                centroid_std=0.0,
-                temporal_density=0.0,
-                bbox_area_fraction_mean=0.0,
-                detected_kind="noise",
-            ))
+            analyses.append(
+                ClusterAnalysis(
+                    cluster_id=-1,  # use -1 sentinel; not stored — see below
+                    detection_count=cnt,
+                    mouth_open_std=0.0,
+                    centroid_std=0.0,
+                    temporal_density=0.0,
+                    bbox_area_fraction_mean=0.0,
+                    detected_kind="noise",
+                )
+            )
             continue
 
         ts = np.asarray(data["ts"], dtype=np.float64)
         cx = np.asarray(data["cx"], dtype=np.float64)
         cy = np.asarray(data["cy"], dtype=np.float64)
         areas = np.asarray(data["area"], dtype=np.float64)
-        mouth = (
-            np.asarray(data["mouth"], dtype=np.float64)
-            if data["mouth"] else np.zeros(1)
-        )
+        mouth = np.asarray(data["mouth"], dtype=np.float64) if data["mouth"] else np.zeros(1)
 
         # std() on a single-element array is 0 by default — fine here,
         # those clusters land in the 'noise' branch via count.
-        centroid_std = float(
-            np.sqrt(np.var(cx) + np.var(cy))
-        )
+        centroid_std = float(np.sqrt(np.var(cx) + np.var(cy)))
         mouth_std = float(np.std(mouth))
         span = float(ts.max() - ts.min())
         # density = detections per second over the cluster's lifespan
@@ -469,46 +476,54 @@ def analyse_clusters(session: Session, source_id: UUID) -> list[ClusterAnalysis]
             temporal_density=density,
             bbox_area_fraction_mean=area_fraction_mean,
         )
-        analyses.append(ClusterAnalysis(
-            cluster_id=cluster_id,
-            detection_count=len(ts),
-            mouth_open_std=mouth_std,
-            centroid_std=centroid_std,
-            temporal_density=density,
-            bbox_area_fraction_mean=area_fraction_mean,
-            detected_kind=detected,
-        ))
+        analyses.append(
+            ClusterAnalysis(
+                cluster_id=cluster_id,
+                detection_count=len(ts),
+                mouth_open_std=mouth_std,
+                centroid_std=centroid_std,
+                temporal_density=density,
+                bbox_area_fraction_mean=area_fraction_mean,
+                detected_kind=detected,
+            )
+        )
 
     # Upsert source_face_clusters rows. We never touch operator-set
     # fields (kind, label, notes, attributed_person_id) — those persist
     # across re-runs. The analyser writes detected_kind, stats, count,
     # and sets `excluded=true` for first-time portrait/noise unless an
     # operator override already exists.
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for a in analyses:
         # NULL cluster bucket is observability-only; skip persistence
         # since the table's PK is (source_id, cluster_id) and we don't
         # want a -1 sentinel row leaking into the runs view.
         if a.cluster_id < 0:
             continue
-        existing = session.query(SourceFaceCluster).filter(
-            SourceFaceCluster.source_id == source_id,
-            SourceFaceCluster.cluster_id == a.cluster_id,
-        ).first()
+        existing = (
+            session.query(SourceFaceCluster)
+            .filter(
+                SourceFaceCluster.source_id == source_id,
+                SourceFaceCluster.cluster_id == a.cluster_id,
+            )
+            .first()
+        )
         if existing is None:
-            session.add(SourceFaceCluster(
-                source_id=source_id,
-                cluster_id=a.cluster_id,
-                kind=None,  # operator-facing, unreviewed
-                excluded=(a.detected_kind in ("portrait", "noise")),
-                detection_count=a.detection_count,
-                mouth_open_std=a.mouth_open_std,
-                centroid_std=a.centroid_std,
-                temporal_density=a.temporal_density,
-                detected_kind=a.detected_kind,
-                created_at=now,
-                updated_at=now,
-            ))
+            session.add(
+                SourceFaceCluster(
+                    source_id=source_id,
+                    cluster_id=a.cluster_id,
+                    kind=None,  # operator-facing, unreviewed
+                    excluded=(a.detected_kind in ("portrait", "noise")),
+                    detection_count=a.detection_count,
+                    mouth_open_std=a.mouth_open_std,
+                    centroid_std=a.centroid_std,
+                    temporal_density=a.temporal_density,
+                    detected_kind=a.detected_kind,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
         else:
             # Update stats + detected_kind but leave operator overrides
             # alone. Re-set excluded only if the operator hasn't been
@@ -522,13 +537,14 @@ def analyse_clusters(session: Session, source_id: UUID) -> list[ClusterAnalysis]
             existing.temporal_density = a.temporal_density
             existing.detected_kind = a.detected_kind
             if existing.kind is None:
-                existing.excluded = (a.detected_kind in ("portrait", "noise"))
+                existing.excluded = a.detected_kind in ("portrait", "noise")
             existing.updated_at = now
     session.commit()
 
     logger.info(
         "Analysed %d clusters for source %s: %s",
-        len(analyses), source_id,
+        len(analyses),
+        source_id,
         {a.detected_kind: sum(1 for x in analyses if x.detected_kind == a.detected_kind) for a in analyses},
     )
     return analyses

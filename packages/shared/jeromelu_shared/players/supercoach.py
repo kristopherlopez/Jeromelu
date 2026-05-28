@@ -19,7 +19,6 @@ from typing import Any
 
 import httpx
 
-
 SUPERCOACH_BASE = "https://www.supercoach.com.au/{season}/api/nrl/classic/v1/players-cf"
 SUPERCOACH_PARAMS: dict[str, Any] = {
     "embed": "notes,odds,player_stats,positions",
@@ -29,10 +28,27 @@ SUPERCOACH_PARAMS: dict[str, Any] = {
 
 # Sanity bounds — full top-grade rosters are ~520-560 across the 17 clubs.
 MIN_PLAYERS = 400
-EXPECTED_NRL_TEAMS = frozenset({
-    "BRO", "BUL", "CBR", "SHA", "DOL", "GCT", "MNL", "MEL", "NEW",
-    "NQC", "PAR", "PTH", "STH", "STG", "SYD", "NZL", "WST",
-})
+EXPECTED_NRL_TEAMS = frozenset(
+    {
+        "BRO",
+        "BUL",
+        "CBR",
+        "SHA",
+        "DOL",
+        "GCT",
+        "MNL",
+        "MEL",
+        "NEW",
+        "NQC",
+        "PAR",
+        "PTH",
+        "STH",
+        "STG",
+        "SYD",
+        "NZL",
+        "WST",
+    }
+)
 
 
 class SuperCoachFetchError(RuntimeError):
@@ -58,17 +74,11 @@ def fetch_supercoach_roster(
     r.raise_for_status()
     data = r.json()
     if not isinstance(data, list):
-        raise SuperCoachFetchError(
-            f"Unexpected response: not a list (got {type(data).__name__})"
-        )
+        raise SuperCoachFetchError(f"Unexpected response: not a list (got {type(data).__name__})")
     if len(data) < MIN_PLAYERS:
-        raise SuperCoachFetchError(
-            f"Roster looks truncated: got {len(data)} players, expected >= {MIN_PLAYERS}"
-        )
+        raise SuperCoachFetchError(f"Roster looks truncated: got {len(data)} players, expected >= {MIN_PLAYERS}")
     teams_seen = {(p.get("team") or {}).get("abbrev") for p in data}
     missing = EXPECTED_NRL_TEAMS - teams_seen
     if missing:
-        raise SuperCoachFetchError(
-            f"Roster missing expected NRL teams: {sorted(missing)}"
-        )
+        raise SuperCoachFetchError(f"Roster missing expected NRL teams: {sorted(missing)}")
     return data

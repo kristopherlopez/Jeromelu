@@ -30,8 +30,6 @@ import sys
 from collections import defaultdict
 from uuid import UUID
 
-from sqlalchemy.orm import Session
-
 from jeromelu_shared.db import (
     Person,
     SessionLocal,
@@ -41,7 +39,7 @@ from jeromelu_shared.db import (
     SourceFaceDetection,
 )
 from jeromelu_shared.s3 import download_raw
-
+from sqlalchemy.orm import Session
 
 #: Same default the live ASD path uses (visual_id.MIN_ACTIVE_MOUTH_OPENING).
 DEFAULT_MOUTH_THRESHOLD = 0.045
@@ -118,11 +116,7 @@ def segment_by_face(
       7. Drop sub-``min_segment_seconds`` segments from the output (no
          re-attribution; just hide them).
     """
-    doc = (
-        session.query(SourceDocument)
-        .filter(SourceDocument.source_id == source_id)
-        .first()
-    )
+    doc = session.query(SourceDocument).filter(SourceDocument.source_id == source_id).first()
     if not doc:
         return []
 
@@ -153,9 +147,7 @@ def segment_by_face(
     per_frame_speaker: list[int | None] = []
     for ts in sorted_frame_ts:
         top_cid, top_mo = max(by_frame[ts], key=lambda t: t[1])
-        per_frame_speaker.append(
-            top_cid if (top_cid is not None and top_mo >= mouth_threshold) else None
-        )
+        per_frame_speaker.append(top_cid if (top_cid is not None and top_mo >= mouth_threshold) else None)
 
     # 4) Word-level transcript load.
     if doc.s3_key:
@@ -235,33 +227,24 @@ def segment_by_face(
             kept = smoothed[-1]
             smoothed.pop()
             smoothed[-1]["end"] = seg["end"]
-            smoothed[-1]["text"] = (
-                smoothed[-1]["text"] + " " + kept["text"] + " " + seg["text"]
-            ).strip()
+            smoothed[-1]["text"] = (smoothed[-1]["text"] + " " + kept["text"] + " " + seg["text"]).strip()
         else:
             smoothed.append(seg)
 
     # 8) Drop tiny segments from the output. Don't re-attribute them
     #    to anyone — that risks lying about who spoke.
-    merged = [
-        s for s in smoothed
-        if (s["end"] - s["start"]) >= min_segment_seconds or s["speaker_cluster_id"] is None
-    ]
+    merged = [s for s in smoothed if (s["end"] - s["start"]) >= min_segment_seconds or s["speaker_cluster_id"] is None]
 
     # 9) Resolve cluster_id → person_name via SourceFaceCluster + Person.
     cluster_meta = {
-        c.cluster_id: c
-        for c in session.query(SourceFaceCluster)
-        .filter(SourceFaceCluster.source_id == source_id)
-        .all()
+        c.cluster_id: c for c in session.query(SourceFaceCluster).filter(SourceFaceCluster.source_id == source_id).all()
     }
-    person_ids = {
-        c.attributed_person_id for c in cluster_meta.values() if c.attributed_person_id
-    }
-    person_name_by_id = {
-        p.person_id: p.canonical_name
-        for p in session.query(Person).filter(Person.person_id.in_(person_ids)).all()
-    } if person_ids else {}
+    person_ids = {c.attributed_person_id for c in cluster_meta.values() if c.attributed_person_id}
+    person_name_by_id = (
+        {p.person_id: p.canonical_name for p in session.query(Person).filter(Person.person_id.in_(person_ids)).all()}
+        if person_ids
+        else {}
+    )
 
     for seg in merged:
         cid = seg["speaker_cluster_id"]
@@ -280,31 +263,40 @@ def segment_by_face(
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Show what the transcript looks like if segmented purely "
-                    "by face presence + mouth opening (no pyannote).",
+        "by face presence + mouth opening (no pyannote).",
     )
     parser.add_argument("source_id", type=str, help="UUID of the sources row")
     parser.add_argument(
-        "--mouth-threshold", type=float, default=DEFAULT_MOUTH_THRESHOLD,
+        "--mouth-threshold",
+        type=float,
+        default=DEFAULT_MOUTH_THRESHOLD,
         help=f"Mouth-opening floor for 'is speaking' (default {DEFAULT_MOUTH_THRESHOLD})",
     )
     parser.add_argument(
-        "--min-segment", type=float, default=DEFAULT_MIN_SEGMENT_SECONDS,
+        "--min-segment",
+        type=float,
+        default=DEFAULT_MIN_SEGMENT_SECONDS,
         help=f"Drop segments shorter than this from output (default {DEFAULT_MIN_SEGMENT_SECONDS}s)",
     )
     parser.add_argument(
-        "--smooth-gap", type=float, default=DEFAULT_SMOOTH_GAP_SECONDS,
+        "--smooth-gap",
+        type=float,
+        default=DEFAULT_SMOOTH_GAP_SECONDS,
         help=f"Merge same-speaker windows across multi-cam cuts up to this gap (default {DEFAULT_SMOOTH_GAP_SECONDS}s)",
     )
     parser.add_argument(
-        "--include-silence", action="store_true",
+        "--include-silence",
+        action="store_true",
         help="Include segments where no face is speaking (default: skip them)",
     )
     parser.add_argument(
-        "--out", default="-",
+        "--out",
+        default="-",
         help="Output path (default '-' = stdout)",
     )
     parser.add_argument(
-        "--log-level", default="WARNING",
+        "--log-level",
+        default="WARNING",
         choices=("DEBUG", "INFO", "WARNING", "ERROR"),
     )
     args = parser.parse_args()
@@ -326,7 +318,8 @@ def main() -> int:
             print(f"No source with id {source_id}", file=sys.stderr)
             return 2
         segments = segment_by_face(
-            session, source_id,
+            session,
+            source_id,
             mouth_threshold=args.mouth_threshold,
             smooth_gap_seconds=args.smooth_gap,
             min_segment_seconds=args.min_segment,

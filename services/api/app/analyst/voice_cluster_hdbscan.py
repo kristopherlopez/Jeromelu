@@ -22,8 +22,8 @@ wrapper lives in :mod:`voice_cluster_runner`.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Sequence
 from uuid import UUID
 
 import numpy as np
@@ -59,6 +59,7 @@ class TurnEmbedding:
     unit-testable without a DB session — the DB wrapper builds these
     from ``source_speakers`` rows where ``embedding IS NOT NULL``.
     """
+
     turn_id: UUID
     embedding: Sequence[float]
 
@@ -66,6 +67,7 @@ class TurnEmbedding:
 @dataclass(frozen=True)
 class VoiceClusterParams:
     """Tunable knobs surfaced to the API + UI."""
+
     min_cluster_size: int = DEFAULT_MIN_CLUSTER_SIZE
     min_samples: int = DEFAULT_MIN_SAMPLES
     noise_threshold: float = DEFAULT_NOISE_THRESHOLD
@@ -74,9 +76,10 @@ class VoiceClusterParams:
 @dataclass
 class VoiceClusterStats:
     """Return shape from :func:`cluster_voice_turns`."""
-    n_turns: int                # rows fed to the clusterer (excludes None-embedding)
-    n_clusters: int             # distinct real cluster labels emitted
-    n_noise: int                # turns labelled NULL (HDBSCAN -1)
+
+    n_turns: int  # rows fed to the clusterer (excludes None-embedding)
+    n_clusters: int  # distinct real cluster labels emitted
+    n_noise: int  # turns labelled NULL (HDBSCAN -1)
     cluster_sizes: list[int] = field(default_factory=list)
 
 
@@ -88,7 +91,7 @@ def _label_from_index(index: int) -> str:
 def cluster_voice_turns(
     rows: Sequence[TurnEmbedding],
     *,
-    params: VoiceClusterParams = VoiceClusterParams(),
+    params: VoiceClusterParams = VoiceClusterParams(),  # noqa: B008  # frozen dataclass — immutable, safely shareable across calls
 ) -> tuple[list[tuple[UUID, str | None]], VoiceClusterStats]:
     """Cluster per-turn medoid embeddings and return ``(turn_id, label)``.
 
@@ -161,10 +164,7 @@ def cluster_voice_turns(
             cn = float(np.linalg.norm(c))
             centroids[new_id] = c / cn if cn > 0 else c
         # Cosine = dot product on L2-normalised vectors. Shape (N,).
-        own_centroid_for = np.array([
-            relabel[int(lbl)] if int(lbl) != -1 else -1
-            for lbl in raw_labels
-        ])
+        own_centroid_for = np.array([relabel[int(lbl)] if int(lbl) != -1 else -1 for lbl in raw_labels])
         cos_to_own = np.full(n_in, -1.0, dtype=np.float32)
         for i in range(n_in):
             cid = own_centroid_for[i]

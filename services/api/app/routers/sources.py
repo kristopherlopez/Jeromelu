@@ -2,9 +2,6 @@ import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func
-from sqlalchemy.orm import Session, joinedload
-
 from jeromelu_shared.db import (
     Claim,
     ClaimChunk,
@@ -15,6 +12,8 @@ from jeromelu_shared.db import (
     SourceSpeaker,
 )
 from jeromelu_shared.s3 import presign_video
+from sqlalchemy import func
+from sqlalchemy.orm import Session, joinedload
 
 from ..deps import get_db
 
@@ -31,11 +30,7 @@ def get_stats(db: Session = Depends(get_db)):
     claim_count = db.query(func.count(Claim.claim_id)).scalar() or 0
 
     # Most recent source ingested
-    latest_source = (
-        db.query(Source)
-        .order_by(Source.ingested_at.desc().nullslast())
-        .first()
-    )
+    latest_source = db.query(Source).order_by(Source.ingested_at.desc().nullslast()).first()
 
     return {
         "sources_scanned": source_count,
@@ -44,7 +39,9 @@ def get_stats(db: Session = Depends(get_db)):
             "title": latest_source.title,
             "creator_name": latest_source.creator_name,
             "ingested_at": latest_source.ingested_at.isoformat() if latest_source.ingested_at else None,
-        } if latest_source else None,
+        }
+        if latest_source
+        else None,
     }
 
 
@@ -83,9 +80,9 @@ def list_sources(
     search_filter = None
     if search:
         like = f"%{search}%"
-        search_filter = func.lower(Source.title).like(func.lower(like)) | func.lower(
-            Source.creator_name
-        ).like(func.lower(like))
+        search_filter = func.lower(Source.title).like(func.lower(like)) | func.lower(Source.creator_name).like(
+            func.lower(like)
+        )
 
     count_query = db.query(func.count(Source.source_id))
     if search_filter is not None:
@@ -153,11 +150,7 @@ def get_source(source_id: uuid.UUID, db: Session = Depends(get_db)):
     if not source:
         raise HTTPException(status_code=404, detail="Source not found")
 
-    doc = (
-        db.query(SourceDocument)
-        .filter(SourceDocument.source_id == source_id)
-        .first()
-    )
+    doc = db.query(SourceDocument).filter(SourceDocument.source_id == source_id).first()
     # No document yet (Scout hasn't ingested or GPU hasn't transcribed): the
     # viewer still renders — video plays, transcript/claims tabs show an
     # empty state — so the user can at least watch in-app instead of being
@@ -190,10 +183,7 @@ def get_source(source_id: uuid.UUID, db: Session = Depends(get_db)):
 
     # Get all chunks ordered by start timestamp for contiguous display
     chunks = (
-        db.query(SourceChunk)
-        .filter(SourceChunk.document_id == doc.document_id)
-        .order_by(SourceChunk.start_ts)
-        .all()
+        db.query(SourceChunk).filter(SourceChunk.document_id == doc.document_id).order_by(SourceChunk.start_ts).all()
     )
 
     # Speaker turns (one row per contiguous turn after mig 045/046)
@@ -248,11 +238,7 @@ def get_source(source_id: uuid.UUID, db: Session = Depends(get_db)):
     claims_data = []
     for claim in claims:
         subject_assoc = next((a for a in claim.associations if a.role == "subject"), None)
-        entity = (
-            people.get(subject_assoc.person_id)
-            if subject_assoc and subject_assoc.person_id
-            else None
-        )
+        entity = people.get(subject_assoc.person_id) if subject_assoc and subject_assoc.person_id else None
         claim_chunks = sorted(claim.chunk_links, key=lambda cl: cl.ordinal)
         claims_data.append(
             {
@@ -335,9 +321,7 @@ def get_source(source_id: uuid.UUID, db: Session = Depends(get_db)):
                 "start_ts": ch.start_ts,
                 "end_ts": ch.end_ts,
                 "has_claims": ch.chunk_id in claim_chunk_ids,
-                "speaker_segment_id": (
-                    str(ch.speaker_segment_id) if ch.speaker_segment_id else None
-                ),
+                "speaker_segment_id": (str(ch.speaker_segment_id) if ch.speaker_segment_id else None),
                 "paragraph_break": ch.paragraph_break,
             }
             for ch in chunks
@@ -346,22 +330,16 @@ def get_source(source_id: uuid.UUID, db: Session = Depends(get_db)):
             {
                 "segment_id": str(sp.segment_id),
                 "speaker_label": sp.speaker_label,
-                "speaker_person_id": (
-                    str(sp.speaker_person_id) if sp.speaker_person_id else None
-                ),
+                "speaker_person_id": (str(sp.speaker_person_id) if sp.speaker_person_id else None),
                 "speaker_person_name": _person_name(sp.speaker_person_id),
                 "start_ts": sp.start_ts,
                 "end_ts": sp.end_ts,
                 "match_method": sp.match_method,
                 "match_confidence": sp.match_confidence,
-                "audio_match_person_id": (
-                    str(sp.audio_match_person_id) if sp.audio_match_person_id else None
-                ),
+                "audio_match_person_id": (str(sp.audio_match_person_id) if sp.audio_match_person_id else None),
                 "audio_match_person_name": _person_name(sp.audio_match_person_id),
                 "audio_match_score": sp.audio_match_score,
-                "visual_match_person_id": (
-                    str(sp.visual_match_person_id) if sp.visual_match_person_id else None
-                ),
+                "visual_match_person_id": (str(sp.visual_match_person_id) if sp.visual_match_person_id else None),
                 "visual_match_person_name": _person_name(sp.visual_match_person_id),
                 "visual_match_score": sp.visual_match_score,
             }
@@ -389,9 +367,7 @@ def people_search(q: str = "", limit: int = 30, db: Session = Depends(get_db)):
         contains = f"%{q}%"
         # Prefix match on canonical_name beats substring beats alias hit.
         query = query.filter(
-            (Person.canonical_name.ilike(like))
-            | (Person.canonical_name.ilike(contains))
-            | (Person.aliases.any(q))
+            (Person.canonical_name.ilike(like)) | (Person.canonical_name.ilike(contains)) | (Person.aliases.any(q))
         )
     rows = query.order_by(Person.canonical_name).limit(limit).all()
     return {

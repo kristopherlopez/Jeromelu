@@ -7,10 +7,7 @@ from typing import Any
 
 import httpx
 
-
-SUPERCOACH_SETTINGS_URL = (
-    "https://www.supercoach.com.au/{season}/api/nrl/{mode}/v1/settings"
-)
+SUPERCOACH_SETTINGS_URL = "https://www.supercoach.com.au/{season}/api/nrl/{mode}/v1/settings"
 
 
 class SuperCoachSettingsFetchError(RuntimeError):
@@ -31,10 +28,8 @@ def fetch_supercoach_settings(
     r.raise_for_status()
     data = r.json()
     if not isinstance(data, dict):
-        raise SuperCoachSettingsFetchError(
-            f"Unexpected shape: {type(data).__name__}, expected dict"
-        )
+        raise SuperCoachSettingsFetchError(f"Unexpected shape: {type(data).__name__}, expected dict")
     return data
 
 
-__all__ = ["fetch_supercoach_settings", "SuperCoachSettingsFetchError"]
+__all__ = ["SuperCoachSettingsFetchError", "fetch_supercoach_settings"]

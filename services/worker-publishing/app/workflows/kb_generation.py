@@ -8,12 +8,12 @@ from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
     from app.activities.generate_kb import (
-        generate_player_summaries,
-        generate_round_briefs,
+        embed_kb_entries,
         generate_decisions_log,
         generate_player_opinions,
+        generate_player_summaries,
+        generate_round_briefs,
         generate_source_digests,
-        embed_kb_entries,
     )
 
 logger = logging.getLogger(__name__)

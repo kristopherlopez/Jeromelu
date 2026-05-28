@@ -17,7 +17,6 @@ import logging
 from typing import Any
 
 import httpx
-
 from jeromelu_shared.scraping.nrl import (
     clean_name,
     extract_all_stats,
@@ -48,10 +47,12 @@ def fetch_stats_raw(season: int, round: int, timeout: float = DEFAULT_TIMEOUT) -
     session, no DB. Returns the raw upstream rows (95 fields each).
     """
     rd_filter = "Totals" if round == 0 else f"{round:02d}"
-    filters = json.dumps({
-        "groupOp": "AND",
-        "rules": [{"field": "Rd", "op": "eq", "data": rd_filter}],
-    })
+    filters = json.dumps(
+        {
+            "groupOp": "AND",
+            "rules": [{"field": "Rd", "op": "eq", "data": rd_filter}],
+        }
+    )
 
     all_rows: list[dict[str, Any]] = []
     with httpx.Client(
@@ -67,9 +68,14 @@ def fetch_stats_raw(season: int, round: int, timeout: float = DEFAULT_TIMEOUT) -
             resp = client.get(
                 f"{BASE_URL}/stats.php",
                 params={
-                    "year": str(season), "grid_id": "list1", "_search": "true",
-                    "rows": PAGE_SIZE, "jqgrid_page": page,
-                    "sidx": "Name", "sord": "asc", "filters": filters,
+                    "year": str(season),
+                    "grid_id": "list1",
+                    "_search": "true",
+                    "rows": PAGE_SIZE,
+                    "jqgrid_page": page,
+                    "sidx": "Name",
+                    "sord": "asc",
+                    "filters": filters,
                 },
                 headers={
                     "X-Requested-With": "XMLHttpRequest",
@@ -133,21 +139,20 @@ def fetch_strict(season: int, round: int, timeout: float = DEFAULT_TIMEOUT) -> l
     """
     raw_rows = fetch_stats_raw(season=season, round=round, timeout=timeout)
     if not raw_rows:
-        raise SuperCoachStatsFetchError(
-            f"Empty response for season={season} round={round}"
-        )
+        raise SuperCoachStatsFetchError(f"Empty response for season={season} round={round}")
     extracted = extract_rows(raw_rows)
     if not extracted:
-        raise SuperCoachStatsFetchError(
-            f"Zero parseable rows after extraction (raw rows: {len(raw_rows)})"
-        )
+        raise SuperCoachStatsFetchError(f"Zero parseable rows after extraction (raw rows: {len(raw_rows)})")
     parsed = [SuperCoachPlayerStats.model_validate(p) for p in extracted]
     logger.info(
-        "supercoach-stats: season=%s round=%s — fetched %d raw rows, "
-        "extracted %d, strict-parsed %d",
-        season, round, len(raw_rows), len(extracted), len(parsed),
+        "supercoach-stats: season=%s round=%s — fetched %d raw rows, extracted %d, strict-parsed %d",
+        season,
+        round,
+        len(raw_rows),
+        len(extracted),
+        len(parsed),
     )
     return parsed
 
 
-__all__ = ["fetch_strict", "fetch_stats_raw", "extract_rows", "SuperCoachStatsFetchError"]
+__all__ = ["SuperCoachStatsFetchError", "extract_rows", "fetch_stats_raw", "fetch_strict"]

@@ -35,26 +35,38 @@ from dataclasses import dataclass
 from typing import Any
 
 from deepgram import DeepgramClient, DeepgramClientOptions, PrerecordedOptions
-from sqlalchemy.orm import Session
-
 from jeromelu_shared.config import settings
 from jeromelu_shared.db import Source, SourceChunk, SourceDocument, SourceSpeaker
 from jeromelu_shared.s3 import download_raw, presign_audio, upload_raw
+from sqlalchemy.orm import Session
 
 from .diarize import diarize as run_pyannote
 from .fusion import fuse_per_turn
 from .identify_voice import identify_pyannote_turns
 from .keyterms import build_keyterms
+
 # Aliased to underscore-prefixed names because two of the helpers
 # (`utterances`, `checksum`) would otherwise collide with the local
 # variable / SourceDocument keyword arg of the same name in transcribe().
 from .transcribe_helpers import (
     audio_duration as _audio_duration,
+)
+from .transcribe_helpers import (
     checksum as _checksum,
+)
+from .transcribe_helpers import (
     max_overlap_turn as _max_overlap_turn,
+)
+from .transcribe_helpers import (
     request_id as _request_id,
+)
+from .transcribe_helpers import (
     safe_embedding as _safe_embedding,
+)
+from .transcribe_helpers import (
     transcript_s3_key_from_audio as _transcript_s3_key_from_audio,
+)
+from .transcribe_helpers import (
     utterances as _utterances,
 )
 from .video_staging import VideoStagingError, staged_video
@@ -76,6 +88,7 @@ DIARIZATION_METHOD = "pyannote-3.1"
 # ---------------------------------------------------------------------------
 # Result + errors
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class TranscribeResult:
@@ -115,6 +128,7 @@ class MissingAudioError(TranscriptionError):
 # Helpers — Deepgram
 # ---------------------------------------------------------------------------
 
+
 def _call_deepgram(audio_url: str, keyterms: list[str]) -> dict[str, Any]:
     """Run a Deepgram prerecorded transcription on a presigned audio URL.
 
@@ -153,6 +167,7 @@ def _call_deepgram(audio_url: str, keyterms: list[str]) -> dict[str, Any]:
 # Public API
 # ---------------------------------------------------------------------------
 
+
 def transcribe(
     session: Session,
     source: Source,
@@ -178,15 +193,11 @@ def transcribe(
         - TranscriptionError raised
     """
     if not source.audio_s3_key:
-        raise MissingAudioError(
-            f"source {source.source_id} has no audio_s3_key — run Scout's "
-            "acquire_audio first"
-        )
+        raise MissingAudioError(f"source {source.source_id} has no audio_s3_key — run Scout's acquire_audio first")
 
     if source.documents and not force:
         raise TranscriptionError(
-            f"source {source.source_id} already has {len(source.documents)} "
-            "document(s); pass force=True to replace"
+            f"source {source.source_id} already has {len(source.documents)} document(s); pass force=True to replace"
         )
 
     transcript_key = _transcript_s3_key_from_audio(source.audio_s3_key)
@@ -206,9 +217,7 @@ def transcribe(
         pyannote_doc = json.loads(download_raw(pyannote_result.pyannote_s3_key))
         pyannote_turns = pyannote_doc.get("turns", [])
         if not pyannote_turns:
-            raise TranscriptionError(
-                "pyannote produced zero turns — refusing to write empty transcript"
-            )
+            raise TranscriptionError("pyannote produced zero turns — refusing to write empty transcript")
 
         # 3) Deepgram for words.
         keyterms = build_keyterms(session)
@@ -224,7 +233,8 @@ def transcribe(
         )
         logger.info(
             "Stored Deepgram JSON: s3://%s/%s",
-            settings.s3_raw_bucket, transcript_key,
+            settings.s3_raw_bucket,
+            transcript_key,
         )
 
         utterances = _utterances(deepgram_response)
@@ -275,8 +285,7 @@ def transcribe(
         session.flush()
         if embeddings_skipped:
             logger.warning(
-                "Dropped %d NaN/inf embeddings (pre-fix pyannote JSON) — "
-                "those turns have NULL embedding",
+                "Dropped %d NaN/inf embeddings (pre-fix pyannote JSON) — those turns have NULL embedding",
                 embeddings_skipped,
             )
 
@@ -287,7 +296,8 @@ def transcribe(
         if turns_voice_match:
             logger.info(
                 "Voice ID: matched %d / %d turns to voiceprints",
-                turns_voice_match, len(turn_rows),
+                turns_voice_match,
+                len(turn_rows),
             )
 
         # 4a-ter) Visual identification — face detection + matching over
@@ -312,9 +322,7 @@ def transcribe(
                 persistent_key=source.video_s3_key,
             ) as video_key:
                 if video_key is None:
-                    logger.info(
-                        "No video available — skipping visual ID, voice-only fusion"
-                    )
+                    logger.info("No video available — skipping visual ID, voice-only fusion")
                 else:
                     try:
                         visual_result = visual_identify(
@@ -336,7 +344,8 @@ def transcribe(
                         )
                     except VisualIdError as exc:
                         logger.warning(
-                            "Visual ID failed: %s — proceeding voice-only", exc,
+                            "Visual ID failed: %s — proceeding voice-only",
+                            exc,
                         )
                     except Exception as exc:
                         # Anything else from visual_identify (RemoteInferenceError
@@ -347,11 +356,13 @@ def transcribe(
                         # re-run separately once the endpoint is warm.
                         logger.warning(
                             "Visual ID raised %s: %s — proceeding voice-only",
-                            type(exc).__name__, exc,
+                            type(exc).__name__,
+                            exc,
                         )
         except VideoStagingError as exc:
             logger.warning(
-                "Video staging failed: %s — proceeding voice-only", exc,
+                "Video staging failed: %s — proceeding voice-only",
+                exc,
             )
 
         turns_visual_match = sum(1 for v in visual_per_turn if v is not None)
@@ -361,7 +372,7 @@ def transcribe(
         turns_identified = 0
         turns_fusion_voice_face = 0
         turns_fusion_disagreement = 0
-        for row, voice, visual in zip(turn_rows, voice_results, visual_per_turn):
+        for row, voice, visual in zip(turn_rows, voice_results, visual_per_turn, strict=False):
             v_pid = voice.person_id if voice else None
             v_score = float(voice.similarity) if voice else None
             f_pid = visual.person_id if visual else None
@@ -389,17 +400,16 @@ def transcribe(
                 turns_fusion_voice_face += 1
 
         logger.info(
-            "Fusion: %d identified (%d voice-only, %d face-only, %d voice+face), "
-            "%d disagreements",
+            "Fusion: %d identified (%d voice-only, %d face-only, %d voice+face), %d disagreements",
             turns_identified,
-            turns_identified - turns_fusion_voice_face - sum(
-                1 for r, v, viz in zip(turn_rows, voice_results, visual_per_turn)
+            turns_identified
+            - turns_fusion_voice_face
+            - sum(
+                1
+                for r, v, viz in zip(turn_rows, voice_results, visual_per_turn, strict=False)
                 if v is None and viz is not None
             ),
-            sum(
-                1 for v, viz in zip(voice_results, visual_per_turn)
-                if v is None and viz is not None
-            ),
+            sum(1 for v, viz in zip(voice_results, visual_per_turn, strict=False) if v is None and viz is not None),
             turns_fusion_voice_face,
             turns_fusion_disagreement,
         )
@@ -492,9 +502,7 @@ def transcribe(
             session.commit()
         except Exception:
             session.rollback()
-            logger.exception(
-                "Failed to mark transcription_status='failed'; manual cleanup required"
-            )
+            logger.exception("Failed to mark transcription_status='failed'; manual cleanup required")
         if isinstance(exc, TranscriptionError):
             raise
         raise TranscriptionError(str(exc)) from exc

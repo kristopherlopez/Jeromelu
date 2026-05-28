@@ -19,15 +19,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import func
-from sqlalchemy.orm import Session
-
 from jeromelu_shared.db import (
     SourceChunk,
     SourceDocument,
     SourceFaceDetection,
     SourceSpeaker,
 )
+from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from app.analyst.voice_clusters import fetch_full_turn_text
 
@@ -53,6 +52,7 @@ DISAGREEMENT_LIMIT = 50
 @dataclass(frozen=True)
 class DetectionRow:
     """Minimal face detection projection consumed by :func:`compute_alignment`."""
+
     detection_id: UUID
     frame_ts: float
     cluster_id: int | None
@@ -63,6 +63,7 @@ class DetectionRow:
 @dataclass(frozen=True)
 class TurnRow:
     """Minimal source_speakers projection consumed by :func:`compute_alignment`."""
+
     segment_id: UUID
     start_ts: float
     end_ts: float
@@ -87,6 +88,7 @@ class ChunkRow:
     so they're the right unit for "what was said when face X was on
     screen?"
     """
+
     chunk_id: UUID
     start_ts: float
     end_ts: float
@@ -169,27 +171,17 @@ def compute_alignment(
             label: str = turn.speaker_label  # type: ignore[assignment]
             key = (det.cluster_id, label)
             overlap_counts[key] = overlap_counts.get(key, 0) + 1
-            is_active = (
-                det.mouth_opening is not None
-                and det.mouth_opening >= MIN_ACTIVE_MOUTH_OPENING
-            )
+            is_active = det.mouth_opening is not None and det.mouth_opening >= MIN_ACTIVE_MOUTH_OPENING
             if is_active:
-                active_overlap_counts[key] = (
-                    active_overlap_counts.get(key, 0) + 1
-                )
+                active_overlap_counts[key] = active_overlap_counts.get(key, 0) + 1
             cluster_counts = per_turn_cluster_counts.setdefault(
-                turn.segment_id, {},
+                turn.segment_id,
+                {},
             )
-            cluster_counts[det.cluster_id] = (
-                cluster_counts.get(det.cluster_id, 0) + 1
-            )
-            per_turn_total_count[turn.segment_id] = (
-                per_turn_total_count.get(turn.segment_id, 0) + 1
-            )
+            cluster_counts[det.cluster_id] = cluster_counts.get(det.cluster_id, 0) + 1
+            per_turn_total_count[turn.segment_id] = per_turn_total_count.get(turn.segment_id, 0) + 1
             if is_active:
-                per_turn_active_count[turn.segment_id] = (
-                    per_turn_active_count.get(turn.segment_id, 0) + 1
-                )
+                per_turn_active_count[turn.segment_id] = per_turn_active_count.get(turn.segment_id, 0) + 1
             # A detection's frame_ts can only land in one turn (turns
             # don't overlap), so break early.
             break
@@ -232,7 +224,8 @@ def compute_alignment(
                 "dominant_share": s["dominant_share"],
             }
             for cid, s in sorted(
-                face_stats.items(), key=lambda kv: -kv[1]["detection_count"],
+                face_stats.items(),
+                key=lambda kv: -kv[1]["detection_count"],
             )
         ],
         "voice_clusters": [
@@ -244,7 +237,8 @@ def compute_alignment(
                 "dominant_share": s["dominant_share"],
             }
             for label, s in sorted(
-                voice_stats.items(), key=lambda kv: -kv[1]["total_seconds"],
+                voice_stats.items(),
+                key=lambda kv: -kv[1]["total_seconds"],
             )
         ],
         "alignment": alignment,
@@ -264,7 +258,8 @@ def _face_cluster_stats(detections: list[DetectionRow]) -> dict[int, dict]:
         if det.cluster_id is None:
             continue
         s = stats.setdefault(
-            det.cluster_id, {"detection_count": 0},
+            det.cluster_id,
+            {"detection_count": 0},
         )
         s["detection_count"] += 1
         if det.matched_person_id is not None:
@@ -291,15 +286,14 @@ def _voice_cluster_stats(speakers: list[TurnRow]) -> dict[str, dict]:
         if not turn.speaker_label:
             continue
         s = stats.setdefault(
-            turn.speaker_label, {"turn_count": 0, "total_seconds": 0.0},
+            turn.speaker_label,
+            {"turn_count": 0, "total_seconds": 0.0},
         )
         s["turn_count"] += 1
         s["total_seconds"] += turn.end_ts - turn.start_ts
         if turn.speaker_person_id is not None:
             pc = person_counts.setdefault(turn.speaker_label, {})
-            pc[turn.speaker_person_id] = (
-                pc.get(turn.speaker_person_id, 0) + 1
-            )
+            pc[turn.speaker_person_id] = pc.get(turn.speaker_person_id, 0) + 1
 
     for label, s in stats.items():
         pc = person_counts.get(label, {})
@@ -333,15 +327,17 @@ def _build_alignment_rows(
         voice_total = voice_stats[label]["total_seconds"] or 1.0
         face_share = count / face_total if face_total else 0.0
         voice_share = count / voice_total
-        rows.append({
-            "face_cluster_id": cid,
-            "speaker_label": label,
-            "overlap_count": count,
-            "active_overlap_count": active_overlap_counts.get((cid, label), 0),
-            "face_cluster_share": face_share,
-            "voice_cluster_share": voice_share,
-            "confidence": min(face_share, voice_share),
-        })
+        rows.append(
+            {
+                "face_cluster_id": cid,
+                "speaker_label": label,
+                "overlap_count": count,
+                "active_overlap_count": active_overlap_counts.get((cid, label), 0),
+                "face_cluster_share": face_share,
+                "voice_cluster_share": voice_share,
+                "confidence": min(face_share, voice_share),
+            }
+        )
     rows.sort(key=lambda r: -r["confidence"])
     return rows
 
@@ -356,19 +352,18 @@ def _greedy_dominant_pairings(alignment: list[dict]) -> list[dict]:
     claimed_voice: set[str] = set()
     out: list[dict] = []
     for row in alignment:
-        if (
-            row["face_cluster_id"] in claimed_face
-            or row["speaker_label"] in claimed_voice
-        ):
+        if row["face_cluster_id"] in claimed_face or row["speaker_label"] in claimed_voice:
             continue
         claimed_face.add(row["face_cluster_id"])
         claimed_voice.add(row["speaker_label"])
-        out.append({
-            "face_cluster_id": row["face_cluster_id"],
-            "speaker_label": row["speaker_label"],
-            "confidence": row["confidence"],
-            "overlap_count": row["overlap_count"],
-        })
+        out.append(
+            {
+                "face_cluster_id": row["face_cluster_id"],
+                "speaker_label": row["speaker_label"],
+                "confidence": row["confidence"],
+                "overlap_count": row["overlap_count"],
+            }
+        )
     return out
 
 
@@ -395,26 +390,30 @@ def _compute_disagreements(
         cluster_counts = per_turn_cluster_counts.get(turn.segment_id)
         if not cluster_counts:
             continue
-        dom_cluster, dom_count = max(
-            cluster_counts.items(), key=lambda kv: kv[1],
+        dom_cluster, _dom_count = max(
+            cluster_counts.items(),
+            key=lambda kv: kv[1],
         )
         face_dom = face_stats[dom_cluster].get("dominant_person_id")
         if not face_dom:
             continue
         if face_dom == str(turn.speaker_person_id):
             continue
-        out.append({
-            "segment_id": str(turn.segment_id),
-            "start_ts": float(turn.start_ts),
-            "end_ts": float(turn.end_ts),
-            "speaker_label": turn.speaker_label,
-            "speaker_person_id": str(turn.speaker_person_id),
-            "face_cluster_id": dom_cluster,
-            "face_person_id": face_dom,
-            "active_overlap_count": active_overlap_counts.get(
-                (dom_cluster, turn.speaker_label or ""), 0,
-            ),
-        })
+        out.append(
+            {
+                "segment_id": str(turn.segment_id),
+                "start_ts": float(turn.start_ts),
+                "end_ts": float(turn.end_ts),
+                "speaker_label": turn.speaker_label,
+                "speaker_person_id": str(turn.speaker_person_id),
+                "face_cluster_id": dom_cluster,
+                "face_person_id": face_dom,
+                "active_overlap_count": active_overlap_counts.get(
+                    (dom_cluster, turn.speaker_label or ""),
+                    0,
+                ),
+            }
+        )
     # Sort by turn duration desc — biggest mismatches first.
     out.sort(key=lambda r: -(r["end_ts"] - r["start_ts"]))
     return out[:DISAGREEMENT_LIMIT]
@@ -460,7 +459,8 @@ def _compute_timeline(
         face_dom: str | None = None
         if cluster_counts:
             face_cluster_id = max(
-                cluster_counts.items(), key=lambda kv: kv[1],
+                cluster_counts.items(),
+                key=lambda kv: kv[1],
             )[0]
             face_dom = face_stats.get(face_cluster_id, {}).get(
                 "dominant_person_id",
@@ -473,39 +473,27 @@ def _compute_timeline(
         else:
             agreement = "none"
 
-        out.append({
-            "segment_id": str(turn.segment_id),
-            "start_ts": float(turn.start_ts),
-            "end_ts": float(turn.end_ts),
-            "duration": float(turn.end_ts - turn.start_ts),
-
-            "speaker_label": turn.speaker_label,
-            "voice_cluster_person_id": voice_dom,
-
-            "face_cluster_id": face_cluster_id,
-            "face_cluster_person_id": face_dom,
-            "total_face_count": per_turn_total_count.get(turn.segment_id, 0),
-            "active_face_count": per_turn_active_count.get(turn.segment_id, 0),
-
-            "audio_match_person_id": (
-                str(turn.audio_match_person_id)
-                if turn.audio_match_person_id else None
-            ),
-            "visual_match_person_id": (
-                str(turn.visual_match_person_id)
-                if turn.visual_match_person_id else None
-            ),
-
-            "speaker_person_id": (
-                str(turn.speaker_person_id)
-                if turn.speaker_person_id else None
-            ),
-            "match_method": turn.match_method,
-            "match_confidence": turn.match_confidence,
-
-            "agreement": agreement,
-            "preview_text": preview_by_segment.get(turn.segment_id, ""),
-        })
+        out.append(
+            {
+                "segment_id": str(turn.segment_id),
+                "start_ts": float(turn.start_ts),
+                "end_ts": float(turn.end_ts),
+                "duration": float(turn.end_ts - turn.start_ts),
+                "speaker_label": turn.speaker_label,
+                "voice_cluster_person_id": voice_dom,
+                "face_cluster_id": face_cluster_id,
+                "face_cluster_person_id": face_dom,
+                "total_face_count": per_turn_total_count.get(turn.segment_id, 0),
+                "active_face_count": per_turn_active_count.get(turn.segment_id, 0),
+                "audio_match_person_id": (str(turn.audio_match_person_id) if turn.audio_match_person_id else None),
+                "visual_match_person_id": (str(turn.visual_match_person_id) if turn.visual_match_person_id else None),
+                "speaker_person_id": (str(turn.speaker_person_id) if turn.speaker_person_id else None),
+                "match_method": turn.match_method,
+                "match_confidence": turn.match_confidence,
+                "agreement": agreement,
+                "preview_text": preview_by_segment.get(turn.segment_id, ""),
+            }
+        )
     return out
 
 
@@ -553,10 +541,7 @@ def _compute_face_transcript(
         if det.cluster_id is None:
             continue
         # Advance chunk_idx to the first chunk whose end_ts >= frame_ts.
-        while (
-            chunk_idx < len(sorted_chunks)
-            and sorted_chunks[chunk_idx].end_ts < det.frame_ts
-        ):
+        while chunk_idx < len(sorted_chunks) and sorted_chunks[chunk_idx].end_ts < det.frame_ts:
             chunk_idx += 1
         if chunk_idx >= len(sorted_chunks):
             break
@@ -586,16 +571,26 @@ def _compute_face_transcript(
     for chunk in sorted_chunks:
         cluster = chunk_dominant_cluster[chunk.chunk_id]
         if cluster != cur_cluster and cur:
-            face_runs.append(_face_run_from_chunks(
-                cur, cur_cluster, speakers, face_stats,
-            ))
+            face_runs.append(
+                _face_run_from_chunks(
+                    cur,
+                    cur_cluster,
+                    speakers,
+                    face_stats,
+                )
+            )
             cur = []
         cur.append(chunk)
         cur_cluster = cluster
     if cur:
-        face_runs.append(_face_run_from_chunks(
-            cur, cur_cluster, speakers, face_stats,
-        ))
+        face_runs.append(
+            _face_run_from_chunks(
+                cur,
+                cur_cluster,
+                speakers,
+                face_stats,
+            )
+        )
 
     # Conflation: for each pyannote turn, walk the chunks whose
     # MIDPOINT falls inside the turn's window and collect their
@@ -615,10 +610,7 @@ def _compute_face_transcript(
         if cluster is None:
             continue
         midpoint = (chunk.start_ts + chunk.end_ts) / 2.0
-        while (
-            speaker_idx < len(sorted_speakers)
-            and sorted_speakers[speaker_idx].end_ts < midpoint
-        ):
+        while speaker_idx < len(sorted_speakers) and sorted_speakers[speaker_idx].end_ts < midpoint:
             speaker_idx += 1
         for i in range(speaker_idx, len(sorted_speakers)):
             turn = sorted_speakers[i]
@@ -627,11 +619,7 @@ def _compute_face_transcript(
             if turn.start_ts <= midpoint <= turn.end_ts:
                 turn_clusters.setdefault(turn.segment_id, set()).add(cluster)
                 break  # midpoint can only be in one turn
-    conflated = [
-        str(tid)
-        for tid, clusters in turn_clusters.items()
-        if len(clusters) > 1
-    ]
+    conflated = [str(tid) for tid, clusters in turn_clusters.items() if len(clusters) > 1]
 
     return {
         "face_runs": face_runs,
@@ -659,11 +647,7 @@ def _face_run_from_chunks(
 
     # Pyannote turn ids this run overlaps in time. Touching boundaries
     # count, same as bucket_chunks_to_spans semantics.
-    overlapping_turns = [
-        str(t.segment_id)
-        for t in speakers
-        if t.end_ts >= start_ts and t.start_ts <= end_ts
-    ]
+    overlapping_turns = [str(t.segment_id) for t in speakers if t.end_ts >= start_ts and t.start_ts <= end_ts]
 
     return {
         "face_cluster_id": cluster_id,
@@ -683,11 +667,7 @@ def fetch_alignment(session: Session, source_id: UUID) -> dict:
     empty lists when either side has no data yet (no detections
     backfilled, or transcription hasn't run).
     """
-    doc = (
-        session.query(SourceDocument)
-        .filter(SourceDocument.source_id == source_id)
-        .first()
-    )
+    doc = session.query(SourceDocument).filter(SourceDocument.source_id == source_id).first()
     if not doc:
         return {
             "face_clusters": [],
@@ -716,9 +696,7 @@ def fetch_alignment(session: Session, source_id: UUID) -> dict:
             detection_id=r.detection_id,
             frame_ts=float(r.frame_ts),
             cluster_id=r.cluster_id,
-            mouth_opening=(
-                float(r.mouth_opening) if r.mouth_opening is not None else None
-            ),
+            mouth_opening=(float(r.mouth_opening) if r.mouth_opening is not None else None),
             matched_person_id=r.matched_person_id,
         )
         for r in det_rows
@@ -729,7 +707,8 @@ def fetch_alignment(session: Session, source_id: UUID) -> dict:
     # takes precedence over pyannote's raw SPEAKER_NN — matches the
     # Voices tab and AssignVoice flow.
     effective_label = func.coalesce(
-        SourceSpeaker.cluster_label, SourceSpeaker.speaker_label,
+        SourceSpeaker.cluster_label,
+        SourceSpeaker.speaker_label,
     ).label("speaker_label")
     speaker_rows = (
         session.query(
@@ -756,10 +735,7 @@ def fetch_alignment(session: Session, source_id: UUID) -> dict:
             match_method=r.match_method,
             audio_match_person_id=r.audio_match_person_id,
             visual_match_person_id=r.visual_match_person_id,
-            match_confidence=(
-                float(r.match_confidence)
-                if r.match_confidence is not None else None
-            ),
+            match_confidence=(float(r.match_confidence) if r.match_confidence is not None else None),
         )
         for r in speaker_rows
     ]
@@ -795,5 +771,8 @@ def fetch_alignment(session: Session, source_id: UUID) -> dict:
     ]
 
     return compute_alignment(
-        detections, speakers, preview_by_segment, chunks=chunks,
+        detections,
+        speakers,
+        preview_by_segment,
+        chunks=chunks,
     )

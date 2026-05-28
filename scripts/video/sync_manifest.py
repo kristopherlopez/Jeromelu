@@ -26,29 +26,33 @@ MANIFEST_PATH = AVATAR_DIR / "manifest.json"
 # Order matters — first match wins.
 CATEGORY_RULES = {
     # Idle
-    "idle":        ("idle", "neutral", True, 0),
-    "breathing":   ("idle", "neutral", True, 0),
+    "idle": ("idle", "neutral", True, 0),
+    "breathing": ("idle", "neutral", True, 0),
     # Reactions
-    "greeting":    ("reaction", "greeting", False, 10),
-    "watching":    ("reaction", "watching", False, 10),
-    "confident":   ("reaction", "confident", False, 10),
-    "annoyed":     ("reaction", "annoyed", False, 10),
+    "greeting": ("reaction", "greeting", False, 10),
+    "watching": ("reaction", "watching", False, 10),
+    "confident": ("reaction", "confident", False, 10),
+    "annoyed": ("reaction", "annoyed", False, 10),
     "celebrating": ("reaction", "celebrating", False, 10),
-    "impatient":   ("reaction", "impatient", False, 10),
-    "engaged":     ("reaction", "engaged", False, 10),
+    "impatient": ("reaction", "impatient", False, 10),
+    "engaged": ("reaction", "engaged", False, 10),
     # Directional
-    "glance":      ("directional", None, False, 5),  # mood from full stem
+    "glance": ("directional", None, False, 5),  # mood from full stem
     # Micro
-    "micro":       ("micro", None, False, 0),         # mood from full stem
+    "micro": ("micro", None, False, 0),  # mood from full stem
 }
 
 
 def get_duration_ms(clip_path: Path) -> int:
     """Get clip duration in milliseconds using ffprobe."""
     cmd = [
-        "ffprobe", "-v", "quiet",
-        "-show_entries", "format=duration",
-        "-of", "csv=p=0",
+        "ffprobe",
+        "-v",
+        "quiet",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "csv=p=0",
         str(clip_path),
     ]
     try:
@@ -123,9 +127,11 @@ def main():
     print(f"Found {len(new_clips)} new clip(s):\n")
     for clip in new_clips:
         print(f"  {clip['file']}")
-        print(f"    id={clip['id']}  category={clip['category']}  "
-              f"mood={clip['mood']}  duration={clip['duration_ms']}ms  "
-              f"loop={clip['loop']}  priority={clip['priority']}")
+        print(
+            f"    id={clip['id']}  category={clip['category']}  "
+            f"mood={clip['mood']}  duration={clip['duration_ms']}ms  "
+            f"loop={clip['loop']}  priority={clip['priority']}"
+        )
         print()
 
     if write_mode:

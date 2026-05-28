@@ -23,9 +23,8 @@ import json
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
-
 from app.scout.nrlcom_ladder.models import NrlcomLadder
+from pydantic import ValidationError
 
 
 @pytest.fixture(scope="module")

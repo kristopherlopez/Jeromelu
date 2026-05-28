@@ -1,10 +1,6 @@
 """Squad roster and trade history endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
-from sqlalchemy import desc, func
-from sqlalchemy.orm import Session
-
+from fastapi import APIRouter, Depends, Query
 from jeromelu_shared.db import (
     Claim,
     ClaimAssociation,
@@ -13,6 +9,10 @@ from jeromelu_shared.db import (
     SquadSlot,
     SquadTrade,
 )
+from pydantic import BaseModel
+from sqlalchemy import desc, func
+from sqlalchemy.orm import Session
+
 from ..deps import get_db
 
 router = APIRouter()
@@ -106,11 +106,7 @@ def get_squad(
         }
 
     # Determine current round from latest claim data
-    current_round = (
-        db.query(func.max(Claim.effective_round))
-        .filter(Claim.season == season)
-        .scalar()
-    ) or 0
+    current_round = (db.query(func.max(Claim.effective_round)).filter(Claim.season == season).scalar()) or 0
 
     # Build roster
     roster = []
@@ -118,9 +114,7 @@ def get_squad(
 
     for slot in slots:
         player = _player_info(slot, db)
-        consensus = _player_consensus(
-            slot.player_entity_id, current_round, season, db
-        )
+        consensus = _player_consensus(slot.player_entity_id, current_round, season, db)
 
         entry = {
             "slot_index": slot.slot_index,
@@ -146,11 +140,7 @@ def get_squad(
 
     # Recent trades (last 5)
     trades = (
-        db.query(SquadTrade)
-        .filter(SquadTrade.season == season)
-        .order_by(desc(SquadTrade.created_at))
-        .limit(5)
-        .all()
+        db.query(SquadTrade).filter(SquadTrade.season == season).order_by(desc(SquadTrade.created_at)).limit(5).all()
     )
 
     recent_trades = [
@@ -222,6 +212,7 @@ def squad_history(
 
 # --- Admin endpoints for manual squad management ---
 
+
 class SlotInput(BaseModel):
     slot_index: int
     position: str
@@ -246,7 +237,8 @@ def set_squad(req: SetSquadRequest, db: Session = Depends(get_db)):
 
     # Deactivate current squad
     db.query(SquadSlot).filter(
-        SquadSlot.active == True, SquadSlot.season == req.season  # noqa: E712
+        SquadSlot.active,
+        SquadSlot.season == req.season,
     ).update({"active": False})
 
     # Insert new slots

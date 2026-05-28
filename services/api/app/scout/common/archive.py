@@ -93,15 +93,18 @@ def archive_response(
     except Exception:
         logger.exception(
             "scout.common.archive: put_object failed bucket=%s key=%s",
-            bucket, key,
+            bucket,
+            key,
         )
         return None
 
     logger.info(
         "scout.common.archive: wrote %d bytes to s3://%s/%s",
-        len(body), bucket, key,
+        len(body),
+        bucket,
+        key,
     )
     return key
 
 
-__all__ = ["archive_response", "build_key", "SCOUT_S3_PREFIX"]
+__all__ = ["SCOUT_S3_PREFIX", "archive_response", "build_key"]

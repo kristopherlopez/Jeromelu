@@ -6,7 +6,6 @@ from typing import Any
 
 import httpx
 
-
 LADDER_URL = "https://www.nrl.com/ladder/data"
 
 
@@ -35,9 +34,9 @@ def fetch_ladder(
     data = r.json()
     if not isinstance(data, dict) or "positions" not in data:
         raise NrlcomLadderFetchError(
-            f"Unexpected response: missing 'positions' (keys: {list(data) if isinstance(data, dict) else type(data).__name__})"
+            f"Unexpected response: missing 'positions' (keys: {list(data) if isinstance(data, dict) else type(data).__name__})"  # noqa: E501
         )
     return data
 
 
-__all__ = ["fetch_ladder", "NrlcomLadderFetchError"]
+__all__ = ["NrlcomLadderFetchError", "fetch_ladder"]

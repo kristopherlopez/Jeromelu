@@ -1,9 +1,8 @@
 from pathlib import Path
 
 import pytest
-from botocore.exceptions import ClientError
-
 from app.scout.media import s3 as media_s3
+from botocore.exceptions import ClientError
 
 
 def _client_error(code: str, status: int) -> ClientError:

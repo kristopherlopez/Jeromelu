@@ -24,11 +24,13 @@ def _discover_via_rss(channel_id: str) -> list[dict] | None:
         video_id = entry.get("yt_videoid", "")
         if not video_id:
             continue
-        videos.append({
-            "video_id": video_id,
-            "title": entry.get("title", ""),
-            "published_at": entry.get("published", ""),
-        })
+        videos.append(
+            {
+                "video_id": video_id,
+                "title": entry.get("title", ""),
+                "published_at": entry.get("published", ""),
+            }
+        )
 
     return videos
 
@@ -39,8 +41,10 @@ def _discover_via_ytdlp(channel_id: str, max_results: int) -> list[dict]:
     result = subprocess.run(
         [
             "yt-dlp",
-            "--print", "%(id)s\t%(title)s\t%(upload_date)s",
-            "--playlist-items", f"1:{max_results}",
+            "--print",
+            "%(id)s\t%(title)s\t%(upload_date)s",
+            "--playlist-items",
+            f"1:{max_results}",
             "--skip-download",
             channel_url,
         ],
@@ -66,11 +70,13 @@ def _discover_via_ytdlp(channel_id: str, max_results: int) -> list[dict]:
         if upload_date and upload_date != "NA" and len(upload_date) == 8:
             published_at = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:8]}T00:00:00Z"
 
-        videos.append({
-            "video_id": video_id,
-            "title": title,
-            "published_at": published_at,
-        })
+        videos.append(
+            {
+                "video_id": video_id,
+                "title": title,
+                "published_at": published_at,
+            }
+        )
 
     return videos
 

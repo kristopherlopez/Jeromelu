@@ -1,9 +1,8 @@
 import asyncio
 import logging
 
+from jeromelu_shared.temporal import EXTRACTION_QUEUE, get_temporal_client
 from temporalio.worker import Worker
-
-from jeromelu_shared.temporal import get_temporal_client, EXTRACTION_QUEUE
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
