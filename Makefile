@@ -1,4 +1,4 @@
-.PHONY: up down db-shell migrate migrate-status seed-teams seed-venues fetch-players seed-players api web logs clean collect-audio collect-video transcribe extract-transcript diarize diarize-compare voice-cluster enroll-voice enroll-face scout-presenters lineup-build lineup-deploy lineup-status lineup-delete test test-eval prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all prod-refresh-videos prod-refresh-channel-stats prod-channel-coverage prod-seed-teams prod-seed-players prod-refresh-players prod-fetch-and-refresh-players prod-refresh-players-nrlcom deploy-prod prod-shell prod-logs
+.PHONY: up down db-shell migrate migrate-status seed-teams seed-venues fetch-players seed-players api web logs clean collect-audio collect-video transcribe extract-transcript diarize diarize-compare voice-cluster enroll-voice enroll-face scout-presenters lineup-build lineup-deploy lineup-status lineup-delete test test-eval typecheck-python prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all prod-refresh-videos prod-refresh-channel-stats prod-channel-coverage prod-seed-teams prod-seed-players prod-refresh-players prod-fetch-and-refresh-players prod-refresh-players-nrlcom deploy-prod prod-shell prod-logs
 
 # Start local infrastructure
 up:
@@ -206,6 +206,17 @@ test:
 # and DATABASE_URL — costs $$ per run, slower, non-deterministic.
 test-eval:
 	. services/api/.venv/Scripts/activate && python -m pytest tests/evals
+
+# Python typecheck via Pyright. Scope is pinned in pyproject.toml
+# [tool.pyright] block (narrow to packages/shared/jeromelu_shared/). Hard-
+# fail in CI via .github/workflows/tests.yml. Install via requirements-dev.txt.
+#
+# NOTE: the umbrella `lint` target (which the plan describes as chaining
+# lint-python + lint-web + typecheck-python) is intentionally absent until
+# TASK-47 (Ruff plumbing) unblocks and adds lint-python. At that point,
+# add `lint:` here that chains all three.
+typecheck-python:
+	pyright
 
 # --- Production ---
 

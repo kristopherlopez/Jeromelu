@@ -1,0 +1,18 @@
+# Root tooling config for the Jaromelu monorepo.
+#
+# Pyright: Python typechecker. Hard-fail in CI via
+# .github/workflows/tests.yml (job: pyright). Scope is narrow to
+# packages/shared/jeromelu_shared/ — widening is a follow-up plan.
+# Local entry point:
+#   make typecheck-python
+#
+# [tool.ruff] block is queued — see TASK-47 (currently BLOCKED on
+# rule-set tuning; will land here once unblocked).
+
+[tool.pyright]
+include = ["packages/shared/jeromelu_shared"]
+exclude = ["**/.venv", "**/node_modules", "**/__pycache__"]
+pythonVersion = "3.12"
+typeCheckingMode = "standard"
+reportMissingImports = "error"
+reportGeneralTypeIssues = "error"

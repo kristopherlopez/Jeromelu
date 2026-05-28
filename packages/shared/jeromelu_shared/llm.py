@@ -49,6 +49,8 @@ def chat_json(system_prompt: str, user_prompt: str, model: str | None = None) ->
         temperature=0.2,
     )
     text = response.choices[0].message.content
+    if text is None:
+        raise RuntimeError("LLM returned no content for chat_json")
     return json.loads(text)
 
 
@@ -64,7 +66,10 @@ def chat_text(system_prompt: str, user_prompt: str, model: str | None = None, te
         ],
         temperature=temperature,
     )
-    return response.choices[0].message.content
+    text = response.choices[0].message.content
+    if text is None:
+        raise RuntimeError("LLM returned no content for chat_text")
+    return text
 
 
 def get_embeddings(texts: list[str], model: str = "text-embedding-3-small") -> list[list[float]]:

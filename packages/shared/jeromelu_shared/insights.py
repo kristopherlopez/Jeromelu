@@ -80,6 +80,12 @@ def get_current_round(db: Session, season: int) -> int:
     ) or 0
 
 
+# NOTE: query_round_claims / query_claim_consensus reference Claim.subject_entity_id
+# which no longer exists on the model — entity links moved to ClaimAssociation in
+# migration 036. These functions are dormant (only called by scripts/insights/
+# generate_round_tips.py) and need rewriting to JOIN through ClaimAssociation.
+# Tracked as TASK-53. The five pyright: ignore markers below are scoped to the
+# attribute-access errors that the live Claim model raises.
 def query_round_claims(
     db: Session,
     round_num: int,
@@ -93,7 +99,7 @@ def query_round_claims(
     q = db.query(Claim).filter(
         Claim.effective_round == round_num,
         Claim.season == season,
-        Claim.subject_entity_id.isnot(None),
+        Claim.subject_entity_id.isnot(None),  # pyright: ignore[reportAttributeAccessIssue]  # Claim.subject_entity_id removed in migration 036 → TASK-53
     )
     if claim_types:
         q = q.filter(Claim.claim_type.in_(claim_types))
@@ -102,7 +108,7 @@ def query_round_claims(
 
     grouped: dict[str, list[dict]] = {}
     for c in claims:
-        eid = str(c.subject_entity_id)
+        eid = str(c.subject_entity_id)  # pyright: ignore[reportAttributeAccessIssue]  # Claim.subject_entity_id removed in migration 036 → TASK-53
         grouped.setdefault(eid, []).append({
             "claim_id": str(c.claim_id),
             "claim_type": c.claim_type,
@@ -126,16 +132,16 @@ def query_claim_consensus(
     """
     rows = (
         db.query(
-            Claim.subject_entity_id,
+            Claim.subject_entity_id,  # pyright: ignore[reportAttributeAccessIssue]  # Claim.subject_entity_id removed in migration 036 → TASK-53
             Claim.claim_type,
             func.count().label("cnt"),
         )
         .filter(
             Claim.effective_round == round_num,
             Claim.season == season,
-            Claim.subject_entity_id.isnot(None),
+            Claim.subject_entity_id.isnot(None),  # pyright: ignore[reportAttributeAccessIssue]  # Claim.subject_entity_id removed in migration 036 → TASK-53
         )
-        .group_by(Claim.subject_entity_id, Claim.claim_type)
+        .group_by(Claim.subject_entity_id, Claim.claim_type)  # pyright: ignore[reportAttributeAccessIssue]  # Claim.subject_entity_id removed in migration 036 → TASK-53
         .all()
     )
 

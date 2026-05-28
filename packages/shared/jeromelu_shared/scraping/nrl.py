@@ -8,6 +8,7 @@ under ``services/api/app/scout/``.
 
 import hashlib
 import re
+from collections.abc import Callable
 
 # Map every known 3-letter team code to its canonical name.
 TEAM_CODE_MAP = {
@@ -48,7 +49,7 @@ def normalize_name(name: str) -> str:
     return name
 
 
-def parse_int(value) -> int:
+def parse_int(value: object) -> int:
     if isinstance(value, (int, float)):
         return int(value)
     try:
@@ -57,7 +58,7 @@ def parse_int(value) -> int:
         return 0
 
 
-def parse_float(value) -> float:
+def parse_float(value: object) -> float:
     if isinstance(value, (int, float)):
         return float(value)
     try:
@@ -68,7 +69,9 @@ def parse_float(value) -> float:
 
 # jqGrid key → (db_column, parser). Single source of truth for stat extraction.
 # Values are SC points, not raw stat counts (e.g. TR=34 = 2 tries × 17pts).
-JQGRID_COLUMN_MAP: dict[str, tuple[str, callable]] = {
+# Parser is one of parse_int / parse_float / str — each accepts object and
+# returns an int / float / str, hence the broad return-type union.
+JQGRID_COLUMN_MAP: dict[str, tuple[str, Callable[[object], int | float | str]]] = {
     # SC Breakdown
     "Base": ("base", parse_int),
     "Attack": ("attack", parse_int),

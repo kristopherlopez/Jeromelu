@@ -71,3 +71,31 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
         working-directory: services/web
+
+  pyright:
+    # Python typecheck. Hard-fail. Scope is narrow to
+    # packages/shared/jeromelu_shared/ per pyproject.toml [tool.pyright].
+    # The pip package bundles a node runtime via nodeenv on first call —
+    # that's expected. requirements-test.txt is installed alongside so
+    # transitive types (sqlalchemy, pydantic, openai, boto3) resolve.
+    name: pyright (packages/shared/jeromelu_shared)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements-test.txt
+            requirements-dev.txt
+      - name: Install deps
+        run: pip install -r requirements-test.txt -r requirements-dev.txt
+      - name: Pin pyright version
+        # requirements-dev.txt allows >=1.1.380,<2 so dev environments
+        # auto-pick up newer pyright releases. CI pins the exact version
+        # so a sudden pyright release doesn't flip the build red on a
+        # regression-of-the-day.
+        run: pip install pyright==1.1.409
+      - name: Pyright
+        run: pyright
