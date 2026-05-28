@@ -1,6 +1,6 @@
 # Engineering quality hardening — Tier 1
 
-**Date:** 2026-05-28 · **Status:** 🟡 In flight (3/6 tasks shipped — TASK-48 [BLOCKED]; TASK-51 + TASK-52 not yet picked up) · **Plan:** [Engineering quality hardening — Tier 1](../PLAN.md#2026-05-28-engineering-quality-hardening--tier-1-ruff--pyright--eslint--gitleaks--deploy-gating)
+**Date:** 2026-05-28 · **Status:** 🟡 In flight (4/6 tasks shipped — TASK-51 + TASK-52 not yet picked up) · **Plan:** [Engineering quality hardening — Tier 1](../PLAN.md#2026-05-28-engineering-quality-hardening--tier-1-ruff--pyright--eslint--gitleaks--deploy-gating)
 
 **TL;DR** — Tier 1 of `docs/operations/engineering-quality-hardening.md` (items 1–6) lands hard-fail CI gates for Python lint (Ruff), Python typecheck (Pyright, narrow), web lint (ESLint), secrets (Gitleaks), and deploys are gated on Tests success. Tier 1 hardening surfaced an unanticipated reality: TASK-47 (Ruff) and TASK-48 (ESLint) both have far more existing violations than the plan's pre-audit anticipated — 875 / 174 files for Ruff, 50 files for ESLint. Both BLOCKED with detailed remediation menus pending the human's rule-set decisions. TASK-49 (Pyright, narrow) shipped clean: 8 errors / 3 files in scope, all addressed (3 real type fixes; 5 suppressions queued as TASK-53 for the underlying schema-drift bug).
 
@@ -105,6 +105,36 @@ Unblocked 2026-05-28 by human picking Option 1 from the BLOCKED note's remediati
 
 ---
 
+### TASK-48 — ESLint CI job + `lint-web` Make target (Option 1 rule downgrades) (`e65544f`)
+
+Unblocked 2026-05-28 by human picking Option 1 from the BLOCKED note. Initial baseline (`npm run lint` on master HEAD before Option 1) was 58 problems (34 errors, 24 warnings) across 50 files. Option 1 downgraded React 19's stricter advisory rules to `warn` and hand-fixed the 13 `react/no-unescaped-entities` errors.
+
+**Files:**
+- `services/web/eslint.config.mjs` — override object added after the `...nextVitals, ...nextTs` spreads (later objects win in flat-config). Sets `react-hooks/set-state-in-effect`, `react-hooks/refs`, `react-hooks/immutability`, `react-hooks/incompatible-library` to `"warn"`. Inline rationale documents the React 19 incremental-migration premise.
+- `services/web/src/app/components/AlignmentPanel.tsx` — 9 entity replacements: 2× `"` → `&quot;` (line 225), 7× `'` → `&apos;` (lines 228, 433, 434, 435, 706, 1097, 1098). Semantic preserved (entities render as same characters).
+- `services/web/src/app/components/AssignRunModal.tsx` — 1 `'` → `&apos;` (line 332).
+- `services/web/src/app/components/AssignVoiceModal.tsx` — 1 `'` → `&apos;` (line 292).
+- `services/web/src/app/components/VoicesPanel.tsx` — 2 `'` → `&apos;` (lines 259, 434).
+- `.github/workflows/tests.yml` — new `web-lint` job placed between `web-typecheck` and `ruff`. Standard shape (`actions/checkout@v6`, `actions/setup-node@v6 node-version: "20"`, npm cache, `npm ci`, `npm run lint`). Inline comment documents the downgraded-rules context.
+- `Makefile` — new `lint-web` target (`cd services/web && npm run lint`); umbrella `lint:` target now chains `lint-python + lint-web + typecheck-python`. `.PHONY` updated.
+
+**Proof:**
+- `make lint-web` → `0 errors, 45 warnings`, exit 0. Warnings: 4 downgraded react-hooks rules (22) + `@next/next/no-img-element` (13) + `@typescript-eslint/no-unused-vars` (8) + `react-hooks/exhaustive-deps` (2).
+- `make lint-python` → `All checks passed!` (TASK-47 stays clean).
+- `pytest tests/unit/` → **398 passed** (no regression).
+
+**adversarial-reviewer: PASS WITH CONCERNS.** No Blockers. 3 Concerns:
+- **C1 (captured below as D1):** The BLOCKED note's `--max-warnings=0` bullet is internally contradictory. Shipped without the flag per the "hard-fail on error-severity" interpretation.
+- **C2 (applied):** Session-scoped staging — `CLAUDE.md`, `scripts/data/populate/phase_aux.py`, `tests/unit/scripts/data/populate/test_phase_aux.py` left unstaged per other-session ownership.
+- **C3 (post-checkoff, per TASK-49/50 precedent):** End-to-end CI verification (push deliberate-error → red, revert → green) is deferred to the post-merge operator window. The gate's mechanism is verified by local-side `npm run lint` exit codes; the CI-side proof is captured when an actual broken PR surfaces (or as part of TASK-51's deploy-gate dry run, which already requires the same observability).
+
+**Deviations from plan:**
+- **D1.** Spec said "Add CI with `--max-warnings=0`". Landed without the flag because the spec's adjacent "warnings become informational" wording and the umbrella "hard-fail on error-severity" property contradict it. The only coherent reading was: hard-fail on errors, warnings show but don't fail. `npm run lint`'s default behavior matches that — no flag needed.
+- **D2.** Initial baseline (audit) showed 34 errors / 24 warnings / 50 files. Post-downgrade-only state was 13 errors / 45 warnings / 50 files. Post-fix state is 0 errors / 45 warnings / 50 files (45 warnings instead of the spec's predicted ~24 because the rule downgrades convert errors into warnings rather than silencing them).
+- **D3.** `&apos;` chosen over `&#39;` as the entity replacement (both render identically; `&apos;` is more readable in source).
+
+---
+
 **Deviations from plan:**
 - **D1.** Umbrella `lint:` Makefile target deferred. Spec said "Update the umbrella `lint` target (added in TASK-47) to also `$(MAKE) typecheck-python`." TASK-47 is BLOCKED so the target doesn't exist; only `typecheck-python` ships. NOTE block left in Makefile so the future TASK-47 unblocker wires it up.
 - **D2.** `# pyright: ignore` markers used for real schema-drift bug rather than the spec's example case ("missing type stub"). Per implementer charter "don't fix tangential bugs," the proper fix (rewriting the queries to JOIN through `ClaimAssociation`) was deferred to a new TASK-53 rather than absorbed into Pyright plumbing scope. Each marker carries an inline rationale pointing at TASK-53.
@@ -112,16 +142,6 @@ Unblocked 2026-05-28 by human picking Option 1 from the BLOCKED note's remediati
 
 **New task queued from this work:**
 - **TASK-53** — Fix `insights.py` dormant queries. The 5 references to non-existent `Claim.subject_entity_id` are real bugs in dormant code (`scripts/insights/generate_round_tips.py` would crash at runtime). Full rewrite to JOIN through `ClaimAssociation` is required, with new unit-test coverage. Currently the bug is suppressed with `# pyright: ignore` so CI stays green; TASK-53 removes the suppressions as part of the fix.
-
----
-
-## Currently BLOCKED
-
-### TASK-48 — ESLint CI job [BLOCKED: eslint-violation-volume — 50 files, 34 errors + 24 warnings]
-
-`npm run lint` has never run in CI; `eslint-config-next/core-web-vitals` ships with stricter `react-hooks/*` rules (React 19's compiler-driven advisory rules) than the codebase was written against. 12 `react-hooks/refs`, 6 `react-hooks/set-state-in-effect`, 3 `react-hooks/immutability` errors need an incremental migration, not a hard gate from day 1. 13 `react/no-unescaped-entities` errors are mechanically fixable (30-min job).
-
-Spec's `>20 files` threshold tripped → BLOCKED. Recommended: option 1 — downgrade the `react-hooks/*` advisory rules to `warn`, fix the 13 `react/no-unescaped-entities` errors manually, ship CI with `--max-warnings=0`. ~1h work after human ratifies.
 
 ---
 
@@ -152,6 +172,7 @@ Spec's `>20 files` threshold tripped → BLOCKED. Recommended: option 1 — down
 
 ## Commits
 
+- `e65544f` — feat(quality): TASK-48 — ESLint CI job + lint-web Make target (Option 1 rule downgrades) [skip-simplify]
 - `6e9c227` — feat(quality): TASK-47 — Ruff plumbing (Option 1 rule-set tuning) [skip-simplify]
 - `1c2aa20` — feat(quality): TASK-50 — Gitleaks plumbing + secret-hygiene META invariant [skip-simplify]
 - `0bccec8` — feat(quality): TASK-49 — Pyright plumbing (narrow scope: packages/shared/jeromelu_shared) [skip-simplify]
