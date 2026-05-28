@@ -25,45 +25,6 @@ Prefix the title with optional tags in square brackets:
 
 ## Open tasks
 
-### TASK-41: Operator backfill — `nrlcom-draw` 1908–2026 (on prod box via loopback)
-
-**What.** Per [PLAN.md "Scout Phase 5"](./PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance) Tasks list. **Operator task** — runs the hardened backfill driver against prod from the prod box via the Phase 4.5 loopback procedure.
-
-Procedure (run on the Lightsail box, per the `docker cp scripts → /runtmp/scripts` precedent — note the trailing-slash gotcha lesson from Phase 4.5 lessons-learned):
-1. SSH the box (`make prod-shell` or `ssh jeromelu-prod`).
-2. `mkdir /runtmp` and `docker cp scripts jeromelu-api:/runtmp/` (trailing slash matters — lands `scripts/` *folder* under `/runtmp/`).
-3. Read `ADMIN_KEY` from `/opt/jeromelu/.env`.
-4. Inside the API container, run a `tmux` or `screen` session so the long-running backfill survives SSH disconnects:
-   ```bash
-   docker exec -it jeromelu-api bash -c "
-     cd /runtmp && python -m scripts.data.scout_backfill \
-       --source nrlcom-draw \
-       --season-from 1908 --season-to 2026 \
-       --round-from 1 --round-to 30 \
-       --competition 111 \
-       --api https://api.jeromelu.ai \
-       --admin-key \$ADMIN_KEY \
-       --archive-only --resume \
-       --rate-limit 1.0 2>&1 | tee /runtmp/backfill_nrlcom-draw_$(date +%Y%m%d_%H%M).log
-   "
-   ```
-   On-box `curl` must hit the loopback — the API container itself can resolve `api.jeromelu.ai` via Docker DNS to the internal nginx proxy, so the `--resolve` trick is only needed for `curl` from the host shell. **Verify before starting:** `docker exec jeromelu-api curl -s -o /dev/null -w "%{http_code}\n" https://api.jeromelu.ai/api/health` returns 200; if not, fall back to the host-shell `curl --resolve` approach and re-shape the script invocation accordingly (BLOCKED tag if the container can't reach the API).
-5. Wall-clock: 1908–2026 × ~26 rounds at 1 req/sec ≈ 1h. Expect 502s for seasons/rounds that don't exist (early years had fewer rounds, finals structure varied) — recorded in failure log, not fatal.
-6. After completion, clean up `/runtmp` on the container: `docker exec jeromelu-api rm -rf /runtmp/scripts /runtmp/backfill_*.log` (copy the log down first if useful).
-
-**How to verify.**
-- `aws s3 ls s3://jeromelu-clean-documents/scout/nrlcom/draw/111/ --recursive | wc -l` ≥ **2700**.
-- `aws s3 ls s3://jeromelu-clean-documents/scout/nrlcom/draw/111/ --recursive | awk -F/ '{print $5}' | sort -u | wc -l` ≥ **115** (distinct season folders — 1908–2026 ≈ 119 with some empty).
-- `psql` (read via `docker exec jeromelu-postgres psql -U jeromelu_admin -d jeromelu -c "..."`):
-  - `SELECT COUNT(*) FROM agent_runs WHERE detail_json->>'pipeline'='nrlcom-draw' AND started_at > <backfill_start_ts> AND status='complete'` matches the driver's successes count (record both in the run report scratchpad).
-  - `SELECT COUNT(*) FROM agent_runs WHERE detail_json->>'pipeline'='nrlcom-draw' AND started_at > <backfill_start_ts> AND status='failed'` matches the driver's failures count.
-- Spot-check S3: `aws s3 cp s3://jeromelu-clean-documents/scout/nrlcom/draw/111/1908/round-01.json - | jq '.fixtures | length, .selectedSeasonId, .selectedRoundId'` returns plausible numbers (≥1 fixture; correct season/round).
-- The driver's final summary log section records: successes count, failures count, first 20 failure lines. **Copy this verbatim into the run report scratchpad on this task's checkoff.**
-
-**Proof notes.**
-
----
-
 ### TASK-42: Operator backfill — `nrlcom-match-centre` 1990–2026 (on prod box via loopback)
 
 **What.** Per [PLAN.md "Scout Phase 5"](./PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance) Tasks list. **Operator task** — same procedure as TASK-41.
@@ -147,39 +108,6 @@ done
 - `aws s3 ls s3://jeromelu-clean-documents/scout/supercoach/classic/settings/ --recursive | wc -l` ≥ **2**.
 - Each driver invocation reports successes / failures in its final summary — record in run report scratchpad.
 - SC siblings: backfilling DOES write to DB (no archive_only flag) — verify `SELECT COUNT(*) FROM sc_settings WHERE season IN (2024, 2025)` ≥ 2 (one per mode × season at minimum).
-
-**Proof notes.**
-
----
-
-### TASK-44: Operator backfill — `supercoach-stats` 2018–2025 (on prod box via loopback)
-
-**What.** Per [PLAN.md "Scout Phase 5"](./PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance) Tasks list. **Operator task** — same procedure as TASK-41/42.
-
-- **Source**: `supercoach-stats` (the nrlsupercoachstats.com jqGrid endpoint).
-- **Seasons**: 2018–2025 (per D12; 2026 already current via cron).
-- **Round depth**: `--round-from 0 --round-to 30` (round 0 = Totals per the route docstring; rounds 1–30 = regular rounds; many old years had fewer than 30 rounds → 502s recorded as failures).
-- **Wall-clock**: ~250 jqGrid sessions at 1 req/sec ≈ 1–2h (each session is ~3 pages internally to the fetcher).
-- **`--archive-only` is mandatory** here because the route writes inline to `player_rounds` — without the flag, every (season, round) would trigger an UPSERT, and 2018 shape may not strict-parse cleanly. TASK-45 runs the new `populate_player_rounds` extractor to write DB rows from S3 after backfill.
-
-```bash
-docker exec -it jeromelu-api bash -c "
-  cd /runtmp && python -m scripts.data.scout_backfill \
-    --source supercoach-stats \
-    --season-from 2018 --season-to 2025 \
-    --round-from 0 --round-to 30 \
-    --api https://api.jeromelu.ai --admin-key \$ADMIN_KEY \
-    --archive-only --resume \
-    --rate-limit 1.0 2>&1 | tee /runtmp/backfill_supercoach-stats_$(date +%Y%m%d_%H%M).log
-"
-```
-
-**How to verify.**
-- `aws s3 ls s3://jeromelu-clean-documents/scout/nrlsupercoachstats/stats/ --recursive | wc -l` ≥ **200** (~8 seasons × ~28 rounds incl. Totals; actual round counts vary by year). Note the `scout/` prefix — every Scout archive is under that prefix per `archive_response()` (corrected from the original planner-sketch which omitted it).
-- `aws s3 ls s3://jeromelu-clean-documents/scout/nrlsupercoachstats/stats/ --recursive | awk -F/ '{print $4}' | sort -u | wc -l` ≥ **8** (distinct season folders 2018–2025; field 4 now because the `scout/` prefix consumes field 1).
-- Spot-check 2018: `aws s3 cp s3://jeromelu-clean-documents/scout/nrlsupercoachstats/stats/2018/round-01.json - | jq '.rows | length'` ≥ 200 (canonical SC roster size).
-- Driver summary recorded in run report scratchpad.
-- **DB verification deferred to TASK-45** — this task only proves S3 capture.
 
 **Proof notes.**
 
