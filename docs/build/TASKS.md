@@ -307,33 +307,6 @@ Files to update:
 
 ---
 
-### TASK-53: Fix `insights.py` dormant queries — `Claim.subject_entity_id` was removed in migration 036
-
-**What.** Surfaced during TASK-49 (Pyright plumbing). `packages/shared/jeromelu_shared/insights.py` functions `query_round_claims()` (line ~88) and `query_claim_consensus()` (line ~123) reference `Claim.subject_entity_id`, which is not a column on `Claim` per `packages/shared/jeromelu_shared/db/models.py:711–733`. Per `models.py:751–771`, entity links moved to `ClaimAssociation` (polymorphic FK to person_id / team_id / etc.) in migration 036.
-
-These functions are dormant — called only by `scripts/insights/generate_round_tips.py`. Production-side likely hasn't run them since the migration 036 schema change. They would raise `AttributeError` at runtime.
-
-The five attribute accesses are currently suppressed with `# pyright: ignore[reportAttributeAccessIssue]` plus a NOTE comment block above `query_round_claims` pointing to this task.
-
-**Concrete changes:**
-1. Rewrite `query_round_claims()` to JOIN through `ClaimAssociation`, grouping by `(person_id, claim_type)` (or `(team_id, claim_type)` depending on what `generate_round_tips.py` expects — inspect the caller for the role values it actually uses). Output shape unchanged: `dict[str, list[dict]]` keyed by `entity_id_str`.
-2. Rewrite `query_claim_consensus()` similarly. Output shape unchanged: `dict[str, dict[str, int]]`.
-3. Remove the 5 `# pyright: ignore[reportAttributeAccessIssue]` markers + the NOTE block above `query_round_claims`.
-4. Add a unit test under `tests/unit/shared/test_insights.py` that builds an in-memory `Claim` + `ClaimAssociation` fixture and exercises both functions — verifies the rewrite is correct.
-5. Run `scripts/insights/generate_round_tips.py --round <N> --season 2026` against a dev DB to confirm runtime behaviour is intact.
-
-**How to verify.**
-- `make typecheck-python` (Pyright) exits 0 with the `# pyright: ignore` markers removed.
-- New unit test `tests/unit/shared/test_insights.py::test_query_round_claims_groups_by_person_id` (and consensus equivalent) passes.
-- `make test` exits 0.
-- Manual run of `generate_round_tips.py` produces output of the expected shape (a SuperCoach round-tips article without error).
-- `git grep -n "subject_entity_id" packages/shared/jeromelu_shared/` returns zero matches.
-
-**Proof notes.**
-
-
-
-
 
 ## Completed work
 
