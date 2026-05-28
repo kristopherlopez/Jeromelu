@@ -123,8 +123,7 @@ Media side shipped (YouTube discovery, enumeration, refresh, audio acquisition).
 
 - [Architecture](architecture.md) — pipeline position, hand-off contract, flow diagrams, component internals
 - [Charter](charter.md) — locked design decisions D1–D13, expanded-charter pipeline inventory, risks, cost/testing/rollout
-- [Roadmap](roadmap.md) — status, charter phasing (Phase 0–7), YouTube depth, multi-platform, future improvements
-- [Phase 1 plan](plans/phase-1-supercoach-roster.md) — SuperCoach roster implementation plan
+- [Roadmap](roadmap.md) — status, charter phasing (Phase 0–7, incl. the Phase 1 SuperCoach roster slice), YouTube depth, multi-platform, future improvements
 - [Data lineage](../../../architecture/data-lineage.md) — end-to-end source → S3 → DB → app map for every Scout pipeline output
 - [Wiki data feeds](../../../pages/wiki/data-feeds.md) — wiki-centric reverse view of which Scout pipelines feed which wiki sections
 - [Crew Dynamics](../dynamics.md) — Scout mode's place in Jaromelu's internal reasoning flow

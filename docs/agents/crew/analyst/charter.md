@@ -118,7 +118,7 @@ Because Analyst consumes the *contract* and not the producer, the Lineup externa
 
 Today **only a local prototype exists** — the [`/clean-transcript`](../../skills/transcript-pipeline.md) skill (plus the `POST /api/admin/update-clean-text` endpoint, which backfills `clean_text` onto existing chunks from a cleaned S3 document). There is **no production cleaning pass yet.** The prototype's job is to settle the prompt and pass structure — that settled form *is* the spec the worker encodes.
 
-> **Coupling to leave intact:** the cleaning pass and the SuperCoach roster regeneration (now run via `make fetch-players`) currently share the `data/players.yaml` registry. Rehoming that — cleaning reads the roster from the DB instead of yaml — is the open loop that would drop the last yaml dependency; tracked in the [Scout Phase 1 plan](../scout/plans/phase-1-supercoach-roster.md), surfaced here because it touches Analyst's input. (The legacy `scrape-supercoach` skill was retired 2026-05-27; being a wrapper around `make fetch-players`, it never actually gated this rehoming.)
+> **Coupling to leave intact:** the cleaning pass and the SuperCoach roster regeneration (now run via `make fetch-players`) currently share the `data/players.yaml` registry. Rehoming that — cleaning reads the roster from the DB instead of yaml — is the open loop that would drop the last yaml dependency; tracked in the [Scout roadmap, Phase 1](../scout/roadmap.md), surfaced here because it touches Analyst's input. (The legacy `scrape-supercoach` skill was retired 2026-05-27; being a wrapper around `make fetch-players`, it never actually gated this rehoming.)
 
 ### A5. Extraction — skill-validated, then workerised; LLM-graded
 

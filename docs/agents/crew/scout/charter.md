@@ -402,6 +402,5 @@ Five steps × six pipelines is the bulk of the migration work — couple of week
 
 - [README.md](README.md) — Scout's identity, scope, and voice
 - [architecture.md](architecture.md) — pipeline position, flow, component internals, S3-first architecture
-- [roadmap.md](roadmap.md) — status and the full Phase 0–7 phasing
-- [plans/phase-1-supercoach-roster.md](plans/phase-1-supercoach-roster.md) — the Phase 1 implementation plan
+- [roadmap.md](roadmap.md) — status and the full Phase 0–7 phasing (incl. Phase 1)
 - [Data lineage](../../../architecture/data-lineage.md) — locked D1–D13 govern the lineage

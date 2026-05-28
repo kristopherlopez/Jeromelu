@@ -35,7 +35,7 @@ The expanded charter ([charter.md](charter.md)) stages the migration of all exte
 
 ### Phase 1 — One pipeline migrated end-to-end (the proof slice) ✅
 
-Pick the smallest pipeline: **SuperCoach player roster**. Full step-by-step plan in [plans/phase-1-supercoach-roster.md](plans/phase-1-supercoach-roster.md).
+Pick the smallest pipeline: **SuperCoach player roster**. The step-by-step record of this slice is the bullet list below.
 
 > **Skill retired 2026-05-27.** The `scrape-supercoach` Claude Code skill was a thin wrapper around `make fetch-players` (which runs `fetch_supercoach_players.py` + `generate_players_yaml.js`) — it owned no logic, so deleting it removed no capability. Operators now run `make fetch-players` (local roster + `data/players.yaml` regen) or the `scout-supercoach-roster` endpoint/`make` target. The transcript-cleaning pipeline still reads `data/players.yaml`; rehoming that to read the roster from the DB is a **separate** open loop (it never actually gated this retirement — see [Analyst roadmap](../analyst/roadmap.md)).
 
@@ -177,4 +177,3 @@ Additive — they layer on top of Tier 1 (already built: known-set injection + b
 - [README.md](README.md) — Scout's identity, scope, and voice
 - [architecture.md](architecture.md) — pipeline position, flow, component internals
 - [charter.md](charter.md) — locked design decisions D1–D13
-- [plans/phase-1-supercoach-roster.md](plans/phase-1-supercoach-roster.md) — the Phase 1 implementation plan
