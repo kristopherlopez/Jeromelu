@@ -16,18 +16,24 @@ too noisy at first.
 
 ## Current Baseline
 
+_Updated 2026-05-28 — Tier 1 items 1–6 shipped via the [Engineering quality hardening — Tier 1 run report](../build/runs/2026-05-28-eng-quality-tier-1.md)._
+
 - Python unit tests run in CI via `pytest`.
+- **Python lint + format check run in CI via `ruff`** (config: root `pyproject.toml [tool.ruff]`).
+- **Python typecheck runs in CI via `pyright`** — narrow include: `packages/shared/jeromelu_shared/`. Widening is a future plan.
 - Web type checking runs in CI via `npm run typecheck`.
+- **Web lint runs in CI via `npm run lint`** — hard-fails on errors; warnings informational. React 19 advisory rules downgraded to `warn` pending incremental migration.
+- **Secret scanning runs in CI via Gitleaks** (config: `.gitleaks.toml`).
 - Terraform has `fmt`, `validate`, and `plan` CI.
 - Scout scraper drift tests exist as a strong subsystem pattern.
-- Web already has `services/web/eslint.config.mjs`; ESLint is configured but
-  not run in CI.
 - `.env`, `.env.local`, and `.env.production` are ignored by git.
-- Deploy is documented as not yet gated by the test workflow.
+- **Deploy gated on `tests.yml` success via `workflow_run`.** Emergency override: `workflow_dispatch` on `deploy.yml`.
 
 ## Tier 1 - High Leverage, Low Cost
 
 ### 1. Python lint and format
+
+**Status:** ✅ Shipped 2026-05-28 — see [run report](../build/runs/2026-05-28-eng-quality-tier-1.md) (TASK-47).
 
 **Gap:** No repo-level Python lint/format configuration is enforced.
 
@@ -43,6 +49,8 @@ obvious bug patterns, and import-order churn before review.
 
 ### 2. Python type checking
 
+**Status:** ✅ Shipped 2026-05-28 — see [run report](../build/runs/2026-05-28-eng-quality-tier-1.md) (TASK-49). Pyright (not mypy) chosen; narrow include `packages/shared/jeromelu_shared/` only. Widening the include set is an explicit follow-up plan.
+
 **Gap:** The web has `tsc --noEmit`; Python has no equivalent check.
 
 **Do:**
@@ -57,6 +65,8 @@ likely to become expensive.
 
 ### 3. Frontend lint in CI
 
+**Status:** ✅ Shipped 2026-05-28 — see [run report](../build/runs/2026-05-28-eng-quality-tier-1.md) (TASK-48). Several React 19 advisory rules downgraded to `warn` pending incremental migration.
+
 **Gap:** ESLint config exists, but CI does not run `npm run lint`.
 
 **Do:**
@@ -67,6 +77,8 @@ likely to become expensive.
 React, hooks, accessibility-adjacent rules, and import mistakes.
 
 ### 4. Datetime and timezone invariant
+
+**Status:** ✅ Shipped 2026-05-28 — see [run report](../build/runs/2026-05-28-eng-quality-tier-1.md) (TASK-47). META invariant landed; Ruff `DTZ` rule set enforces it. `DTZ011` (`call-date-today`) explicitly excluded — `date.today()` is valid for naive-date contexts.
 
 **Gap:** There is no explicit project rule for timezone-safe datetime use.
 
@@ -82,6 +94,8 @@ Naive datetime bugs will be subtle.
 
 ### 5. Secret hygiene
 
+**Status:** ✅ Shipped 2026-05-28 — see [run report](../build/runs/2026-05-28-eng-quality-tier-1.md) (TASK-50). Gitleaks (not detect-secrets) chosen; working-tree / PR-diff scope (not full git history). META invariant landed. Historical scan is a Tier 2 follow-up if/when desired.
+
 **Gap:** `.env` is ignored, but secret-handling rules are not stated as a
 project invariant and no repo-level secret scanner is configured.
 
@@ -96,6 +110,8 @@ project invariant and no repo-level secret scanner is configured.
 keys, and self-hosted deployment. A single leaked key has high blast radius.
 
 ### 6. Gate deploy on quality checks
+
+**Status:** ✅ Shipped 2026-05-28 — see [run report](../build/runs/2026-05-28-eng-quality-tier-1.md) (TASK-51). Gate landed via `workflow_run` trigger on `deploy.yml`. Emergency override: `workflow_dispatch`. SHA fidelity preserved via `workflow_run.head_sha`.
 
 **Gap:** `tests.yml` does not currently gate `deploy.yml`.
 
@@ -225,12 +241,14 @@ to review. Avoid hard line-count rules unless they are solving a real problem.
 
 ## Suggested Implementation Order
 
-1. Add Ruff config and CI.
-2. Add web lint to CI.
-3. Add deploy gating after tests and lint are stable.
-4. Add Pyright or mypy in a narrow, warning-first mode.
-5. Add secret scanning and Dependabot/Renovate.
+_Items 1–6 shipped 2026-05-28 — see [Engineering quality hardening — Tier 1 run report](../build/runs/2026-05-28-eng-quality-tier-1.md). Items 7+ remain as the next-up backlog._
+
+1. Add Ruff config and CI. ✅
+2. Add web lint to CI. ✅
+3. Add deploy gating after tests and lint are stable. ✅
+4. Add Pyright or mypy in a narrow, warning-first mode. ✅
+5. Add secret scanning and Dependabot/Renovate. ✅ (Gitleaks shipped; Dependabot/Renovate is a Tier 2 follow-up.)
 6. Update `docs/build/META.md` with timezone, secret hygiene, idempotency,
-   dependency, and migration-safety invariants.
+   dependency, and migration-safety invariants. ✅ (Datetime + secret-hygiene shipped via TASK-47 + TASK-50. Idempotency, dependency, migration-safety remain in Tier 2.)
 7. Standardize scraper error handling and API conventions as new endpoints are
    touched.

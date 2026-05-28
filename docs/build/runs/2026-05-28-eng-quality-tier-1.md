@@ -1,8 +1,8 @@
 # Engineering quality hardening — Tier 1
 
-**Date:** 2026-05-28 · **Status:** 🟡 In flight (4/6 tasks shipped — TASK-51 + TASK-52 not yet picked up) · **Plan:** [Engineering quality hardening — Tier 1](../PLAN.md#2026-05-28-engineering-quality-hardening--tier-1-ruff--pyright--eslint--gitleaks--deploy-gating)
+**Date:** 2026-05-28 · **Status:** 🟢 Shipped (6/6 tasks) · **Plan:** removed from PLAN.md "Active plan" at closure per the META run-report ritual; this report is the durable record.
 
-**TL;DR** — Tier 1 of `docs/operations/engineering-quality-hardening.md` (items 1–6) lands hard-fail CI gates for Python lint (Ruff), Python typecheck (Pyright, narrow), web lint (ESLint), secrets (Gitleaks), and deploys are gated on Tests success. Tier 1 hardening surfaced an unanticipated reality: TASK-47 (Ruff) and TASK-48 (ESLint) both have far more existing violations than the plan's pre-audit anticipated — 875 / 174 files for Ruff, 50 files for ESLint. Both BLOCKED with detailed remediation menus pending the human's rule-set decisions. TASK-49 (Pyright, narrow) shipped clean: 8 errors / 3 files in scope, all addressed (3 real type fixes; 5 suppressions queued as TASK-53 for the underlying schema-drift bug).
+**TL;DR** — Tier 1 of `docs/operations/engineering-quality-hardening.md` (items 1–6) landed hard-fail CI gates for Python lint (Ruff), Python typecheck (Pyright, narrow), web lint (ESLint), secrets (Gitleaks), and deploy gated on Tests success. The hardening surfaced an unanticipated reality on day 1: TASK-47 (Ruff) and TASK-48 (ESLint) both had far more existing violations than the plan's pre-audit anticipated (875 / 174 files for Ruff; 50 files for ESLint). Both BLOCKED on initial pickup with detailed remediation menus; both unblocked by the human picking Option 1 (rule-set tuning) and shipped. TASK-49 (Pyright, narrow) shipped clean: 8 errors / 3 files in scope, all addressed (3 real type fixes; 5 suppressions queued as TASK-53 for the underlying schema-drift bug). TASK-50 (Gitleaks) shipped with a tight allowlist of 4 categories (paths + 2 file-specific narrow regexes). TASK-51 (deploy gating) landed the `workflow_run` mechanism with SHA fidelity via `head_sha`. TASK-52 (closure) flipped this report to 🟢 Shipped and removed the plan from PLAN.md.
 
 ---
 
@@ -135,6 +135,70 @@ Unblocked 2026-05-28 by human picking Option 1 from the BLOCKED note. Initial ba
 
 ---
 
+### TASK-51 — Deploy gating via `workflow_run` on Tests success (`fd51651`)
+
+Gates `deploy.yml` on `tests.yml` success. Bad code can no longer ship automatically.
+
+**Files:**
+- `.github/workflows/deploy.yml`:
+  - **Trigger flip.** `on: push: branches: [master]` → `on: workflow_run: workflows: [Tests], types: [completed], branches: [master]` + `workflow_dispatch`. Top-of-`on:` comment block documents the gate mechanism + emergency override.
+  - **Conditional guard.** `detect-changes` (upstream job every downstream job `needs:`) gets `if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'`. Single point of gating; cascades to all downstream jobs.
+  - **SHA fidelity.** `${{ github.sha }}` in `docker build/push` replaced with `SHA="${{ github.event.workflow_run.head_sha || github.sha }}"`. Under `workflow_run`, `github.sha` is default-branch HEAD at action-dispatch time (may drift past what Tests validated); `head_sha` is the SHA Tests actually ran against. Fallback handles `workflow_dispatch`.
+- `.github/workflows/tests.yml` — header comment updated (C1 from adversarial-reviewer): the old "this workflow does NOT gate deploy.yml" text is now factually wrong; rewritten to enumerate the 6 quality-gate jobs and document the `workflow_run` gating.
+- `docs/ops/ci-cd.md`:
+  - Workflow trigger table: `deploy.yml` row reflects `workflow_run` gating + `workflow_dispatch` override; `tests.yml` row lists all 6 jobs.
+  - New "Tests gate (TASK-51, 2026-05-28)" subsection documents the mechanism, `head_sha` SHA-fidelity guarantee, and emergency override path.
+  - `## tests.yml — unit tests + web typecheck` renamed to `## tests.yml — quality gates`; body expanded from 2 jobs to all 6 with config/scope notes per job.
+  - New "Quality gates — how to silence a false positive" subsection covering Ruff, Pyright, ESLint, Gitleaks silencing patterns.
+  - Obsolete bullets removed: "Tests + web typecheck — Not yet a hard gate"; "Promote to a hard gate by adding `needs:`...".
+
+**Prerequisite verified before starting:** the latest `tests.yml` run on master (`e65544f`, TASK-48 feature) was green across all 6 jobs. Confirmed via `gh run view --json jobs`. Subsequent push of TASK-51 itself (`fd51651`) is the first end-to-end exercise of the new gate.
+
+**Proof:**
+- `python -c "import yaml; yaml.safe_load(open('.github/workflows/deploy.yml'))"` → YAML valid.
+- `grep -A 6 "^on:" .github/workflows/deploy.yml` shows `workflow_run` block + `workflow_dispatch`.
+- `grep "github.event.workflow_run.conclusion" .github/workflows/deploy.yml` returns 1 line (the `if:` guard).
+- `grep "head_sha || github.sha" .github/workflows/deploy.yml` returns 1 line (the SHA-fidelity shell assignment).
+
+**adversarial-reviewer: PASS WITH CONCERNS.** No Blockers. 4 Concerns:
+- **C1 (addressed):** `tests.yml` header comment was factually wrong post-gate; rewritten in this changeset.
+- **C2 (deferred to dry-run 3b):** Path-filter SHA gap under `workflow_run`. `actions/checkout@v6` in `detect-changes` doesn't pass `ref: ${{ github.event.workflow_run.head_sha }}`, so `dorny/paths-filter@v4` evaluates against the default-branch HEAD at dispatch time. The image tag uses `head_sha` (correct) but the path-filter evaluates a potentially-moved HEAD. In practice the window is tiny (master rarely has back-to-back pushes during a Tests run), but the operator should compare `git rev-parse HEAD` against `head_sha` during 3b verification. If divergence is real, queue a follow-up to add the explicit `ref:` to the checkout step.
+- **C3 (recorded):** Spec said "returns only lines of the form `head_sha || github.sha`" — 3 comment-only `github.sha` references remain (lines 117, 120, 141 of `deploy.yml`); all are documentation explaining behavior. Rewriting would degrade clarity.
+- **C4 (pre-existing, not in scope):** `docs/ops/ci-cd.md` line 28 says `dorny/paths-filter@v3` but workflow uses `@v4`; path-filter scope table omits `video_worker` and `deploy_only`. Pre-existing drift surfaced by the reviewer's accuracy challenge; queued as a future follow-up (not introduced or fixed by this task).
+
+**Dry-run verification (operator step, deferred to post-merge):**
+- **3a:** push a deliberate red commit (break Ruff or any other gate) → `tests.yml` red → confirm via Actions UI that `Build & Deploy` did NOT trigger. Revert → `tests.yml` green → confirm `Build & Deploy` then runs.
+- **3b:** on the green deploy following the revert, open the `build-and-push` log and confirm `docker build ... -t $IMAGE:<sha>` uses the `workflow_run.head_sha` value (not the moved master HEAD). Cross-reference `git log --oneline -1` on master at dispatch time. **If divergence is observed, surface C2 for follow-up.**
+- **3c:** manually `workflow_dispatch` `Build & Deploy` during a red Tests state → confirm runs to completion via the `workflow_dispatch` override.
+
+**Deviations from plan:**
+- **D1.** Spec said "Replace every occurrence of `${{ github.sha }}` inside the workflow with `${{ github.event.workflow_run.head_sha || github.sha }}`". Landed via a shell variable `SHA="..."` extracted once per matrix step rather than inline at each `${{ }}` substitution — cleaner, single source of truth, easier to read.
+- **D2.** Added a top-of-`on:` comment block in `deploy.yml` documenting the gate mechanism. Not in spec; aids the next maintainer.
+- **D3.** `tests.yml` header rewrite (C1) was not in spec's file list but the reviewer (correctly) flagged the staleness under META "Documentation discipline." Fixed in the same changeset.
+
+---
+
+### TASK-52 — Plan closure (this commit)
+
+**Files:**
+- `docs/operations/engineering-quality-hardening.md`:
+  - Updated "Current Baseline" to reflect the new state (Ruff in CI, Pyright in CI, web lint in CI, Gitleaks in CI, deploy gated).
+  - Each of Tier 1 items 1–6 gets a `**Status:** ✅ Shipped 2026-05-28 — see [run report](...)` line referencing the originating task ID.
+  - "Suggested Implementation Order" gets a header note + ✅ markers on items 1–6.
+- `docs/build/runs/2026-05-28-eng-quality-tier-1.md` (this file) — flipped 🟡 → 🟢 Shipped; TL;DR rewritten; TASK-51 + TASK-52 entries added; "Currently BLOCKED" section removed (both unblocks shipped).
+- `docs/build/runs/README.md` — top row updated to 🟢 Shipped with the actual outcome summary.
+- `docs/build/PLAN.md` — Engineering quality hardening — Tier 1 section removed from "Active plan". Scout Phase 5 remains.
+- `docs/build/TASKS.md` — TASK-51 + TASK-52 removed per the no-graveyard rule.
+
+**Proof:**
+- `grep -c "✅ Shipped 2026-05-28" docs/operations/engineering-quality-hardening.md` returns **6** (one per Tier 1 item).
+- `grep "Engineering quality hardening" docs/build/PLAN.md` returns 0 matches in "Active plan" (only mentions in archived references).
+- `grep "🟢 Shipped" docs/build/runs/2026-05-28-eng-quality-tier-1.md` returns ≥1.
+- `head -5 docs/build/runs/README.md` shows this row marked 🟢 Shipped.
+- `grep "TASK-5[12]" docs/build/TASKS.md` returns 0 matches.
+
+---
+
 **Deviations from plan:**
 - **D1.** Umbrella `lint:` Makefile target deferred. Spec said "Update the umbrella `lint` target (added in TASK-47) to also `$(MAKE) typecheck-python`." TASK-47 is BLOCKED so the target doesn't exist; only `typecheck-python` ships. NOTE block left in Makefile so the future TASK-47 unblocker wires it up.
 - **D2.** `# pyright: ignore` markers used for real schema-drift bug rather than the spec's example case ("missing type stub"). Per implementer charter "don't fix tangential bugs," the proper fix (rewriting the queries to JOIN through `ClaimAssociation`) was deferred to a new TASK-53 rather than absorbed into Pyright plumbing scope. Each marker carries an inline rationale pointing at TASK-53.
@@ -167,11 +231,24 @@ Unblocked 2026-05-28 by human picking Option 1 from the BLOCKED note. Initial ba
 - **`reportMissingImports="error"` is load-bearing for Pyright correctness but creates a hidden dependency on the test/dev environment.** Future widenings of the Pyright include set MUST audit `import X` statements against `requirements-dev.txt` (or whatever the typecheck-time deps file is). Worth promoting to META.md once the second widening lands.
 - **TASK-47 caught a real production bug.** Ruff's F821 in `worker-publishing/.../update_consensus.py:125` (`len(entity_claims)` referencing an undefined name) would have raised `NameError` at runtime if the snapshot-flip log path ever fired. This is the load-bearing case for Ruff plumbing being a net-positive even when initial violation volume is high: even a "noisy" lint pass surfaces real bugs that would otherwise crash in production.
 - **Batch-fixing mechanical violations via a one-shot helper script is faster + safer than 33 individual Edit calls** for AST-shaped patterns like B904. The helper-script-then-delete pattern (no committed scripts) preserves clean implementer history.
+- **`workflow_run` gating is the correct mechanism for "deploy follows Tests" when Tests is its own workflow.** Inline `needs:` would require merging the two workflows; `workflow_run` keeps them file-separated and gives a clean operator-override path via `workflow_dispatch`. The subtle catch is path-filter SHA fidelity — the downstream workflow's `actions/checkout@v6` defaults to default-branch HEAD, not `workflow_run.head_sha`. Documented in TASK-51 / C2 as a deferred verification item.
+
+---
+
+## Deferred verification (operator action items)
+
+These were called out by adversarial-reviewer and require an operator-side action that can't run synchronously during the implementer session.
+
+1. **TASK-51 dry-run 3a/3b/3c** — push a deliberate red commit to master, observe `deploy.yml` does NOT trigger (3a); on the revert observe the green deploy uses `workflow_run.head_sha` as the image tag (3b); manually `workflow_dispatch` `Build & Deploy` during a red state and observe it runs (3c). URLs/screenshots get pasted into this report under "Operator dry-run results" when complete.
+2. **TASK-51 / C2 — path-filter SHA divergence** — during 3b, compare `git rev-parse HEAD` against `workflow_run.head_sha`. If different, the deploy ran path-filter against a moved HEAD; queue a follow-up to add explicit `ref: ${{ github.event.workflow_run.head_sha }}` to the `actions/checkout@v6` in `detect-changes`.
+3. **TASK-48 / C3 — ESLint CI breakage proof** — open a throwaway PR with a deliberate `react/no-unescaped-entities` violation; observe `web-lint` CI job fails; revert; observe green. Capture both URLs.
+4. **TASK-49 / TASK-50 / TASK-47 CI breakage proofs** — same pattern for Pyright (break a return type), Gitleaks (paste a non-example AKIA-format token), Ruff (introduce an unused import). Captured opportunistically when a future PR organically trips each gate.
 
 ---
 
 ## Commits
 
+- `fd51651` — feat(ci): TASK-51 — Deploy gating via workflow_run on Tests success [skip-simplify]
 - `e65544f` — feat(quality): TASK-48 — ESLint CI job + lint-web Make target (Option 1 rule downgrades) [skip-simplify]
 - `6e9c227` — feat(quality): TASK-47 — Ruff plumbing (Option 1 rule-set tuning) [skip-simplify]
 - `1c2aa20` — feat(quality): TASK-50 — Gitleaks plumbing + secret-hygiene META invariant [skip-simplify]
