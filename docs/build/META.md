@@ -70,6 +70,10 @@ Always apply migrations via `make migrate`. Never hand-apply SQL with `psql` sho
 
 New AWS resources go through Terraform in `infra/terraform/`. Never `aws` CLI to provision as a shortcut. The agent writes the Terraform; the human runs `apply`.
 
+### Secret hygiene
+
+Never commit `.env*`, tokens, API keys, prod credentials, or any high-entropy string that looks like a secret. Redact secrets from logs, issue comments, PR descriptions, and run reports. Enforced by Gitleaks in CI (`gitleaks` job in `.github/workflows/tests.yml`) against the working tree + PR diff; CI fails on any finding. False positives go in `.gitleaks.toml` with a `description` rationale — never inline `# gitleaks:allow` comments. Local check: `gitleaks detect --no-git --source=. --no-banner --redact --exit-code 1`.
+
 ### Heavy ML deps stay isolated
 
 `pyannote`, `torch`, GPU-bound code stays in `services/gpu` or workers, behind RPC. The API container stays lean — lazy imports don't fix image bloat because pip runs at build time. Split helpers into `*_helpers.py` so CI and unit tests run without the GPU stack.

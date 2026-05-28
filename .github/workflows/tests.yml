@@ -99,3 +99,23 @@ jobs:
         run: pip install pyright==1.1.409
       - name: Pyright
         run: pyright
+
+  gitleaks:
+    # Secret scanner. Reads .gitleaks.toml at the repo root for the rule
+    # set + allowlist. Working-tree / PR-diff scan only (not full history)
+    # per the docs/build/META.md "Secret hygiene" invariant and the plan's
+    # rationale. fetch-depth: 0 lets gitleaks-action walk the PR commit
+    # range; on push to master it scans HEAD.
+    name: gitleaks (working tree)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE intentionally omitted — public repo on the
+          # free tier. The action runs unauthenticated with reduced
+          # telemetry. Add the license key here if/when the org adopts
+          # gitleaks's paid org tier.

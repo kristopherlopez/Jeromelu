@@ -1,0 +1,53 @@
+# Gitleaks config — secret scanner used by the `gitleaks` CI job in
+# .github/workflows/tests.yml. Hard-fails on any finding in the working
+# tree / PR diff. Per docs/build/META.md "Secret hygiene" invariant.
+#
+# Local entry point (working-tree scan, mirrors what
+# gitleaks-action@v2 runs in CI on a push):
+#   gitleaks detect --no-git --source=. --no-banner --redact --exit-code 1
+#
+# To add an allowlist entry for a confirmed false positive, append a
+# new [[allowlists]] block below. Each entry MUST carry a `description`
+# explaining why the match is a false positive. Path-based entries are
+# preferred over regex-based for traceability.
+
+[extend]
+useDefault = true
+
+# --- Globally-excluded paths ---
+# These directories are gitignored and contain third-party content we
+# never want to scan. Without them, a working-tree scan walks node_modules
+# and .venv and surfaces hundreds of false positives. Also excludes
+# `.env*` files — they are gitignored and only ever contain LOCAL dev
+# secrets that are not committed; CI's git-tracked scan never sees them,
+# so the local --no-git scan should match that posture.
+[[allowlists]]
+description = "Third-party + build directories + gitignored env files — never scan"
+paths = [
+    '''(^|/)\.venv/''',
+    '''(^|/)node_modules/''',
+    '''(^|/)\.next/''',
+    '''(^|/)dist/''',
+    '''(^|/)build/''',
+    '''(^|/)\.git/''',
+    '''(^|/)__pycache__/''',
+    '''\.lock$''',
+    '''package-lock\.json$''',
+    '''(^|/)\.env(\.|$)''',
+]
+
+# --- Confirmed false positives in tracked files ---
+
+[[allowlists]]
+description = "Docker BuildKit secret references in services/gpu — the `id=hf_token` is the secret-mount *name* (label) that BuildKit uses to identify the secret in the Dockerfile, not the secret value. The actual HuggingFace token is read from the HUGGINGFACE_API_KEY env var by the build host. See services/gpu/SETUP.md."
+paths = [
+    '''^services/gpu/Dockerfile$''',
+    '''^services/gpu/build_and_push\.sh$''',
+]
+
+[[allowlists]]
+description = "AWS resource inventory contains KMS Key UUIDs (e.g. 23a1e42f-ac32-4e3b-bd11-3f8e5c0335cc) which gitleaks's generic-api-key entropy rule flags. Narrow regex match (UUID format only) so a real AWS access token (AKIA prefix), generic API key, or other non-UUID secret would still trigger if it ever lands in this doc. regexTarget=secret matches against the captured secret value, not the full match text."
+regexTarget = "secret"
+regexes = [
+    '''^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$''',
+]
