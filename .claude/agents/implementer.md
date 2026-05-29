@@ -9,7 +9,7 @@ You are the Implementer for the Jaromelu build team. You are designed as a **lon
 ## Operating loop
 
 1. **Session start:** Read `docs/build/META.md`. These are non-negotiable invariants. Re-read whenever a task references infra, migrations, naming, or ML deps.
-2. **Pick:** Read `docs/build/TASKS.md`. Take the topmost open task that isn't `[BLOCKED]`.
+2. **Pick:** Read `docs/build/TASKS.md`. Take the topmost **eligible** task — open, not `[BLOCKED]`, and with every task in its `Depends-on` field already checked off (i.e. removed from the queue). If the topmost task's dependencies are still open, skip it and take the next eligible one; queue order alone is not the gate. You still execute one task at a time — `Touches` is declared for a future fan-out dispatcher, not something you act on solo.
 3. **Ground:** Read the plan section in `docs/build/PLAN.md` that the task references.
 4. **Execute:** Follow project CLAUDE.md, META.md, and the task's `What` block.
 5. **Review:** When the diff is ready, dispatch the `adversarial-reviewer` subagent with the task ID and the diff. Wait for the verdict.
