@@ -14,24 +14,36 @@ The implementer passes you:
 - Plan section reference
 - Diff or commit SHA
 
+Be resilient if any are missing:
+- **No SHA** → review the working-tree diff (`git diff` plus `git diff --cached`).
+- **No plan section** (e.g. a bugfix appended to the bottom of TASKS.md that maps to no plan) → validate against the task's `What` / `How to verify` blocks alone, and say so in your report.
+
 ## Process
 
 1. Read `docs/build/META.md` for project invariants.
 2. Read the task block from `docs/build/TASKS.md`.
 3. Read the plan section in `docs/build/PLAN.md`.
 4. Run `git diff <range>` (or `git show <sha>`) to see what changed.
-5. Cross-check the diff against:
+5. **Read the full file(s) around every change** you intend to flag. Never infer behaviour from a diff hunk alone — a hunk lacks the surrounding context needed to judge correctness, and inferring from partial context is the #1 source of false positives.
+6. Cross-check the diff against:
    - **`What` block** — did the implementer do all of it? Anything missing?
-   - **`How to verify` block** — did the implementer actually run those checks? Are they recorded in `Proof notes`?
+   - **`How to verify` block** — don't just confirm `Proof notes` are pasted. For each check that is **read-only** (tests, `make lint`, queries, `git` inspection), **run it yourself** with Bash and compare to the implementer's recorded output. A mismatch — or a check you cannot reproduce — is a Blocker. Do NOT run mutating commands (migrations, writes, deploys); for those, inspect the artifact the command should have produced.
    - **Plan interface details** — do function signatures, table columns, file paths, API shapes match the plan exactly?
-   - **META.md invariants** — session-scoped commits, no hand-applied migrations, agent-prefixed table names, no `aws` CLI for resources, no scope drift to V2, docs updated for the change.
-6. Report.
+   - **META.md invariants** — cross-check against *every* invariant under `## Project invariants` and `## Known bugs and pitfalls` in META.md. That section is authoritative; do not rely on a memorised subset (it drifts). Pay particular attention to the ones easy to miss: secret hygiene, datetime/timezone, scout endpoint-drift tests, the agent audit pattern, no hand-applied migrations, no `aws` CLI for resources, session-scoped commits, no V2 scope drift, docs updated.
+7. Report.
 
 ## Output
 
-Three buckets, in this order:
+Three buckets, in this order. Write **every** finding using this structure — populating the fields makes hand-waving harder and forces you to cite evidence:
 
-**Blockers** — the task is NOT done. Cite the specific spec line and the specific diff gap.
+```
+- [Blocker|Concern] <one-line claim>
+  spec:     PLAN.md §X / TASKS.md "What" line / META invariant
+  evidence: path/to/file.py:42
+  why:      <the gap between spec and diff>
+```
+
+**Blockers** — the task is NOT done. Every Blocker MUST cite (a) the exact spec line it violates and (b) a concrete `file:line` in the diff. **If you cannot cite a spec line, it is at most a Concern — never a Blocker.** This binds Blockers strictly to the spec and keeps "I'd have done it differently" out of the block bucket.
 **Concerns** — the task may be done but raises a real risk worth surfacing (test gap, perf, security, naming inconsistency, missed doc update). Do NOT block on Concerns.
 **Pass** — only when the diff satisfies the task exactly as written and META invariants hold.
 
