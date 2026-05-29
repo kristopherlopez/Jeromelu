@@ -1,6 +1,6 @@
 # Scout Phase 5 — Historical backfill + standard-data-model conformance
 
-**Date:** 2026-05-28 · **Status:** 🟡 In flight (6/10 tasks shipped — code complete; TASK-41 (nrlcom-draw) + TASK-44 (supercoach-stats) operator backfills complete; TASK-42 (match-centre) running; TASK-43 (short bundle) + TASK-45 (extractor sweep) + TASK-46 (closure) remaining) · **Plan:** [Scout Phase 5](../PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance)
+**Date:** 2026-05-28..29 · **Status:** 🟡 In flight (8/10 tasks shipped — code complete; all 4 operator backfills (TASK-41, 42, 43, 44) complete; TASK-45 (extractor sweep) running; TASK-46 (closure) remaining) · **Plan:** [Scout Phase 5](../PLAN.md#2026-05-28-scout-phase-5--historical-backfill--standard-data-model-conformance)
 
 **TL;DR** — Phase 5 lands historical NRL data (draw 1908+, match-centre 1990+, ladder 1996+, stats 2013+, SC stats 2018+) into the canonical DB schema. The load-bearing constraint is "all the data needs to conform to a standard data model" — era variance is reconciled by NULLs + a new `matches.data_coverage` column ('full' / 'lineups+timeline' / 'timeline_only' / 'fixture_only'), never by alternate tables or JSONB blobs. D8 strict-parse stays modern-only; backfill bypasses it via a new `archive_only=true` route flag. Era-tolerance lives in extractors, not in models. 10 tasks: 4 code (37-40), 4 operator backfills (41-44), 1 DB sweep (45), 1 closure (46).
 
@@ -146,6 +146,53 @@ Wall-clock: ~8 minutes (vs spec estimate ~1h). Cause: nearly all entries pre-exi
 
 ---
 
+### TASK-42 — Operator backfill: `nrlcom-match-centre` 1990–2026 (354 successes / 756 skipped / 0 failures)
+
+Operator task; same procedure as TASK-41. ~45 min wall-clock (vs spec 3-4h estimate — same warm-cache short-circuit dominating).
+
+**Result:**
+- **354 successes** — new fetches (mostly 2026 finals + cold-cache 1990s rounds).
+- **756 skipped** — entries already in S3.
+- **0 failures.** Round-level resume strategy (LIST prefix instead of HEAD) per TASK-40's `resume_strategy: list` design.
+
+**Proof — meets all spec thresholds:**
+- `aws s3 ls s3://jeromelu-clean-documents/scout/nrlcom/match-centre/111/ --recursive | wc -l` → **7386** ≥ spec floor **4500** ✓
+- Distinct seasons: **37** (1990-2026) ≥ spec floor **30** ✓
+- Pre-2000 spot (1995): **233 keys** — better than the spec's "small set or zero" hedge; 1995 actually has thin-but-real match-centre data via the timeline shape.
+- Post-2000 spot (2010): **201 keys** ≥ 180 ✓
+- One specific 2010 inspect: top-level keys = `['matchId', 'matchMode', 'matchState', 'updated', 'gameSeconds', 'roundNumber', 'roundTitle', 'startTime', 'url', 'homeTeam']` — full-shape modern payload.
+
+**Deviation:** wall-clock far below 3-4h spec estimate (warm-cache pattern again).
+
+**adversarial-reviewer:** not dispatched (no code diff).
+
+---
+
+### TASK-43 — Operator backfill: short bundle (ladder 1996–2026, stats 2013–2026, SC siblings 2024–2025)
+
+Three sub-backfills bundled per spec. Executed in two passes due to a `&&` chain quirk; results combined here.
+
+**Sub-backfill 1: nrlcom-ladder 1996-2026** — 839 successes / 31 skipped / **60 failures**.
+The 60 failures are all `HTTP 500 Internal Server Error` for 1996 + 1997 rounds. Investigation: nrl.com's ladder endpoint genuinely doesn't have data before ~1998; the route's upstream fetcher returns 500 rather than 200-with-empty for these rounds. **Not a Jaromelu bug** — upstream archive policy.
+- ✓ S3 count: **870** ≥ spec floor **600**.
+
+**Sub-backfill 2: nrlcom-stats 2013-2026** — 0 successes / **14 skipped** / 0 failures. All seasons already populated from a prior run.
+- ✓ S3 count: **14** = spec exact target **14**.
+
+**Sub-backfill 3: SC siblings 2024-2025** — for each of `supercoach-roster`, `supercoach-teams`, `supercoach-settings`: 2024 **failed** with upstream `HTTP 500` from `supercoach.com.au/2024/api/nrl/classic/v1/...` (supercoach.com.au has retired its 2024-season API paths — not a Jaromelu bug, an upstream retirement); 2025 succeeded for all three. Each S3 prefix now has ≥ 2 keys (existing 2026 from daily cron + new 2025).
+- ✓ roster: 3 keys ≥ 2.
+- ✓ teams: 2 keys ≥ 2.
+- ✓ settings: 5 keys ≥ 2.
+- ⚠ `sc_settings` DB rows: only 2025 classic landed automatically (sc_siblings backfill defaults `mode=classic`); manually ran a one-shot `httpx.post(.../supercoach-settings?mode=draft&season=2025)` to add the draft variant. Final count: **2 rows** (2025 classic + 2025 draft) = spec floor 2 ✓. 2024 rows still 0 due to upstream retirement.
+
+**Deviations:**
+- **D1.** The original launch used a `&&` chain across the 3 sub-backfills. `scout_backfill.py` exits non-zero when there are any failures (the 60 ladder 500s), so the chain broke and nrlcom-stats didn't run. Re-launched nrlcom-stats separately with a `;` separator. SC siblings ran as planned (separate `for` loop, errors absorbed per-source).
+- **D2.** sc_settings DB threshold (`≥ 2`) required manually adding the 2025 draft mode because `scout_backfill.py` doesn't iterate `mode` and defaults to `classic`. The spec's "one per mode × season at minimum" wording assumed multi-mode iteration that the driver doesn't actually implement. Worth flagging as a Tier-2 spec refinement.
+
+**adversarial-reviewer:** not dispatched (no code diff).
+
+---
+
 ### TASK-44 — Operator backfill: `supercoach-stats` 2018–2025 (effectively a no-op — already populated)
 
 Operator task; ran the hardened `scout_backfill.py` driver from inside `jeromelu-api` on the Lightsail box via the loopback procedure. Detached via `docker exec -d` + `nohup`; log captured to `/runtmp/backfill_supercoach-stats_20260528_2200.log` (in-container).
@@ -187,6 +234,7 @@ Phase 5 is in flight. After TASK-37: the canonical schema has the `data_coverage
 
 ## Decisions & deviations
 - **Migration number 071 (not 061).** Planner missed that 061..070 already exist. Implementer chose next-free. Future references to "the Phase 5 migration" should read 071.
+- **Migration 071 was NOT applied on prod before TASK-45.** Discovered during TASK-45 pre-flight: `SELECT version FROM schema_migrations WHERE version LIKE '07%'` returned only `070_dedup_metrics_snapshots.sql` and `\d matches` had no `data_coverage` column. Cause: TASK-37 (which introduced the migration) was a code-only commit — migrations are applied manually per META invariant ("Always apply migrations via `make migrate`"). Implementer applied 071 via the documented invocation: `ssh jeromelu-prod 'cd /opt/jeromelu && set -a && . ./.env && set +a && DATABASE_URL="postgresql://jeromelu_admin:${POSTGRES_PASSWORD}@127.0.0.1:5432/jeromelu" bash packages/db/migrate.sh'`. 612 existing matches rows defaulted to `'full'` per the migration's `DEFAULT 'full'`. Verified post-apply: column + CHECK constraint + partial index all in place.
 - **`_derive_data_coverage` degenerate fallback = `'fixture_only'` (not `'full'`).** Spec wording "default still 'full'" was about the column-default in the migration, not the function's no-stats/no-rosters/no-timeline edge case. Implementer chose `'fixture_only'` because the non-downgrade CASE prevents poisoning existing rows; pinned by `test_data_coverage_derivation_thresholds`.
 - **Draw `external_match_id` = slug, not `fixture.matchId`.** Spec wording was impossible (draw fixtures have `matchId: null`). Slug from `matchCentreUrl` for modern fixtures; synthetic `{home}-v-{away}-r{NN}-{season}` for pre-1990. Two teams with identical nicknames in pre-1908 archives would collide (extremely unlikely; acceptable).
 - **Slug-disjoint identity scheme.** Match-centre keeps using `payload.matchId` (e.g., `'20261111210'`); draw-only uses slug. Walker pre-builds `mc_slugs` set so draw-only rows are only emitted for fixtures lacking a corresponding match-centre archive — no upsert collisions possible. The trust hierarchy (match-centre wins) is enforced by the non-downgrade CASE in the UPSERT.
