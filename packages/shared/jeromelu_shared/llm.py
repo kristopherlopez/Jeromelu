@@ -1,9 +1,18 @@
+from __future__ import annotations
+
 import json
 import logging
-
-from openai import OpenAI
+from typing import TYPE_CHECKING
 
 from jeromelu_shared.config import settings
+
+if TYPE_CHECKING:
+    # `openai` is a network SDK deliberately excluded from requirements-test.txt
+    # so unit-test collection stays lean. It is imported lazily inside the client
+    # getters below; this TYPE_CHECKING import keeps the type annotations resolvable
+    # for pyright (which installs openai via requirements-dev.txt) without forcing a
+    # runtime dependency at import time.
+    from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +24,8 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 def get_chat_client() -> OpenAI:
     """Get an OpenAI-compatible client for chat completions (routes via configured provider)."""
+    from openai import OpenAI
+
     global _chat_client
     if _chat_client is None:
         if settings.llm_provider == "openrouter":
@@ -29,6 +40,8 @@ def get_chat_client() -> OpenAI:
 
 def get_embedding_client() -> OpenAI:
     """Get an OpenAI client for embeddings (always OpenAI direct — OpenRouter doesn't support embedding models reliably)."""  # noqa: E501  # single-line docstring
+    from openai import OpenAI
+
     global _embedding_client
     if _embedding_client is None:
         _embedding_client = OpenAI(api_key=settings.openai_api_key)

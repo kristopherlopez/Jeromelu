@@ -8,11 +8,12 @@ ruff>=0.15,<1
 # pins the exact version after `pip install -r requirements-*.txt` for
 # determinism (pyright ships frequent releases).
 pyright>=1.1.380,<2
-# openai / temporalio are imported at module top-level inside the pyright
-# include set (packages/shared/jeromelu_shared/llm.py + temporal.py), so
-# pyright needs them present to resolve imports. requirements-test.txt
-# deliberately excludes them (its docstring lists "network SDKs" as
-# excluded for fast test installs) so they live here instead. Versions
-# match services/api/requirements.txt.
+# openai / temporalio are referenced by the pyright include set
+# (packages/shared/jeromelu_shared/llm.py + temporal.py), so pyright needs
+# them present to resolve imports. llm.py imports openai lazily (inside the
+# client getters, guarded by a TYPE_CHECKING import) so unit-test collection
+# stays lean; requirements-test.txt deliberately excludes them (its docstring
+# lists "network SDKs" as excluded for fast test installs) so they live here
+# instead. Versions match services/api/requirements.txt.
 openai==1.65.*
 temporalio==1.9.*
