@@ -30,16 +30,35 @@ _STATS_KEY_RE = re.compile(r"scout/nrlcom/stats/(?P<comp>\d+)/(?P<season>\d{4})\
 _CASUALTY_KEY_RE = re.compile(r"scout/nrlcom/casualty-ward/(?P<comp>\d+)/(?P<date>\d{8})\.json$")
 
 
-def _strip_nuls(row: dict[str, Any]) -> dict[str, Any]:
-    """Strip NULL bytes (`\\x00`) from any string values.
+def _scrub_nuls(value: Any) -> Any:
+    """Recursively strip NULL bytes from strings inside nested structures.
 
-    Postgres TEXT columns reject NULL bytes server-side. Historical nrl.com
-    payloads occasionally embed them (observed in 1999 ladder `streak` and
-    similar fields). The bytes carry no semantic value; stripping them
-    preserves the rest of the string. Applied to every string field in the
-    upsert dict so future fields are also protected.
+    Postgres TEXT columns reject embedded NULL bytes server-side; Postgres
+    JSONB also rejects the JSON escape form (backslash u followed by four
+    zeros) that json.dumps emits when it encounters a NULL char in a string.
+    Historical nrl.com payloads occasionally carry them (observed in 1999
+    ladder `streak` field). Stripping NULL bytes from the source dict before
+    json.dumps means the resulting JSON has no such escape and the JSONB
+    cast succeeds.
     """
-    return {k: v.replace("\x00", "") if isinstance(v, str) else v for k, v in row.items()}
+    if isinstance(value, str):
+        return value.replace("\x00", "")
+    if isinstance(value, dict):
+        return {k: _scrub_nuls(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_scrub_nuls(v) for v in value]
+    return value
+
+
+def _strip_nuls(row: dict[str, Any]) -> dict[str, Any]:
+    """Top-level NULL-byte scrub for an upsert row dict.
+
+    Delegates to :func:`_scrub_nuls` so nested values inside json-dumped
+    payloads are also covered. The JSONB cast at the upsert site rejects
+    the NULL-byte JSON escape, so the source dict must be scrubbed before
+    json.dumps emits any.
+    """
+    return _scrub_nuls(row)
 
 
 _EXPECTED_RETURN_RE = re.compile(r"Round\s+(\d+)", re.IGNORECASE)
@@ -119,6 +138,10 @@ def _extract_standing_rows(
     """
     rows: list[dict[str, Any]] = []
     for idx, pos in enumerate(payload.get("positions") or [], start=1):
+        # Scrub the source dict first so the raw_payload json.dumps below
+        # doesn't emit any embedded NULL-byte escapes (Postgres JSONB
+        # rejects them).
+        pos = _scrub_nuls(pos)
         stats = pos.get("stats") or {}
         nick = pos.get("teamNickname") or ""
         team_id = team_map.get(nick.lower())
