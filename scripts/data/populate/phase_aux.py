@@ -29,6 +29,19 @@ _LADDER_KEY_RE = re.compile(r"scout/nrlcom/ladder/(?P<comp>\d+)/(?P<season>\d{4}
 _STATS_KEY_RE = re.compile(r"scout/nrlcom/stats/(?P<comp>\d+)/(?P<season>\d{4})\.json$")
 _CASUALTY_KEY_RE = re.compile(r"scout/nrlcom/casualty-ward/(?P<comp>\d+)/(?P<date>\d{8})\.json$")
 
+
+def _strip_nuls(row: dict[str, Any]) -> dict[str, Any]:
+    """Strip NULL bytes (`\\x00`) from any string values.
+
+    Postgres TEXT columns reject NULL bytes server-side. Historical nrl.com
+    payloads occasionally embed them (observed in 1999 ladder `streak` and
+    similar fields). The bytes carry no semantic value; stripping them
+    preserves the rest of the string. Applied to every string field in the
+    upsert dict so future fields are also protected.
+    """
+    return {k: v.replace("\x00", "") if isinstance(v, str) else v for k, v in row.items()}
+
+
 _EXPECTED_RETURN_RE = re.compile(r"Round\s+(\d+)", re.IGNORECASE)
 
 
@@ -109,7 +122,7 @@ def _extract_standing_rows(
         stats = pos.get("stats") or {}
         nick = pos.get("teamNickname") or ""
         team_id = team_map.get(nick.lower())
-        rows.append({
+        rows.append(_strip_nuls({
             "team_id": team_id,
             "nrlcom_team_nickname": nick,
             "competition": competition,
@@ -141,7 +154,7 @@ def _extract_standing_rows(
             "odds": stats.get("odds"),
             "raw_payload": json.dumps(pos, default=str),
             "s3_archive_key": key,
-        })
+        }))
     return rows
 
 
