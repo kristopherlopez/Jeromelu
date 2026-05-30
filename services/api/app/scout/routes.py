@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from .dashboard import router as dashboard_router
 from .nrlcom_casualty_ward import router as nrlcom_casualty_ward_router
 from .nrlcom_draw import router as nrlcom_draw_router
 from .nrlcom_ladder import router as nrlcom_ladder_router
@@ -19,6 +20,7 @@ from .supercoach_teams import router as supercoach_teams_router
 router = APIRouter()
 
 for pipeline_router in (
+    dashboard_router,
     supercoach_roster_router,
     supercoach_settings_router,
     supercoach_stats_router,

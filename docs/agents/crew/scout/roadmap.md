@@ -117,11 +117,14 @@ Total: ~4-5 hours single-machine, rate-limited at 1 req/sec per origin. ~1-2GB S
 
 Backfill produces the same S3 keys daily cron does — re-running future cron over the same range is a no-op.
 
-### Phase 6 — Unified Scout dashboard — In design
+### Phase 6 — Unified Scout dashboard — API shipped; web in design
 
 Operator view at `/admin/scout` showing health across every pipeline (media + identity + stats + fixtures + injuries + ladder + leaderboards). Reads from `agent_runs` filtered by `agent_id='scout'`, groups by `detail_json.pipeline`. Per-pipeline: last run, status, row counts, cost. No new data — just the view.
 
-This phase isn't blocked by anything earlier; could ship in parallel with Phases 3-4 to give visibility while migration happens.
+API slice: `GET /api/admin/scout/dashboard` is read-only and groups recent
+Scout `agent_runs` rows by `detail_json.pipeline`, returning last run status,
+timestamps, summary, compact detail counts, recent failure count, and cost
+rollups. The web UI at `/admin/scout` remains the follow-up slice.
 
 ### Phase 7 (future) — Multi-platform expansion — Backlog
 
