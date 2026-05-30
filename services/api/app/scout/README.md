@@ -10,7 +10,7 @@ belongs to Analyst, Bookkeeper, Archivist, or feature routers.
 |---|---|
 | `routes.py` | Aggregates all Scout admin pipeline routers for `app.main`. |
 | `common/` | Shared deterministic-pipeline plumbing: audit rows, archive detail flags, raw-response S3 archive writer. |
-| `source_discovery/` | Agentic YouTube/web source discovery. |
+| `source_discovery/` | Deterministic YouTube discovery plus agentic web/off-platform discovery. |
 | `presenter_research/` | Agentic presenter/person research for one known channel. |
 | `youtube/` | YouTube Data API client plus refresh/metrics/coverage jobs. |
 | `media/` | YouTube audio acquisition plus legacy/debug persistent video helpers and CLIs. |

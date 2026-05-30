@@ -7,12 +7,12 @@ tags: [area/agents, subarea/system, status/live]
 | | |
 |---|---|
 | **Package** | `services/api/app/scout/` |
-| **Trigger** | Manual CLI for now (`python -m app.scout.source_discovery.cli`); admin endpoint + cron later |
+| **Trigger** | Deterministic YouTube: admin endpoint / CLI; agentic long tail: manual CLI |
 | **Crew counterpart** | [Scout](../crew/scout/README.md) — this is Scout's source-discovery surface |
 | **ETL role** | **Extract only.** No Transform. (Cleaning, diarisation, parsing, embedding are downstream — see [crew/scout/architecture.md § Hand-off contract](../crew/scout/architecture.md#hand-off-contract).) |
-| **Status** | Discovery + admin recon API + post-approval video enumeration shipped |
+| **Status** | Deterministic YouTube discovery + agentic long-tail discovery + admin recon API + post-approval video enumeration shipped |
 
-Scout's "find new sources" job. An autonomous Anthropic agent that hunts the web for NRL YouTube channels and videos, scores them, and files them to `scout_candidates` for human review. **Not Temporal-based** — runs in-process, see [project-temporal-not-in-prod note](../../operations/aws-resource-inventory.md).
+Scout's "find new sources" job. The YouTube-native bulk path is deterministic: it calls the YouTube Data API, dedupes against server-side DB state, scores candidates with transparent metadata-based reasons, and files only novel rows to `scout_candidates` for human review. The autonomous Anthropic agent remains available for off-platform and long-tail discovery where structured YouTube search is not enough. **Not Temporal-based** — runs in-process, see [project-temporal-not-in-prod note](../../operations/aws-resource-inventory.md).
 
 Approval of a channel candidate triggers deterministic post-processing: the channel's full uploads playlist is enumerated and each video is inserted as a `sources` row, with an initial popularity snapshot in `video_metrics`. A daily refresh job re-walks each channel for new uploads and re-snapshots view/like/comment counts so we can rank videos by influence and detect breakouts. See [§ Post-approval video enumeration](#post-approval-video-enumeration) below.
 
@@ -31,6 +31,26 @@ It does not write `source_documents` (that's [ingestion](ingestion.md)), nor any
 ## Architecture
 
 ```
+YOUTUBE_API_KEY
+        │
+        ▼
+  YouTube Data API helpers (services/api/app/scout/youtube/client.py)
+        │
+        ├── search_channels / harvest_channels_from_videos / search_videos
+        ├── get_channel_stats / get_video_stats
+        └── server-side dedupe filter:
+              channels.external_id
+              sources.canonical_url -> video_id
+              scout_candidates.(platform, kind, external_id)
+        │
+        ▼
+  deterministic_youtube.py
+        │
+        ├── enriches IDs with useful metadata
+        ├── scores with explicit score_reasons
+        └── INSERT scout_candidates (status='pending')
+            ON CONFLICT DO NOTHING
+
 ANTHROPIC_API_KEY
         │
         ▼
@@ -58,9 +78,12 @@ ANTHROPIC_API_KEY
 | File | Purpose |
 |---|---|
 | `app/scout/prompt.py` | System prompt (Scout voice + scope + tagging taxonomy) and default user brief |
+| `app/scout/source_discovery/deterministic_youtube.py` | Deterministic YouTube discovery, scoring, DB dedupe, and candidate persistence |
+| `app/scout/source_discovery/deterministic_youtube_cli.py` | `python -m app.scout.source_discovery.deterministic_youtube_cli` entry point |
+| `app/scout/source_discovery/routes.py` | Admin endpoint for cron-friendly deterministic YouTube discovery |
 | `app/scout/source_discovery/tools.py` | Anthropic tool definitions + Python handlers (`dedupe_check`, `persist_candidate`) |
 | `app/scout/source_discovery/agent.py` | Multi-turn streaming loop with bounds (turns, tool calls, wall-clock, USD budget) |
-| `app/scout/source_discovery/cli.py` | `python -m app.scout.source_discovery.cli` entry point |
+| `app/scout/source_discovery/cli.py` | Agentic discovery entry point |
 | `app/scout/youtube/client.py` | YouTube Data API v3 client (search, channel stats, playlist enumeration, video stats) |
 | `app/scout/youtube/refresh.py` | Post-approval video enumeration + daily stats refresh (deterministic, not agent-driven) |
 | `app/routers/recon.py` | Admin recon endpoints (list/approve/reject candidates) + the daily refresh entry point |
@@ -77,6 +100,48 @@ ANTHROPIC_API_KEY
 | `dedupe_check_bulk` | Custom | Batched dedupe: pass an array of `{kind, url}`, get a verdict for each in one call. **Preferred** for filtering a fresh search-result page. |
 | `dedupe_check` | Custom | Single-item dedupe. Use only when investigating one candidate (e.g. after a `web_fetch`). |
 | `persist_candidate` | Custom | Writes to `scout_candidates` with `status='pending'`. Idempotent on `(platform, kind, external_id)`. |
+
+## Deterministic YouTube discovery
+
+The deterministic path is first-class for YouTube-native discovery:
+
+1. Load known IDs from `channels`, YouTube `sources`, and `scout_candidates`.
+2. Pass those known IDs into the YouTube helper calls so the API-facing server code filters repeat channels/videos before scoring.
+3. Enrich novel channel IDs with `channels.list` and novel video IDs with `videos.list`.
+4. Compute `content_categories`, `score`, and `score_reasons` from explicit metadata signals such as NRL wording, subscriber/video/view counts, AU country, parent channel ID, and harvest context.
+5. Insert candidates with `status='pending'` using `ON CONFLICT DO NOTHING` on `(platform, kind, external_id)`.
+
+Cron-friendly endpoint:
+
+```http
+POST /api/admin/scout/source-discovery/youtube
+  ?dry_run=true
+  ?max_results=10
+  ?max_videos=25
+  ?published_after=2026-04-01T00:00:00Z
+  Header: X-Admin-Key
+```
+
+Optional repeated query params override the default query bank:
+`channel_query=...`, `video_query=...`, `harvest_query=...`, and
+`related_channel_id=UC...`. `no_channel_search=true`,
+`no_video_search=true`, and `no_harvest_search=true` disable individual
+surfaces. The endpoint writes `agent_runs` rows under
+`detail_json.pipeline='youtube-discovery'`; it does not add cron.
+
+Manual CLI:
+
+```bash
+python -m app.scout.source_discovery.deterministic_youtube_cli --dry-run
+python -m app.scout.source_discovery.deterministic_youtube_cli --channel-query "NRL injury podcast" --json
+python -m app.scout.source_discovery.deterministic_youtube_cli --no-video-search --max-results 25
+```
+
+The older agentic CLI remains:
+
+```bash
+python -m app.scout.source_discovery.cli --brief "Find off-platform NRL podcasts and blogs"
+```
 
 ## Anti-rediscovery — Tier 1 (built)
 
@@ -99,9 +164,9 @@ Defaults (override via CLI flags or `AgentBounds`):
 ## DB interactions
 
 - Reads: `channels.external_id`, `sources.canonical_url`, `scout_candidates.(platform,kind,external_id)` — all dedup checks.
-- Writes: `scout_candidates` rows (candidates), `crew_activity` rows (run-level start + end summaries — see Audit trail below).
+- Writes: `scout_candidates` rows (candidates), `agent_runs` rows for run-level start/end summaries, and `agent_events` rows for the agentic loop.
 
-Approval flow (writes to `channels` / `sources`) is a separate slice — no admin endpoint yet.
+Approval flow (writes to `channels` / `sources`) is handled by the admin recon endpoints in `app/routers/recon.py`.
 
 ## Audit trail
 
@@ -517,7 +582,7 @@ LIMIT 50;
 
 - Admin review queue UI (`/admin/recon`) — backend endpoints exist; UI pending
 - Live Recon stream in `/pulse` (SSE) — Slice 3
-- Scheduled Scout runs (cron / APScheduler) — Slice 4
+- Scheduled deterministic discovery runs (cron / APScheduler) — endpoint and CLI exist; no schedule is added here
 - `Event` rows for the agent's reasoning trace — TBD when the live stream lands
 - Transcript-ingestion automation for newly-enumerated videos — single-source
   CLI shipped (`make extract-transcript SOURCE_ID=...`, audio-first via
@@ -525,34 +590,17 @@ LIMIT 50;
   [`sources/extraction-method.md`](../../sources/extraction-method.md)).
   Recurring drain over `ingestion_status='pending'` is the next slice.
 
-## Future improvements — Tier 2 and Tier 3
+## Future improvements
 
-Documented for when Tier 1 stops being enough.
+### Bias toward category gaps
 
-### Tier 2 — Replace generic `web_search` with YouTube-aware tools
+Today the deterministic query bank is even-handed across the full NRL ecosystem. In practice it can still over-surface whatever YouTube ranks highest — likely SuperCoach + match highlights, since those dominate volume.
 
-Tier 1 reduces wasted drill-ins but doesn't stop the upstream search engine from returning popular hits in the first place. Tier 2 cuts at the source.
-
-Add two custom tools that replace generic `web_search` for YouTube-specific discovery:
-
-- **`youtube_search(query, filter_known=True)`** — calls the YouTube Data API (or `yt-dlp --match-filter`) directly. Server-side filters out any channel/video whose `external_id` is already in `channels` / `sources` / `scout_candidates` *before* returning to the agent. The agent only ever sees novel results.
-- **`find_related_channels(known_channel_id, limit=10)`** — pulls channels related to one we already track, via YouTube's "related channels" signal or by scraping the channel's collaborators / community / featured-channels surface. High-leverage for finding adjacent creators we don't already know.
-
-Tradeoffs: more code, YouTube Data API quota to budget (search.list is 100 units/call vs the 10,000-unit daily free tier), and we lose some serendipity (`web_search` sometimes finds great channels via blog posts that mention them — a YouTube-native tool can't).
-
-Keep `web_search` available but de-emphasise it in the prompt; use it for the off-platform discovery angle (blogs, news mentions) only.
-
-### Tier 3 — Bias toward category gaps
-
-Today the brief is even-handed across the full NRL ecosystem. In practice the agent will gravitate to whatever sub-vertical the search engine surfaces most — likely SuperCoach + match highlights, since those dominate volume.
-
-Tier 3: pre-run, count `scout_candidates.content_categories` to find which tags are underrepresented (e.g. zero candidates for `nrlw`, `junior`, `classic`). Inject into the user brief:
+Next step: pre-run, count `scout_candidates.content_categories` to find which tags are underrepresented (e.g. zero candidates for `nrlw`, `junior`, `classic`) and add a targeted query set for the next deterministic run:
 
 ```
 Coverage gaps: nrlw (0 candidates), junior (0), classic (1).
-This run: bias toward these.
+This run: add NRLW / junior / classic query terms.
 ```
 
-Cheap to add (one query + one paragraph in the brief). Naturally rotates Scout through the long tail without us having to write rotating query banks. Best added once we have a few runs of data so "underrepresented" actually means something.
-
-Both tiers are additive — they layer on top of Tier 1 without replacing it.
+Cheap to add (one query + one result paragraph). Naturally rotates Scout through the long tail without relying on the agentic loop for YouTube-native gaps. Best added once we have a few deterministic runs of data so "underrepresented" actually means something.

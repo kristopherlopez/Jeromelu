@@ -10,6 +10,7 @@ from .nrlcom_ladder import router as nrlcom_ladder_router
 from .nrlcom_match_centre import router as nrlcom_match_centre_router
 from .nrlcom_players_roster import router as nrlcom_players_roster_router
 from .nrlcom_stats import router as nrlcom_stats_router
+from .source_discovery.routes import router as source_discovery_router
 from .supercoach_roster import router as supercoach_roster_router
 from .supercoach_settings import router as supercoach_settings_router
 from .supercoach_stats import router as supercoach_stats_router
@@ -28,6 +29,7 @@ for pipeline_router in (
     nrlcom_ladder_router,
     nrlcom_stats_router,
     nrlcom_players_roster_router,
+    source_discovery_router,
 ):
     router.include_router(pipeline_router)
 
