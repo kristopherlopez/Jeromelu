@@ -27,7 +27,7 @@ class TestTranscriptS3KeyFromAudio:
         assert result == "youtube/UCxxx/abc123.deepgram.json"
 
     def test_non_m4a_appends_suffix(self):
-        # Defensive: if Scout ever stores audio under a different extension
+        # Defensive: if Miner ever stores audio under a different extension
         # the key still derives uniquely (no clobber of a real .m4a path).
         result = transcript_s3_key_from_audio("youtube/UCxxx/abc123.wav")
         assert result == "youtube/UCxxx/abc123.wav.deepgram.json"

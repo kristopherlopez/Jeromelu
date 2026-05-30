@@ -23,7 +23,7 @@ Sources scanned, in priority order:
 
 (Sources we deliberately skip)
   - supercoach players-cf: already the primary writer for people via
-    `scout/supercoach_roster/`. No new inserts here.
+    `miner/supercoach_roster/`. No new inserts here.
   - nrlsupercoachstats: synthetic name-hash IDs. Not safe as an
     identity primary key.
   - casualty-ward: no profile id. Only useful for enrichment.
@@ -227,7 +227,7 @@ def populate_people_history(
         len(team_id_by_nrlcom), len(team_id_by_nick), len(by_nrlcom), len(by_slug),
     )
 
-    keys = list_keys(f"scout/nrlcom/match-centre/{competition}/")
+    keys = list_keys(f"miner/nrlcom/match-centre/{competition}/")
     logger.info("phase_people: %d match-centre archives to scan", len(keys))
 
     # Distinct-by-nrlcom-id, keeping the FIRST (most-recent walk-order)

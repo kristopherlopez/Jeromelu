@@ -19,7 +19,7 @@ tags: [area/operations, data-lineage]
 - `process-transcript` skill — multi-pass extraction; writes pending claims with `claim_type` + `payload_json`
 - `verify-claims` skill — Haiku agent per claim re-checks `claim_type`, `claim_text`, `strength`, `polarity`, `start_ts`, `end_ts` against the clean transcript
 - `upload-transcript` skill — persists verified claims to DB
-- `services/api/app/scout/supercoach_roster/notes_extractor.py` — SC notes path
+- `services/api/app/miner/supercoach_roster/notes_extractor.py` — SC notes path
 
 ## Field mapping
 

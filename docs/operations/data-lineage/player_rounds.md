@@ -17,8 +17,8 @@ tags: [area/operations, data-lineage]
 
 ## Writers
 
-- `services/api/app/scout/supercoach_stats/` — primary path; reads from `scout/nrlsupercoachstats/stats/{season}/round-{NN}.json` and writes to `player_rounds`
-- **Planned:** SC overlay extractor — reads `scout/supercoach/classic/players-cf/*.player_stats[]` and writes lookahead/projection columns
+- `services/api/app/miner/supercoach_stats/` — primary path; reads from `miner/nrlsupercoachstats/stats/{season}/round-{NN}.json` and writes to `player_rounds`
+- **Planned:** SC overlay extractor — reads `miner/supercoach/classic/players-cf/*.player_stats[]` and writes lookahead/projection columns
 
 ## Field mapping
 

@@ -18,7 +18,7 @@ forensic transcript.
 S3 key format:
   {settings.s3_agent_logs_bucket}/agent-logs/{agent_id}/{YYYY}/{MM}/{DD}/{run_id}.jsonl
 
-Usage skeleton (see services/api/app/scout/source_discovery/agent.py for the reference impl):
+Usage skeleton (see services/api/app/miner/source_discovery/agent.py for the reference impl):
 
     from jeromelu_shared.agent_audit import (
         AgentAuditLog, AgentBounds, MODEL_PRICING,
@@ -26,12 +26,12 @@ Usage skeleton (see services/api/app/scout/source_discovery/agent.py for the ref
         record_agent_started, record_agent_ended,
     )
 
-    run_id = make_run_id("scout")
+    run_id = make_run_id("miner")
     audit = AgentAuditLog(
-        session=session, agent_id="scout", run_id=run_id,
+        session=session, agent_id="miner", run_id=run_id,
         s3_bucket=settings.s3_agent_logs_bucket,
     )
-    record_agent_started(session, agent_id="scout", agent_name="Scout",
+    record_agent_started(session, agent_id="miner", agent_name="Miner",
                          run_id=run_id, model=..., brief=..., bounds=asdict(bounds))
     audit.run_started(model=..., brief=..., bounds=asdict(bounds))
 

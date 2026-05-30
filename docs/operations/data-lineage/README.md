@@ -30,7 +30,7 @@ For the conceptual L1 (external) → L2 (S3) → L3 (DB) overview and identity-r
 
 ### Layer 3 — Content & claims
 
-- [scout_candidates](scout_candidates.md) · [scout_presenter_candidates](scout_presenter_candidates.md) · [source_presenters](source_presenters.md)
+- [miner_candidates](miner_candidates.md) · [miner_presenter_candidates](miner_presenter_candidates.md) · [source_presenters](source_presenters.md)
 - [channels](channels.md) · [channel_metrics](channel_metrics.md) · [sources](sources.md) · [video_metrics](video_metrics.md)
 - [source_documents](source_documents.md) · [source_chunks](source_chunks.md) · [source_speakers](source_speakers.md) · [source_chapters](source_chapters.md)
 - [source_face_detections](source_face_detections.md) · [source_face_clusters](source_face_clusters.md) · [person_voiceprints](person_voiceprints.md) · [person_face_embeddings](person_face_embeddings.md)

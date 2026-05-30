@@ -83,7 +83,7 @@ export default function ChannelCoveragePanel() {
     setError(null);
     try {
       // onlyGaps is filtered client-side so toggling it doesn't refetch.
-      const url = `${base}/api/admin/scout/channel-coverage`;
+      const url = `${base}/api/admin/miner/channel-coverage`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
       const json: CoverageResponse = await res.json();

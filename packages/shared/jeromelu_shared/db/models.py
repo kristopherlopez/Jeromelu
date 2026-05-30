@@ -1691,7 +1691,7 @@ class AgentRun(Base):
             name="ck_agent_runs_status",
         ),
         CheckConstraint(
-            "agent_id IN ('scout', 'scribe', 'analyst', 'stats', 'fixtures')",
+            "agent_id IN ('miner', 'presenter_miner', 'scribe', 'analyst', 'stats', 'fixtures')",
             name="ck_agent_runs_agent_id",
         ),
         Index("idx_agent_runs_agent_started", "agent_id", "started_at"),
@@ -1767,10 +1767,10 @@ class Outcome(Base):
     scored_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
 
-class ScoutCandidate(Base):
-    """Scout's candidate inbox.
+class MinerCandidate(Base):
+    """Miner's candidate inbox.
 
-    Scout (the source-discovery agent) writes here as it hunts the web for
+    Miner (the source-discovery agent) writes here as it hunts the web for
     new NRL channels and videos worth onboarding. Humans approve or reject
     via the admin review queue; approval promotes a row into the canonical
     ``channels`` (kind=channel) or ``sources`` (kind=video) tables.
@@ -1779,7 +1779,7 @@ class ScoutCandidate(Base):
     pipeline. Renamed from ``discovered_sources`` in migration 035.
     """
 
-    __tablename__ = "scout_candidates"
+    __tablename__ = "miner_candidates"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
     kind: Mapped[str] = mapped_column(Text, nullable=False)
@@ -1803,21 +1803,21 @@ class ScoutCandidate(Base):
     run_id: Mapped[str | None] = mapped_column(Text)
 
     __table_args__ = (
-        CheckConstraint("kind IN ('channel', 'video')", name="ck_scout_candidates_kind"),
+        CheckConstraint("kind IN ('channel', 'video')", name="ck_miner_candidates_kind"),
         CheckConstraint(
             "status IN ('pending', 'approved', 'rejected', 'snoozed', 'duplicate')",
-            name="ck_scout_candidates_status",
+            name="ck_miner_candidates_status",
         ),
         UniqueConstraint(
             "platform",
             "kind",
             "external_id",
-            name="uq_scout_candidates_platform_kind_external",
+            name="uq_miner_candidates_platform_kind_external",
         ),
-        Index("idx_scout_candidates_status", "status"),
-        Index("idx_scout_candidates_kind", "kind"),
-        Index("idx_scout_candidates_run", "run_id"),
-        Index("idx_scout_candidates_at", "discovered_at"),
+        Index("idx_miner_candidates_status", "status"),
+        Index("idx_miner_candidates_kind", "kind"),
+        Index("idx_miner_candidates_run", "run_id"),
+        Index("idx_miner_candidates_at", "discovered_at"),
     )
 
 
@@ -1879,17 +1879,17 @@ class VideoMetric(Base):
     )
 
 
-class ScoutPresenterCandidate(Base):
-    """Presenter Scout's staging inbox.
+class MinerPresenterCandidate(Base):
+    """Presenter Miner's staging inbox.
 
-    The Presenter Scout agent researches a channel's regular presenters via
+    The Presenter Miner agent researches a channel's regular presenters via
     web search and files each finding here. Humans confirm/reject in the
     admin review surface; confirmation creates (or links) a `people` row
     and writes a `source_presenters` association. See migration 052 and
     docs/todo/source-presenters.md.
     """
 
-    __tablename__ = "scout_presenter_candidates"
+    __tablename__ = "miner_presenter_candidates"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
     channel_id: Mapped[uuid.UUID] = mapped_column(
@@ -1918,13 +1918,13 @@ class ScoutPresenterCandidate(Base):
     __table_args__ = (
         CheckConstraint(
             "role IN ('host','co-host','regular','frequent-guest')",
-            name="ck_scout_pres_role",
+            name="ck_miner_pres_role",
         ),
         CheckConstraint(
             "status IN ('pending','confirmed','rejected')",
-            name="ck_scout_pres_status",
+            name="ck_miner_pres_status",
         ),
-        Index("idx_scout_pres_channel_status", "channel_id", "status"),
+        Index("idx_miner_pres_channel_status", "channel_id", "status"),
     )
 
 
@@ -1954,7 +1954,7 @@ class SourcePresenter(Base):
     confirmed_by: Mapped[str | None] = mapped_column(Text)
     candidate_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("scout_presenter_candidates.id", ondelete="SET NULL"),
+        ForeignKey("miner_presenter_candidates.id", ondelete="SET NULL"),
     )
 
     __table_args__ = (

@@ -22,7 +22,7 @@ _AWAY_UUID = "22222222-2222-2222-2222-222222222222"
 
 @pytest.fixture(scope="module")
 def payload(fixtures_dir: Path) -> dict:
-    path = fixtures_dir / "scout" / "nrlcom_match_centre" / "canonical_response.json"
+    path = fixtures_dir / "miner" / "nrlcom_match_centre" / "canonical_response.json"
     return json.loads(path.read_text(encoding="utf-8"))
 
 

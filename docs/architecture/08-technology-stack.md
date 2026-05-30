@@ -19,14 +19,14 @@ the full status of each module, see
 ## Public / Admin API
 - **FastAPI + Python**
 - Pydantic for typed schemas
-- SSE for streamed agentic events (Scout, Analyst); plain JSON otherwise
+- SSE for streamed agentic events (Miner, Analyst); plain JSON otherwise
 - Admin endpoints gated by `X-Admin-Key`
 
 ## Pipelines
 Most production pipelines are CLI / cron-driven Python modules inside the `api`
 container. The two surfaces:
 
-- **Scout** (`services/api/app/scout/`) — agentic discovery via the Claude Agent SDK; deterministic enumeration / refresh; yt-dlp-based audio + low-res video acquisition.
+- **Miner** (`services/api/app/miner/`) — agentic discovery via the Claude Agent SDK; deterministic enumeration / refresh; yt-dlp-based audio + low-res video acquisition.
 - **Analyst** (`services/api/app/analyst/`) — Deepgram + pyannote transcription, voice / visual speaker identification, cross-modal fusion. Heavy inference can offload to the `services/gpu/` SageMaker Async endpoint when `LINEUP_REMOTE=1`.
 
 **Workflow orchestration:** Temporal exists in `docker-compose.yml` for local
@@ -47,7 +47,7 @@ or one-shot CLI invocations driven via `make` targets.
 - Migrations: hand-numbered SQL under `packages/db/migrations/`, applied via `make migrate`
 
 ## AI / ML Layer
-- **LLM** — Anthropic (`claude-sonnet-4-6` for the Scout agentic loop today; broader use as more pipelines come online). Some legacy code still references OpenAI; migration in progress.
+- **LLM** — Anthropic (`claude-sonnet-4-6` for the Miner agentic loop today; broader use as more pipelines come online). Some legacy code still references OpenAI; migration in progress.
 - **ASR** — Deepgram nova-3, batch prerecorded API, `language=en-AU`, keyterm vocabulary built from the canonical roster.
 - **Diarisation** — `pyannote/speaker-diarization-3.1` (HuggingFace) — primary diarizer.
 - **Voice embeddings** — `pyannote/wespeaker-voxceleb-resnet34-LM` (256-dim, bundled with the diarization pipeline).
@@ -75,13 +75,13 @@ or one-shot CLI invocations driven via `make` targets.
 | Service | Status | Location |
 |---|---|---|
 | `web` (Next.js) | Live | Lightsail container, image `jeromelu/web` |
-| `api` (FastAPI — Scout + Analyst + admin) | Live | Lightsail container, image `jeromelu/api` |
+| `api` (FastAPI — Miner + Analyst + admin) | Live | Lightsail container, image `jeromelu/api` |
 | `postgres` | Live | Lightsail container, named volume |
 | `caddy` | Live | Lightsail container, ACME via Let's Encrypt |
 | `services/gpu/` (lineup remote inference) | Live (on-demand) | SageMaker Async, `ml.g4dn.xlarge`, scale-to-zero |
 | `worker-publishing`, `worker-orchestrator` | Dev-only (Temporal) | Local docker-compose, not deployed |
-| `worker-scraper` | Retired 2026-05-28 | Deleted from tree (Scout Phase 4 closure, TASK-28); activities migrated to `services/api/app/scout/<pipeline>/` per the [Scout charter](../agents/crew/scout/charter.md) D4 |
-| `worker-ingestion` | Superseded | Replaced by Scout `audio.py` + Analyst `transcribe.py` |
+| `worker-scraper` | Retired 2026-05-28 | Deleted from tree (Miner Phase 4 closure, TASK-28); activities migrated to `services/api/app/miner/<pipeline>/` per the [Miner charter](../agents/crew/miner/charter.md) D4 |
+| `worker-ingestion` | Superseded | Replaced by Miner `audio.py` + Analyst `transcribe.py` |
 | `worker-extraction`, `worker-decision` | Not built | — |
 
 For per-module detail (driver, schedule, status), see

@@ -1,6 +1,6 @@
 """Phase 2e — extract_match_timeline + extract_match_officials.
 
-Both come from the same scout/nrlcom/match-centre/* archives — combined
+Both come from the same miner/nrlcom/match-centre/* archives — combined
 here so we only walk the archive set once.
 
 match_timeline:
@@ -138,7 +138,7 @@ def populate_timeline_and_officials(
         len(team_map), len(match_map), len(player_map),
     )
 
-    keys = list_keys(f"scout/nrlcom/match-centre/{competition}/")
+    keys = list_keys(f"miner/nrlcom/match-centre/{competition}/")
     if seasons:
         season_strs = {f"/{s}/" for s in seasons}
         keys = [k for k in keys if any(s in k for s in season_strs)]

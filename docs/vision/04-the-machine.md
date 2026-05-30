@@ -20,7 +20,7 @@ What follows is the machine, layer by layer. Each layer is a component defined b
 
 ## 1. Source Discovery Layer
 
-**Component:** Scout
+**Component:** Miner
 
 **Purpose:** Find the relevant voices, sources, and content worth ingesting.
 
@@ -49,13 +49,13 @@ What follows is the machine, layer by layer. Each layer is a component defined b
 
 **Reusability**
 
-High. You can point Scout at NRL, AI, SuperCoach, cricket, markets, or any other topic.
+High. You can point Miner at NRL, AI, SuperCoach, cricket, markets, or any other topic.
 
 **Strategic status**
 
 Useful internal infrastructure. Probably not a standalone product, because research-agent / source-discovery tooling is crowded. The defensible part is domain tuning, source scoring, and integration into the rest of the system.
 
-See [Scout](../agents/crew/scout/README.md).
+See [Miner](../agents/crew/miner/README.md).
 
 ---
 
@@ -97,7 +97,7 @@ Very high. This is a generic "topic data ingestion" layer.
 
 **Strategic status**
 
-Necessary foundation, but not the main differentiator. The durability discipline behind it — archive everything, make every projection re-derivable from the archive — is documented in [data-lineage](../architecture/data-lineage.md). This is Scout's **bronze layer**: raw capture for every external source, media and structured alike, landed faithfully before any interpretation — see [Scout charter §D1](../agents/crew/scout/charter.md#d1-the-boundary-principle--scout-owns-the-bronze-layer).
+Necessary foundation, but not the main differentiator. The durability discipline behind it — archive everything, make every projection re-derivable from the archive — is documented in [data-lineage](../architecture/data-lineage.md). This is Miner's **bronze layer**: raw capture for every external source, media and structured alike, landed faithfully before any interpretation — see [Miner charter §D1](../agents/crew/miner/charter.md#d1-the-boundary-principle--miner-owns-the-bronze-layer).
 
 ---
 
@@ -329,7 +329,7 @@ Core differentiator. This is different from track record. Track record asks, *"W
 - media reports
 - historical databases
 
-> These all arrive through Scout's bronze layer — nrl.com match-centre, casualty-ward, ladder, and rugbyleagueproject feeds are Scout-acquired and trust-resolved per [Scout charter §D11](../agents/crew/scout/charter.md#d11-trust-hierarchy--which-source-wins-per-field). The Referee *reads* them; it does not fetch them.
+> These all arrive through Miner's bronze layer — nrl.com match-centre, casualty-ward, ladder, and rugbyleagueproject feeds are Miner-acquired and trust-resolved per [Miner charter §D11](../agents/crew/miner/charter.md#d11-trust-hierarchy--which-source-wins-per-field). The Referee *reads* them; it does not fetch them.
 
 **Outputs**
 
@@ -585,8 +585,8 @@ Build state is *not* duplicated here. Worker status lives in the [system index](
 
 | # | Layer | Crew mode | Runtime (worker / surface) |
 |---|---|---|---|
-| 1 | Source Discovery | [Scout](../agents/crew/scout/README.md) | [source-discovery](../agents/system/source-discovery.md) |
-| 2 | Data Ingestion | [Scout](../agents/crew/scout/README.md) | [ingestion](../agents/system/ingestion.md) |
+| 1 | Source Discovery | [Miner](../agents/crew/miner/README.md) | [source-discovery](../agents/system/source-discovery.md) |
+| 2 | Data Ingestion | [Miner](../agents/crew/miner/README.md) | [ingestion](../agents/system/ingestion.md) |
 | 3 | Identity & Attribution | — | [speaker-identification](../agents/system/speaker-identification.md) |
 | 4 | Transcript Quality | [Analyst](../agents/crew/analyst/README.md) | [transcription-pipeline](../agents/system/transcription-pipeline.md) |
 | 5 | Maintained Knowledge | [Archivist](../agents/crew/archivist/README.md) | [publishing](../agents/system/publishing.md) |
@@ -602,7 +602,7 @@ Build state is *not* duplicated here. Worker status lives in the [system index](
 
 What the crosswalk makes visible: the five crew modes fan out across all 14 layers and several layers (Identity, Observability, Synthetic Media) have *no* crew owner because they're plumbing, not thinking. The crew is the lens for *how Jaromelu reasons*; The Machine is the lens for *what the pipeline does*. Neither replaces the other.
 
-**Medallion cross-reference.** Scout's charter cuts the same system a third way — by *data maturity*. In medallion terms: **bronze** is raw external capture, owned by Scout — layers 1–2 plus the structured feeds behind layers 8–9; **silver** is the interpretive transform owned by the Analyst — cleaning and claim extraction (layers 4, 6), plus the speaker→Person attribution slice of layer 3; **gold** is the curated and derived tier owned by the Bookkeeper and Archivist — consensus, scoring, the wiki (layers 5, 7, 9). The charter's medallion model names only those four crew; Critic (verification) and Jaromelu (decision, agent, presentation) are later crew that consume *across* all three tiers rather than owning one. See [Scout charter §D1](../agents/crew/scout/charter.md#d1-the-boundary-principle--scout-owns-the-bronze-layer).
+**Medallion cross-reference.** Miner's charter cuts the same system a third way — by *data maturity*. In medallion terms: **bronze** is raw external capture, owned by Miner — layers 1–2 plus the structured feeds behind layers 8–9; **silver** is the interpretive transform owned by the Analyst — cleaning and claim extraction (layers 4, 6), plus the speaker→Person attribution slice of layer 3; **gold** is the curated and derived tier owned by the Bookkeeper and Archivist — consensus, scoring, the wiki (layers 5, 7, 9). The charter's medallion model names only those four crew; Critic (verification) and Jaromelu (decision, agent, presentation) are later crew that consume *across* all three tiers rather than owning one. See [Miner charter §D1](../agents/crew/miner/charter.md#d1-the-boundary-principle--miner-owns-the-bronze-layer).
 
 ---
 
@@ -611,7 +611,7 @@ What the crosswalk makes visible: the five crew modes fan out across all 14 laye
 - [Knowledge Asset](03-knowledge-asset.md) — the asset these layers build
 - [Venture Thesis](01-venture-thesis.md) — why NRL is the proving ground, not the product
 - [Agents](../agents/README.md) — the crew / system / skills taxonomy the crosswalk maps onto
-- [Scout](../agents/crew/scout/README.md) — source discovery in practice
+- [Miner](../agents/crew/miner/README.md) — source discovery in practice
 - [Agent Audit](../agents/system/agent-audit.md) — the observability layer + event model contract
 - [LLM Wiki](../pages/wiki/llm-wiki-pattern.md) — the self-maintaining knowledge layer
 - [The Ledger](../pages/ledger/overview.md) — the reputation layer (Alignment Index) in practice

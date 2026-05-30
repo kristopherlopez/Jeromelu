@@ -1,6 +1,6 @@
 """Unit tests for the phase_aux stat-leaderboards pure extractor.
 
-`phase_aux.py:populate_stat_leaderboards` projects Scout's nrl.com
+`phase_aux.py:populate_stat_leaderboards` projects Miner's nrl.com
 /stats/data S3 archives into `stat_leaderboards`. The DB write is a straight
 UPSERT; the *mapping* — walk both scope blocks, flatten the four-level
 nesting (scope → category → subgroup → leader), float-coerce `value`,
@@ -23,7 +23,7 @@ import pytest
 from scripts.data.populate.phase_aux import _extract_leader_rows
 
 
-_STATS_KEY = "scout/nrlcom/stats/111/2026.json"
+_STATS_KEY = "miner/nrlcom/stats/111/2026.json"
 _ISAAKO_UUID = "11111111-1111-1111-1111-111111111111"
 _DOLPHINS_UUID = "22222222-2222-2222-2222-222222222222"
 _STORM_UUID = "33333333-3333-3333-3333-333333333333"
@@ -42,7 +42,7 @@ _EXPECTED_COLUMNS = {
 @pytest.fixture(scope="module")
 def stats_payload(fixtures_dir: Path) -> dict:
     """The canonical nrl.com /stats/data response as a raw dict."""
-    path = fixtures_dir / "scout" / "nrlcom_stats" / "canonical_response.json"
+    path = fixtures_dir / "miner" / "nrlcom_stats" / "canonical_response.json"
     return json.loads(path.read_text(encoding="utf-8"))
 
 

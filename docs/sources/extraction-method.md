@@ -16,7 +16,7 @@ How raw source bytes are turned into the canonical raw layer (`source_documents`
 |---|---|---|---|
 | `deepgram_v1` | yt-dlp audio + Deepgram nova-3 (diarisation + keyterm) | Canonical | First-class. Speaker labels, punctuation, AU-accent biased model. ~$0.30 / 90-min video. |
 | `youtube_captions` | youtube-transcript-api auto-captions | Legacy | Single channel, no diarisation, NRL names mangled. Backfill-only. |
-| `NULL` | Discovered but not yet extracted | n/a | `sources` row exists (Scout enumerated it); no chunks. |
+| `NULL` | Discovered but not yet extracted | n/a | `sources` row exists (Miner enumerated it); no chunks. |
 
 The 221k auto-caption-era chunks are archived in `source_chunks_v1` (migration 044). They aren't visible to current downstream queries because nothing JOINs that table — re-extract via the canonical path when ready.
 
@@ -24,7 +24,7 @@ The 221k auto-caption-era chunks are archived in `source_chunks_v1` (migration 0
 
 ## Pipeline (`deepgram_v1`)
 
-`services/api/app/analyst/transcribe.py` · `transcribe(session, source)` · driver `python -m app.analyst.transcribe_cli <source_id>` (or `make transcribe SOURCE_ID=...`). Audio acquisition is a separate Scout step (`make collect-audio`); `make extract-transcript` chains both.
+`services/api/app/analyst/transcribe.py` · `transcribe(session, source)` · driver `python -m app.analyst.transcribe_cli <source_id>` (or `make transcribe SOURCE_ID=...`). Audio acquisition is a separate Miner step (`make collect-audio`); `make extract-transcript` chains both.
 
 ```
 Source.canonical_url
@@ -91,7 +91,7 @@ Hard cap 100 entries — Deepgram's practical limit. The actual count today is ~
 
 No fallback chain.
 
-- **yt-dlp failure** (Scout): `sources.ingestion_status='failed'`, `AudioError` re-raised. Operator inspects and re-runs `make collect-audio`.
+- **yt-dlp failure** (Miner): `sources.ingestion_status='failed'`, `AudioError` re-raised. Operator inspects and re-runs `make collect-audio`.
 - **Deepgram failure** (Analyst): `sources.transcription_status='failed'` (separate transaction), `TranscriptionError` re-raised. Operator inspects and re-runs `make transcribe ... FORCE=1`. Audio is already in S3 — no re-download.
 
 Common failure modes seen so far:
@@ -114,7 +114,7 @@ Every successful run produces:
 - The full Deepgram response in S3 — re-process locally without re-paying the API cost.
 - The audio file in S3 — re-transcribe with a different model later (e.g. when nova-4 ships, or for voice-fingerprint clustering).
 
-There is **no** `agent_runs` row for this work today. Audio extraction is deterministic and synchronous; if we add cost / latency dashboards later, the same pattern as Scout's `agent_id='scout-det'` could apply.
+There is **no** `agent_runs` row for this work today. Audio extraction is deterministic and synchronous; if we add cost / latency dashboards later, the same pattern as Miner's `agent_id='miner-det'` could apply.
 
 ---
 
@@ -127,16 +127,16 @@ There is **no** `agent_runs` row for this work today. Audio extraction is determ
 | S3 raw transcript JSON | < $0.001 / video / month | negligible |
 | yt-dlp / compute | free | free |
 
-Backfill of the 215 prod sources currently in `source_chunks_v1` is deferred — re-run cost is real. A targeted backfill of *high-leverage* channels (top-5 by view-velocity per `scout/youtube/refresh.py`) would be ~$50 and is the natural first step.
+Backfill of the 215 prod sources currently in `source_chunks_v1` is deferred — re-run cost is real. A targeted backfill of *high-leverage* channels (top-5 by view-velocity per `miner/youtube/refresh.py`) would be ~$50 and is the natural first step.
 
 ---
 
 ## Related
 
-- [Scout § 3.5 — Audio acquisition](../agents/crew/scout/architecture.md#35-audio-acquisition-deterministic-shipped)
+- [Miner § 3.5 — Audio acquisition](../agents/crew/miner/architecture.md#35-audio-acquisition-deterministic-shipped)
 - [Analyst (crew)](../agents/crew/analyst/README.md) — owns transcription + later passes
-- [Audio ingestion system spec](../agents/system/ingestion.md) — Scout's audio-pull surface
+- [Audio ingestion system spec](../agents/system/ingestion.md) — Miner's audio-pull surface
 - [Transcription system spec](../agents/system/transcription-pipeline.md) — Analyst's Deepgram surface
 - [Migration 044](../../packages/db/migrations/044_audio_first_extract.sql) — chunks rebuilt with speaker FK
-- [Migration 045](../../packages/db/migrations/045_split_ingestion_transcription.sql) — split Scout ingest from Analyst transcription
+- [Migration 045](../../packages/db/migrations/045_split_ingestion_transcription.sql) — split Miner ingest from Analyst transcription
 - [Migration 046](../../packages/db/migrations/046_chunk_paragraph_break.sql) — `source_chunks.paragraph_break`

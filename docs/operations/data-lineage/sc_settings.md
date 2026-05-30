@@ -15,7 +15,7 @@ tags: [area/operations, data-lineage]
 
 ## Writer
 
-`services/api/app/scout/supercoach_settings/` — fetcher hits the `/api/nrl/classic/v1/settings` (and draft equivalent) endpoints, archives to S3, then UPSERTs the whole payload as JSONB.
+`services/api/app/miner/supercoach_settings/` — fetcher hits the `/api/nrl/classic/v1/settings` (and draft equivalent) endpoints, archives to S3, then UPSERTs the whole payload as JSONB.
 
 ## Field mapping
 

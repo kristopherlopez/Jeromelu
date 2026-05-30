@@ -17,7 +17,7 @@ Two emotions, in order.
 
 **On arrival: awe.** *"Wait — this is an AI, and it actually has takes."* The shock of meeting something that feels alive instead of indexed. Not a chatbot waiting for you to prompt it. Not a wrapper around a model. A presence with a name, a voice, and opinions about your team — already mid-thought when you arrived.
 
-**On return: aquarium.** Something is always happening. Scout is searching. Analyst is cross-referencing. Archivist is updating the wiki. Critic is disagreeing in the corner. The screen looks different on Monday than on Thursday because the operation kept running while you were gone.
+**On return: aquarium.** Something is always happening. Miner is searching. Analyst is cross-referencing. Archivist is updating the wiki. Critic is disagreeing in the corner. The screen looks different on Monday than on Thursday because the operation kept running while you were gone.
 
 These aren't competing emotions — they're **first encounter** and **sustained pull**. The site has to deliver both. The awe gets people to remember the URL. The aquarium gets them to type it again.
 
@@ -25,9 +25,9 @@ These aren't competing emotions — they're **first encounter** and **sustained 
 
 Jaromelu is the voice. One personality, one editorial register — everything you read or hear in his name is his.
 
-The crew is the visible labour. Scout, Analyst, Critic, Bookkeeper, Archivist — they don't speak in their own voice, they *work*, and their work is visible:
+The crew is the visible labour. Miner, Analyst, Critic, Bookkeeper, Archivist — they don't speak in their own voice, they *work*, and their work is visible:
 
-- A Scout query firing into the YouTube ecosystem
+- A Miner query firing into the YouTube ecosystem
 - A new source landing in the candidate queue
 - An Archivist diff hitting the wiki
 - A Critic flag attached to a claim that didn't hold up

@@ -187,7 +187,7 @@ Gates `deploy.yml` on `tests.yml` success. Bad code can no longer ship automatic
   - "Suggested Implementation Order" gets a header note + ✅ markers on items 1–6.
 - `docs/build/runs/2026-05-28-eng-quality-tier-1.md` (this file) — flipped 🟡 → 🟢 Shipped; TL;DR rewritten; TASK-51 + TASK-52 entries added; "Currently BLOCKED" section removed (both unblocks shipped).
 - `docs/build/runs/README.md` — top row updated to 🟢 Shipped with the actual outcome summary.
-- `docs/build/PLAN.md` — Engineering quality hardening — Tier 1 section removed from "Active plan". Scout Phase 5 remains.
+- `docs/build/PLAN.md` — Engineering quality hardening — Tier 1 section removed from "Active plan". Miner Phase 5 remains.
 - `docs/build/TASKS.md` — TASK-51 + TASK-52 removed per the no-graveyard rule.
 
 **Proof:**

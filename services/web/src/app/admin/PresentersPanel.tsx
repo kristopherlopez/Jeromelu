@@ -114,7 +114,7 @@ export default function PresentersPanel() {
 
   // Populate channel picker from the existing coverage endpoint.
   useEffect(() => {
-    fetch(`${base}/api/admin/scout/channel-coverage`)
+    fetch(`${base}/api/admin/miner/channel-coverage`)
       .then((r) => r.json())
       .then((j: CoverageResponse) => {
         setChannels(j.per_channel ?? []);
@@ -144,7 +144,7 @@ export default function PresentersPanel() {
     if (channelId) fetchByChannel();
   }, [channelId, fetchByChannel]);
 
-  const runScout = useCallback(async () => {
+  const runMiner = useCallback(async () => {
     if (!channelId) return;
     setRunning(true);
     setError(null);
@@ -248,7 +248,7 @@ export default function PresentersPanel() {
             ))}
           </select>
           <button
-            onClick={runScout}
+            onClick={runMiner}
             disabled={!channelId || running}
             className="rounded bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-500 disabled:opacity-50"
           >

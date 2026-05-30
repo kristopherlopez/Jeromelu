@@ -28,7 +28,7 @@ Each beat has a distinct feel: what content appears, how dense the Stream is, wh
 
 ### What's in the Stream
 
-- Scout activity cards stacking up fast
+- Miner activity cards stacking up fast
   - "4 new episodes overnight"
   - "KingOfSC dropped a Round 7 preview. Flagging for Analyst."
   - "NRLBrothers went deep on Munster's form. 22 minutes on one player."
@@ -42,10 +42,10 @@ High. Many small cards. Fast-moving. The Stream feels alive after a quiet weeken
 ### Crew Bar
 
 ```
-[●] Scout — Scanning 6 new episodes    [○] Analyst    [○] Critic    [○] Bookkeeper    [●] Archivist — Updating records
+[●] Miner — Scanning 6 new episodes    [○] Analyst    [○] Critic    [○] Bookkeeper    [●] Archivist — Updating records
 ```
 
-Scout is the star of this beat. The audience learns: when Scout is busy, intel is coming.
+Miner is the star of this beat. The audience learns: when Miner is busy, intel is coming.
 
 ### Interaction Bar
 
@@ -55,15 +55,15 @@ No Remarks to react to yet. The audience is in observation mode.
 
 ### Video Moment
 
-None for this beat. Intel Drops is about volume and speed — crew activity cards stacking up. The personality comes from Scout's avatar being visibly busy in the Crew Bar, and the rapid-fire entry animations of activity cards sliding in.
+None for this beat. Intel Drops is about volume and speed — crew activity cards stacking up. The personality comes from Miner's avatar being visibly busy in the Crew Bar, and the rapid-fire entry animations of activity cards sliding in.
 
 ### Transition Out
 
-Not a divider line — a **scene change**. Scout's avatar in the Crew Bar transitions from active to completing (brief nod animation). Analyst's avatar wakes up (eyes opening, colour returning). In the Stream, a transition card appears:
+Not a divider line — a **scene change**. Miner's avatar in the Crew Bar transitions from active to completing (brief nod animation). Analyst's avatar wakes up (eyes opening, colour returning). In the Stream, a transition card appears:
 
 ```
 ┌─────────────────────────────────────────┐
-│  [👤 Scout fading out →]               │
+│  [👤 Miner fading out →]               │
 │       ─── data flowing ───             │
 │               [← 👤 Analyst waking up] │
 │                                         │
@@ -97,12 +97,12 @@ The audience sees the handoff between characters. The scene is changing.
 
 ### Stream Density
 
-Medium. Cards are longer and more detailed than Scout's Intel Drop cards. The content is heavier — analysis, not discovery.
+Medium. Cards are longer and more detailed than Miner's Intel Drop cards. The content is heavier — analysis, not discovery.
 
 ### Crew Bar
 
 ```
-[○] Scout    [●] Analyst — Cross-referencing Cleary claims    [○] Critic    [●] Bookkeeper — Running numbers    [●] Archivist — Pulling history
+[○] Miner    [●] Analyst — Cross-referencing Cleary claims    [○] Critic    [●] Bookkeeper — Running numbers    [●] Archivist — Pulling history
 ```
 
 Multiple crew members active. The operation is in full swing.
@@ -168,7 +168,7 @@ If there are multiple Remarks, they arrive spaced out — not stacked. Each one 
 ### Crew Bar
 
 ```
-[○] Scout    [○] Analyst    [●] Critic — Challenging the Cleary call    [○] Bookkeeper    [○] Archivist    [●] Jaromelu — Making his call
+[○] Miner    [○] Analyst    [●] Critic — Challenging the Cleary call    [○] Bookkeeper    [○] Archivist    [●] Jaromelu — Making his call
 ```
 
 Jaromelu and possibly the Critic are the only active crew. Everyone else has done their work.
@@ -235,7 +235,7 @@ Medium. The Stream isn't as fast as Intel Drops but has periodic updates as matc
 ### Crew Bar
 
 ```
-[○] Scout    [○] Analyst    [○] Critic    [●] Bookkeeper — Tracking live scores    [○] Archivist    [●] Jaromelu — Watching the matches
+[○] Miner    [○] Analyst    [○] Critic    [●] Bookkeeper — Tracking live scores    [○] Archivist    [●] Jaromelu — Watching the matches
 ```
 
 ### Interaction Bar
@@ -291,7 +291,7 @@ Medium-high. Lots of resolution content arriving. Each resolved Remark gets its 
 ### Crew Bar
 
 ```
-[○] Scout    [○] Analyst    [○] Critic    [○] Bookkeeper    [●] Archivist — Updating the Ledger    [●] Jaromelu — Post-round review
+[○] Miner    [○] Analyst    [○] Critic    [○] Bookkeeper    [●] Archivist — Updating the Ledger    [●] Jaromelu — Post-round review
 ```
 
 ### Interaction Bar
@@ -349,6 +349,6 @@ When there's no active beat (e.g., Tuesday of a bye week, or off-season):
 - The Stream shows the most recent Reckoning
 - **Jaromelu's idle state is visual**: His avatar plays a slow idle loop in the Crew Bar — thinking, reviewing something on a screen, occasionally glancing at camera. In the Stream's empty space below the last card, a faint atmospheric illustration of the "war room" — desk, screens, the suggestion of a space where the crew works.
 - The Crew Bar shows all crew dormant except Jaromelu: "Watching the market."
-- A subtle "Next episode" indicator with countdown: "Round 8 starts Monday. Scout runs at 10 PM. ⏱ 2d 14h"
+- A subtle "Next episode" indicator with countdown: "Round 8 starts Monday. Miner runs at 10 PM. ⏱ 2d 14h"
 - Historical content is scrollable — the audience can rewind through past episodes
 - **Easter egg**: If the user scrolls all the way to the very first episode, Jaromelu's avatar gives a brief nod and the status text reads: "You went back to the beginning. Respect."

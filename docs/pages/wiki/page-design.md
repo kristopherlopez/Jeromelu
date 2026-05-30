@@ -146,7 +146,7 @@ The default landing view is editorial: an opinionated entry point rather than a 
 │  └─────────────────────────────────────────────┘     │
 │                                                      │
 │  ─────────────────────────────────────────────       │
-│            Updated continuously by Scout.            │  ← centred footer caption
+│            Updated continuously by Miner.            │  ← centred footer caption
 └──────────────────────────────────────────────────────┘
 ```
 

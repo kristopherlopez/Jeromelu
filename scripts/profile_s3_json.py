@@ -2,12 +2,12 @@
 
 Samples N objects, walks each JSON tree, and emits a markdown shape report:
 top-level structure tree + per-path table (type, presence, nullability,
-cardinality, example values). Designed to run against any scout/* prefix
+cardinality, example values). Designed to run against any miner/* prefix
 to ground per-table lineage docs in the actual upstream shape.
 
 Usage:
-    python scripts/profile_s3_json.py scout/nrlcom/match-centre/111/2026/round-07/
-    python scripts/profile_s3_json.py scout/nrlcom/match-centre/ --samples 20
+    python scripts/profile_s3_json.py miner/nrlcom/match-centre/111/2026/round-07/
+    python scripts/profile_s3_json.py miner/nrlcom/match-centre/ --samples 20
     python scripts/profile_s3_json.py <prefix> --out docs/architecture/profiles/nrlcom/match-centre.md
 """
 

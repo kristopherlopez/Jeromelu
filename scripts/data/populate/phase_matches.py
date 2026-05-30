@@ -1,13 +1,13 @@
-"""Phase 2b — extract matches from scout/nrlcom/{match-centre,draw}/* archives.
+"""Phase 2b — extract matches from miner/nrlcom/{match-centre,draw}/* archives.
 
-Era-aware projection per [Scout Phase 5](../../docs/build/PLAN.md). One row per
+Era-aware projection per [Miner Phase 5](../../docs/build/PLAN.md). One row per
 (source='nrl_com', season, grade, external_match_id) — idempotent upsert keyed
 on the `uq_matches_source_external` partial unique index.
 
 Two source archives feed this phase:
-  - `scout/nrlcom/match-centre/{comp}/{season}/round-{NN}/{slug}.json` —
+  - `miner/nrlcom/match-centre/{comp}/{season}/round-{NN}/{slug}.json` —
     full or partial detail; identity `external_match_id = payload.matchId`.
-  - `scout/nrlcom/draw/{comp}/{season}/round-{NN}.json` — fixture list;
+  - `miner/nrlcom/draw/{comp}/{season}/round-{NN}.json` — fixture list;
     identity `external_match_id = <slug from matchCentreUrl>`.
 
 Each match-centre archive's row gets `data_coverage` derived from its shape:
@@ -53,11 +53,11 @@ logger = logging.getLogger(__name__)
 
 
 _KEY_RE = re.compile(
-    r"scout/nrlcom/match-centre/(?P<comp>\d+)/(?P<season>\d{4})/round-(?P<round>\d+)/(?P<slug>[^/]+)\.json$"
+    r"miner/nrlcom/match-centre/(?P<comp>\d+)/(?P<season>\d{4})/round-(?P<round>\d+)/(?P<slug>[^/]+)\.json$"
 )
 
 _DRAW_KEY_RE = re.compile(
-    r"scout/nrlcom/draw/(?P<comp>\d+)/(?P<season>\d{4})/round-(?P<round>\d+)\.json$"
+    r"miner/nrlcom/draw/(?P<comp>\d+)/(?P<season>\d{4})/round-(?P<round>\d+)\.json$"
 )
 
 
@@ -358,7 +358,7 @@ def populate_matches(
                 len(team_map), len(venue_map))
 
     # 1. Walk match-centre archives — modern matches with full/partial shape.
-    mc_keys = list_keys(f"scout/nrlcom/match-centre/{competition}/")
+    mc_keys = list_keys(f"miner/nrlcom/match-centre/{competition}/")
     if seasons:
         season_strs = {f"/{s}/" for s in seasons}
         mc_keys = [k for k in mc_keys if any(s in k for s in season_strs)]
@@ -390,7 +390,7 @@ def populate_matches(
 
     # 2. Walk draw archives — pre-1990 fixtures and any modern (season,round)
     # whose match-centre archive isn't (yet) in S3.
-    draw_keys = list_keys(f"scout/nrlcom/draw/{competition}/")
+    draw_keys = list_keys(f"miner/nrlcom/draw/{competition}/")
     if seasons:
         season_strs = {f"/{s}/" for s in seasons}
         draw_keys = [k for k in draw_keys if any(s in k for s in season_strs)]

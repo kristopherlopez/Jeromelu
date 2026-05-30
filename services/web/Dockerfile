@@ -31,5 +31,5 @@ ENV PORT=3000
 
 CMD ["node", "server.js"]
 
-# redeploy 2026-05-27: ship scout shim-removal import-path tweaks (77bb677);
+# redeploy 2026-05-27: ship miner shim-removal import-path tweaks (77bb677);
 # first web deploy since 05-23, unblocked after the repo went public.

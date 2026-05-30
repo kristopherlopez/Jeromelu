@@ -7,7 +7,7 @@ tags: [area/operations]
 One-time prod maintenance to return disk to the OS after the change-only-storage
 switch. Pairs with migration `070_dedup_metrics_snapshots.sql` (the logical
 dedup) and the skip-if-unchanged write path in
-`services/api/app/scout/youtube/refresh.py`. Background + evidence:
+`services/api/app/miner/youtube/refresh.py`. Background + evidence:
 [PLAN.md § 2026-05-27](../build/PLAN.md) and the
 [run report](../build/runs/2026-05-27-change-only-metrics-storage.md).
 

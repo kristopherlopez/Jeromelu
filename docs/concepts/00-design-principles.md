@@ -32,7 +32,7 @@ The Stream doesn't look the same on Monday as it does on Thursday. The visual de
 
 | Beat | Stream Feel |
 |------|-------------|
-| Intel Drops (Mon) | Busy. Rolling updates. Scout activity stacking up. High information density. |
+| Intel Drops (Mon) | Busy. Rolling updates. Miner activity stacking up. High information density. |
 | Tension Builds (Tue–Wed) | Threading. Contradictions highlighted. Open questions visible. Analyst working. |
 | The Call (Thu) | Sparse. One big Remark dominates the screen. The moment of commitment. |
 | The Match (Sat–Sun) | Live. Locked Remarks resolving. Outcomes appearing. |
@@ -70,7 +70,7 @@ Design implications:
 
 The crew's process is the spectacle. The audience wants to see *how* the analysis got made, not just the result.
 
-- Scout's findings are visible, not hidden behind an API
+- Miner's findings are visible, not hidden behind an API
 - Analyst's contradictions are highlighted, not silently resolved
 - The Critic's challenge appears before Jaromelu's final call
 - Evidence trails are expandable on every Remark
@@ -84,7 +84,7 @@ Transparency is entertainment. "12 podcast hours compressed into 4 Remarks" is t
 
 When Jaromelu makes The Call on Thursday, the Stream should feel different. Quieter. More space. One Remark, big and bold.
 
-Conversely, during Intel Drops, the Stream is alive with Scout activity — fast-moving, dense, lots of small updates.
+Conversely, during Intel Drops, the Stream is alive with Miner activity — fast-moving, dense, lots of small updates.
 
 **The amount of whitespace is a storytelling tool.** Sparse = important. Dense = building. The audience reads the rhythm unconsciously.
 
@@ -95,7 +95,7 @@ Conversely, during Intel Drops, the Stream is alive with Scout activity — fast
 Every piece of text on the screen has a speaker. Nothing is "system copy."
 
 - Loading state: "Analyst is thinking..." (not "Loading...")
-- Empty state: "Scout hasn't found anything yet. Give it time." (not "No data available")
+- Empty state: "Miner hasn't found anything yet. Give it time." (not "No data available")
 - Error state: "Something broke. Even the best crews have bad days." (not "500 Internal Server Error")
 - Timestamps are contextual: "3 hours ago" not "2026-03-28T14:32:00Z"
 

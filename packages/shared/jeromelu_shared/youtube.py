@@ -1,4 +1,4 @@
-"""YouTube URL parsing helpers shared by Scout and downstream agents."""
+"""YouTube URL parsing helpers shared by Miner and downstream agents."""
 
 from __future__ import annotations
 

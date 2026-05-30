@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from jeromelu_shared.db import SessionLocal, Source
 from sqlalchemy.orm import joinedload
 
-from app.scout.media.drain import (
+from app.miner.media.drain import (
     collected_untranscribed_source_criteria,
     drain_source_ids,
     require_positive_limit,

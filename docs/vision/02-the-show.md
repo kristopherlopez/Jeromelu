@@ -23,7 +23,7 @@ This is how 01's two feelings get delivered. **Awe** on arrival — *this is an 
 
 Every surface answers one question: **"What is the crew working on right now, and what is Jaromelu about to call?"**
 
-Data is never presented raw. It flows through a visible process — gathered by Scout, analysed by Analyst, called by Jaromelu — and arrives as a **Remark**: an opinionated, voiced position with Jaromelu's name on it.
+Data is never presented raw. It flows through a visible process — gathered by Miner, analysed by Analyst, called by Jaromelu — and arrives as a **Remark**: an opinionated, voiced position with Jaromelu's name on it.
 
 ---
 
@@ -35,7 +35,7 @@ Awe is **not** produced by visible work. A status line — *"Analyst is cross-re
 
 **1. The Arrival Jolt — *it already knows.*** Nobody lands on a welcome screen. They land on Jaromelu *already mid-thought about their world*. One tap names your team and he's got a sharp, specific, slightly-spicy take waiting before you've done anything — *"Broncos fan? Your forward pack is the problem nobody's saying out loud. Want the case?"* The awe is being addressed by an intelligence that was already thinking about the thing you care about. Not *"how can I help"* — a take, unprompted, and right enough to sting.
 
-**2. The Live Reversal — *watching him think.*** The Feed's job is not to log activity; it's to show a mind working. You watch a call take shape — Jaromelu leaning one way, Critic poking a hole, Scout dropping a coach quote that doesn't fit — and then Jaromelu *changes his mind on screen*: *"Hold on. That changes it."* Visible doubt and live reconsideration is the most alive thing the system can do. A pipeline emits status; a being reconsiders in front of you.
+**2. The Live Reversal — *watching him think.*** The Feed's job is not to log activity; it's to show a mind working. You watch a call take shape — Jaromelu leaning one way, Critic poking a hole, Miner dropping a coach quote that doesn't fit — and then Jaromelu *changes his mind on screen*: *"Hold on. That changes it."* Visible doubt and live reconsideration is the most alive thing the system can do. A pipeline emits status; a being reconsiders in front of you.
 
 **3. The Landing — *a bold call comes good.*** The loudest moment of the week is a contrarian call resolving correct, staged like a sporting moment, not a data update: *"Round 6. I had the Storm by 12 when 68% of you said no. Full time — 18-point margin. Called it."* This is the spine-tingle, the screenshot, the reason someone tells a mate. Receipts aren't artifacts bolted on at the end; they're the climax the whole week builds toward.
 
@@ -75,7 +75,7 @@ The weekly episode (below) still exists — but as a **narrative wrapper**, a wa
 
 ## Why It's A Crew, Not A Tool
 
-A solo agent answering questions feels like a chatbot. A crew working in public — Scout pulling intel, Analyst cross-referencing, Critic challenging, Bookkeeper tracking, Archivist remembering, Jaromelu putting his name on the call — feels like a **production**.
+A solo agent answering questions feels like a chatbot. A crew working in public — Miner pulling intel, Analyst cross-referencing, Critic challenging, Bookkeeper tracking, Archivist remembering, Jaromelu putting his name on the call — feels like a **production**.
 
 | A character | A tool |
 |---|---|
@@ -91,7 +91,7 @@ To be precise: **Jaromelu** is the character — the one with personality, a voi
 
 The crew makes the process *legible* and the show *watchable*. Each role creates anticipation for the next:
 
-- Scout is busy → new intel incoming
+- Miner is busy → new intel incoming
 - Analyst found a contradiction → tension building
 - Jaromelu is making his call → the moment of commitment
 
@@ -107,25 +107,25 @@ Six roles — but think of them as a **footy media team in a glass-walled war ro
 
 > **Two rules for how the crew appears.**
 >
-> **Work, not telemetry.** What's shown is always the *result* — or the visible *act* — of effort, in terms a fan gets: *"Scout sat through 6 hours of pods; here are the 3 takes that matter."* Never an abstract status like *"cross-referencing 2 sources…"*. The words *agent*, *module*, and *pipeline* never appear on screen.
+> **Work, not telemetry.** What's shown is always the *result* — or the visible *act* — of effort, in terms a fan gets: *"Miner sat through 6 hours of pods; here are the 3 takes that matter."* Never an abstract status like *"cross-referencing 2 sources…"*. The words *agent*, *module*, and *pipeline* never appear on screen.
 >
-> **Jaromelu narrates them.** The crew don't speak in their own voices. You hear what Scout found and what Critic challenged *through Jaromelu*, in his voice — *"Scout's been up all night; found three things I didn't know."* Single voice, visible labour — and the labour gets characterful without five competing personalities.
+> **Jaromelu narrates them.** The crew don't speak in their own voices. You hear what Miner found and what Critic challenged *through Jaromelu*, in his voice — *"Miner's been up all night; found three things I didn't know."* Single voice, visible labour — and the labour gets characterful without five competing personalities.
 
-### Scout — the one who listens to everything
+### Miner — the one who listens to everything
 
 The bloke who sits through every podcast, panel and post so you don't have to.
 
 **What the audience sees:**
 
-- *"Scout chewed through 47 articles, 6 pods and 900 posts overnight — here are the 3 takes that matter on Cleary."*
-- *"Scout found something nobody's said out loud yet. Hold on."*
+- *"Miner chewed through 47 articles, 6 pods and 900 posts overnight — here are the 3 takes that matter on Cleary."*
+- *"Miner found something nobody's said out loud yet. Hold on."*
 - *"While you slept: every Round 6 preview, listened to and logged."*
 
-Detail: [agents/crew/scout/README.md](../agents/crew/scout/README.md).
+Detail: [agents/crew/miner/README.md](../agents/crew/miner/README.md).
 
 ### Analyst — the one who joins the dots
 
-Takes everything Scout drags in and works out where the takes agree, where they clash, and what's quietly shifting.
+Takes everything Miner drags in and works out where the takes agree, where they clash, and what's quietly shifting.
 
 **What the audience sees:**
 
@@ -184,7 +184,7 @@ This is the *narrative* shape of a round — not the cadence of updates. The cad
 
 | Beat | Day | What's Happening | Feel |
 |------|-----|------------------|------|
-| **Intel Drops** | Monday | Scout surfaces new takes from the weekend's pods and media. *"The pods are in. Let's see what they're saying."* | Discovery. The raw material arrives. |
+| **Intel Drops** | Monday | Miner surfaces new takes from the weekend's pods and media. *"The pods are in. Let's see what they're saying."* | Discovery. The raw material arrives. |
 | **Tension Builds** | Tue–Wed | Analyst cross-references. Sources disagree. Contradictions surface. Critic is challenging the draft calls. *"Three pods fading Cleary. One backing him hard. Something's off."* | Suspense. The picture is incomplete. |
 | **The Call** | Thursday | Jaromelu locks in his Remarks. *"Here's where I stand. Judge me."* | Commitment. Public, irreversible. |
 | **The Match** | Sat–Sun | Results come in. Predictions resolve live. The audience watches alongside Jaromelu. | Stakes. Real consequences. |
@@ -192,7 +192,7 @@ This is the *narrative* shape of a round — not the cadence of updates. The cad
 
 The arc creates natural return triggers without push notifications. The audience learns when to check in:
 
-- Monday morning: *what did Scout find?*
+- Monday morning: *what did Miner find?*
 - Wednesday: *where is Analyst stuck?*
 - Thursday: *what did Jaromelu call?*
 - Monday: *was he right?*
@@ -223,7 +223,7 @@ A Remark **is** an NRL commentary call — who wins, whose form is real, the sel
 OPEN → LOCKED → RESOLVED
 ```
 
-1. **Open** — Jaromelu states a position. It's live, and it **moves**: the live read updates as Scout pulls new intel, every shift visible and timestamped. This is the mutation that makes the Feed breathe — and the Live Reversal happen. The audience reacts.
+1. **Open** — Jaromelu states a position. It's live, and it **moves**: the live read updates as Miner pulls new intel, every shift visible and timestamped. This is the mutation that makes the Feed breathe — and the Live Reversal happen. The audience reacts.
 2. **Locked** — The round begins. The position freezes. No edits. The call is on the record.
 3. **Resolved** — Outcomes arrive. The Remark is graded. Receipts generated.
 
@@ -254,7 +254,7 @@ The spine. A live, rewindable view of the crew at work and the Remarks they prod
 
 The Feed shows three layers, interleaved:
 
-**Crew Activity** — the visible process. Scout discovering, Analyst cross-referencing, Critic challenging, Bookkeeper resolving. Progress indicators with crew attribution.
+**Crew Activity** — the visible process. Miner discovering, Analyst cross-referencing, Critic challenging, Bookkeeper resolving. Progress indicators with crew attribution.
 
 **Remarks** — the output. Jaromelu's calls, displayed prominently with conviction level. Open Remarks with reaction counts. Resolved Remarks with receipts.
 
@@ -320,7 +320,7 @@ Tracks prediction accuracy not just for Jaromelu but for **every commentator** t
 
 ### How It Works
 
-1. Claims are extracted from every source Scout ingests
+1. Claims are extracted from every source Miner ingests
 2. Claims that constitute predictions are identified and tracked by Bookkeeper
 3. Outcomes are matched against predictions when results arrive
 4. Alignment scores are computed — how often each source's calls match reality
@@ -410,18 +410,18 @@ The first time someone lands, pull the curtain back deliberately. Not a welcome 
 
 ### Every Visit After — The Aquarium
 
-After that, the crew settles into the periphery: calm, always-on, legible motion. Something is always happening behind the glass — but every visible move is a comprehensible piece of work (*"Scout's pulling apart the late mail"*), never a status code. This is the original fish-tank: ambient enough to ignore, alive enough to pull you back.
+After that, the crew settles into the periphery: calm, always-on, legible motion. Something is always happening behind the glass — but every visible move is a comprehensible piece of work (*"Miner's pulling apart the late mail"*), never a status code. This is the original fish-tank: ambient enough to ignore, alive enough to pull you back.
 
 ### Cause And Effect — Why The Number Moved
 
-Crew visibility is what makes the heartbeat *legible*. The crew's work is the **cause**; the moving number is the **effect**. Scout surfaces a late injury → you watch the live read tick *"Storm by 12 → by 8"* → and you can see exactly *why*. The fan isn't watching busywork; they're watching an intelligence **react to the real world in real time, with the receipts in plain sight**. That cause-and-effect is only possible because the crew is visible — it's the single most alive thing on the site.
+Crew visibility is what makes the heartbeat *legible*. The crew's work is the **cause**; the moving number is the **effect**. Miner surfaces a late injury → you watch the live read tick *"Storm by 12 → by 8"* → and you can see exactly *why*. The fan isn't watching busywork; they're watching an intelligence **react to the real world in real time, with the receipts in plain sight**. That cause-and-effect is only possible because the crew is visible — it's the single most alive thing on the site.
 
 ### First-Person Voice
 
 All copy on the site is written from the crew's perspective. Never neutral database language.
 
 - Nav labels: *"The Wiki", "The Ledger", "Ask Me"* — not "Knowledge Base", "Predictions", "Chatbot"
-- Empty states: *"Scout hasn't found anything yet. Give it time."* — not "No data available"
+- Empty states: *"Miner hasn't found anything yet. Give it time."* — not "No data available"
 - Error states: *"Something broke. Even the best crews have bad days."* — not "500 Internal Server Error"
 - Loading states: *"Analyst is thinking..."* — not "Loading..."
 

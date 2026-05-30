@@ -70,7 +70,7 @@ Promoting Analyst's durable scope from local prototypes to production **workers*
 - Build the cleaning **worker** pass (the [`/clean-transcript`](../../skills/transcript-pipeline.md) skill is the local prototype it encodes — [charter A11](charter.md#a11-production-runs-in-workers-not-claude-code-skills)), covering the [charter A4](charter.md#a4-cleaning--skill-validated-then-workerised) contention points (garbled/Polynesian names, nicknames+initials, SC jargon, number typing, filler).
 - Lock a cleaning-fidelity eval (does it fix garbles without "correcting" legitimate NRL slang like *PVL*?).
 - **Prerequisites:** the alias table (`people.aliases`) and a SuperCoach jargon lexicon — both currently absent (see [Backlog](#backlog)). Cleaning quality is capped by these registries.
-- **Open loop:** the cleaning pass shares `data/players.yaml` with SuperCoach roster regeneration (now done by `make fetch-players`). Rehoming it — cleaning reads the roster from the DB instead of the yaml — would drop the last yaml dependency. (The legacy `scrape-supercoach` skill was retired 2026-05-27 independently; it was a wrapper around the same `make` target, so it never actually gated this.) See [Scout roadmap, Phase 1](../scout/roadmap.md). ([charter A4](charter.md#a4-cleaning--skill-validated-then-workerised))
+- **Open loop:** the cleaning pass shares `data/players.yaml` with SuperCoach roster regeneration (now done by `make fetch-players`). Rehoming it — cleaning reads the roster from the DB instead of the yaml — would drop the last yaml dependency. (The legacy `scrape-supercoach` skill was retired 2026-05-27 independently; it was a wrapper around the same `make` target, so it never actually gated this.) See [Miner roadmap, Phase 1](../miner/roadmap.md). ([charter A4](charter.md#a4-cleaning--skill-validated-then-workerised))
 
 ### T2 — Referential resolution + extraction & shaping worker — Planned
 
@@ -114,7 +114,7 @@ Additive items that layer on the tracks above, pulled from the [transcription-pi
 | Falsifiability + resolution schema | T2 | `claims` needs fields for the falsifiability flag, resolution criterion, and horizon ([charter A10](charter.md#a10-claims-carry-falsifiability--resolution-criteria)) — the columns the ledger grades against. Design intent; not in schema yet. |
 | Topic-targeted keyterms | (Lineup) | Per-source keyterms from title/description/channel focus instead of the global roster pool. Lives with the transcription producer — moves out with Lineup. |
 | Backfill legacy `source_chunks_v1` (221k auto-caption chunks) | T1/T2 | Re-clean + re-extract highest-leverage channels first. |
-| "Analyst health" admin panel | T-all | Per-pass run counts, cost, latency from `agent_runs` filtered by `agent_id='analyst'`. Parallels the Scout dashboard. |
+| "Analyst health" admin panel | T-all | Per-pass run counts, cost, latency from `agent_runs` filtered by `agent_id='analyst'`. Parallels the Miner dashboard. |
 | Chapter detection as a first-class pass | T2 | Currently bundled into `/analyse-transcript`; may split out so annotation + extraction both depend on it ([charter Open Q3](charter.md#open-questions)). |
 
 ---
@@ -128,4 +128,4 @@ Additive items that layer on the tracks above, pulled from the [transcription-pi
 - [Speaker identification plan](../../../todo/speaker-identification-plan.md) — full Lineup phase ledger and tuning notes
 - [Extraction worker](../../../todo/extraction-worker.md) — claim-extraction worker tasks and local experimentation plan
 - [Consensus engine](../../../todo/consensus-engine.md) — cross-source consensus design
-- [Scout roadmap](../scout/roadmap.md) — the bronze-stage roadmap feeding Analyst's input
+- [Miner roadmap](../miner/roadmap.md) — the bronze-stage roadmap feeding Analyst's input

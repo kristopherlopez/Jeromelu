@@ -42,7 +42,7 @@ Every crew member is a **character with a face**, not an emoji with a label. Eac
 
 | Character | Visual Style | Expression Range |
 |-----------|-------------|-----------------|
-| Scout | Field operative. Alert eyes. Collar up. Always looking at something off-screen. | Scanning, alert, reporting |
+| Miner | Field operative. Alert eyes. Collar up. Always looking at something off-screen. | Scanning, alert, reporting |
 | Analyst | Clean, precise. Glasses optional. Thoughtful expression. Surrounded by data. | Focused, furrowed brow, presenting both sides |
 | Critic | Arms often crossed. Sceptical eyebrow. Direct eye contact. | Sceptical, challenging, rare approving nod |
 | Bookkeeper | Neat, orderly. Calculator energy. Neutral expression. | Precise, unemotional, slight head tilt when presenting numbers |
@@ -142,7 +142,7 @@ A thin horizontal strip of status pills — one per crew member. This replaces t
 
 | Name | Icon | Role |
 |------|------|------|
-| Scout | 🔍 | Gathers intel from NRL podcasts and media |
+| Miner | 🔍 | Gathers intel from NRL podcasts and media |
 | Analyst | 🧠 | Cross-references claims, finds contradictions |
 | Critic | ⚖️ | Challenges calls before they go public |
 | Bookkeeper | 📊 | Runs the numbers — prices, breakevens, stats |
@@ -153,7 +153,7 @@ A thin horizontal strip of status pills — one per crew member. This replaces t
 
 **Active:**
 ```
-[👤 full-colour portrait, 32px] Scout — Scanning 4 new episodes
+[👤 full-colour portrait, 32px] Miner — Scanning 4 new episodes
 ```
 - Full-colour avatar with pulsing orange ring
 - Animated idle loop (if available, otherwise static portrait)
@@ -176,7 +176,7 @@ Show only active crew + Jaromelu. Dormant collapse to `+3` overflow pill. Tap to
 
 When no crew is working:
 ```
-[○] Scout  [○] Analyst  [○] Critic  [○] Bookkeeper  [○] Archivist  [●] Jaromelu — Squad locked. Watching the market.
+[○] Miner  [○] Analyst  [○] Critic  [○] Bookkeeper  [○] Archivist  [●] Jaromelu — Squad locked. Watching the market.
 ```
 
 Jaromelu is never fully dormant.
@@ -193,7 +193,7 @@ Small, compact. Shows a crew member doing work.
 
 ```
 ┌────────────────────────────────────────────┐
-│ 🔍 Scout                           3h ago │
+│ 🔍 Miner                           3h ago │
 │ Picked up 4 new episodes overnight.       │
 │ 2 mention Cleary, 1 deep-dive on Munster. │
 └────────────────────────────────────────────┘
@@ -208,9 +208,9 @@ Small, compact. Shows a crew member doing work.
 
 **Variants by crew member:**
 
-Scout:
+Miner:
 ```
-🔍 Scout · 3h ago
+🔍 Miner · 3h ago
 Picked up 4 new episodes overnight. 2 mention Cleary, 1 deep-dive on Munster.
 ```
 
@@ -444,7 +444,7 @@ Contextual panels that open when tapping references in the Stream. Not pages.
 │                              │
 │  ── The Crew's Intel ──      │
 │                              │
-│  🔍 Scout                    │
+│  🔍 Miner                    │
 │  3 sources this week:        │
 │  KingOfSC (SELL),            │
 │  NRLBrothers (SELL),         │
@@ -592,10 +592,10 @@ Use these as realistic content to populate the prototype.
 
 ### Crew Bar (active state)
 ```
-[●] Scout — Scanning 6 new episodes    [●] Analyst — Cross-referencing Cleary claims    [○] Critic    [○] Bookkeeper    [○] Archivist    [●] Jaromelu — Reviewing the evidence
+[●] Miner — Scanning 6 new episodes    [●] Analyst — Cross-referencing Cleary claims    [○] Critic    [○] Bookkeeper    [○] Archivist    [●] Jaromelu — Reviewing the evidence
 ```
 
-### Scout Activity Cards
+### Miner Activity Cards
 ```
 "4 new episodes overnight. 2 mention Cleary, 1 deep-dive on Munster."
 "KingOfSC just dropped a Round 7 preview. Flagging for Analyst."

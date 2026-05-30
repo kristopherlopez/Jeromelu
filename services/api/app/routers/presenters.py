@@ -27,7 +27,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from jeromelu_shared.db import (
     Channel,
     Person,
-    ScoutPresenterCandidate,
+    MinerPresenterCandidate,
     SourcePresenter,
 )
 from pydantic import BaseModel
@@ -36,7 +36,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..deps import get_db
-from ..scout.presenter_research.agent import run_presenter_research
+from ..miner.presenter_research.agent import run_presenter_research
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -66,7 +66,7 @@ def _unique_person_slug(session: Session, base: str) -> str:
         n += 1
 
 
-def _candidate_to_dict(c: ScoutPresenterCandidate) -> dict[str, Any]:
+def _candidate_to_dict(c: MinerPresenterCandidate) -> dict[str, Any]:
     return {
         "id": str(c.id),
         "channel_id": str(c.channel_id),
@@ -160,13 +160,13 @@ def list_candidates(
     limit: int = Query(default=200, le=500),
     db: Session = Depends(get_db),
 ):
-    stmt = select(ScoutPresenterCandidate).order_by(ScoutPresenterCandidate.discovered_at.desc())
+    stmt = select(MinerPresenterCandidate).order_by(MinerPresenterCandidate.discovered_at.desc())
     if channel_id is not None:
-        stmt = stmt.where(ScoutPresenterCandidate.channel_id == channel_id)
+        stmt = stmt.where(MinerPresenterCandidate.channel_id == channel_id)
     if status:
         if status not in ("pending", "confirmed", "rejected"):
             raise HTTPException(status_code=400, detail="bad status")
-        stmt = stmt.where(ScoutPresenterCandidate.status == status)
+        stmt = stmt.where(MinerPresenterCandidate.status == status)
     stmt = stmt.limit(limit)
 
     rows = db.execute(stmt).scalars().all()
@@ -189,14 +189,14 @@ def by_channel(
 
     pending_rows = (
         db.execute(
-            select(ScoutPresenterCandidate)
+            select(MinerPresenterCandidate)
             .where(
-                ScoutPresenterCandidate.channel_id == channel_id,
-                ScoutPresenterCandidate.status == "pending",
+                MinerPresenterCandidate.channel_id == channel_id,
+                MinerPresenterCandidate.status == "pending",
             )
             .order_by(
-                ScoutPresenterCandidate.role,
-                ScoutPresenterCandidate.llm_confidence.desc().nullslast(),
+                MinerPresenterCandidate.role,
+                MinerPresenterCandidate.llm_confidence.desc().nullslast(),
             )
         )
         .scalars()
@@ -205,12 +205,12 @@ def by_channel(
 
     rejected_rows = (
         db.execute(
-            select(ScoutPresenterCandidate)
+            select(MinerPresenterCandidate)
             .where(
-                ScoutPresenterCandidate.channel_id == channel_id,
-                ScoutPresenterCandidate.status == "rejected",
+                MinerPresenterCandidate.channel_id == channel_id,
+                MinerPresenterCandidate.status == "rejected",
             )
-            .order_by(ScoutPresenterCandidate.reviewed_at.desc().nullslast())
+            .order_by(MinerPresenterCandidate.reviewed_at.desc().nullslast())
             .limit(50)
         )
         .scalars()
@@ -267,7 +267,7 @@ def confirm_candidate(
     (channel_id, person_id) the candidate is still marked confirmed and the
     existing association is returned.
     """
-    candidate = db.get(ScoutPresenterCandidate, candidate_id)
+    candidate = db.get(MinerPresenterCandidate, candidate_id)
     if candidate is None:
         raise HTTPException(status_code=404, detail="candidate not found")
 
@@ -341,7 +341,7 @@ def confirm_candidate(
         sp = existing_sp
         association_status = "already-exists"
         # Re-attach the candidate that we lost on the rollback.
-        candidate = db.get(ScoutPresenterCandidate, candidate_id)
+        candidate = db.get(MinerPresenterCandidate, candidate_id)
 
     candidate.status = "confirmed"
     candidate.confirmed_person_id = person_id
@@ -379,7 +379,7 @@ def reject_candidate(
     body: RejectBody = Body(default_factory=RejectBody),
     db: Session = Depends(get_db),
 ):
-    candidate = db.get(ScoutPresenterCandidate, candidate_id)
+    candidate = db.get(MinerPresenterCandidate, candidate_id)
     if candidate is None:
         raise HTTPException(status_code=404, detail="candidate not found")
 

@@ -1,7 +1,7 @@
 """Jaromelu status and round overview endpoints.
 
 Internal note: the underlying `agent_runs` table still tracks per-internal-mode
-activity (scout / scribe / analyst / stats / fixtures) for engineering telemetry,
+activity (miner / scribe / analyst / stats / fixtures) for engineering telemetry,
 but the user-facing API surfaces a single Jaromelu status — the wholesale model
 (see docs/agents/crew/README.md). File name retained for git history; routes
 have moved off the `/crew/...` prefix.
@@ -29,7 +29,7 @@ def jaromelu_status(db: Session = Depends(get_db)):
     """Current single-character Jaromelu status for the homepage.
 
     Aggregates the most recent agent_runs row across all internal modes into
-    a single status. The internal mode (e.g. scout / analyst) is reflected only
+    a single status. The internal mode (e.g. miner / analyst) is reflected only
     in the action string — never as a separate agent identity in the response.
     """
 

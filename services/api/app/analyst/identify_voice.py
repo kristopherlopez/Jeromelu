@@ -205,7 +205,7 @@ def enrollment_context(
     if source is None:
         raise EnrollmentError(f"no source with id {source_id}")
     if not source.audio_s3_key:
-        raise EnrollmentError(f"source {source_id} has no audio_s3_key — run Scout's acquire_audio first")
+        raise EnrollmentError(f"source {source_id} has no audio_s3_key — run Miner's acquire_audio first")
     if not settings.huggingface_api_key:
         raise EnrollmentError("HUGGINGFACE_API_KEY is not configured — required to load the embedding model")
 

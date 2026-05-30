@@ -15,7 +15,7 @@ This doc maps the internal flow for engineering, prompt design, and copy purpose
 
 The default flow inside Jaromelu's reasoning before a call is published:
 
-1. **Scout (research)** — gather intel, surface what's new
+1. **Miner (research)** — gather intel, surface what's new
 2. **Analyst (cross-reference)** — find contradictions and consensus shifts
 3. **Bookkeeper (numbers)** — breakevens, cap space, math
 4. **Critic (challenge)** — pre-call objection on thin evidence
@@ -30,7 +30,7 @@ In the system, this corresponds to a chain of workers (ingestion → extraction 
 Each step's output is the next step's input:
 
 ```
-Scout: "3 new takes on Cleary — KingOfSC SELL, NRLBrothers SELL, PodcastNRL BUY"
+Miner: "3 new takes on Cleary — KingOfSC SELL, NRLBrothers SELL, PodcastNRL BUY"
    ↓
 Analyst: "Contradiction. Same matchup data, opposite reads. Sell side has 2/3 sources;
          one is below 50% accuracy historically."
@@ -69,9 +69,9 @@ The cadence of internal reasoning maps to system events, not to on-screen beats:
 
 | Internal step | System trigger | User-facing surface |
 |---|---|---|
-| Scout | New transcript discovered / source added | "Jaromelu found new sources / new takes" — published as a Jaromelu update in the feed |
+| Miner | New transcript discovered / source added | "Jaromelu found new sources / new takes" — published as a Jaromelu update in the feed |
 | Analyst | Extraction worker output | Numbers / claims cited in Jaromelu's next Remark |
-| Bookkeeper | Scout scrape complete | Numbers cited inline in Jaromelu's next Remark |
+| Bookkeeper | Miner scrape complete | Numbers cited inline in Jaromelu's next Remark |
 | Critic | Pre-publish gate on a draft Remark | Self-aware framing in the final voice ("almost talked myself out of it") |
 | Jaromelu | Decision worker commits | Remark card publishes |
 | **Archivist** *(out-of-band)* | New claims / stats / team lists / Remarks land | Wiki page rewrites, surfaced in `/wiki` and the activity Feed (revisions) |
@@ -83,7 +83,7 @@ The cadence of internal reasoning maps to system events, not to on-screen beats:
 The five-step flow above is the **call chain** — the reasoning that produces a Remark. The Archivist is not in that chain. It runs continuously and asynchronously, downstream of every other crew member, and writes to a separate user-facing surface (the wiki).
 
 ```
-Scout      →  Analyst    →  Bookkeeper  →  Critic     →  Jaromelu
+Miner      →  Analyst    →  Bookkeeper  →  Critic     →  Jaromelu
 (acquire)     (extract)     (numbers)      (challenge)    (voice / Remark)
                   ↓             ↓                            ↓
                   ───────────► Archivist ◄────────────────────

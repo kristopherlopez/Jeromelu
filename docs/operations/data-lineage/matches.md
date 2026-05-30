@@ -16,7 +16,7 @@ tags: [area/operations, data-lineage]
 
 ## Extractor
 
-`scripts/data/populate/phase_matches.py` — `populate_matches()` walks `scout/nrlcom/match-centre/{comp}/{season}/round-{NN}/{slug}.json`, does idempotent UPSERT keyed on `(source, season, grade, external_match_id)` per the `uq_matches_source_external` partial unique index.
+`scripts/data/populate/phase_matches.py` — `populate_matches()` walks `miner/nrlcom/match-centre/{comp}/{season}/round-{NN}/{slug}.json`, does idempotent UPSERT keyed on `(source, season, grade, external_match_id)` per the `uq_matches_source_external` partial unique index.
 
 ## Field mapping
 
@@ -25,10 +25,10 @@ tags: [area/operations, data-lineage]
 | `match_id` | derived | — | UUID, DB-side default |
 | `source` | constant | `'nrl_com'` | Hardcoded in extractor |
 | `external_match_id` | match-centre | `$.matchId` | Idempotency key. Skipped if missing/blank |
-| `season` | S3 key | `scout/.../{season}/...` | Parsed from key path, not payload |
-| `round` | S3 key | `scout/.../round-{NN}/...` | Parsed from key path |
+| `season` | S3 key | `miner/.../{season}/...` | Parsed from key path, not payload |
+| `round` | S3 key | `miner/.../round-{NN}/...` | Parsed from key path |
 | `round_label` | match-centre | `$.roundTitle` | e.g. "Round 7", "Finals Week 1" |
-| `grade` | S3 key | `scout/.../{competition}/...` | Mapped via `_GRADE_MAP`: 111→`nrl`, 161→`nrlw`, 113→`nsw_cup`, 114→`qld_cup`, 156→`jersey_flegg`, 155→`mal_meninga`. Default `nrl` |
+| `grade` | S3 key | `miner/.../{competition}/...` | Mapped via `_GRADE_MAP`: 111→`nrl`, 161→`nrlw`, 113→`nsw_cup`, 114→`qld_cup`, 156→`jersey_flegg`, 155→`mal_meninga`. Default `nrl` |
 | `home_team_id` | match-centre | `$.homeTeam.teamId` | Resolved via `teams.nrlcom_team_id`; **row dropped** if no team match |
 | `away_team_id` | match-centre | `$.awayTeam.teamId` | Same; row dropped if missing or `home_team_id == away_team_id` (`ck_matches_distinct_teams`) |
 | `venue_id` | match-centre | `$.venue` | Fuzzy match on `lower(venues.name)`; NULL on miss (no row dropped) |
@@ -59,7 +59,7 @@ On conflict, only these columns are overwritten:
 
 ## Bye rows
 
-The extractor does not currently emit `status='bye'` rows. Match-centre archives don't exist for bye fixtures — those would have to come from `scout/nrlcom/draw/*` (`$.filterRounds[*]` enumerates byes), via a separate path that's not yet built.
+The extractor does not currently emit `status='bye'` rows. Match-centre archives don't exist for bye fixtures — those would have to come from `miner/nrlcom/draw/*` (`$.filterRounds[*]` enumerates byes), via a separate path that's not yet built.
 
 ## Drift notes (catalogue)
 

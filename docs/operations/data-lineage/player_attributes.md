@@ -15,7 +15,7 @@ tags: [area/operations, data-lineage]
 
 ## Extractors
 
-- `services/api/app/scout/supercoach_roster/` — writes SC-eligible player rows with `source='supercoach'`
+- `services/api/app/miner/supercoach_roster/` — writes SC-eligible player rows with `source='supercoach'`
 - `scripts/data/populate/phase_attributes.py` — `populate_player_attributes()` reads `match_team_lists` chronologically, groups consecutive same-team appearances into tenure windows, UPSERTs with `source='nrlcom/match-centre'`
 
 ## Field mapping

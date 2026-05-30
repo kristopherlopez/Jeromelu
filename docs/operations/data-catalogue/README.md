@@ -46,8 +46,8 @@ Layer 2 — STRUCTURED WORLD ─────────────────
                                     └────────────────────┘
 
 Layer 3 — CONTENT & CLAIMS ─────────────────────────────────────────────────────
-   scout_candidates           ──(promote)──▶ channels / sources    (Scout's review queue)
-   scout_presenter_candidates ──(confirm)──▶ source_presenters     (Presenter Scout's queue)
+   miner_candidates           ──(promote)──▶ channels / sources    (Miner's review queue)
+   miner_presenter_candidates ──(confirm)──▶ source_presenters     (Presenter Miner's queue)
                                               │
                                               └─▶ people  (created on confirm if no link)
    channels ──▶ sources ──▶ source_documents
@@ -108,10 +108,10 @@ Real-world rows holding facts. Cross-type references from claims/predictions/etc
 
 ### 3. Content & claims
 
-Pipeline from channel → source → document → overlays → quote → claim, plus time-series popularity sidecars and Scout's review queues.
+Pipeline from channel → source → document → overlays → quote → claim, plus time-series popularity sidecars and Miner's review queues.
 
-- [scout_candidates](scout_candidates.md) — Scout's candidate inbox (channels + videos awaiting approval)
-- [scout_presenter_candidates](scout_presenter_candidates.md) — Presenter Scout's staging inbox
+- [miner_candidates](miner_candidates.md) — Miner's candidate inbox (channels + videos awaiting approval)
+- [miner_presenter_candidates](miner_presenter_candidates.md) — Presenter Miner's staging inbox
 - [source_presenters](source_presenters.md) — confirmed `(channel, person, role)` association
 - [channels](channels.md) — registry of content sources (YouTube, podcast, web, twitter, instagram)
 - [channel_metrics](channel_metrics.md) — time-series popularity per channel (multi-platform via JSONB)
@@ -152,7 +152,7 @@ What Jaromelu produces from the world (Layer 2) plus the content (Layer 3).
 
 ### 5. Agent audit
 
-Per-run and per-event observability for Claude-Agent-SDK-based agents (Scout, Scribe, Analyst, Stats, Fixtures). Live-queryable store while a run is in flight; the same events also serialise to JSONL and upload to S3 at run end. See [docs/agents/system/agent-audit.md](../../agents/system/agent-audit.md) for the full audit pattern.
+Per-run and per-event observability for Claude-Agent-SDK-based agents (Miner, Scribe, Analyst, Stats, Fixtures). Live-queryable store while a run is in flight; the same events also serialise to JSONL and upload to S3 at run end. See [docs/agents/system/agent-audit.md](../../agents/system/agent-audit.md) for the full audit pattern.
 
 - [agent_runs](agent_runs.md) — run-level summary (one row per run, keyed by `run_id`)
 - [agent_events](agent_events.md) — per-event audit trail (dense `sequence` per run for ordered replay)

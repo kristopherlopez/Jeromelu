@@ -42,8 +42,8 @@ Temporal Server
 │   ├── FeedGenerationWorkflow
 │   └── KBGenerationWorkflow
 │
-├── worker-scraper (scraper) — RETIRED 2026-05-28 (Scout Phase 4 closure;
-│                                migrated to services/api/app/scout/<pipeline>/)
+├── worker-scraper (scraper) — RETIRED 2026-05-28 (Miner Phase 4 closure;
+│                                migrated to services/api/app/miner/<pipeline>/)
 │
 ├── worker-extraction (extraction) — NOT YET BUILT
 └── worker-decision (decision) — NOT YET BUILT

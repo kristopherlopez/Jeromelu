@@ -12,10 +12,10 @@ How Analyst works in depth: where it sits in the pipeline, what it reads and wri
 
 ## Pipeline position
 
-Analyst is the **interpretive stage** of the multi-agent pipeline. It owns everything from "here is a speaker-attributed transcript" through "here is structured, cross-referenced knowledge." Acquisition is upstream (Scout/bronze); the structural audio→transcript transform (Lineup) is becoming an external service that sits *between* Scout and Analyst; numbers, challenge, and the final voice are downstream.
+Analyst is the **interpretive stage** of the multi-agent pipeline. It owns everything from "here is a speaker-attributed transcript" through "here is structured, cross-referenced knowledge." Acquisition is upstream (Miner/bronze); the structural audio→transcript transform (Lineup) is becoming an external service that sits *between* Miner and Analyst; numbers, challenge, and the final voice are downstream.
 
 ```
-Scout        →  Lineup          →  Analyst        →  Bookkeeper + Critic  →  Jaromelu
+Miner        →  Lineup          →  Analyst        →  Bookkeeper + Critic  →  Jaromelu
 (acquire,        (structural:        (this:             (numbers + challenge)   (voice)
  bronze)         audio→attributed    interpret,
                  transcript —        silver)
@@ -24,7 +24,7 @@ Scout        →  Lineup          →  Analyst        →  Bookkeeper + Critic  
 
 | Stage | Crew mode | System surface | What it does | Status |
 |---|---|---|---|---|
-| Acquire | [Scout](../scout/README.md) | [source-discovery](../../system/source-discovery.md), [ingestion](../../system/ingestion.md) | Discover, enumerate, pull audio/video to S3, fetch structured feeds | Media shipped; data in design |
+| Acquire | [Miner](../miner/README.md) | [source-discovery](../../system/source-discovery.md), [ingestion](../../system/ingestion.md) | Discover, enumerate, pull audio/video to S3, fetch structured feeds | Media shipped; data in design |
 | **Structural transform** | **Lineup** *(externalising)* | [transcription-pipeline](../../system/transcription-pipeline.md), [speaker-identification](../../system/speaker-identification.md) | Diarize + ASR + merge + speaker ID → a speaker-attributed transcript | In-repo path **live but legacy** (per [charter A8](charter.md#a8-disposition-of-the-in-repo-lineup-code--legacy-not-deleted)); external API not built |
 | **Interpret** | **Analyst** *(this doc)* | [extraction](../../system/extraction.md); local prototypes in [skills/](../../skills/transcript-pipeline.md) | Clean, chapter, annotate, embed, extract entities/quotes/claims, cross-reference for consensus + contradictions | No production pipeline yet — prototyped locally ([charter A11](charter.md#a11-production-runs-in-workers-not-claude-code-skills)) |
 | Derive | [Bookkeeper](../bookkeeper/README.md) + [Critic](../critic/README.md) | [decision](../../system/decision.md) | Numeric derivations over extracted claims (alignment, accuracy, breakevens); challenge thin evidence | Partial; decision worker not built |
@@ -66,7 +66,7 @@ Speaker attribution reads use `coalesce(cluster_label, speaker_label)` — the `
 | `claim_associations` | Claim ↔ entity links (the subject/source resolved by referential resolution) | Extraction | Not built (local prototype) |
 | `consensus_snapshots` | Semantic consensus shifts + contradictions across sources | Cross-reference | Not built |
 
-Analyst writes **nothing** to the bronze tables (`scout_candidates`, `channels`, `sources` audio/ingestion fields, `people`, `matches`, `player_rounds`, …) — those are Scout's. It writes **nothing** to the numeric-derivation tables (`predictions`, `decisions`, alignment/accuracy metrics) — those are Bookkeeper's. And it does not compose `wiki_pages` — that's the Archivist's read over Analyst's outputs.
+Analyst writes **nothing** to the bronze tables (`miner_candidates`, `channels`, `sources` audio/ingestion fields, `people`, `matches`, `player_rounds`, …) — those are Miner's. It writes **nothing** to the numeric-derivation tables (`predictions`, `decisions`, alignment/accuracy metrics) — those are Bookkeeper's. And it does not compose `wiki_pages` — that's the Archivist's read over Analyst's outputs.
 
 > **Boundary note on `source_speakers`.** Analyst *reads* `speaker_person_id` but does **not** write it — that's Lineup's column. The one exception today is the legacy in-repo path, where transcription writes those rows inline; under the externalised model ([charter A2](charter.md#a2-lineup-is-a-service-boundary-not-a-sub-module)) the producer of `speaker_person_id` is the Lineup service, and Analyst is purely a reader.
 
@@ -245,7 +245,7 @@ Analyst is mid-transition on two axes at once: **producer** (in-repo Lineup → 
 ```
 TODAY (local prototyping only — no production pipeline)   TARGET (production)
 ───────────────────────────────────────────────────────  ───────────────────
-Scout audio in S3                              Scout audio in S3
+Miner audio in S3                              Miner audio in S3
    │                                              │
    ▼                                              ▼
 in-repo Lineup (transcribe.py + GPU)          external Lineup API
@@ -266,7 +266,7 @@ quotes · claims · consensus(by hand)           ▼
                                                quotes · claims · consensus_snapshots
 ```
 
-**Shared shape across Analyst's target passes** (mirrors Scout's module shape, adapted for LLM work):
+**Shared shape across Analyst's target passes** (mirrors Miner's module shape, adapted for LLM work):
 
 1. Each pass is an idempotent transform over the previous pass's output, keyed so a re-run is a no-op when inputs are unchanged.
 2. Each pass writes one `agent_runs` row with `agent_id='analyst'`, `detail_json.pass='<pass>'`, plus per-run counts ([charter A7](charter.md#a7-audit--agent_idanalyst-pass-discriminator-in-detail_json)).
@@ -286,4 +286,4 @@ quotes · claims · consensus(by hand)           ▼
 - [Extraction](../../system/extraction.md) — claim/entity/quote extraction surface
 - [Transcript Pipeline skill](../../skills/transcript-pipeline.md) — the clean → process → verify → upload chain (local prototype only; not production — [charter A11](charter.md#a11-production-runs-in-workers-not-claude-code-skills))
 - [Agent audit pattern](../../system/agent-audit.md) — `agent_runs` / `agent_events` / S3 conventions shared across agents
-- [Scout architecture](../scout/architecture.md) — the bronze-stage architecture Analyst's interpretive stage consumes
+- [Miner architecture](../miner/architecture.md) — the bronze-stage architecture Analyst's interpretive stage consumes

@@ -120,20 +120,20 @@ class TestMakeRunId:
     RUN_ID_PATTERN = re.compile(r"^([a-z_]+)-(\d{8})T(\d{6})-([0-9a-f]{6})$")
 
     def test_format_matches_spec(self):
-        run_id = make_run_id("scout")
+        run_id = make_run_id("miner")
         match = self.RUN_ID_PATTERN.match(run_id)
         assert match is not None, f"Run id {run_id!r} doesn't match expected format"
-        assert match.group(1) == "scout"
+        assert match.group(1) == "miner"
 
     def test_agent_id_carried_through_as_prefix(self):
-        for agent in ["scout", "analyst", "critic", "bookkeeper"]:
+        for agent in ["miner", "analyst", "critic", "bookkeeper"]:
             run_id = make_run_id(agent)
             assert run_id.startswith(f"{agent}-"), f"prefix mismatch for {agent}: {run_id}"
 
     def test_repeated_calls_unique(self):
         # Same-second triggers should still produce distinct ids thanks to
         # the hex nonce. 100 calls is plenty to surface a collision bug.
-        ids = {make_run_id("scout") for _ in range(100)}
+        ids = {make_run_id("miner") for _ in range(100)}
         assert len(ids) == 100
 
 

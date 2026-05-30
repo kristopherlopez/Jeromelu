@@ -11,7 +11,7 @@ Run-level summary. One row per run, keyed by `run_id`. Inserted with `status='ru
 | Column | Type | Nullable | Default | Notes |
 |--------|------|----------|---------|-------|
 | run_id | text | PK | | |
-| agent_id | text | no | | `scout`, `scribe`, `analyst`, `stats`, `fixtures` |
+| agent_id | text | no | | `miner`, `scribe`, `analyst`, `stats`, `fixtures` |
 | agent_name | text | no | | |
 | status | text | no | `running` | `running`, `completed`, `aborted`, `failed` |
 | started_at | timestamptz | no | now() | |

@@ -5,8 +5,8 @@ tags: [area/agents, subarea/system, status/live]
 # Agent Audit — Standardised Logging Pattern
 
 **Module:** `packages/shared/jeromelu_shared/agent_audit.py`
-**Applies to:** every agent built on the Anthropic Messages API + custom-tool loop (Scout today; Analyst, Critic, Bookkeeper, Archivist when they arrive).
-**Reference implementation:** `services/api/app/scout/source_discovery/agent.py`.
+**Applies to:** every agent built on the Anthropic Messages API + custom-tool loop (Miner today; Analyst, Critic, Bookkeeper, Archivist when they arrive).
+**Reference implementation:** `services/api/app/miner/source_discovery/agent.py`.
 
 This is the contract every Claude-Agent-SDK-based agent in the system MUST follow. Uniform audit trail = uniform observability + uniform debugging + uniform cost tracking, with no per-agent reinvention.
 
@@ -20,7 +20,7 @@ Three layers, all joined by a single `run_id`:
 |---|---|---|
 | **Run summary** | `agent_runs` (DB) — **one row per run, keyed by `run_id`**; inserted with `status='running'`, updated in place at run end | "Did agent X run today, what was the outcome, what did it cost" |
 | **Per-event trace** | `agent_events` (DB) — one row per event, queryable while the run is in progress; **plus** an at-end JSONL bundle uploaded to `s3://{settings.s3_agent_logs_bucket}/agent-logs/{agent_id}/{YYYY}/{MM}/{DD}/{run_id}.jsonl` | "Why did it skip that result? What did web_search return on turn 3?" — DB for live + ad-hoc queries; S3 for long-term forensics. |
-| **Domain output** | Agent-specific tables (`scout_candidates` for Scout, `claims` for Analyst, etc.) tagged with `run_id` | "What did this run actually produce" |
+| **Domain output** | Agent-specific tables (`miner_candidates` for Miner, `claims` for Analyst, etc.) tagged with `run_id` | "What did this run actually produce" |
 
 All three tables expose `run_id` as a top-level indexed column (PK on `agent_runs`, unique-with-sequence on `agent_events`), so cross-table queries are clean: `SELECT … FROM agent_runs JOIN agent_events USING (run_id, agent_id) …`.
 
@@ -86,7 +86,7 @@ One row per run, keyed by `run_id` (the primary key). Inserted with
 
 ```
 run_id                TEXT          PK
-agent_id              TEXT          NOT NULL  (CHECK: scout|scribe|analyst|stats|fixtures)
+agent_id              TEXT          NOT NULL  (CHECK: miner|scribe|analyst|stats|fixtures)
 agent_name            TEXT          NOT NULL
 status                TEXT          NOT NULL  (CHECK: running|completed|aborted|failed)
 started_at            TIMESTAMPTZ   NOT NULL
@@ -115,7 +115,7 @@ run inside the helper, so every agent's spend is derived identically.
 
 Round/season aren't on `agent_runs` — they're agent-specific concerns and
 belong on per-agent output tables (`claims.effective_round`,
-`scout_candidates.discovered_at`, etc.), not on the run-level summary.
+`miner_candidates.discovered_at`, etc.), not on the run-level summary.
 
 ---
 
@@ -210,7 +210,7 @@ agent loop.
 
 **Mid-run** (for budget gating), call them yourself in the loop and compare
 to `bounds.max_budget_usd`. Server-side tools are billed separately — a
-typical Scout run does 5–15 web_searches = $0.05–$0.15 on top of token cost,
+typical Miner run does 5–15 web_searches = $0.05–$0.15 on top of token cost,
 always combine both for the gate. The shared module is the single source of
 truth; verify pricing against current Anthropic numbers when editing.
 
@@ -219,7 +219,7 @@ truth; verify pricing against current Anthropic numbers when editing.
 ## Run id — `make_run_id(agent_id)`
 
 Format: `{agent_id}-{YYYYMMDDTHHMMSS}-{6-char-nonce}`.
-Example: `scout-20260427T103045-a1b2c3`.
+Example: `miner-20260427T103045-a1b2c3`.
 
 The agent prefix lets you grep logs / S3 keys / DB rows by agent without parsing JSON. The timestamp keeps runs sortable by name. The nonce avoids collisions from same-second triggers.
 
@@ -227,14 +227,14 @@ The agent prefix lets you grep logs / S3 keys / DB rows by agent without parsing
 
 ## `agent_runs` CHECK constraint — gotcha for new agents
 
-`agent_runs.agent_id` has a CHECK constraint enumerating allowed values (currently `scout`, `scribe`, `analyst`, `stats`, `fixtures`). When adding a new agent (e.g. `critic`, `bookkeeper`, `archivist`), **first ship a migration that extends the constraint**, otherwise `record_agent_started` will fail at INSERT time.
+`agent_runs.agent_id` has a CHECK constraint enumerating allowed values (currently `miner`, `scribe`, `analyst`, `stats`, `fixtures`). When adding a new agent (e.g. `critic`, `bookkeeper`, `archivist`), **first ship a migration that extends the constraint**, otherwise `record_agent_started` will fail at INSERT time.
 
 Migration template:
 ```sql
 -- 0NN_extend_agent_runs_agent_ids.sql
 ALTER TABLE agent_runs DROP CONSTRAINT ck_agent_runs_agent_id;
 ALTER TABLE agent_runs ADD CONSTRAINT ck_agent_runs_agent_id
-    CHECK (agent_id IN ('scout', 'scribe', 'analyst', 'stats', 'fixtures', 'critic'));
+    CHECK (agent_id IN ('miner', 'scribe', 'analyst', 'stats', 'fixtures', 'critic'));
 ```
 
 Update the matching `__table_args__` in `packages/shared/jeromelu_shared/db/models.py` in the same changeset.
@@ -288,13 +288,13 @@ SELECT sequence, t, type, turn,
        payload->>'name'  AS tool_name,
        LEFT(payload::text, 200) AS preview
 FROM agent_events
-WHERE run_id = 'scout-20260427T103045-a1b2c3'
+WHERE run_id = 'miner-20260427T103045-a1b2c3'
 ORDER BY sequence;
 
 -- Live tail while a run is in progress (poll this from another connection)
 SELECT sequence, type, turn, payload->>'name' AS name
 FROM agent_events
-WHERE run_id = 'scout-20260427T103045-a1b2c3'
+WHERE run_id = 'miner-20260427T103045-a1b2c3'
 ORDER BY sequence DESC
 LIMIT 10;
 
@@ -319,10 +319,10 @@ ORDER BY t DESC;
 ### S3 bundle (long-term forensics)
 
 ```bash
-aws s3 cp s3://jeromelu-clean-documents/agent-logs/scout/2026/04/27/scout-...jsonl - | jq
+aws s3 cp s3://jeromelu-clean-documents/agent-logs/miner/2026/04/27/miner-...jsonl - | jq
 
 # Just the candidates filed
-aws s3 cp s3://.../scout-...jsonl - \
+aws s3 cp s3://.../miner-...jsonl - \
   | jq -c 'select(.type=="tool_use" and .payload.name=="persist_candidate") | .payload.input | {title, score}'
 ```
 

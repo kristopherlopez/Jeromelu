@@ -21,7 +21,7 @@ Internal reasoning architecture for Jaromelu — not separate visible characters
 | Internal function | What it does |
 |---|---|
 | [Jaromelu](crew/jaromelu/README.md) | The on-screen character — integrates everything below |
-| [Scout](crew/scout/README.md) | Research / intelligence gathering mode |
+| [Miner](crew/miner/README.md) | Research / intelligence gathering mode |
 | [Analyst](crew/analyst/README.md) | Cross-reference / contradiction-detection mode |
 | [Critic](crew/critic/README.md) | Self-doubt / pre-call challenge mode |
 | [Bookkeeper](crew/bookkeeper/README.md) | Math / numbers mode |
@@ -51,4 +51,4 @@ See also: [Crew Dynamics](crew/dynamics.md) — internal reasoning patterns (han
 
 ## How crew vs system relate
 
-Crew is **how Jaromelu thinks** — internal reasoning architecture (research, analysis, skepticism, math, memory). System is **what actually runs** — Temporal workflows, LLM activities, scrapers. They map but are not 1:1: a single internal mode (e.g. Scout = research) can span multiple system workers (ingestion + source discovery), and conversely the publishing agent wraps every internal-mode output in Jaromelu's single on-screen voice. Treat them as separate concerns that reference each other, not duplicates.
+Crew is **how Jaromelu thinks** — internal reasoning architecture (research, analysis, skepticism, math, memory). System is **what actually runs** — Temporal workflows, LLM activities, scrapers. They map but are not 1:1: a single internal mode (e.g. Miner = research) can span multiple system workers (ingestion + source discovery), and conversely the publishing agent wraps every internal-mode output in Jaromelu's single on-screen voice. Treat them as separate concerns that reference each other, not duplicates.

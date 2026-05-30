@@ -32,7 +32,7 @@ If the work order is satisfied exactly as written, the coordinator would trust t
 A plan section looks like:
 
 ```
-## 2026-05-30: Scout phase 6 - <title>
+## 2026-05-30: Miner phase 6 - <title>
 
 **Goal:** <one sentence>
 
@@ -65,10 +65,10 @@ Each work order in `WORK_ORDERS.md` looks like:
 ```
 ### WO-01: <title>
 
-**Plan.** [2026-05-30: Scout phase 6](./PLAN.md#2026-05-30-scout-phase-6---title)
+**Plan.** [2026-05-30: Miner phase 6](./PLAN.md#2026-05-30-miner-phase-6---title)
 **State.** ready
 **Owner.** unassigned
-**Branch.** `codex/scout-phase-6-<slice>`
+**Branch.** `codex/miner-phase-6-<slice>`
 **Depends-on.** none
 **Touches.** `path/glob/**`, `other/file.py`
 

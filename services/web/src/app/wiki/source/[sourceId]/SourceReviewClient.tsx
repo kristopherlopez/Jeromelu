@@ -195,7 +195,7 @@ export default function SourceReviewClient({ data, allSources }: Props) {
       return "Transcription failed for this episode. The video plays but no transcript or claims are available.";
     }
     if (source.ingestion_status !== "completed") {
-      return "Scout hasn't finished ingesting this episode yet. Transcript and claims will appear once it's processed.";
+      return "Miner hasn't finished ingesting this episode yet. Transcript and claims will appear once it's processed.";
     }
     return "This episode is queued for transcription. Transcript and claims will appear once the GPU worker finishes.";
   })();

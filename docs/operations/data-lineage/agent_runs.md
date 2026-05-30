@@ -11,18 +11,18 @@ tags: [area/operations, data-lineage]
 | Pipeline | Profile | Role |
 |---|---|---|
 | Every Claude-Agent-SDK agent run | — | **Primary** — one row per run |
-| Deterministic Scout admin pipelines | — | **Primary** for cron/admin fetch health; `agent_id='scout'`, `detail_json.pipeline` names the module |
+| Deterministic Miner admin pipelines | — | **Primary** for cron/admin fetch health; `agent_id='miner'`, `detail_json.pipeline` names the module |
 
 ## Writer
 
-`jeromelu_shared.agent_audit` — every Claude-Agent-SDK-based agent (Scout, Scribe, Analyst, Stats, Fixtures) calls `start_run()` at the top, which INSERTs a row with `status='running'`, then `end_run()` UPDATEs in place at run end with totals, summary, and cost rollup. Deterministic Scout admin pipelines use `services/api/app/scout/common/pipeline_run.py`, which wraps the same helpers with `model='deterministic'`, zero token/tool counts, and a stable `detail_json.pipeline`. Per [[project_agent_audit_pattern]].
+`jeromelu_shared.agent_audit` — every Claude-Agent-SDK-based agent (Miner, Scribe, Analyst, Stats, Fixtures) calls `start_run()` at the top, which INSERTs a row with `status='running'`, then `end_run()` UPDATEs in place at run end with totals, summary, and cost rollup. Deterministic Miner admin pipelines use `services/api/app/miner/common/pipeline_run.py`, which wraps the same helpers with `model='deterministic'`, zero token/tool counts, and a stable `detail_json.pipeline`. Per [[project_agent_audit_pattern]].
 
 ## Field mapping
 
 | DB column | Source | Notes |
 |---|---|---|
 | `run_id` | derived (uuid hex) | PK; passed to all events for join |
-| `agent_id` | agent | `scout`, `scribe`, `analyst`, `stats`, `fixtures` |
+| `agent_id` | agent | `miner`, `scribe`, `analyst`, `stats`, `fixtures` |
 | `agent_name` | agent | Human-readable variant |
 | `status` | lifecycle | `running` → `completed`/`aborted`/`failed` |
 | `started_at` | derived | DB default `now()` at start_run |
@@ -44,4 +44,4 @@ tags: [area/operations, data-lineage]
 - The matching event trail is in [agent_events](agent_events.md), joined via `run_id`.
 - Per [[project_agent_audit_pattern]]: every agent has run_id / bounds / cost / 3-layer audit trail (live DB rows + S3 JSONL upload + per-event rows).
 - YouTube refresh labels: `youtube-refresh-videos` for the daily enumerate+video-stats endpoint, `youtube-channel-videos` for approval-time or ad-hoc one-channel enumeration, and `youtube-channel-stats` for channel metrics refresh. The daily `youtube-refresh-videos` endpoint remains HTTP 200 for per-channel enumeration partial failures, but its `agent_runs.status` is `failed` and `detail_json` includes `partial_failure`, `channels_failed`, and sample `channel_errors`.
-- Scout source health (`app.scout.source_health`) reads these YouTube pipeline rows to classify stale channel stats refreshes, stale video refreshes, and recent failed refresh/backfill attempts. Missing completed run rows are surfaced as `unknown`, never as healthy.
+- Miner source health (`app.miner.source_health`) reads these YouTube pipeline rows to classify stale channel stats refreshes, stale video refreshes, and recent failed refresh/backfill attempts. Missing completed run rows are surfaced as `unknown`, never as healthy.

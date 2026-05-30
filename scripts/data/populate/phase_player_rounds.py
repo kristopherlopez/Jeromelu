@@ -1,4 +1,4 @@
-"""Phase 5 — extract player_rounds from scout/nrlsupercoachstats/stats/* archives.
+"""Phase 5 — extract player_rounds from miner/nrlsupercoachstats/stats/* archives.
 
 One row per (player_id, round, season) — idempotent UPSERT on the
 `uq_player_round_season` unique index. Same projection the supercoach-stats
@@ -6,10 +6,10 @@ route does inline, but reading S3 archives (so historical backfill works:
 the route's `archive_only=true` mode captures S3 without DB writes; this
 extractor lands the DB rows era-aware).
 
-S3 archive shape (per `services/api/app/scout/supercoach_stats/routes.py`):
+S3 archive shape (per `services/api/app/miner/supercoach_stats/routes.py`):
     {"season": <int>, "round": <int>, "rows": [<raw jqGrid dicts>]}
 Key path:
-    scout/nrlsupercoachstats/stats/{season}/round-{NN:02d}.json
+    miner/nrlsupercoachstats/stats/{season}/round-{NN:02d}.json
 
 Per-row pipeline (matches the route's logic):
     raw jqGrid dict → extract_rows() → SuperCoachPlayerStats.model_validate()
@@ -32,8 +32,8 @@ from pydantic import ValidationError
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.scout.supercoach_stats.fetcher import extract_rows
-from app.scout.supercoach_stats.models import SuperCoachPlayerStats
+from app.miner.supercoach_stats.fetcher import extract_rows
+from app.miner.supercoach_stats.models import SuperCoachPlayerStats
 from jeromelu_shared.scraping.nrl import STAT_DB_COLUMNS
 
 from ._s3_walk import list_keys, read_json_concurrent
@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 
 _KEY_RE = re.compile(
-    r"scout/nrlsupercoachstats/stats/(?P<season>\d{4})/round-(?P<round>\d+)\.json$"
+    r"miner/nrlsupercoachstats/stats/(?P<season>\d{4})/round-(?P<round>\d+)\.json$"
 )
 
 
@@ -107,13 +107,13 @@ def populate_player_rounds(
     seasons: list[int] | None = None,
     commit: bool = True,
 ) -> dict[str, Any]:
-    """Walk scout/nrlsupercoachstats/stats/* archives and UPSERT player_rounds.
+    """Walk miner/nrlsupercoachstats/stats/* archives and UPSERT player_rounds.
 
     Mirrors the inline route logic (see `supercoach_stats/routes.py`) but
     reads from S3 instead of fetching. Used by Phase 5 historical backfill
     after the route's `archive_only=true` mode has populated S3.
     """
-    keys = list_keys("scout/nrlsupercoachstats/stats/")
+    keys = list_keys("miner/nrlsupercoachstats/stats/")
     if seasons:
         season_strs = {f"/{s}/" for s in seasons}
         keys = [k for k in keys if any(s in k for s in season_strs)]

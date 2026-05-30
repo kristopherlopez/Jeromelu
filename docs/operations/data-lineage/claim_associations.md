@@ -14,7 +14,7 @@ tags: [area/operations, data-lineage]
 
 ## Writer
 
-`scripts/transcripts/extraction/writer.py` — driven by the `upload-transcript` skill. For each [claims](claims.md) row, resolves the subject (and any contextual entities) to typed FKs and writes one association row per typed reference. SC notes path uses the same writer via `services/api/app/scout/supercoach_roster/notes_extractor.py`.
+`scripts/transcripts/extraction/writer.py` — driven by the `upload-transcript` skill. For each [claims](claims.md) row, resolves the subject (and any contextual entities) to typed FKs and writes one association row per typed reference. SC notes path uses the same writer via `services/api/app/miner/supercoach_roster/notes_extractor.py`.
 
 Example: a "Reece Walsh is a buy this week against the Storm" claim writes:
 - `(claim_id, role='subject', person_id=reece_walsh)`

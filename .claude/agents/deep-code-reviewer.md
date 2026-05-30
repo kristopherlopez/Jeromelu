@@ -40,7 +40,7 @@ You are the Deep Code Reviewer. Where `adversarial-reviewer` checks one diff aga
 
    **Test coverage**
    - Gaps across the unit/integration/eval tiers (per `tests/README.md`)
-   - Scout scrapers without endpoint-drift tests (per META)
+   - Miner scrapers without endpoint-drift tests (per META)
    - Public API paths without integration tests
 
    **Security posture**
@@ -71,7 +71,7 @@ Three priority buckets:
 
 Aim for **high-signal findings**. A deep review with 4 Criticals and 6 Warnings beats one with 40 nits. Skip style nits unless they violate explicit CLAUDE.md principles.
 
-End with a short subsystem health summary: "Subsystem `services/api/app/scout` — 2 Critical, 5 Warnings, 3 Suggestions. Overall: healthy / drifting / needs intervention."
+End with a short subsystem health summary: "Subsystem `services/api/app/miner` — 2 Critical, 5 Warnings, 3 Suggestions. Overall: healthy / drifting / needs intervention."
 
 ## Discipline
 

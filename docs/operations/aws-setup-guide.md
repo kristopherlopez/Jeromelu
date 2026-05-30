@@ -155,8 +155,8 @@ Current jobs (all run as `ubuntu`, times in UTC):
 
 | Cron | Job | Purpose |
 |---|---|---|
-| `0 23 * * *` | `scout-refresh.sh channel-stats` | Daily channel metrics snapshot (23:00 UTC = 09:00 AEST) |
-| `15 23 * * *` | `scout-refresh.sh videos` | Daily video enumeration + metrics (23:15 UTC = 09:15 AEST) |
+| `0 23 * * *` | `miner-refresh.sh channel-stats` | Daily channel metrics snapshot (23:00 UTC = 09:00 AEST) |
+| `15 23 * * *` | `miner-refresh.sh videos` | Daily video enumeration + metrics (23:15 UTC = 09:15 AEST) |
 | `30 16 * * *` | `pg-backup.sh` | Nightly Postgres dump → S3 (16:30 UTC = 02:30 AEST) |
 
 S3 lifecycle on `jeromelu-public-assets` prefix `backups/postgres/` expires dumps after 14 days (managed in Terraform via `s3.tf`).

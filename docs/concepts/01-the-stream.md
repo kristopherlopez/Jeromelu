@@ -57,12 +57,12 @@ Fixed to the top of the viewport. Not a status ticker — a **row of characters*
 A horizontal row of crew member **avatar portraits** with status. Each slot shows a small circular avatar (the crew member's face/character image) alongside their name and activity.
 
 ```
-[👤 Scout — Scanning 4 new episodes]   [👤 Analyst]   [👤 Critic]   [👤 Bookkeeper]   [👤 Archivist]   [👤 Jaromelu — Reviewing]
+[👤 Miner — Scanning 4 new episodes]   [👤 Analyst]   [👤 Critic]   [👤 Bookkeeper]   [👤 Archivist]   [👤 Jaromelu — Reviewing]
 ```
 
 - **Active**: Avatar is full colour with a subtle idle animation (breathing, slight head movement — a 2-3 second Kling loop). Pulsing orange ring around the portrait. Name + status text visible.
 - **Dormant**: Avatar is desaturated/dimmed. No animation. Static portrait. Tap/hover to see last action and next scheduled run.
-- **Transition — Wake up**: When a crew member activates, their avatar plays a brief "wake" animation — eyes opening, head turning to camera, colour returning. This is a micro-moment: Scout just woke up and the audience *sees* it.
+- **Transition — Wake up**: When a crew member activates, their avatar plays a brief "wake" animation — eyes opening, head turning to camera, colour returning. This is a micro-moment: Miner just woke up and the audience *sees* it.
 - **Transition — Complete**: Avatar plays a brief nod or checkmark gesture, then fades to dormant.
 
 ### Behaviour
@@ -93,7 +93,7 @@ Small, compact. Attributed to a crew member. Show the process.
 
 ```
 ┌─────────────────────────────────────┐
-│ [👤] Scout                  3h ago │
+│ [👤] Miner                  3h ago │
 │ Picked up 4 new episodes overnight │
 │ 2 mention Cleary, 1 deep-dive on   │
 │ Munster                             │
@@ -182,7 +182,7 @@ At key moments in the episode, short video clips (3-8 seconds) appear inline in 
 - **Auto-scroll**: When the user is at the bottom of the stream, new content pushes in and the view auto-scrolls. Like a live chat.
 - **History mode**: When the user scrolls up, auto-scroll disengages. A "↓ New activity" pill appears at the bottom to jump back to live.
 - **Day dividers**: Thin separators with date labels. "Today", "Yesterday", "Tuesday", etc.
-- **Beat transitions**: When the episode transitions between beats, it's not a divider line — it's a **mini-scene**. A brief animation shows the outgoing crew member's avatar fading out and the incoming one fading in, with a beat label. The audience sees the scene change, not just a text separator. Example: Scout's avatar slides out left, a connecting animation (data flowing), Analyst's avatar slides in right with a focused expression. Beat name appears: "Tension Builds".
+- **Beat transitions**: When the episode transitions between beats, it's not a divider line — it's a **mini-scene**. A brief animation shows the outgoing crew member's avatar fading out and the incoming one fading in, with a beat label. The audience sees the scene change, not just a text separator. Example: Miner's avatar slides out left, a connecting animation (data flowing), Analyst's avatar slides in right with a focused expression. Beat name appears: "Tension Builds".
 
 ### Stream Density
 
@@ -190,7 +190,7 @@ The stream's visual density is not constant. It mirrors the episode arc:
 
 | Beat | Density | What It Looks Like |
 |------|---------|-------------------|
-| Intel Drops | High | Many small Scout activity cards stacking up. Fast-moving. |
+| Intel Drops | High | Many small Miner activity cards stacking up. Fast-moving. |
 | Tension Builds | Medium | Analyst cards with contradiction highlights. Open thread indicators. |
 | The Call | Low | One or two large Remark cards. Lots of whitespace. The moment. |
 | The Match | Medium | Locked Remarks with live resolution indicators updating. |

@@ -9,11 +9,11 @@ tags: [area/agents, subarea/system, status/live]
 > which is being moved out of this repo. The end state is an external API
 > call that returns a speaker-attributed transcript; the diarization /
 > visual_id / fusion code in `services/api/app/analyst/` and
-> `services/gpu/` is legacy until then. Stage 1 (Scout audio acquisition)
+> `services/gpu/` is legacy until then. Stage 1 (Miner audio acquisition)
 > and downstream stages (cleaning, claim extraction, wiki, ledger) stay in
 > Jaromelu. See `memory/project_lineup_external.md`.
 
-The orchestration surface for the audio → identified-transcript flow. Takes an audio (and optionally video) source from Scout and walks it through diarization, Automatic Speech Recognition (ASR), merge, and speaker identification — producing the structured transcript every downstream pass (cleaning, claim extraction, the wiki, the ledger) reads from.
+The orchestration surface for the audio → identified-transcript flow. Takes an audio (and optionally video) source from Miner and walks it through diarization, Automatic Speech Recognition (ASR), merge, and speaker identification — producing the structured transcript every downstream pass (cleaning, claim extraction, the wiki, the ledger) reads from.
 
 This doc is the **end-to-end view**. For matching algorithm detail (voice + face + fusion), see [speaker-identification.md](speaker-identification.md). For audio acquisition, see [ingestion.md](ingestion.md). The rest of this doc owns the pyannote / Deepgram / merge stages and the orchestration that ties everything together.
 
@@ -22,7 +22,7 @@ This doc is the **end-to-end view**. For matching algorithm detail (voice + face
 Stages run **sequentially** in the order shown. Each block lists the technologies used and the artefacts written.
 
 ```
-[1] Audio acquisition (Scout)
+[1] Audio acquisition (Miner)
        Tools:  yt-dlp (audio-only m4a) · boto3 → S3
        Output: m4a → s3://jeromelu-raw-audio/...
        │
@@ -67,7 +67,7 @@ Stages run **sequentially** in the order shown. Each block lists the technologie
 
 | Stage | What it does | Surface spec |
 |---|---|---|
-| **Audio + video acquisition** | Scout downloads audio (and optionally video) to S3 — `audio_s3_key` populated; video staged ephemerally per request. | [ingestion.md](ingestion.md) |
+| **Audio + video acquisition** | Miner downloads audio (and optionally video) to S3 — `audio_s3_key` populated; video staged ephemerally per request. | [ingestion.md](ingestion.md) |
 | **Diarization (pyannote)** | `pyannote/speaker-diarization-3.1` segments audio into per-speaker turns; per-window 256-dim voice embeddings via `pyannote/wespeaker-voxceleb-resnet34-LM`. | This doc, step 1 |
 | **ASR (Deepgram)** | `nova-3`, keyterm-biased to the canonical NRL roster; produces words + timestamps + paragraph breaks. | This doc, step 2 |
 | **Merge** | Joins Deepgram utterances to pyannote turns by max-overlap; writes `source_documents` + `source_speakers` (one row per turn) + `source_chunks` (one row per utterance). | This doc, step 3 |
@@ -80,11 +80,11 @@ Stages run **sequentially** in the order shown. Each block lists the technologie
 | **Modules** | `services/api/app/analyst/transcribe.py` (orchestrator), `services/api/app/analyst/diarize.py` (pyannote stage). Speaker-identification modules — `identify_voice.py`, `visual_id.py`, `fusion.py` — are run inline by the orchestrator; see [speaker-identification.md](speaker-identification.md). |
 | **Driver** | `python -m app.analyst.transcribe_cli <source_id>` · `make transcribe SOURCE_ID=<uuid>` · `python -m app.analyst.transcribe_drain_cli --limit N` · `make transcribe-drain LIMIT=N` |
 | **Crew counterpart** | [Analyst](../crew/analyst/README.md) — Analyst's first surface, sitting in front of cleaning / claim extraction. |
-| **ETL role** | **Transform.** Reads Scout's audio (and video, when speaker ID is in scope); produces the structured transcript artefacts every later stage depends on. |
+| **ETL role** | **Transform.** Reads Miner's audio (and video, when speaker ID is in scope); produces the structured transcript artefacts every later stage depends on. |
 | **Cost** | Deepgram ~$0.30 per 90-min video (nova-3 batch, words only). Pyannote 3.1 + InsightFace combined: ~50 min CPU per 45-min source locally; ~3 min wall time on the SageMaker Async GPU endpoint when `LINEUP_REMOTE=1`. End-to-end **~$0.43/source** with remote GPU enabled. |
 | **Status** | Diarization + ASR + merge + voice ID + visual ID + fusion all live. Single-source CLI and bounded drain CLI shipped. No cron entry yet. |
 
-> **For audio acquisition** — see [ingestion.md](ingestion.md). That's Scout's job; this module refuses to run if Scout hasn't already populated `audio_s3_key`.
+> **For audio acquisition** — see [ingestion.md](ingestion.md). That's Miner's job; this module refuses to run if Miner hasn't already populated `audio_s3_key`.
 
 ---
 
@@ -111,7 +111,7 @@ For one source where `audio_s3_key IS NOT NULL`:
    - `sources.transcription_status='transcribed'`, `extraction_method='deepgram_words+pyannote_v1'`, `diarization_method='pyannote-3.1'`.
 4. **Speaker identification (voice + face + fusion)** — see [speaker-identification.md](speaker-identification.md). The voiceprint and face registries are matched against each pyannote turn's per-window voice embeddings and (when a video stream is available) per-frame face embeddings; results are fused per turn into `speaker_person_id` + `match_method` + `match_confidence`. With empty registries every turn stays unidentified — no error.
 
-On failure (Deepgram, network, malformed response, pyannote, ffmpeg, missing HF token): roll back the transcription transaction, mark `sources.transcription_status='failed'` in a separate transaction, raise `TranscriptionError`. Pyannote is run before Deepgram so a pyannote failure costs zero Deepgram dollars. **No fallback chain** — operator inspects, fixes, re-runs with `--force`. Scout's `audio_s3_key` and `ingestion_status='collected'` are not touched, so the audio doesn't get re-downloaded.
+On failure (Deepgram, network, malformed response, pyannote, ffmpeg, missing HF token): roll back the transcription transaction, mark `sources.transcription_status='failed'` in a separate transaction, raise `TranscriptionError`. Pyannote is run before Deepgram so a pyannote failure costs zero Deepgram dollars. **No fallback chain** — operator inspects, fixes, re-runs with `--force`. Miner's `audio_s3_key` and `ingestion_status='collected'` are not touched, so the audio doesn't get re-downloaded.
 
 `--force` on transcribe replaces the SourceDocument and re-runs Deepgram + DB writes, but **does not** force a pyannote re-run (the pyannote artefact is idempotent at JSON_VERSION). To re-diarize, run `make diarize SOURCE_ID=... FORCE=1` first, then `make transcribe SOURCE_ID=... FORCE=1`.
 
@@ -135,8 +135,8 @@ This module does **not** write `source_chapters`, `quotes`, `claims`, or `claim_
 Full operator workflow for one source:
 
 ```bash
-# 1. Prerequisite: Scout has collected the audio (and video, if speaker
-#    identification will be applied — Scout writes both to S3 today).
+# 1. Prerequisite: Miner has collected the audio (and video, if speaker
+#    identification will be applied — Miner writes both to S3 today).
 make collect-audio SOURCE_ID=<uuid>
 
 # 2. (Optional, but recommended) Enroll any known hosts before transcribing.
@@ -205,7 +205,7 @@ OK
 - **Embedding pass** — `source_chunks.embedding` (text embedding, separate from the voice embedding on `source_speakers`). Not yet built.
 - **Player alias backfill** — `people.aliases` is empty; populating it improves keyterm coverage for nicknames (the biggest single keyterm-pool win).
 - **Topic-targeted keyterms** — derive per-source from video title + description + channel focus, replacing the global roster pool. See [extraction-method § keyterm](../../sources/extraction-method.md#keyterm-vocabulary) discussion.
-- **`agent_runs` rows** — deterministic transcription currently has no canonical run log. Standardising would unify cost / latency dashboards with Scout's agentic discovery surface.
+- **`agent_runs` rows** — deterministic transcription currently has no canonical run log. Standardising would unify cost / latency dashboards with Miner's agentic discovery surface.
 
 ---
 
@@ -228,7 +228,7 @@ Output is RTTM-style turn segmentation — a list of `(start, end, speaker_label
 ## Related
 
 - [Analyst (crew)](../crew/analyst/README.md)
-- [Audio ingestion (Scout)](ingestion.md) — predecessor stage
+- [Audio ingestion (Miner)](ingestion.md) — predecessor stage
 - [Speaker Identification](speaker-identification.md) — successor stage; voice + face + fusion. Populates `speaker_person_id` from the per-turn embeddings this pipeline produces.
 - [Sources § extraction method](../../sources/extraction-method.md) — keyterm strategy, error handling, per-stage cost model
 - [Speaker Identification plan](../../todo/speaker-identification-plan.md) — phase ledger and tuning notes

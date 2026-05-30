@@ -6,8 +6,8 @@
 # Required environment (sourced from /opt/jeromelu/.env on the host):
 #   POSTGRES_PASSWORD       — db password (rotate from current RDS password on cutover)
 #   OPENAI_API_KEY
-#   ANTHROPIC_API_KEY       — required for Claude-Agent-SDK agents (Scout, etc.)
-#   YOUTUBE_API_KEY         — Scout's YouTube Data API v3 discovery tools
+#   ANTHROPIC_API_KEY       — required for Claude-Agent-SDK agents (Miner, etc.)
+#   YOUTUBE_API_KEY         — Miner's YouTube Data API v3 discovery tools
 #   ADMIN_KEY               — protects /api/admin/*
 #   AWS_ACCESS_KEY_ID       — for S3 access from api / pg-backup cron
 #   AWS_SECRET_ACCESS_KEY
@@ -88,7 +88,7 @@ services:
       AWS_DEFAULT_REGION: ap-southeast-2
       # Persistent .video.mp4 files live in jeromelu-raw-audio (matches
       # packages/shared/jeromelu_shared/config.py:s3_audio_bucket and the
-      # upload path in services/api/app/scout/media/persistent_video.py). Pointing this at
+      # upload path in services/api/app/miner/media/persistent_video.py). Pointing this at
       # raw-transcripts causes HeadObject 404 on click-to-reassign.
       S3_AUDIO_BUCKET: jeromelu-raw-audio
     volumes:

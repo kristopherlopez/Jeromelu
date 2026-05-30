@@ -15,7 +15,7 @@ tags: [area/operations, data-lineage]
 
 ## Writers
 
-- `services/api/app/scout/supercoach_roster/notes_extractor.py` — SC notes extractor; one quote per SC player note
+- `services/api/app/miner/supercoach_roster/notes_extractor.py` — SC notes extractor; one quote per SC player note
 - `upload-transcript` skill — persists Analyst-extracted quotes from a processed transcript
 
 ## Field mapping

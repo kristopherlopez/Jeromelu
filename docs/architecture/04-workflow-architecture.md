@@ -8,7 +8,7 @@ tags: [area/architecture]
 
 The intended workflow shapes, once the pipeline supports them:
 
-- **Daily intel sweep** — Scout ingests approved sources; Analyst extracts claims/predictions; consensus refreshes; notable Feed events publish.
+- **Daily intel sweep** — Miner ingests approved sources; Analyst extracts claims/predictions; consensus refreshes; notable Feed events publish.
 - **Match review** — collect outcomes, grade against predictions, publish hits/misses, update the Alignment Index.
 - **Continuous wiki maintenance** — the Archivist updates affected pages whenever upstream data lands (async, no weekly climax).
 - **Event-triggered re-evaluation** — breaking injury news, late team changes, an urgent source claim, or an operator event trigger partial re-evaluation. This is the engine behind the live-number heartbeat in [02 — The Show](../vision/02-the-show.md).

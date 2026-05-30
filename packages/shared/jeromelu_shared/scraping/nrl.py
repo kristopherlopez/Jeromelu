@@ -2,8 +2,8 @@
 
 Shared team-code mapping, name normalization, and deterministic player ID
 generation. Originally split out of the worker-scraper activities (which
-were retired and deleted 2026-05-28); now used by the Scout pipelines
-under ``services/api/app/scout/``.
+were retired and deleted 2026-05-28); now used by the Miner pipelines
+under ``services/api/app/miner/``.
 """
 
 import hashlib

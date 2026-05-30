@@ -1,4 +1,4 @@
-"""Phase 2c — extract match_team_lists from scout/nrlcom/match-centre/* archives.
+"""Phase 2c — extract match_team_lists from miner/nrlcom/match-centre/* archives.
 
 Two row classes land in match_team_lists:
 
@@ -174,7 +174,7 @@ def populate_team_lists(
         len(team_map), len(match_map), len(player_map),
     )
 
-    keys = list_keys(f"scout/nrlcom/match-centre/{competition}/")
+    keys = list_keys(f"miner/nrlcom/match-centre/{competition}/")
     if seasons:
         season_strs = {f"/{s}/" for s in seasons}
         keys = [k for k in keys if any(s in k for s in season_strs)]

@@ -16,7 +16,7 @@ tags: [area/operations, data-lineage]
 
 ## Extractors
 
-- `services/api/app/scout/supercoach_roster/` — SC roster fetcher; primary writer for SC-eligible players
+- `services/api/app/miner/supercoach_roster/` — SC roster fetcher; primary writer for SC-eligible players
 - `scripts/data/populate/phase_people.py` — `populate_people_history()`, walks every match-centre archive; INSERTs net-new profile ids (players + coaches + officials), merges into existing rows by name + current team
 - `scripts/data/populate/phase_identity.py` — `backfill_identity()` walks 2024-2026 match-centre and UPDATEs `nrlcom_player_id` onto rows already inserted by other writers
 

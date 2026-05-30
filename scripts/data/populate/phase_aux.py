@@ -1,8 +1,8 @@
 """Phase 3 — auxiliary extractors.
 
-  - populate_team_standings:   scout/nrlcom/ladder/* → team_standings
-  - populate_stat_leaderboards: scout/nrlcom/stats/* → stat_leaderboards
-  - populate_injuries:         scout/nrlcom/casualty-ward/* → injuries
+  - populate_team_standings:   miner/nrlcom/ladder/* → team_standings
+  - populate_stat_leaderboards: miner/nrlcom/stats/* → stat_leaderboards
+  - populate_injuries:         miner/nrlcom/casualty-ward/* → injuries
 
 All three are independent — they run in one pass per archive set, but the
 top-level driver runs each in its own DB transaction so a failure in one
@@ -25,9 +25,9 @@ from ._s3_walk import list_keys, read_json_concurrent
 logger = logging.getLogger(__name__)
 
 
-_LADDER_KEY_RE = re.compile(r"scout/nrlcom/ladder/(?P<comp>\d+)/(?P<season>\d{4})/round-(?P<round>\d+)\.json$")
-_STATS_KEY_RE = re.compile(r"scout/nrlcom/stats/(?P<comp>\d+)/(?P<season>\d{4})\.json$")
-_CASUALTY_KEY_RE = re.compile(r"scout/nrlcom/casualty-ward/(?P<comp>\d+)/(?P<date>\d{8})\.json$")
+_LADDER_KEY_RE = re.compile(r"miner/nrlcom/ladder/(?P<comp>\d+)/(?P<season>\d{4})/round-(?P<round>\d+)\.json$")
+_STATS_KEY_RE = re.compile(r"miner/nrlcom/stats/(?P<comp>\d+)/(?P<season>\d{4})\.json$")
+_CASUALTY_KEY_RE = re.compile(r"miner/nrlcom/casualty-ward/(?P<comp>\d+)/(?P<date>\d{8})\.json$")
 
 
 def _scrub_nuls(value: Any) -> Any:
@@ -188,7 +188,7 @@ def populate_team_standings(
     commit: bool = True,
 ) -> dict[str, Any]:
     team_map = _build_team_nick_map(db)
-    keys = list_keys(f"scout/nrlcom/ladder/{competition}/")
+    keys = list_keys(f"miner/nrlcom/ladder/{competition}/")
     logger.info("phase_standings: %d ladder archives to scan", len(keys))
 
     upsert_sql = text("""
@@ -345,7 +345,7 @@ def populate_stat_leaderboards(
 ) -> dict[str, Any]:
     team_map = _build_team_nick_map(db)
     player_map = _build_player_id_map(db)
-    keys = list_keys(f"scout/nrlcom/stats/{competition}/")
+    keys = list_keys(f"miner/nrlcom/stats/{competition}/")
     logger.info("phase_leaderboards: %d stats archives to scan", len(keys))
 
     upsert_sql = text("""
@@ -494,7 +494,7 @@ def populate_injuries(
 ) -> dict[str, Any]:
     team_map = _build_team_nick_map(db)
     people_lookup = _build_people_name_lookup(db)
-    keys = sorted(list_keys(f"scout/nrlcom/casualty-ward/{competition}/"))
+    keys = sorted(list_keys(f"miner/nrlcom/casualty-ward/{competition}/"))
     logger.info("phase_injuries: %d casualty snapshots to scan", len(keys))
 
     archives_read = 0

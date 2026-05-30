@@ -20,7 +20,7 @@ tags: [area/operations, data-lineage]
 - **`scripts/data/seed_teams.py`** — yaml-driven seeder for ad-hoc top-ups (PNG team name announcement, feeder affiliation changes)
 - **Admin endpoint** — `POST /api/admin/teams/seed` (`make prod-seed-teams`) takes a yaml-shaped JSON payload, runs the same idempotent upsert via `jeromelu_shared.teams.seed_teams()`
 - **`scripts/data/populate/phase_identity.py`** — `backfill_identity()` walks match-centre archives and UPDATEs `nrlcom_team_id` onto seeded rows (matched by lower(slug/short_name/aliases) against nrl.com nickname)
-- **`services/api/app/scout/supercoach_teams/`** — populates `metadata_json.supercoach`
+- **`services/api/app/miner/supercoach_teams/`** — populates `metadata_json.supercoach`
 
 ## Field mapping
 

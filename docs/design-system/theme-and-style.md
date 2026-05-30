@@ -59,7 +59,7 @@ The dark theme uses a lifted, warm brown base with multiple coloured accents. Th
 
 | Token | Value | CSS Variable | Crew | Usage |
 |-------|-------|-------------|------|-------|
-| Teal | `#5a9e8a` | `--teal` | Scout | Success, verified, buy signals |
+| Teal | `#5a9e8a` | `--teal` | Miner | Success, verified, buy signals |
 | Slate Blue | `#8aadcc` | `--slate` | Analyst | Context, mechanisms, neutral info |
 | Lilac | `#a898c8` | `--lilac` | Bookkeeper | Numbers, stats, captain picks |
 | Clay Red | `#c45050` | `--red` | Critic | Sell signals, warnings, injuries |
@@ -111,7 +111,7 @@ Surfaces use warm solid backgrounds, not transparency on black. Each crew member
 | Deep | `--background-deep` `#241e1a` | — | Top bar, wells |
 | Card | `--surface` `#342c26` | `--border` | Cards, panels, elevated containers |
 | Card (hover) | `--surface-hover` `#3e3630` | `--border` | Hovered cards |
-| Crew card (Scout) | `var(--teal-bg)` | `var(--teal-border)` | Scout content cards |
+| Crew card (Miner) | `var(--teal-bg)` | `var(--teal-border)` | Miner content cards |
 | Crew card (Analyst) | `var(--slate-bg)` | `var(--slate-border)` | Analyst content cards |
 | Crew card (Bookkeeper) | `var(--lilac-bg)` | `var(--lilac-border)` | Bookkeeper content cards |
 | Crew card (Archivist) | `var(--ochre-bg)` | `var(--ochre-border)` | Archivist content cards |
@@ -223,7 +223,7 @@ Per design principles — every piece of text has a speaker. No "system copy."
 | State | Pattern | Example |
 |-------|---------|---------|
 | Loading | Crew member is working | "Analyst is thinking..." |
-| Empty | Crew hasn't done this yet | "Scout hasn't found anything yet." |
+| Empty | Crew hasn't done this yet | "Miner hasn't found anything yet." |
 | Error | Crew acknowledges failure | "Something broke. Even the best crews have bad days." |
 | Timestamps | Relative, conversational | "3 hours ago" not ISO strings |
 
@@ -257,7 +257,7 @@ Per design principles — every piece of text has a speaker. No "system copy."
   --ochre: #c4a840;
 
   /* Semantic / crew colours */
-  --teal: #5a9e8a;       /* Scout */
+  --teal: #5a9e8a;       /* Miner */
   --slate: #8aadcc;      /* Analyst */
   --lilac: #a898c8;      /* Bookkeeper */
   --red: #c45050;        /* Critic */

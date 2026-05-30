@@ -15,10 +15,10 @@ There are three kinds of endpoints, each with a different organising principle:
 | Kind | Examples | Organising principle |
 |---|---|---|
 | **Public** | `/api/feed`, `/api/wiki/pages`, `/api/ask` | Grouped by *user-facing feature*. Users don't know about crew agents. |
-| **Admin (operator)** | `/api/admin/scout/refresh-videos`, `/api/admin/players/refresh` | Should be grouped by *crew agent owner* — the agent whose work the endpoint triggers, monitors, or corrects. |
+| **Admin (operator)** | `/api/admin/miner/refresh-videos`, `/api/admin/players/refresh` | Should be grouped by *crew agent owner* — the agent whose work the endpoint triggers, monitors, or corrects. |
 | **System** | `/health` | Cross-cutting, no agent. |
 
-The public surface is feature-aligned and largely fine where it is. The admin surface is where the reorganisation pays off — today admin endpoints are scattered across 8 routers with inconsistent grouping (`/api/admin/players/*` for SuperCoach roster, `/api/admin/scout/*` for media refresh, `/api/admin/recon/*` for Scout's approval queue, `/api/admin/presenters/*` for Analyst's presenter identification — all four are agent-owned but live under different prefixes).
+The public surface is feature-aligned and largely fine where it is. The admin surface is where the reorganisation pays off — today admin endpoints are scattered across 8 routers with inconsistent grouping (`/api/admin/players/*` for SuperCoach roster, `/api/admin/miner/*` for media refresh, `/api/admin/recon/*` for Miner's approval queue, `/api/admin/presenters/*` for Analyst's presenter identification — all four are agent-owned but live under different prefixes).
 
 ---
 
@@ -32,7 +32,7 @@ Surfaces the crew's activity stream and Jaromelu's voice.
 |---|---|---|
 | GET | `/api/feed` | Paginated feed events |
 | POST | `/api/feed/ask` | Embedded chat within the feed |
-| GET | `/api/jaromelu/status` | Live crew-status indicator ("Scout is scanning…") |
+| GET | `/api/jaromelu/status` | Live crew-status indicator ("Miner is scanning…") |
 
 ### Wiki (`/api/wiki/*`)
 
@@ -89,30 +89,30 @@ Source detail page reads (the source-review page).
 
 Today these live across 8 routers and are inconsistently namespaced. Each row's **proposed owner** column anticipates the reorganisation below.
 
-### Currently in `routers/scout.py` *(none — Scout admin lives in `routers/recon.py`)*
+### Currently in `routers/miner.py` *(none — Miner admin lives in `routers/recon.py`)*
 
 ### Currently in `routers/recon.py` (9)
 
 | Method | Path | Purpose | Proposed owner |
 |---|---|---|---|
-| GET | `/api/admin/recon/candidates` | List Scout discovery candidates pending approval | **Scout** |
-| GET | `/api/admin/recon/candidates/{candidate_id}` | Single candidate detail | **Scout** |
-| POST | `/api/admin/recon/candidates/{candidate_id}/approve` | Approve a candidate | **Scout** |
-| POST | `/api/admin/recon/candidates/{candidate_id}/reject` | Reject a candidate | **Scout** |
-| GET | `/api/admin/recon/stats` | Discovery queue stats | **Scout** |
-| GET | `/api/admin/scout/channel-coverage` | Per-channel funnel audit | **Scout** |
-| POST | `/api/admin/scout/channels/{channel_ref}/refresh-videos` | Refresh one channel's videos | **Scout** |
-| POST | `/api/admin/scout/refresh-channel-stats` | Daily channel stats sweep | **Scout** |
-| POST | `/api/admin/scout/refresh-videos` | Daily video metadata refresh | **Scout** |
+| GET | `/api/admin/recon/candidates` | List Miner discovery candidates pending approval | **Miner** |
+| GET | `/api/admin/recon/candidates/{candidate_id}` | Single candidate detail | **Miner** |
+| POST | `/api/admin/recon/candidates/{candidate_id}/approve` | Approve a candidate | **Miner** |
+| POST | `/api/admin/recon/candidates/{candidate_id}/reject` | Reject a candidate | **Miner** |
+| GET | `/api/admin/recon/stats` | Discovery queue stats | **Miner** |
+| GET | `/api/admin/miner/channel-coverage` | Per-channel funnel audit | **Miner** |
+| POST | `/api/admin/miner/channels/{channel_ref}/refresh-videos` | Refresh one channel's videos | **Miner** |
+| POST | `/api/admin/miner/refresh-channel-stats` | Daily channel stats sweep | **Miner** |
+| POST | `/api/admin/miner/refresh-videos` | Daily video metadata refresh | **Miner** |
 
 ### Currently in `routers/players.py` (4)
 
 | Method | Path | Purpose | Proposed owner |
 |---|---|---|---|
-| POST | `/api/admin/players/seed` | First-time roster seed from SuperCoach JSON | **Scout** |
-| POST | `/api/admin/players/refresh` | Weekly SCD-2 roster refresh from JSON payload | **Scout** |
-| POST | `/api/admin/players/fetch-and-refresh` | Server-side fetch + SCD-2 (one call) | **Scout** |
-| POST | `/api/admin/players/refresh-nrlcom` | NRL.com roster cross-reference refresh | **Scout** |
+| POST | `/api/admin/players/seed` | First-time roster seed from SuperCoach JSON | **Miner** |
+| POST | `/api/admin/players/refresh` | Weekly SCD-2 roster refresh from JSON payload | **Miner** |
+| POST | `/api/admin/players/fetch-and-refresh` | Server-side fetch + SCD-2 (one call) | **Miner** |
+| POST | `/api/admin/players/refresh-nrlcom` | NRL.com roster cross-reference refresh | **Miner** |
 
 ### Currently in `routers/presenters.py` (5)
 
@@ -166,7 +166,7 @@ These are operator tools on the source-review page, *not* public reads. The URL 
 
 | Method | Path | Purpose | Proposed owner |
 |---|---|---|---|
-| POST | `/api/admin/teams/seed` | One-off seed of team identity rows | **Scout (identity acquisition)** |
+| POST | `/api/admin/teams/seed` | One-off seed of team identity rows | **Miner (identity acquisition)** |
 
 ---
 
@@ -190,7 +190,7 @@ Per-agent URL prefix for every admin endpoint. The shape:
 
 | Prefix | Owner | What lives here | Today's analog |
 |---|---|---|---|
-| `/api/admin/scout/*` | Scout | All acquisition: media discovery, audio, SuperCoach roster + stats, NRL.com fetchers, recon approval queue, team-identity seed | Scattered across `/api/admin/scout/*`, `/api/admin/recon/*`, `/api/admin/players/*`, `/api/admin/teams/*` |
+| `/api/admin/miner/*` | Miner | All acquisition: media discovery, audio, SuperCoach roster + stats, NRL.com fetchers, recon approval queue, team-identity seed | Scattered across `/api/admin/miner/*`, `/api/admin/recon/*`, `/api/admin/players/*`, `/api/admin/teams/*` |
 | `/api/admin/analyst/*` | Analyst | Transcript ingest, transcript cleaning, presenter identification, face cluster / face track / face run admin, speaker rename / reassign | Scattered across `/api/admin/ingest*`, `/api/admin/transcript-*`, `/api/admin/update-clean-text`, `/api/admin/presenters/*`, `/api/sources/{id}/face-*`, `/api/sources/{id}/speakers/*` |
 | `/api/admin/archivist/*` | Archivist | Wiki update sessions (Phase 1+ of Archivist build) | Doesn't exist yet |
 | `/api/admin/bookkeeper/*` | Bookkeeper | Math jobs — alignment indices, advisor accuracy, consensus snapshots | Doesn't exist yet (some math runs inside other endpoints today) |
@@ -201,23 +201,23 @@ Per-agent URL prefix for every admin endpoint. The shape:
 
 | Today | Proposed | Owner | Notes |
 |---|---|---|---|
-| `POST /api/admin/scout/refresh-videos` | `POST /api/admin/scout/refresh-videos` | Scout | ✓ already correct |
-| `POST /api/admin/scout/refresh-channel-stats` | `POST /api/admin/scout/refresh-channel-stats` | Scout | ✓ already correct |
-| `POST /api/admin/scout/channels/{channel_ref}/refresh-videos` | `POST /api/admin/scout/channels/{channel_ref}/refresh-videos` | Scout | ✓ already correct |
-| `GET /api/admin/scout/channel-coverage` | `GET /api/admin/scout/channel-coverage` | Scout | ✓ already correct |
-| `GET /api/admin/recon/candidates` | `GET /api/admin/scout/recon/candidates` | Scout | Move under scout |
-| `GET /api/admin/recon/candidates/{id}` | `GET /api/admin/scout/recon/candidates/{id}` | Scout | Move under scout |
-| `POST /api/admin/recon/candidates/{id}/approve` | `POST /api/admin/scout/recon/candidates/{id}/approve` | Scout | Move under scout |
-| `POST /api/admin/recon/candidates/{id}/reject` | `POST /api/admin/scout/recon/candidates/{id}/reject` | Scout | Move under scout |
-| `GET /api/admin/recon/stats` | `GET /api/admin/scout/recon/stats` | Scout | Move under scout |
-| `POST /api/admin/players/seed` | `POST /api/admin/scout/supercoach-roster/seed` | Scout | Phase 1 of charter — supercoach_roster module |
-| `POST /api/admin/players/refresh` | `POST /api/admin/scout/supercoach-roster/refresh` | Scout | Phase 1 of charter |
-| `POST /api/admin/players/fetch-and-refresh` | `POST /api/admin/scout/supercoach-roster` | Scout | Phase 1 of charter; alias the legacy path |
-| `POST /api/admin/players/refresh-nrlcom` | `POST /api/admin/scout/nrlcom-roster` | Scout | Phase 3 of charter — separate pipeline |
-| `POST /api/admin/teams/seed` | `POST /api/admin/scout/teams/seed` | Scout | Identity acquisition |
+| `POST /api/admin/miner/refresh-videos` | `POST /api/admin/miner/refresh-videos` | Miner | ✓ already correct |
+| `POST /api/admin/miner/refresh-channel-stats` | `POST /api/admin/miner/refresh-channel-stats` | Miner | ✓ already correct |
+| `POST /api/admin/miner/channels/{channel_ref}/refresh-videos` | `POST /api/admin/miner/channels/{channel_ref}/refresh-videos` | Miner | ✓ already correct |
+| `GET /api/admin/miner/channel-coverage` | `GET /api/admin/miner/channel-coverage` | Miner | ✓ already correct |
+| `GET /api/admin/recon/candidates` | `GET /api/admin/miner/recon/candidates` | Miner | Move under miner |
+| `GET /api/admin/recon/candidates/{id}` | `GET /api/admin/miner/recon/candidates/{id}` | Miner | Move under miner |
+| `POST /api/admin/recon/candidates/{id}/approve` | `POST /api/admin/miner/recon/candidates/{id}/approve` | Miner | Move under miner |
+| `POST /api/admin/recon/candidates/{id}/reject` | `POST /api/admin/miner/recon/candidates/{id}/reject` | Miner | Move under miner |
+| `GET /api/admin/recon/stats` | `GET /api/admin/miner/recon/stats` | Miner | Move under miner |
+| `POST /api/admin/players/seed` | `POST /api/admin/miner/supercoach-roster/seed` | Miner | Phase 1 of charter — supercoach_roster module |
+| `POST /api/admin/players/refresh` | `POST /api/admin/miner/supercoach-roster/refresh` | Miner | Phase 1 of charter |
+| `POST /api/admin/players/fetch-and-refresh` | `POST /api/admin/miner/supercoach-roster` | Miner | Phase 1 of charter; alias the legacy path |
+| `POST /api/admin/players/refresh-nrlcom` | `POST /api/admin/miner/nrlcom-roster` | Miner | Phase 3 of charter — separate pipeline |
+| `POST /api/admin/teams/seed` | `POST /api/admin/miner/teams/seed` | Miner | Identity acquisition |
 | `POST /api/admin/ingest` | `POST /api/admin/analyst/ingest` | Analyst | Transcript ingest — Analyst territory (Q4 resolved) |
 | `POST /api/admin/ingest-raw` | `POST /api/admin/analyst/ingest-raw` | Analyst | Raw transcript ingest — Analyst territory (Q4 resolved) |
-| *(future)* | `POST /api/admin/scout/ingest` | Scout | Scout's audio-acquisition path (currently CLI-only via `make collect-audio`). HTTP-wraps when needed; namespace reserved alongside `analyst/ingest` per Q4 |
+| *(future)* | `POST /api/admin/miner/ingest` | Miner | Miner's audio-acquisition path (currently CLI-only via `make collect-audio`). HTTP-wraps when needed; namespace reserved alongside `analyst/ingest` per Q4 |
 | `POST /api/admin/update-clean-text` | `POST /api/admin/analyst/cleaning/override` | Analyst | Operator override of cleaned chunk |
 | `GET /api/admin/transcript-test-files` | `GET /api/admin/analyst/dev/transcript-fixtures` | Analyst | Dev tool, namespaced |
 | `GET /api/admin/transcript-diff/{filename}` | `GET /api/admin/analyst/dev/transcript-fixtures/{filename}/diff` | Analyst | Dev tool, namespaced |
@@ -225,7 +225,7 @@ Per-agent URL prefix for every admin endpoint. The shape:
 | `GET /api/admin/presenters/by-channel/{channel_id}` | `GET /api/admin/analyst/presenters/by-channel/{channel_id}` | Analyst | |
 | `POST /api/admin/presenters/candidates/{id}/confirm` | `POST /api/admin/analyst/presenters/candidates/{id}/confirm` | Analyst | |
 | `POST /api/admin/presenters/candidates/{id}/reject` | `POST /api/admin/analyst/presenters/candidates/{id}/reject` | Analyst | |
-| `POST /api/admin/presenters/research/{channel_id}` | `POST /api/admin/analyst/presenters/discover/{channel_id}` | Analyst | Verb renamed to avoid collision with the Scout crew member (Q1 resolved) |
+| `POST /api/admin/presenters/research/{channel_id}` | `POST /api/admin/analyst/presenters/discover/{channel_id}` | Analyst | Verb renamed to avoid collision with the Miner crew member (Q1 resolved) |
 | `GET /api/sources/{source_id}/face-runs` | `GET /api/admin/analyst/sources/{source_id}/face-runs` | Analyst | Face admin moves out of the public /api/sources/* namespace |
 | `POST /api/sources/{source_id}/face-runs/assign` | `POST /api/admin/analyst/sources/{source_id}/face-runs/assign` | Analyst | |
 | `POST /api/sources/{source_id}/face-runs/move-run` | `POST /api/admin/analyst/sources/{source_id}/face-runs/move-run` | Analyst | |
@@ -245,7 +245,7 @@ Per-agent URL prefix for every admin endpoint. The shape:
 
 ### What changes at the *file* layout level
 
-Per [D9 of the Scout charter](../agents/crew/scout/charter.md), each Scout pipeline already has its own folder with a `routes.py`. Applying the same shape to admin endpoints across the API:
+Per [D9 of the Miner charter](../agents/crew/miner/charter.md), each Miner pipeline already has its own folder with a `routes.py`. Applying the same shape to admin endpoints across the API:
 
 ```
 services/api/app/
@@ -260,7 +260,7 @@ services/api/app/
 │   ├── sources.py                    # /api/sources/* (read-only after migration)
 │   ├── people.py                     # /api/people/search
 │   └── stats.py                      # /api/stats
-├── scout/                            # Scout's admin endpoints land here per D9
+├── miner/                            # Miner's admin endpoints land here per D9
 │   ├── loop.py · refresh.py · …      # legacy media flat files
 │   ├── supercoach_roster/routes.py   # NEW
 │   ├── supercoach_stats/routes.py    # NEW
@@ -268,7 +268,7 @@ services/api/app/
 │   ├── nrlcom_teamlists/routes.py    # NEW
 │   ├── nrlcom_injuries/routes.py     # NEW
 │   ├── nrlcom_rounds/routes.py       # NEW
-│   ├── teams_seed/routes.py          # NEW (or stays in scout/data/)
+│   ├── teams_seed/routes.py          # NEW (or stays in miner/data/)
 │   └── recon/routes.py               # NEW (moves out of routers/recon.py)
 ├── analyst/                          # Analyst's admin endpoints land here
 │   ├── transcribe.py · diarize.py · …  # existing
@@ -294,13 +294,13 @@ This is a big reorganisation. Phase to minimise back-compat risk.
 
 ### Phase A — New endpoints land under the new pattern from day one (no migration cost)
 
-Anything *not yet built* — Archivist endpoints, Bookkeeper endpoints, new Scout pipelines (supercoach-roster Phase 1 onwards) — ships directly under the proposed structure. Already locked in the Scout charter via D9.
+Anything *not yet built* — Archivist endpoints, Bookkeeper endpoints, new Miner pipelines (supercoach-roster Phase 1 onwards) — ships directly under the proposed structure. Already locked in the Miner charter via D9.
 
 ### Phase B — Aliases for existing endpoints
 
 For each legacy admin path: add the new path as an alias that calls into the same handler. Old path stays live, marked `@deprecated` in code. Caller-facing breaking change: none.
 
-Example: `POST /api/admin/scout/supercoach-roster` is added (per Phase 1 of the Scout charter); `POST /api/admin/players/fetch-and-refresh` becomes an alias.
+Example: `POST /api/admin/miner/supercoach-roster` is added (per Phase 1 of the Miner charter); `POST /api/admin/players/fetch-and-refresh` becomes an alias.
 
 ### Phase C — Move handlers to agent folders
 
@@ -314,7 +314,7 @@ After a release cycle (or two) where the new paths have been live and all caller
 
 - **Phase A** is automatic (only applies to net-new work).
 - **Phase B + C can ship per-agent**, not all at once:
-  1. Scout admin (already partially done — Phase 1 of Scout charter does this for SuperCoach roster)
+  1. Miner admin (already partially done — Phase 1 of Miner charter does this for SuperCoach roster)
   2. Analyst admin (the largest migration — 18 endpoints across 4 routers + sources.py)
   3. Ops (3 endpoints — small, can ship anytime)
 - **Phase D** waits until every caller is on the new paths and metrics confirm no traffic on the legacy ones.
@@ -350,7 +350,7 @@ Frontend code that today bundles read + write under `/api/sources/{id}/*` will n
 
 ## Resolved questions (2026-05-12)
 
-1. **The "presenter scout" naming collision.**
+1. **The "presenter miner" naming collision.**
    *Question:* `POST /api/admin/presenters/research/{channel_id}` is presenter research, but it's currently mounted under the Presenter admin surface rather than Analyst.
    **Resolution: rename the verb.** New path is `POST /api/admin/analyst/presenters/discover/{channel_id}`. Migration map updated accordingly.
 
@@ -359,12 +359,12 @@ Frontend code that today bundles read + write under `/api/sources/{id}/*` will n
    **Resolution: yes, move to Analyst.** The full read/write split is now explicit (see §"Explicit read/write split for `/api/sources/*`" above). Public `/api/sources/*` stays; every mutation goes under `/api/admin/analyst/sources/*`. Frontend will need a small refactor at Phase C.
 
 3. **`/api/admin/teams/seed` ownership.**
-   *Question:* One-off seed of team identity rows — Scout or its own concern?
-   **Resolution: Scout owns it.** New teams enter rarely (~once a season at most) so the pipeline is very slow-moving, but identity acquisition is a Scout responsibility per D1 of the charter regardless of cadence. Path becomes `POST /api/admin/scout/teams/seed`.
+   *Question:* One-off seed of team identity rows — Miner or its own concern?
+   **Resolution: Miner owns it.** New teams enter rarely (~once a season at most) so the pipeline is very slow-moving, but identity acquisition is a Miner responsibility per D1 of the charter regardless of cadence. Path becomes `POST /api/admin/miner/teams/seed`.
 
-4. **`/api/admin/ingest` vs Scout's audio acquisition.**
-   *Question:* The names overlap; both Scout and Analyst have "ingest"-shaped work.
-   **Resolution: both namespaces are valid; they refer to different work.** `POST /api/admin/analyst/ingest` (and `/ingest-raw`) handle transcript persistence — Analyst's territory. `POST /api/admin/scout/ingest` is the future HTTP wrapper for Scout's audio acquisition (currently CLI-only via `make collect-audio`); namespace reserved for when that becomes an admin endpoint. Migration map carries both.
+4. **`/api/admin/ingest` vs Miner's audio acquisition.**
+   *Question:* The names overlap; both Miner and Analyst have "ingest"-shaped work.
+   **Resolution: both namespaces are valid; they refer to different work.** `POST /api/admin/analyst/ingest` (and `/ingest-raw`) handle transcript persistence — Analyst's territory. `POST /api/admin/miner/ingest` is the future HTTP wrapper for Miner's audio acquisition (currently CLI-only via `make collect-audio`); namespace reserved for when that becomes an admin endpoint. Migration map carries both.
 
 5. **`/api/sources` vs `/api/admin/analyst/sources/*` clarity.**
    *Question:* Mixed namespace risk after migration.
@@ -392,6 +392,6 @@ For now, hand-maintained. Revisit auto-generation once the migration is underway
 
 ## Related
 
-- [Scout charter expansion (draft)](../agents/crew/scout/charter.md) — D9 establishes the folder-per-pipeline pattern this doc extends across all agents
+- [Miner charter expansion (draft)](../agents/crew/miner/charter.md) — D9 establishes the folder-per-pipeline pattern this doc extends across all agents
 - [Crew docs](../agents/crew/README.md) — who the agents are
 - Live OpenAPI: `http://localhost:8000/openapi.json` (dev) — authoritative source of current shape

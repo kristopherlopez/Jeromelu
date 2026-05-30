@@ -39,7 +39,7 @@ from jeromelu_shared.players.roster import (
 from sqlalchemy.orm import Session
 
 from ..deps import get_db
-from ..scout.supercoach_roster.routes import run_supercoach_roster
+from ..miner.supercoach_roster.routes import run_supercoach_roster
 from .admin import require_admin
 
 logger = logging.getLogger(__name__)
@@ -101,11 +101,11 @@ def fetch_and_refresh_players(
     source: str = Query(default="supercoach"),
     db: Session = Depends(get_db),
 ):
-    """**Deprecated alias.** Use ``POST /admin/scout/supercoach-roster`` instead.
+    """**Deprecated alias.** Use ``POST /admin/miner/supercoach-roster`` instead.
 
-    Per the Scout charter expansion (D6 + D9), this pipeline is now owned by
-    Scout, lives under ``services/api/app/scout/supercoach_roster/``, and is
-    audited as ``agent_id='scout'`` with ``detail_json.pipeline='supercoach-roster'``.
+    Per the Miner charter expansion (D6 + D9), this pipeline is now owned by
+    Miner, lives under ``services/api/app/miner/supercoach_roster/``, and is
+    audited as ``agent_id='miner'`` with ``detail_json.pipeline='supercoach-roster'``.
     This route remains live for back-compat and calls into the same handler;
     new callers should use the canonical path.
     """

@@ -1,6 +1,6 @@
 """Unit tests for the phase_aux pure extractors.
 
-`phase_aux.py` projects Scout's nrl.com ladder + casualty-ward S3 archives
+`phase_aux.py` projects Miner's nrl.com ladder + casualty-ward S3 archives
 into `team_standings` / `injuries`. The DB writes are a state machine (and a
 straight UPSERT); the *mapping* is pulled into pure seams so it can be tested
 without S3 or a DB:
@@ -31,18 +31,18 @@ from scripts.data.populate.phase_aux import (
 
 
 _PANTHERS = "11111111-1111-1111-1111-111111111111"
-_LADDER_KEY = "scout/nrlcom/ladder/111/2026/round-12.json"
+_LADDER_KEY = "miner/nrlcom/ladder/111/2026/round-12.json"
 
 
 @pytest.fixture(scope="module")
 def ladder_payload(fixtures_dir: Path) -> dict:
-    path = fixtures_dir / "scout" / "nrlcom_ladder" / "canonical_response.json"
+    path = fixtures_dir / "miner" / "nrlcom_ladder" / "canonical_response.json"
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 @pytest.fixture(scope="module")
 def casualty_payload(fixtures_dir: Path) -> dict:
-    path = fixtures_dir / "scout" / "nrlcom_casualty_ward" / "canonical_response.json"
+    path = fixtures_dir / "miner" / "nrlcom_casualty_ward" / "canonical_response.json"
     return json.loads(path.read_text(encoding="utf-8"))
 
 
