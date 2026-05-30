@@ -44,6 +44,7 @@ from sqlalchemy import Integer, distinct, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
+from ..common.pipeline_run import start_deterministic_run
 from . import client as youtube_api
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,11 @@ _METRIC_FIELDS = ("views", "likes", "comments")
 
 
 _video_id_from_url = extract_video_id
+
+
+PIPELINE_YOUTUBE_REFRESH_VIDEOS = "youtube-refresh-videos"
+PIPELINE_YOUTUBE_CHANNEL_VIDEOS = "youtube-channel-videos"
+PIPELINE_YOUTUBE_CHANNEL_STATS = "youtube-channel-stats"
 
 
 def _most_recent_known_video_id(session: Session, channel_id: UUID) -> str | None:
@@ -699,3 +705,156 @@ def refresh_all_channels_incremental(session: Session) -> dict[str, Any]:
         "total_videos_inserted": total_inserted,
         "per_channel": per_channel,
     }
+
+
+# ---------------------------------------------------------------------------
+# Audited job wrappers
+# ---------------------------------------------------------------------------
+
+
+def _compact_enumerate_detail(result: dict[str, Any]) -> dict[str, Any]:
+    """Summarise the per-channel enumerate result for agent_runs.detail_json."""
+    per_channel = result.get("per_channel") or []
+    failed = [row for row in per_channel if row.get("error")]
+    detail = {k: v for k, v in result.items() if k != "per_channel"}
+    detail["per_channel_count"] = len(per_channel)
+    detail["channels_failed"] = len(failed)
+    if failed:
+        detail["channel_errors"] = failed[:20]
+    return detail
+
+
+def _channel_detail(channel: Channel) -> dict[str, Any]:
+    return {
+        "channel_id": str(channel.channel_id),
+        "channel_slug": getattr(channel, "slug", None),
+        "channel_name": channel.name,
+        "external_id": channel.external_id,
+    }
+
+
+def run_youtube_refresh_videos(
+    session: Session,
+    *,
+    skip_stats: bool = False,
+    skip_enumerate: bool = False,
+) -> dict[str, Any]:
+    """Run the daily YouTube refresh endpoint under a Scout agent_runs row."""
+    run = start_deterministic_run(
+        session,
+        pipeline=PIPELINE_YOUTUBE_REFRESH_VIDEOS,
+        brief=(
+            "YouTube refresh: incremental channel video enumeration "
+            f"and video stats (skip_enumerate={skip_enumerate}, skip_stats={skip_stats})"
+        ),
+        detail={"skip_stats": skip_stats, "skip_enumerate": skip_enumerate},
+        max_wall_seconds=1800,
+    )
+    enumerate_result: dict[str, Any] | None = None
+    stats_result: dict[str, Any] | None = None
+
+    try:
+        if not skip_enumerate:
+            enumerate_result = refresh_all_channels_incremental(session)
+            run.detail["enumerate"] = _compact_enumerate_detail(enumerate_result)
+        if not skip_stats:
+            stats_result = refresh_all_video_stats(session)
+            run.detail["stats"] = stats_result
+    except Exception as e:
+        if enumerate_result is not None:
+            run.detail["enumerate"] = _compact_enumerate_detail(enumerate_result)
+        if stats_result is not None:
+            run.detail["stats"] = stats_result
+        run.fail(e, summary_text=f"YouTube refresh-videos failed: {e}")
+        raise
+
+    channels_processed = (enumerate_result or {}).get("channels_processed", 0)
+    videos_inserted = (enumerate_result or {}).get("total_videos_inserted", 0)
+    videos_refreshed = (stats_result or {}).get("videos_refreshed", 0)
+    run.complete(
+        summary_text=(
+            "YouTube refresh-videos: "
+            f"channels_processed={channels_processed}, "
+            f"videos_inserted={videos_inserted}, "
+            f"videos_refreshed={videos_refreshed}"
+        )
+    )
+
+    return {
+        "run_id": run.run_id,
+        "ok": True,
+        "enumerate": enumerate_result,
+        "stats": stats_result,
+    }
+
+
+def run_youtube_channel_videos(
+    session: Session,
+    channel: Channel,
+    *,
+    max_results: int = 200,
+    full_backfill: bool = False,
+) -> dict[str, Any]:
+    """Enumerate one channel's uploads under a Scout agent_runs row."""
+    run = start_deterministic_run(
+        session,
+        pipeline=PIPELINE_YOUTUBE_CHANNEL_VIDEOS,
+        brief=(
+            f"YouTube channel video enumerate: {channel.name} "
+            f"(full_backfill={full_backfill}, max_results={max_results})"
+        ),
+        detail={
+            **_channel_detail(channel),
+            "full_backfill": full_backfill,
+            "max_results": max_results,
+        },
+        max_wall_seconds=900,
+    )
+    try:
+        result = refresh_channel_videos(
+            session,
+            channel,
+            max_results=max_results,
+            full_backfill=full_backfill,
+        )
+        run.detail.update(result)
+    except Exception as e:
+        run.fail(e, summary_text=f"YouTube channel video enumerate failed: {e}")
+        raise
+
+    run.complete(
+        summary_text=(
+            "YouTube channel video enumerate: "
+            f"channel_id={channel.channel_id}, "
+            f"videos_inserted={result.get('videos_inserted', 0)}, "
+            f"metrics_recorded={result.get('metrics_recorded', 0)}"
+        )
+    )
+    return {"run_id": run.run_id, "ok": True, **result}
+
+
+def run_youtube_channel_stats(session: Session) -> dict[str, Any]:
+    """Run the YouTube channel metrics refresh under a Scout agent_runs row."""
+    run = start_deterministic_run(
+        session,
+        pipeline=PIPELINE_YOUTUBE_CHANNEL_STATS,
+        brief="YouTube channel stats refresh",
+        detail={},
+        max_wall_seconds=600,
+    )
+    try:
+        result = refresh_all_channel_stats(session)
+        run.detail.update(result)
+    except Exception as e:
+        run.fail(e, summary_text=f"YouTube channel stats refresh failed: {e}")
+        raise
+
+    run.complete(
+        summary_text=(
+            "YouTube channel stats refresh: "
+            f"channels_total={result.get('channels_total', 0)}, "
+            f"metrics_recorded={result.get('metrics_recorded', 0)}, "
+            f"channels_unchanged={result.get('channels_unchanged', 0)}"
+        )
+    )
+    return {"run_id": run.run_id, "ok": True, **result}

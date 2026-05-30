@@ -15,7 +15,7 @@ tags: [area/operations, data-lineage]
 
 ## Writer
 
-- `services/api/app/scout/youtube/client.py` (called by `services/api/app/scout/youtube/refresh.py`) — periodic refresh against YouTube Data API; INSERTs a row **only when the metrics payload changes** vs the latest snapshot (change-only storage, migration 070). First-snapshot writers (channel-approval snapshot in `routers/recon.py`, `canonicalise_handles` backfill) always write — no prior row to compare.
+- `services/api/app/scout/youtube/client.py` (called by `services/api/app/scout/youtube/refresh.py`) — periodic refresh against YouTube Data API; INSERTs a row **only when the metrics payload changes** vs the latest snapshot (change-only storage, migration 070). The recurring channel metrics endpoint is audited as Scout pipeline `youtube-channel-stats`. First-snapshot writers (channel-approval snapshot in `routers/recon.py`, `canonicalise_handles` backfill) always write — no prior row to compare.
 
 ## Field mapping
 

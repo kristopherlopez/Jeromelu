@@ -14,7 +14,7 @@ tags: [area/operations, data-lineage]
 
 ## Writer
 
-- `services/api/app/scout/youtube/client.py` (called by `services/api/app/scout/youtube/refresh.py`) — sampled at video discovery time and daily thereafter via the admin refresh endpoint; INSERTs a row **only when views/likes/comments change** vs the latest snapshot (change-only storage, migration 070). First-snapshot writers (`refresh_channel_videos`, the channel-approval snapshot in `routers/recon.py`) always write — no prior row to compare.
+- `services/api/app/scout/youtube/client.py` (called by `services/api/app/scout/youtube/refresh.py`) — sampled at video discovery time and daily thereafter via the admin refresh endpoint; INSERTs a row **only when views/likes/comments change** vs the latest snapshot (change-only storage, migration 070). First-snapshot writers (`refresh_channel_videos`, including approval-time `youtube-channel-videos` runs) always write — no prior row to compare. Daily all-video refreshes are audited as Scout pipeline `youtube-refresh-videos`.
 
 ## Field mapping
 

@@ -203,7 +203,7 @@ Cheap, fast, reproducible YouTube-native discovery. Owns the bulk case (new uplo
 
 **Quota budget** — `search.list` = 100 units/call. ~10 seed queries × daily = 7,000 units/week. ~150 channels × `channels.list?relatedToChannelId` = depends on endpoint cost (verify during implementation). Target: stay within 10,000-unit/day free tier including the daily refresh job (§3.4, ~750 units/day).
 
-**Audit** — needs to land on `agent_runs` even though there's no LLM (treat the cron run as an "agent" of `agent_id='scout-det'` for unified cost/health dashboards). Open question — see [roadmap.md](roadmap.md).
+**Audit** — needs to land on `agent_runs` even though there's no LLM, using the standard deterministic Scout pattern (`agent_id='scout'`, `detail_json.pipeline=<pipeline>`) for unified cost/health dashboards. Open question — see [roadmap.md](roadmap.md).
 
 ### 3.2 Discovery agent `[agentic]`
 
@@ -251,7 +251,7 @@ Runs synchronously inside the recon-approval HTTP handler. Pulls a freshly-appro
 
 **Failure mode** — approval still commits if YouTube API fails; channel is in `channels`, admin can re-trigger via the per-channel endpoint (§3.4 — `POST /admin/scout/channels/{ref}/refresh-videos?full_backfill=true`) without waiting for the daily cron.
 
-**Audit** — currently logged through the recon endpoint's standard request log (no `agent_runs` row — this is a deterministic post-processing step, not an agent run).
+**Audit** — one `agent_runs` row under `agent_id='scout'`, `detail_json.pipeline='youtube-channel-videos'`. The run detail records the channel identity, `full_backfill=true`, `max_results`, and inserted/listed/metric counts. Approval still commits if this audited backfill fails; the failure row is the recovery breadcrumb for the per-channel endpoint.
 
 ### 3.4 Daily refresh job `[deterministic]`
 
@@ -271,9 +271,9 @@ Keeps every tracked YouTube channel's video list and per-video popularity number
 
 **Downstream** — once `video_metrics` has 2+ samples per video, view-velocity ranking becomes available (SQL in [the spec](../../system/source-discovery.md#influence-ranking)).
 
-**Gap** — channel-level metadata (`channel_metrics`: subs, total views, video count, name changes, active/inactive) is only written at *approval time* today. It does not get periodically refreshed. Weekly channel-stats refresh is on the roadmap.
+**Channel stats variant** — `POST /api/admin/scout/refresh-channel-stats` snapshots channel-level metadata (`channel_metrics`: subscribers, total views, video count, country, channel age, handle/avatar sync). It is separate from the heavier video refresh so channel popularity still updates if video enumeration fails.
 
-**Audit** — endpoint return value reports counts; no `agent_runs` row.
+**Audit** — `POST /api/admin/scout/refresh-videos` writes one `agent_runs` row under `agent_id='scout'`, `detail_json.pipeline='youtube-refresh-videos'`, and returns that `run_id` alongside the existing `enumerate`/`stats` payloads. The per-channel ad-hoc variant writes `detail_json.pipeline='youtube-channel-videos'`; the channel-stats endpoint writes `detail_json.pipeline='youtube-channel-stats'`. Failures mark the corresponding row `failed` before propagating the HTTP error.
 
 ### 3.5 Audio acquisition `[deterministic, shipped]`
 
