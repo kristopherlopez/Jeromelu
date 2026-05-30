@@ -94,8 +94,11 @@ the existing orchestrator, and logs to `/var/log/jeromelu/scout-populate.log`.
 /opt/jeromelu/scripts/scout-populate.sh nrlcom-current --no-op
 ```
 
-`nrlcom-current` is the scheduled current-season projection used by
-`scripts/cron.d/jeromelu` after the daily nrl.com archive jobs. It does not run
-historical backfills. Use `phase ... --dry-run` for operator checks where the
-phase may read S3/DB but must roll back writes; use `--no-op` for local/static
-verification with no docker, S3, or DB access.
+`nrlcom-current` is the scheduled projection used by `scripts/cron.d/jeromelu`
+after the daily nrl.com archive jobs. Season-aware phases receive the requested
+season list, while identity/re-resolution phases may inspect existing DB rows to
+keep canonical links coherent. It does not enumerate historical S3 backfill
+ranges; use explicit `phase ... --seasons ...` or the backfill flow for that.
+Use `phase ... --dry-run` for operator checks where the phase may read S3/DB but
+must roll back writes; use `--no-op` for local/static verification with no
+docker, S3, or DB access.

@@ -86,8 +86,10 @@ D8-hardened ingest (envelope **and** item/stats strict — deeper than draw/matc
 now stages `scripts/` + `packages/` into the running `jeromelu-api` container and
 executes `populate_db_from_s3` there. `scripts/cron.d/jeromelu` runs
 `scout-populate.sh nrlcom-current` daily after the nrl.com archive jobs, so the
-current-season S3 captures project into DB tables without a manual operator run.
-Historical backfills remain deliberate one-off runs.
+latest NRL.com captures project into DB tables without a manual operator run.
+Season-aware phases receive the current season; identity/re-resolution phases may
+inspect existing DB rows to keep links coherent. Historical S3 backfills remain
+deliberate one-off runs.
 
 ### Phase 4.5 — NRL.com stats + players roster ✅ Shipped (2026-05-28)
 

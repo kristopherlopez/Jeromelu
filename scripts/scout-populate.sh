@@ -55,10 +55,11 @@ Usage:
   scout-populate.sh all [--seasons YEAR[,YEAR...]] [--competition N] [--dry-run] [--no-op]
 
 Jobs:
-  nrlcom-current  Project the current NRL.com S3 captures into DB tables:
+  nrlcom-current  Project the latest NRL.com S3 captures into DB tables:
                   identity, people, rounds, matches, team_lists, stats,
                   timeline, standings, leaderboards, injuries, reresolve,
-                  attributes.
+                  attributes. Season-aware phases receive --seasons; identity
+                  and re-resolution phases may inspect existing DB rows.
   phase PHASE     Run one populate_db_from_s3 phase.
   all             Run populate_db_from_s3 --phase all.
 

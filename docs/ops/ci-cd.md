@@ -135,7 +135,7 @@ GitHub Actions only handles `cost-report.yml`. Everything else recurring runs as
 | `30 18 * * *` / 04:30 | `scout-refresh.sh nrlcom-casualty-ward` | Archives daily nrl.com casualty-ward snapshot to S3. |
 | `45 18 * * *` / 04:45 | `scout-refresh.sh nrlcom-ladder` | Archives current-round nrl.com ladder JSON to S3. |
 | `50 18 * * *` / 04:50 | `scout-refresh.sh nrlcom-stats` | Archives nrl.com stat leaderboards to S3. |
-| `20 19 * * *` / 05:20 | `scout-populate.sh nrlcom-current` | Projects current-season Scout S3 archives into relational DB tables inside `jeromelu-api`. |
+| `20 19 * * *` / 05:20 | `scout-populate.sh nrlcom-current` | Projects latest Scout S3 archives into relational DB tables inside `jeromelu-api`; season-aware phases use the current season, identity/re-resolution phases may inspect existing DB rows. |
 | `45 22 * * *` / 08:45 | `scout-refresh.sh supercoach-roster` | Archives SuperCoach roster and applies the SCD-2 people/player-attributes refresh. |
 | `55 22 * * 0,2,4` / Mon/Wed/Fri 08:55 | `scout-refresh.sh supercoach-stats current` | Resolves SuperCoach `current_round` and upserts current-round `player_rounds`. |
 | `0 23 * * *` / 09:00 | `scout-refresh.sh channel-stats` | POSTs to `/api/admin/scout/refresh-channel-stats`. Snapshots subscriber/video/view counts into `channel_metrics`. ~3 YouTube quota units. |
@@ -155,7 +155,7 @@ Per-job log files under `/var/log/jeromelu/`:
 | Log file | Producer |
 |---|---|
 | `scout-refresh.log` | Scout endpoint refreshes; one line per run with timestamp + HTTP status + response body |
-| `scout-populate.log` | Scout S3-to-DB projection wrapper; command/status lines plus populate output |
+| `scout-populate.log` | Scout S3-to-DB projection wrapper; command/status lines plus populate output; consumed by `cron-report.sh` for the `nrlcom-current` row |
 | `pg-backup.log` | pg-backup runs; one line per successful run |
 | `cron-report.log` · `error-report.log` · `content-report.log` · `disk-report.log` | full text version of each digest sent |
 

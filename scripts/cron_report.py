@@ -62,6 +62,7 @@ BACKUP_BUCKET = "jeromelu-public-assets"
 BACKUP_PREFIX = "backups/postgres/"
 
 SCOUT_LOG = "/var/log/jeromelu/scout-refresh.log"
+SCOUT_POPULATE_LOG = "/var/log/jeromelu/scout-populate.log"
 PG_BACKUP_LOG = "/var/log/jeromelu/pg-backup.log"
 
 GITHUB_REPO = "kristopherlopez/Jeromelu"
@@ -173,6 +174,10 @@ SCOUT_LINE = re.compile(
     r"^\[(?P<ts>\S+)\]\s+(?P<job>\S+)\s+"
     r"(?:status=(?P<status>\d+)\s+body=(?P<body>.*)|curl_rc=(?P<rc>\d+)\s+err=(?P<err>.*))$"
 )
+POPULATE_LINE = re.compile(r"^\[(?P<ts>\S+)\]\s+(?P<msg>.*)$")
+POPULATE_JOB_START = re.compile(r"^job=(?P<job>\S+)\s+.*\sstart$")
+POPULATE_STATUS = re.compile(r"^status=(?P<status>\d+)$")
+POPULATE_PHASE_COMPLETE = re.compile(r"^phase=(?P<phase>\S+)\s+complete$")
 
 
 def latest_scout_line(job: str, now: datetime) -> dict[str, Any] | None:
@@ -202,6 +207,62 @@ def latest_scout_line(job: str, now: datetime) -> dict[str, Any] | None:
             "err": m.group("err") or "",
         }
     return None
+
+
+def latest_scout_populate_run(job: str, now: datetime) -> dict[str, Any] | None:
+    """Return the latest scout-populate run summary within RUN_WINDOW.
+
+    scout-populate logs multiple lines per invocation. A successful run has a
+    `job=<name> ... start`, zero-valued command `status=` lines, per-phase
+    completion markers, and a final `job=<name> complete`. A failed run exits
+    via `set -e`, so it has a non-zero command status and no final completion
+    marker.
+    """
+    if not os.path.exists(SCOUT_POPULATE_LOG):
+        return None
+    cutoff = now - RUN_WINDOW
+    entries: list[tuple[datetime, str]] = []
+    with open(SCOUT_POPULATE_LOG, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            m = POPULATE_LINE.match(line.strip())
+            if not m:
+                continue
+            ts = _parse_log_ts(m.group("ts"))
+            if ts is None or ts < cutoff:
+                continue
+            entries.append((ts, m.group("msg")))
+
+    start_idx = None
+    for idx in range(len(entries) - 1, -1, -1):
+        m = POPULATE_JOB_START.match(entries[idx][1])
+        if m and m.group("job") == job:
+            start_idx = idx
+            break
+    if start_idx is None:
+        return None
+
+    run_entries = entries[start_idx:]
+    statuses: list[int] = []
+    phases_completed: list[str] = []
+    completed = False
+    for _, msg in run_entries[1:]:
+        if POPULATE_JOB_START.match(msg):
+            break
+        if msg == f"job={job} complete":
+            completed = True
+            continue
+        if status_match := POPULATE_STATUS.match(msg):
+            statuses.append(int(status_match.group("status")))
+            continue
+        if phase_match := POPULATE_PHASE_COMPLETE.match(msg):
+            phases_completed.append(phase_match.group("phase"))
+
+    return {
+        "ts": run_entries[0][0],
+        "statuses": statuses,
+        "phases_completed": phases_completed,
+        "completed": completed,
+    }
 
 
 def latest_pg_backup_log(now: datetime) -> datetime | None:
@@ -413,6 +474,46 @@ def row_videos(now: datetime) -> Row:
     )
 
 
+def row_scout_populate_nrlcom_current(now: datetime) -> Row:
+    log = latest_scout_populate_run("nrlcom-current", now)
+    if log is None:
+        return Row(
+            name="Scout: populate nrlcom-current",
+            schedule="19:20 UTC daily",
+            status=FAIL,
+            last_run="—",
+            detail="No scout-populate log entry in last 25h",
+        )
+
+    last_run = log["ts"].isoformat().replace("+00:00", "Z")
+    statuses: list[int] = log["statuses"]
+    failed_statuses = [status for status in statuses if status != 0]
+    phase_count = len(log["phases_completed"])
+    if failed_statuses:
+        return Row(
+            name="Scout: populate nrlcom-current",
+            schedule="19:20 UTC daily",
+            status=FAIL,
+            last_run=last_run,
+            detail=f"command status={failed_statuses[-1]} after {phase_count} completed phases",
+        )
+    if log["completed"]:
+        return Row(
+            name="Scout: populate nrlcom-current",
+            schedule="19:20 UTC daily",
+            status=OK,
+            last_run=last_run,
+            detail=f"completed {phase_count} phases; {len(statuses)} commands exited clean",
+        )
+    return Row(
+        name="Scout: populate nrlcom-current",
+        schedule="19:20 UTC daily",
+        status=WARN,
+        last_run=last_run,
+        detail=f"started but no completion marker; {len(statuses)} commands logged",
+    )
+
+
 def row_pg_backup(now: datetime) -> Row:
     s3_latest = latest_pg_backup_s3(now)
     log_ts = latest_pg_backup_log(now)
@@ -547,6 +648,7 @@ def main() -> int:
         row_cost_report(now),
         row_channel_stats(now),
         row_videos(now),
+        row_scout_populate_nrlcom_current(now),
         row_pg_backup(now),
     ]
     text = render_text(now, rows)
