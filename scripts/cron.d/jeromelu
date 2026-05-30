@@ -32,6 +32,17 @@ MAILTO=""
 # has 1-day resolution; comfortably under the 10k daily quota even at peak.
 15 23 * * *     ubuntu  /opt/jeromelu/scripts/scout-refresh.sh videos
 
+# Daily SuperCoach roster refresh — 22:45 UTC = 08:45 AEST / 09:45 AEDT.
+# Fetches the canonical players-cf roster, archives to S3, and applies the
+# SCD-2 people/player_attributes refresh via /api/admin/scout/supercoach-roster.
+45 22 * * *     ubuntu  /opt/jeromelu/scripts/scout-refresh.sh supercoach-roster
+
+# Current-round SuperCoach stats — Sunday/Tuesday/Thursday 22:55 UTC =
+# Monday/Wednesday/Friday 08:55 AEST. Resolves current_round from the public
+# SuperCoach settings JSON, then calls /api/admin/scout/supercoach-stats.
+# Idempotent UPSERT on player_rounds; no historical backfill here.
+55 22 * * 0,2,4 ubuntu  /opt/jeromelu/scripts/scout-refresh.sh supercoach-stats current
+
 # Weekly SuperCoach teams refresh — Mondays 23:30 UTC = Tuesday 09:30 AEST.
 # Tiny payload (17 rows, ~3KB). Refreshes teams.metadata_json.supercoach
 # via /api/admin/scout/supercoach-teams. Audit row under agent_id='scout'.
@@ -72,6 +83,13 @@ MAILTO=""
 # scout/nrlcom/stats/111/{season}.json. Cheap to run daily even though the
 # leaderboards only change a few times per week.
 50 18 * * *     ubuntu  /opt/jeromelu/scripts/scout-refresh.sh nrlcom-stats
+
+# Daily Scout S3-to-DB projection — 19:20 UTC = 05:20 AEST. Runs after the
+# nrl.com archive jobs above and projects the current-season S3 captures into
+# rounds, matches, team lists, player match stats, timelines, standings,
+# leaderboards, injuries, and derived nrl.com attributes. Wrapper logs to
+# /var/log/jeromelu/scout-populate.log and stages scripts into jeromelu-api.
+20 19 * * *     ubuntu  /opt/jeromelu/scripts/scout-populate.sh nrlcom-current
 
 # Nightly Postgres backup — 16:30 UTC = 02:30 AEST / 03:30 AEDT.
 # Streams pg_dump from the postgres container to s3://jeromelu-public-assets/

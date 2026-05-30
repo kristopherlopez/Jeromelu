@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Wrapper around the prod admin /api/admin/scout/refresh-* endpoints.
-# Used by cron (scripts/cron.d/jeromelu) to refresh channel and video
-# metrics on a schedule.
+# Wrapper around the prod admin /api/admin/scout/* endpoints.
+# Used by cron (scripts/cron.d/jeromelu) to run Scout media and data
+# refresh jobs on a schedule.
 #
-# Usage: scout-refresh.sh {channel-stats|videos|supercoach-teams|supercoach-settings|nrlcom-draw|nrlcom-match-centre|nrlcom-casualty-ward|nrlcom-ladder|nrlcom-stats|nrlcom-players-roster}
+# Usage: scout-refresh.sh {channel-stats|videos|supercoach-roster|supercoach-stats [ROUND|current]|supercoach-teams|supercoach-settings|nrlcom-draw|nrlcom-match-centre|nrlcom-casualty-ward|nrlcom-ladder|nrlcom-stats|nrlcom-players-roster} [--dry-run]
 #
 # Sources /opt/jeromelu/.env to pick up ADMIN_KEY. ALWAYS appends a
 # status line to /var/log/jeromelu/scout-refresh.log — including on
@@ -20,37 +20,111 @@
 # box's own egress IP just times out. Caddy in the same compose stack
 # answers fine on loopback with the right Host header.
 #
-# Tail /var/log/jeromelu/scout-refresh.log to see recent runs.
+# Use --dry-run to print the resolved admin URL without sourcing prod env or
+# calling the API. Tail /var/log/jeromelu/scout-refresh.log to see recent runs.
 
 # Note: deliberately NOT using `set -e` — we want to log the failure
 # status even when curl exits non-zero. `pipefail` is fine since we
 # don't have any pipelines that should swallow upstream failures.
 set -uo pipefail
 
+usage() {
+  echo "usage: $0 {channel-stats|videos|supercoach-roster|supercoach-stats [ROUND|current]|supercoach-teams|supercoach-settings|nrlcom-draw|nrlcom-match-centre|nrlcom-casualty-ward|nrlcom-ladder|nrlcom-stats|nrlcom-players-roster} [--dry-run]" >&2
+}
+
+resolve_supercoach_round() {
+  local season="$1"
+  local settings_url="https://www.supercoach.com.au/${season}/api/nrl/classic/v1/settings"
+  local settings_json
+
+  settings_json="$(curl -fsS --max-time 30 "$settings_url")" || return 1
+  printf '%s' "$settings_json" | python3 -c '
+import json
+import sys
+
+data = json.load(sys.stdin)
+round_no = data.get("competition", {}).get("current_round")
+if round_no is None:
+    round_no = data.get("system", {}).get("current_round")
+if not isinstance(round_no, int):
+    raise SystemExit("current_round missing from SuperCoach settings")
+print(round_no)
+'
+}
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  usage
+  exit 0
+fi
+
+DRY_RUN=0
+POSITIONAL=()
+for RAW_ARG in "$@"; do
+  case "$RAW_ARG" in
+    --dry-run) DRY_RUN=1 ;;
+    *) POSITIONAL+=("$RAW_ARG") ;;
+  esac
+done
+set -- "${POSITIONAL[@]}"
+if [[ "${SCOUT_REFRESH_DRY_RUN:-}" == "1" ]]; then
+  DRY_RUN=1
+fi
+
 JOB="${1:-}"
+ARG="${2:-}"
+SEASON="${SCOUT_SEASON:-$(date -u +%Y)}"
+
 case "$JOB" in
   channel-stats) ENDPOINT="refresh-channel-stats" ;;
   videos)        ENDPOINT="refresh-videos" ;;
+  supercoach-roster)   ENDPOINT="supercoach-roster?season=${SEASON}" ;;
+  supercoach-stats)
+    ROUND="${ARG:-${SCOUT_SUPERCOACH_STATS_ROUND:-current}}"
+    if [[ "$ROUND" == "current" ]]; then
+      if [[ "$DRY_RUN" -eq 0 ]]; then
+        ROUND="$(resolve_supercoach_round "$SEASON")"
+        ROUND_RC=$?
+        if [[ $ROUND_RC -ne 0 ]]; then
+          LOG_DIR="${SCOUT_LOG_DIR:-/var/log/jeromelu}"
+          LOG_FILE="${LOG_DIR}/scout-refresh.log"
+          mkdir -p "$LOG_DIR"
+          TS="$(date -u +%FT%TZ)"
+          echo "[${TS}] ${JOB} curl_rc=${ROUND_RC} err=failed to resolve SuperCoach current_round" >> "$LOG_FILE"
+          exit 1
+        fi
+      fi
+    fi
+    if [[ "$ROUND" != "current" && ! "$ROUND" =~ ^[0-9]+$ ]]; then
+      echo "supercoach-stats round must be an integer or 'current'" >&2
+      exit 2
+    fi
+    ENDPOINT="supercoach-stats?round=${ROUND}&season=${SEASON}"
+    ;;
   supercoach-teams)    ENDPOINT="supercoach-teams" ;;
   supercoach-settings) ENDPOINT="supercoach-settings" ;;
-  nrlcom-draw)         ENDPOINT="nrlcom-draw?competition=111&season=$(date -u +%Y)" ;;
-  nrlcom-match-centre) ENDPOINT="nrlcom-match-centre?competition=111&season=$(date -u +%Y)" ;;
+  nrlcom-draw)         ENDPOINT="nrlcom-draw?competition=111&season=${SEASON}" ;;
+  nrlcom-match-centre) ENDPOINT="nrlcom-match-centre?competition=111&season=${SEASON}" ;;
   nrlcom-casualty-ward) ENDPOINT="nrlcom-casualty-ward?competition=111" ;;
-  nrlcom-ladder)        ENDPOINT="nrlcom-ladder?competition=111&season=$(date -u +%Y)" ;;
-  nrlcom-stats)         ENDPOINT="nrlcom-stats?competition=111&season=$(date -u +%Y)" ;;
+  nrlcom-ladder)        ENDPOINT="nrlcom-ladder?competition=111&season=${SEASON}" ;;
+  nrlcom-stats)         ENDPOINT="nrlcom-stats?competition=111&season=${SEASON}" ;;
   nrlcom-players-roster) ENDPOINT="nrlcom-players-roster/refresh-all?competition=111" ;;
-  *) echo "usage: $0 {channel-stats|videos|supercoach-teams|supercoach-settings|nrlcom-draw|nrlcom-match-centre|nrlcom-casualty-ward|nrlcom-ladder|nrlcom-stats|nrlcom-players-roster}" >&2; exit 2 ;;
+  *) usage; exit 2 ;;
 esac
-
-# shellcheck disable=SC1091
-. /opt/jeromelu/.env
 
 API_HOST="api.jeromelu.ai"
 API_URL="https://${API_HOST}/api/admin/scout/${ENDPOINT}"
-LOG_DIR="/var/log/jeromelu"
+LOG_DIR="${SCOUT_LOG_DIR:-/var/log/jeromelu}"
 LOG_FILE="${LOG_DIR}/scout-refresh.log"
 
+if [[ "$DRY_RUN" -eq 1 ]]; then
+  echo "job=${JOB} api_url=${API_URL}"
+  exit 0
+fi
+
 mkdir -p "$LOG_DIR"
+
+# shellcheck disable=SC1091
+. /opt/jeromelu/.env
 
 TS="$(date -u +%FT%TZ)"
 # --max-time 3600: the videos job typically runs 13–20 min server-side (~2400

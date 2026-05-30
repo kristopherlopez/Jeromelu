@@ -59,6 +59,7 @@ All emails ship through AWS SES (sandbox mode — verified sender + verified rec
 | GHA cost-report | GitHub Actions REST API | Workflow conclusion |
 | Scout: channel-stats | `scout-refresh.log` — `status=` and `curl_rc=` | DB: rows + distinct channels in `channel_metrics` |
 | Scout: videos | Same file, `videos` lines | DB: rows + distinct videos in `video_metrics`, plus count of new `sources(source_type='youtube')` rows |
+| Scout: populate nrlcom-current | `scout-populate.log` — `job=... start/complete` and command `status=` lines | Completed phase count and command exit status |
 | pg-backup | S3 `list_objects_v2` on `backups/postgres/` — newest object | Backup key + size |
 
 Status logic:

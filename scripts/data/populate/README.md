@@ -12,6 +12,7 @@ archives, and the place the per-table extraction logic lives.
 ```
 identity → people → rounds → matches → team_lists → stats → timeline
          → standings → leaderboards → injuries → reresolve → attributes
+         → player_rounds
 ```
 
 Each phase is **idempotent** (UPSERT on a natural key), so re-running is safe.
@@ -79,21 +80,25 @@ back at the end. `--dry-run` now computes counts and writes nothing.
 
 ## Runtime (how to actually run it)
 
-⚠️ **The prod box has no standalone Python env with these deps** (`sqlalchemy`,
-`psycopg`, `pydantic`, `httpx`, `boto3` + `jeromelu_shared`). The historical
-runs were driven from a dev machine over an SSH tunnel to the loopback-only DB.
-For an on-box run, the deps live in the `jeromelu-api` container — stage the
-scripts in and exec there:
+The prod box has no standalone Python env with these deps (`sqlalchemy`,
+`psycopg`, `pydantic`, `httpx`, `boto3` + `jeromelu_shared`). The deps live in
+the `jeromelu-api` container, so production runs go through
+`scripts/scout-populate.sh`. The wrapper stages `scripts/` and `packages/` into
+`/runtmp/scout-populate` inside the running container, sets
+`PYTHONPATH=/runtmp/scout-populate/packages/shared:/runtmp/scout-populate`, runs
+the existing orchestrator, and logs to `/var/log/jeromelu/scout-populate.log`.
 
 ```bash
-docker exec jeromelu-api mkdir -p /runtmp
-docker cp /opt/jeromelu/scripts  jeromelu-api:/runtmp/scripts
-docker cp /opt/jeromelu/packages jeromelu-api:/runtmp/packages
-docker exec -w /runtmp -e PYTHONPATH=/runtmp/packages/shared jeromelu-api \
-    python -m scripts.data.populate_db_from_s3 --phase all --seasons 2026
-docker exec jeromelu-api rm -rf /runtmp   # ephemeral
+/opt/jeromelu/scripts/scout-populate.sh nrlcom-current
+/opt/jeromelu/scripts/scout-populate.sh phase leaderboards --seasons 2026 --dry-run
+/opt/jeromelu/scripts/scout-populate.sh nrlcom-current --no-op
 ```
 
-This works but is a one-off. A **reproducible runtime is an open follow-up** —
-preferred fix: bake `scripts/` + `packages/shared` into the api image (or a
-managed ops venv) so future backfills/cron don't depend on `docker cp`.
+`nrlcom-current` is the scheduled projection used by `scripts/cron.d/jeromelu`
+after the daily nrl.com archive jobs. Season-aware phases receive the requested
+season list, while identity/re-resolution phases may inspect existing DB rows to
+keep canonical links coherent. It does not enumerate historical S3 backfill
+ranges; use explicit `phase ... --seasons ...` or the backfill flow for that.
+Use `phase ... --dry-run` for operator checks where the phase may read S3/DB but
+must roll back writes; use `--no-op` for local/static verification with no
+docker, S3, or DB access.
