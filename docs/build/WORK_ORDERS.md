@@ -38,74 +38,74 @@ Prefix the title with optional tags in square brackets:
 ### SCOUT-OPS-SCHEDULES
 
 - **Plan.** [Scout roadmap completion](./PLAN.md#2026-05-30---scout-roadmap-completion)
-- **State.** review
-- **Owner.** worker branch complete; reviewer `019e76a3-9821-7d50-8c21-d1b768e3afe4`
+- **State.** done-pending-report
+- **Owner.** integrated by coordinator
 - **Branch.** `codex/scout-roadmap-ops-sched` / `C:\tmp\Jeromelu-ops-sched`
 - **Depends-on.** none
 - **Touches.** `scripts/scout-refresh.sh`, `scripts/scout-populate.sh`, `scripts/cron.d/jeromelu`, `scripts/data/populate/README.md`, related Scout/ops docs
 - **What.** Add missing operator scheduling/wrapper coverage for shipped deterministic Scout pipelines and document the prod/runtime expectations.
 - **How to verify.** Shell syntax checks, wrapper dry-runs, cron shape checks, docs review.
-- **Proof notes.** Worker commit `fa75243048ce799694ef585e9b4c2a17f5126540` pushed; parallel review in progress.
+- **Proof notes.** Integrated via branch `codex/scout-roadmap-ops-sched` at `2e4904ba2c7ceb04cdfba437d0018cdf7a3837ae`. Reviewer PASS WITH CONCERNS; coordinator addressed cron-digest visibility and docs scoping before merge.
 
 ### SCOUT-YT-AGENT-RUNS
 
 - **Plan.** [Scout roadmap completion](./PLAN.md#2026-05-30---scout-roadmap-completion)
-- **State.** review
-- **Owner.** worker branch complete; reviewer `019e76a3-ca9f-76d3-875d-b1a7068a48db`
+- **State.** done-pending-report
+- **Owner.** integrated by coordinator
 - **Branch.** `codex/scout-roadmap-yt-agent-runs` / `C:\tmp\Jeromelu-scout-yt-agent-runs`
 - **Depends-on.** none
 - **Touches.** `services/api/app/scout/youtube/refresh.py`, `services/api/app/routers/recon.py`, `tests/unit/api/scout/test_youtube_refresh_audit.py`, data-lineage docs
 - **What.** Standardise deterministic YouTube/recon jobs onto `agent_runs` so downstream health/dashboard work has a durable run source.
 - **How to verify.** Unit tests for audit rows, import checks, docs review.
-- **Proof notes.** Worker commit `a600862d72c6dae5189822295ea347b5283a789b` pushed; pytest reached 100% but local environment timed out during shutdown; parallel review in progress.
+- **Proof notes.** Integrated via branch `codex/scout-roadmap-yt-agent-runs` at `12ec6268bbda013c74dc18ea1ae8830ca8503078`. Initial reviewer BLOCK fixed; re-review PASS WITH CONCERNS. Remaining concern: cron-level monitoring sees HTTP 200 partial failures, while `agent_runs` marks them failed.
 
 ### SCOUT-RECON-UI
 
 - **Plan.** [Scout roadmap completion](./PLAN.md#2026-05-30---scout-roadmap-completion)
-- **State.** review
-- **Owner.** worker branch complete; reviewer `019e76a3-fc73-77c0-8133-7561ffd733d5`
+- **State.** done-pending-report
+- **Owner.** integrated by coordinator
 - **Branch.** `codex/scout-roadmap-recon-ui` / `C:\tmp\Jeromelu-recon-ui`
 - **Depends-on.** none
 - **Touches.** `services/web/src/app/admin/AdminClient.tsx`, `services/web/src/app/admin/ReconCandidatesPanel.tsx`
 - **What.** Add the admin recon candidate review queue UI.
 - **How to verify.** Web lint/typecheck and reviewer inspection for admin UI regressions.
-- **Proof notes.** Worker commit `84d4b02356e62fdcc4f4d23af9fca341a53aa5be` pushed; lint/typecheck passed with existing warnings; parallel review in progress.
+- **Proof notes.** Integrated via branch `codex/scout-roadmap-recon-ui` at `dcaf99cee88367bb91899bebd1190fcb4497ea13`. Reviewer concerns about nullable arrays, min-score validation, and pending labels were patched before merge.
 
 ### SCOUT-MEDIA-DRAIN
 
 - **Plan.** [Scout roadmap completion](./PLAN.md#2026-05-30---scout-roadmap-completion)
-- **State.** review
-- **Owner.** worker branch complete; reviewer `019e76a4-2fa7-7990-9765-bb25971b3f16`
+- **State.** done-pending-report
+- **Owner.** integrated by coordinator
 - **Branch.** `codex/scout-roadmap-media-drain-v2` / `C:\tmp\Jeromelu-media-drain`
 - **Depends-on.** none
 - **Touches.** `services/api/app/scout/media/drain.py`, `services/api/app/scout/media/cli/drain_audio.py`, `services/api/app/analyst/transcribe_drain_cli.py`, drain tests, `Makefile`, ingestion/transcription docs
 - **What.** Add a reusable recurring drain surface for pending media ingestion/transcription work.
 - **How to verify.** CLI help checks, drain unit tests, docs review.
-- **Proof notes.** Worker commit `9017ec1deb414f2e3b7cf6016effae43f480f35e` pushed; pytest reached 100% but local environment timed out during shutdown; parallel review in progress.
+- **Proof notes.** Integrated via branch `codex/scout-roadmap-media-drain-v2` at `663c02200e4adafa610cd234c3e49ae4d9bb38ae`. Initial reviewer BLOCK fixed; re-review PASS.
 
 ### SCOUT-DETERMINISTIC-YT
 
 - **Plan.** [Scout roadmap completion](./PLAN.md#2026-05-30---scout-roadmap-completion)
-- **State.** review
-- **Owner.** worker branch complete; reviewer `019e76a4-6590-7a60-89dc-63df55c90898`
+- **State.** done-pending-report
+- **Owner.** integrated by coordinator
 - **Branch.** `codex/scout-roadmap-deterministic-yt` / `C:\tmp\Jeromelu-deterministic-yt`
 - **Depends-on.** none
 - **Touches.** `services/api/app/scout/source_discovery/**`, `services/api/app/scout/routes.py`, Scout/source-discovery docs, deterministic-discovery tests
 - **What.** Land the deterministic YouTube discovery surface from the Scout architecture plan.
 - **How to verify.** Unit tests for filtering/scoring/persistence, CLI help, route import checks.
-- **Proof notes.** Worker commit `d374dc3695db8ede9358f4e6e1751e87713944cf` pushed; pytest passed its collected tests but local environment timed out during shutdown; parallel review in progress.
+- **Proof notes.** Integrated via branch `codex/scout-roadmap-deterministic-yt` at `9d89b0d4078f2af0c8a184248d4ac291c7608a04`. Reviewer concerns about dry-run output and route/CLI coverage were patched before merge.
 
 ### SCOUT-DASHBOARD-API
 
 - **Plan.** [Scout roadmap completion](./PLAN.md#2026-05-30---scout-roadmap-completion)
-- **State.** ready
-- **Owner.** unassigned
-- **Branch.** `codex/scout-roadmap-dashboard-api`
+- **State.** in-flight
+- **Owner.** worker `019e76c0-73c0-7290-b49b-c18ac53d25de`
+- **Branch.** `codex/scout-roadmap-dashboard-api` / `C:\tmp\Jeromelu-dashboard-api`
 - **Depends-on.** SCOUT-YT-AGENT-RUNS
 - **Touches.** `services/api/app/routers/**`, Scout dashboard API tests, dashboard docs
 - **What.** Expose a Scout pipeline health endpoint backed by `agent_runs`, grouped by `detail_json.pipeline`.
 - **How to verify.** Unit tests for grouping/status/row-count response shape and import/API checks.
-- **Proof notes.** Waiting for SCOUT-YT-AGENT-RUNS review/integration.
+- **Proof notes.** Worker Volta running.
 
 ### SCOUT-DASHBOARD-WEB
 
@@ -117,31 +117,31 @@ Prefix the title with optional tags in square brackets:
 - **Touches.** `services/web/src/app/admin/**`
 - **What.** Add the operator Scout dashboard UI after the API response shape is stable.
 - **How to verify.** Web typecheck/lint and browser/UI smoke check.
-- **Proof notes.** Sequential behind API and recon UI to avoid admin-surface conflicts.
+- **Proof notes.** Sequential behind dashboard API; recon UI is integrated.
 
 ### SCOUT-SOURCE-DISCOVERY-SCHED
 
 - **Plan.** [Scout roadmap completion](./PLAN.md#2026-05-30---scout-roadmap-completion)
-- **State.** ready
-- **Owner.** unassigned
-- **Branch.** `codex/scout-roadmap-source-discovery-sched`
+- **State.** in-flight
+- **Owner.** worker `019e76c0-b8eb-7ae2-ad78-f7fe36abe089`
+- **Branch.** `codex/scout-roadmap-source-discovery-sched` / `C:\tmp\Jeromelu-source-discovery-sched`
 - **Depends-on.** SCOUT-DETERMINISTIC-YT
 - **Touches.** `scripts/scout-refresh.sh`, `scripts/cron.d/jeromelu`, source-discovery docs/tests
 - **What.** Add scheduled deterministic source-discovery execution with dry-run/operator controls.
 - **How to verify.** Script syntax, dry-run command proof, cron shape check.
-- **Proof notes.** Waiting for SCOUT-DETERMINISTIC-YT review/integration.
+- **Proof notes.** Worker Pascal running.
 
 ### SCOUT-SOURCE-HEALTH
 
 - **Plan.** [Scout roadmap completion](./PLAN.md#2026-05-30---scout-roadmap-completion)
-- **State.** ready
-- **Owner.** unassigned
-- **Branch.** `codex/scout-roadmap-source-health`
+- **State.** in-flight
+- **Owner.** worker `019e76c1-06af-7531-a3c0-73fc4a63fc2f`
+- **Branch.** `codex/scout-roadmap-source-health` / `C:\tmp\Jeromelu-source-health`
 - **Depends-on.** SCOUT-YT-AGENT-RUNS
 - **Touches.** source-health API/Scout modules, tests, source-health docs
 - **What.** Detect stalled channels, unreachable sources, transcript fetch failures, and caption-regeneration risk using Scout run/source metadata.
 - **How to verify.** Unit tests for stale/failed source classification and API/import checks.
-- **Proof notes.** Waiting for SCOUT-YT-AGENT-RUNS review/integration.
+- **Proof notes.** Worker Nash running.
 
 ---
 

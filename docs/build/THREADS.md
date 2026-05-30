@@ -14,8 +14,6 @@ Live coordination state for Codex background threads working on the current goal
 
 | Thread ID | Role | Work order | Branch/worktree | Touches | Status | Notes |
 |---|---|---|---|---|---|---|
-| 019e76a3-9821-7d50-8c21-d1b768e3afe4 | adversarial-reviewer | SCOUT-OPS-SCHEDULES | `codex/scout-roadmap-ops-sched` / `C:\tmp\Jeromelu-ops-sched` | read-only | working | Reviewer: Ampere |
-| 019e76a3-ca9f-76d3-875d-b1a7068a48db | adversarial-reviewer | SCOUT-YT-AGENT-RUNS | `codex/scout-roadmap-yt-agent-runs` / `C:\tmp\Jeromelu-scout-yt-agent-runs` | read-only | working | Reviewer: Sartre |
-| 019e76a3-fc73-77c0-8133-7561ffd733d5 | adversarial-reviewer | SCOUT-RECON-UI | `codex/scout-roadmap-recon-ui` / `C:\tmp\Jeromelu-recon-ui` | read-only | working | Reviewer: Dirac |
-| 019e76a4-2fa7-7990-9765-bb25971b3f16 | adversarial-reviewer | SCOUT-MEDIA-DRAIN | `codex/scout-roadmap-media-drain-v2` / `C:\tmp\Jeromelu-media-drain` | read-only | working | Reviewer: Mencius |
-| 019e76a4-6590-7a60-89dc-63df55c90898 | adversarial-reviewer | SCOUT-DETERMINISTIC-YT | `codex/scout-roadmap-deterministic-yt` / `C:\tmp\Jeromelu-deterministic-yt` | read-only | working | Reviewer: Meitner |
+| 019e76c0-73c0-7290-b49b-c18ac53d25de | implementer | SCOUT-DASHBOARD-API | `codex/scout-roadmap-dashboard-api` / `C:\tmp\Jeromelu-dashboard-api` | `services/api/app/scout/dashboard*`, tests/docs | working | Worker: Volta |
+| 019e76c0-b8eb-7ae2-ad78-f7fe36abe089 | implementer | SCOUT-SOURCE-DISCOVERY-SCHED | `codex/scout-roadmap-source-discovery-sched` / `C:\tmp\Jeromelu-source-discovery-sched` | scripts/cron/source-discovery docs | working | Worker: Pascal |
+| 019e76c1-06af-7531-a3c0-73fc4a63fc2f | implementer | SCOUT-SOURCE-HEALTH | `codex/scout-roadmap-source-health` / `C:\tmp\Jeromelu-source-health` | `services/api/app/scout/source_health.py`, tests/docs | working | Worker: Nash |
