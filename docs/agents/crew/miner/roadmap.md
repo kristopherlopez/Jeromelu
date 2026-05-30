@@ -4,11 +4,11 @@ tags: [area/agents, subarea/crew]
 
 # Miner — Status & Roadmap
 
-> Last reviewed: 2026-05-24.
+> Last reviewed: 2026-05-30.
 
 The forward plan for Miner, in three layers:
 
-1. **Charter phasing (Phase 0–7)** — the staged migration of all external data acquisition under Miner, per [charter.md](charter.md). Phase 0–2 shipped; Phase 2.5 onward is the remaining work.
+1. **Charter phasing (Phase 0–7)** — the staged migration of all external data acquisition under Miner, per [charter.md](charter.md). Phases 0–4.5 and 6 shipped; Phase 5 is the remaining one-time historical backfill; Phase 7 is future multi-platform expansion.
 2. **YouTube depth + multi-platform** — the media-side roadmap (capabilities on the existing platform, then new platforms).
 3. **Future improvements** — additive enhancements that layer on top of what's built.
 
@@ -63,15 +63,13 @@ The **bronze/S3-first retrofit is done** — `miner/supercoach_roster/` and `min
 - ✅ Shipped: `miner/supercoach_settings/` — captures SC game rules (lockouts, scoring config, captains/emergencies/dual-position rules) per season; weekly cron (Mon 23:35 UTC, classic mode), S3 archive at `miner/supercoach/{mode}/settings/{season}/{YYYYMMDD}.json`, DB snapshots into `sc_settings`. Draft mode stays on-demand. D8 fixture + unit + live (classic + draft) drift tests.
 - ✅ Done: one-time S3 seed for season 2026 (classic teams + classic/draft settings) — S3 archives and `sc_settings` rows verified 2026-05-24.
 
-### Phase 3 — NRL.com draw + match-centre ingest ✅ Shipped (extractors → Phase 3.5)
+### Phase 3 — NRL.com draw + match-centre ingest ✅ Shipped
 
-The two capture pipelines that feed the wiki's match data. **Ingest shipped 2026-05-24** — D8-hardened, scheduled, seeded. The pre-existing fetch+archive code was retrofitted to charter discipline (the same pattern as Phase 2.5). The DB extractors that actually light up wiki pages are Phase 3.5.
+The two capture pipelines that feed the wiki's match data. **Ingest shipped 2026-05-24** — D8-hardened, scheduled, seeded. The pre-existing fetch+archive code was retrofitted to charter discipline (the same pattern as Phase 2.5). The DB extractors that light up wiki pages shipped under `scripts/data/populate/` and now run through the scheduled `miner-populate.sh nrlcom-current` projection.
 
 - ✅ Shipped: `miner/nrlcom_draw/` — `/draw/data` per (competition, season, round) → S3; `NrlcomDraw`+`DrawFixture` D8 models, strict-parse wired into the route (drift → 500), daily cron (current round, 18:00 UTC). Discovers each match's `matchCentreUrl`.
 - ✅ Shipped: `miner/nrlcom_match_centre/` — walks the round's fixtures, fetches `/.../{slug}/data/` per match → S3. **Highest-leverage capture** (lineups, per-player 58-field stats, 100+ timeline events, officials). D8 union envelope (FullTime/Upcoming state-dependent), non-aborting per-match validation, round-optional (resolves the current round), daily cron (18:15 UTC). Seeded R12/2026 — 5/5 matches, 0 validation failures.
-- ⏳ Phase 3.5: DB extractors — `extract_matches` (writes `matches`, `match_team_lists`, `player_match_stats`, `match_timeline`, `match_officials`) + the `player_round_stats` extractor against nrlcom + nrlsupercoachstats with D11 trust-hierarchy merge.
-
-Phase 3.5 unblocks: every team page's `## Recent Results`, every round page's `## Team Lists` + `## Results`, and every player page's per-match history including timeline events (try at 53', sin bin, etc.). Phase 3 (ingest) is the S3-archived, drift-protected foundation those extractors read.
+- ✅ Shipped: DB extractors in `scripts/data/populate/` — `populate_rounds`, `populate_matches`, `populate_match_team_lists`, `populate_player_match_stats`, `populate_match_timeline`, and `populate_player_rounds` read the S3 archives and project them into canonical tables. The scheduled populate wrapper runs current-season projections after daily capture; historical seasons remain a deliberate Phase 5 backfill run.
 
 ### Phase 4 — NRL.com casualty ward + ladder ✅ Shipped (2026-05-28)
 
@@ -103,9 +101,9 @@ Hardening replay of the existing (but unhardened) `miner/nrlcom_stats/` + `miner
 - Folding `jeromelu_shared/players/nrlcom_refresh.py` (HTML profile scraper) into the `miner/nrlcom_players_roster/` folder per D9. The HTML-scrape and JSON-fetch are different upstream sources reaching different enrichment fields; the fold is a refactor concern, not a hardening one.
 - Tightening `Profile` identity-field types from `str | None` to `str` non-null when a future `/players/data` extractor lands.
 
-### Phase 5 — Historical backfill (one-time, ~4-5 hours operationally) — In design
+### Phase 5 — Historical backfill (one-time, ~4-5 hours operationally) — Ready for operator run
 
-Per D12. Each pipeline supports a `?season=Y[&round=N]` backfill mode that hits the same admin endpoint with explicit parameters. One-time operator-triggered job per pipeline:
+Per D12. Each pipeline supports a `?season=Y[&round=N]` backfill mode that hits the same admin endpoint with explicit parameters. `scripts/data/miner_backfill.py` adds resume support and `archive_only=true` for older seasons whose shapes may drift from current D8 models. One-time operator-triggered job per pipeline:
 
 1. `make miner-backfill SOURCE=nrlcom-draw SEASON_FROM=1908` → ~3,000 GETs over 1h
 2. `make miner-backfill SOURCE=nrlcom-match-centre SEASON_FROM=2000` → ~5,200 GETs over 3-4h
@@ -140,17 +138,17 @@ The multi-platform roadmap items below (podcasts, radio, TV shows, Twitter/X, In
 |---|---|---|
 | **Deterministic discovery surface (§3.1)** — `youtube_search` + `find_related_channels` with server-side `filter_known=True` | Shipped | Admin endpoint and CLI file novel YouTube candidates into `miner_candidates` with server-side dedupe and `agent_runs` audit rows. |
 | Refocus agentic Miner brief on off-platform + long-tail (instead of competing with deterministic) | Planned | Tied to §3.1 landing |
-| Admin review queue UI at `/admin/recon` | In design | Backend endpoints shipped; UI not started |
+| Admin review queue UI at `/admin/recon` | Shipped (2026-05-30) | Admin tab lists candidates, supports details, approval/rejection, filters, admin-key storage, and stats. |
 | Live Recon SSE stream in `/pulse` (theatric reasoning visible to users) | Planned | Drives the visible-reasoning UX |
 | `Event` rows for the reasoning trace (Pulse feed integration) | Backlog | TBD when live stream lands |
 | Scheduled deterministic YouTube discovery | Shipped (2026-05-30) | Weekly Lightsail cron invokes `miner-refresh.sh source-discovery-youtube` at Monday 06:30 AEST; operator `--dry-run` is static/no-op. Agentic off-platform discovery remains manual. |
-| **Weekly channel-metadata refresh** — periodic re-snapshot of subs/views/video count and active/inactive detection (extends §3.4) | Planned | Channel metadata only written at approval today |
-| **Source health / liveness monitoring** — detect stalled channels, failed refresh/backfill runs, pending/failed audio or transcription work, caption-regeneration risk | Shipped (internal classifier) | `app.miner.source_health` returns route-free structured summaries from DB metadata. Dashboard API/UI remain separate Phase 6 slices. |
+| **Channel-metadata refresh** — periodic re-snapshot of subs/views/video count and active/inactive detection (extends §3.4) | Shipped | Daily cron invokes `/api/admin/miner/refresh-channel-stats`; the job writes `agent_runs` and channel metric snapshots independently of the heavier video refresh. |
+| **Source health / liveness monitoring** — detect stalled channels, failed refresh/backfill runs, pending/failed audio or transcription work, caption-regeneration risk | Shipped (internal classifier) | `app.miner.source_health` returns route-free structured summaries from DB metadata. Dashboard surfacing can layer on later if operators need it. |
 | Audio acquisition surface (Miner owns yt-dlp → S3) | Shipped (2026-05-03) | `make collect-audio SOURCE_ID=...`. Diarised transcription split out to Analyst. |
-| Recurring drain job for `ingestion_status='pending'` sources | Backlog | Single-source CLI today; APScheduler / cron driver is the next slice. |
+| Recurring drain job for `ingestion_status='pending'` sources | Partially shipped | Bounded drain helpers + `make collect-audio-drain` exist. Cron/APScheduler scheduling is still open. |
 | Backfill of legacy `source_chunks_v1` (221k auto-caption chunks) | Backlog | Re-extract via Miner audio + Analyst transcribe on highest-leverage channels first; ~$50 for top-5. |
 | Production ingestion off Temporal | Shipped | `IntelSweepWorkflow` superseded by Miner `audio.py` + Analyst `transcribe.py`. Worker code remains in tree for reference but is not invoked. |
-| `agent_runs` rows for deterministic jobs (3.2, 3.3, 3.4) | Backlog | Currently logged as plain HTTP requests / cron output; standardising would unify cost/health dashboards across agentic + deterministic components |
+| `agent_runs` rows for deterministic jobs (3.2, 3.3, 3.4) | Shipped (2026-05-30) | YouTube refresh, per-channel refresh, channel-stats refresh, and deterministic discovery write standard Miner audit rows. |
 
 ---
 
@@ -407,7 +405,7 @@ YouTube will never provide.
 
 Additive — they layer on top of Tier 1 (already built: known-set injection + bulk dedupe) without replacing it.
 
-> **Note:** The former "Tier 2 — YouTube-aware tools" entry has been promoted to a first-class architectural change — see [architecture.md §3.1](architecture.md) (in design) and the YouTube roadmap above.
+> **Note:** The former "Tier 2 — YouTube-aware tools" entry has been promoted to a shipped first-class architectural change — see [architecture.md §3.1](architecture.md) and the YouTube roadmap above.
 
 **Tier 3 — Coverage-gap biasing (agentic surface)**
 - Pre-run, count `miner_candidates.content_categories` (and, post multi-platform, `platform`) to find underrepresented dimensions

@@ -22,7 +22,7 @@ Miner       →  Analyst    →  Bookkeeper + Critic  →  Jaromelu
 
 | Stage | Crew mode | System agent | What it does | Status |
 |---|---|---|---|---|
-| **Acquire** | **Miner** *(this doc)* | [source-discovery](../../system/source-discovery.md), [ingestion](../../system/ingestion.md), `miner/<pipeline>/*` folders (per D9) | Discover sources, enumerate content, refresh metadata, pull transcripts. **Also:** fetch SuperCoach roster + stats, NRL.com draw / match-centre / casualty-ward / ladder. | Media: shipped (YouTube). Data: Phases 1–4 shipped (SuperCoach roster + stats; nrl.com draw + match-centre + casualty-ward + ladder). The legacy `services/worker-scraper/` Temporal worker was retired 2026-05-28. |
+| **Acquire** | **Miner** *(this doc)* | [source-discovery](../../system/source-discovery.md), [ingestion](../../system/ingestion.md), `miner/<pipeline>/*` folders (per D9) | Discover sources, enumerate content, refresh metadata, pull transcripts. **Also:** fetch SuperCoach roster + stats, NRL.com draw / match-centre / casualty-ward / ladder / stat leaderboards / player profiles. | Media: shipped (YouTube). Data: Phases 1–4.5 and 6 shipped (SuperCoach roster + stats; nrl.com draw + match-centre + casualty-ward + ladder + stats + players roster). The legacy `services/worker-scraper/` Temporal worker was retired 2026-05-28. |
 | Extract | [Analyst](../analyst/README.md) | [extraction](../../system/extraction.md) (today via [Transcript Pipeline skill](../../skills/transcript-pipeline.md)) | Turn raw content into entities, quotes, claims; cross-reference for contradictions | Skill-based today; worker not built |
 | Derive | [Bookkeeper](../bookkeeper/README.md) + [Critic](../critic/README.md) | [decision](../../system/decision.md) | Apply math to Miner-fetched numbers (breakevens, cap, alignment indices, consensus snapshots), rank, challenge thin evidence. Acquisition itself is now Miner's per the charter expansion. | Decision worker not built; derived metrics partial |
 | Voice | [Jaromelu](../jaromelu/README.md) | [publishing](../../system/publishing.md) | Integrate everything, commit to a call, publish in the on-screen voice | Live |
@@ -123,7 +123,7 @@ flowchart LR
 | Off-platform mentions | LLM with `web_search` |
 | Semantic quality filter | Deterministic metadata score for YouTube-native; LLM for long-tail/off-platform |
 | Cost / run | ~$0 deterministic + agentic runs only when scheduled manually |
-| Cadence | Endpoint/CLI available; cron not added in this slice |
+| Cadence | Endpoint/CLI available; weekly cron runs the deterministic YouTube discovery sweep |
 
 ### Tracked-source operations — *how do we keep approved sources current and extract their content?*
 
@@ -183,7 +183,7 @@ Each component follows the same internal structure — trigger, inputs, processi
 
 Cheap, fast, reproducible YouTube-native discovery. Owns the bulk case (new channels, relevant videos, adjacent channels) so the agentic surface is freed for off-platform and semantic work.
 
-**Trigger** — Admin endpoint `POST /api/admin/miner/source-discovery/youtube` or manual CLI `python -m app.miner.source_discovery.deterministic_youtube_cli`. Cron is not added in this slice.
+**Trigger** — Admin endpoint `POST /api/admin/miner/source-discovery/youtube`, manual CLI `python -m app.miner.source_discovery.deterministic_youtube_cli`, or weekly cron via `scripts/miner-refresh.sh source-discovery-youtube`.
 
 **Inputs**
 - Default query bank in `deterministic_youtube.py`, overridable by repeated endpoint/CLI query args.

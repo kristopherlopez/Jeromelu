@@ -49,8 +49,8 @@ Pipeline inventory after full source enumeration (2026-05-12). Each row is a fol
 
 | Pipeline folder | Endpoint | S3 path | DB extraction target | Status |
 |---|---|---|---|---|
-| `miner/nrlcom_draw/` | `/draw/data?competition={N}&season={Y}&round={N}` | `nrlcom/draw/{comp}/{season}/round-{NN}.json` | `matches` (fixtures), `rounds` (round metadata derived) | ✅ ingest shipped (Phase 3); extraction → Phase 3.5 |
-| `miner/nrlcom_match_centre/` | `/draw/{league}/{season}/round-{N}/{slug}/data/` per match | `nrlcom/match-centre/{comp}/{season}/round-{NN}/{slug}.json` | `match_team_lists`, `player_match_stats` (new), `match_timeline` (new), `match_officials` (new), augments `matches` | ✅ ingest shipped (Phase 3); extraction → Phase 3.5 |
+| `miner/nrlcom_draw/` | `/draw/data?competition={N}&season={Y}&round={N}` | `nrlcom/draw/{comp}/{season}/round-{NN}.json` | `matches` (fixtures), `rounds` (round metadata derived) | ✅ ingest + extractors shipped |
+| `miner/nrlcom_match_centre/` | `/draw/{league}/{season}/round-{N}/{slug}/data/` per match | `nrlcom/match-centre/{comp}/{season}/round-{NN}/{slug}.json` | `match_team_lists`, `player_match_stats` (new), `match_timeline` (new), `match_officials` (new), augments `matches` | ✅ ingest + extractors shipped |
 | `miner/nrlcom_casualty_ward/` | `/casualty-ward/data?competition={N}` | `nrlcom/casualty-ward/{comp}/{YYYYMMDD}.json` | `injuries` | ✅ shipped (Phase 4) — D8 envelope+item strict, daily cron, extractor live |
 | `miner/nrlcom_ladder/` | `/ladder/data?competition={N}&season={Y}[&round={N}]` | `nrlcom/ladder/{comp}/{season}/round-{NN}.json` | `team_standings` | ✅ shipped (Phase 4) — D8 envelope+position+stats strict (alias-mapped), daily cron, extractor live |
 | `miner/nrlcom_stats/` | `/stats/data?competition={N}&season={Y}` | `nrlcom/stats/{comp}/{season}.json` | `stat_leaderboards` | ✅ shipped (Phase 4.5) — D8 envelope+category+subgroup+leader strict, daily cron (18:50 UTC), extractor live (manual via `populate_db_from_s3 --phase leaderboards`) |
@@ -89,7 +89,7 @@ The S3-first architecture diagram (one identity, many modules → S3 → DB extr
 
 ## Phasing
 
-The full phasing (Phase 0–7) lives in [roadmap.md § Charter phasing](roadmap.md#charter-phasing-phase-07). Phase 0–2 shipped (doc reconciliation + SuperCoach roster + stats); Phase 2.5 onward is the remaining migration work.
+The full phasing (Phase 0–7) lives in [roadmap.md § Charter phasing](roadmap.md#charter-phasing-phase-07). Phases 1–4.5 and 6 are shipped; Phase 5 is the historical backfill operator run; Phase 7 is future multi-platform expansion.
 
 ---
 
@@ -123,7 +123,7 @@ This mirrors how Miner's media work is already structured today — `source_disc
 
 **Decision (locked): external cron hitting admin endpoints.** Each Miner pipeline exposes a `POST /api/admin/miner/<pipeline>` endpoint that returns a `run_id`. Cron (or the `scheduler` skill, or a `make` target) just hits the endpoint with the admin key. This matches the existing pattern — the daily YouTube refresh already works this way per [architecture.md §3.4](architecture.md) — and avoids introducing a new container or scheduler service for the prod footprint we already have.
 
-A future Phase 5 could replace external cron with an in-process APScheduler if cadence management becomes painful, but that's not the V1 problem.
+A future scheduler hardening pass could replace external cron with an in-process APScheduler if cadence management becomes painful, but that's not the V1 problem.
 
 ### D4. Disposition of `services/worker-scraper/`
 

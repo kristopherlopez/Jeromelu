@@ -4,7 +4,7 @@ tags: [area/agents, subarea/crew]
 
 # Miner — Jaromelu's Inventory Mode
 
-> **Charter expansion (2026-05-12).** Miner's scope has been formally expanded from *media inventory* to *all external data acquisition* per the [Miner charter](charter.md) (decisions D1–D13 locked). Some sections describe modules that are still in design (SuperCoach roster + stats, NRL.com fetchers for matches, team lists, injuries, rounds). Media-acquisition content is shipped today; data-acquisition content is in design — see [roadmap.md](roadmap.md) for status.
+> **Charter expansion (2026-05-12).** Miner's scope has been formally expanded from *media inventory* to *all external data acquisition* per the [Miner charter](charter.md) (decisions D1–D13 locked). Media-acquisition, SuperCoach, and NRL.com core data-acquisition phases are largely shipped; the remaining named work is Phase 5 historical backfill plus the Phase 7 multi-platform expansion backlog — see [roadmap.md](roadmap.md) for status.
 
 **Role:** Acquire and maintain Jeromelu's raw inventory across every external source of truth — NRL media (video, podcasts, radio, TV, social, blogs, web) and NRL data (SuperCoach API, NRL.com endpoints, league feeds). **Miner is the project's bronze layer** — it pulls raw external data, lands it faithfully, and deterministically projects *structured* feeds into typed rows. It does **no interpretive transformation** (cleaning, diarisation, speaker attribution, claim/quote extraction, embedding) — those are downstream agents. See [charter D1](charter.md#d1-the-boundary-principle--miner-owns-the-bronze-layer).
 
@@ -17,7 +17,7 @@ Scope is everything from *we don't know about this source* to *typed rows persis
 | **Type**              | Crew mode (internal reasoning) + data-acquisition worker                                                                                                     |
 | **ETL role**          | **Bronze.** Extract + the deterministic typed-projection of structured feeds. No *interpretive* transform (cleaning, diarisation, claim/quote extraction, embedding — all downstream).                |
 | **Scope**             | Media discovery + enumeration + raw transcript pull · SuperCoach roster + stats · NRL.com matches / team lists / injuries / rounds · future: podcasts, radio, TV, Twitter/X, Instagram, blogs, Reddit |
-| **Status**            | **Media side shipped:** agentic discovery, recon API, post-approval enumeration, daily video-stats refresh. **Data side largely shipped:** per the charter expansion, SuperCoach + NRL.com fetchers have migrated from `scripts/data/fetchers/` (and the now-retired `services/worker-scraper/`) into per-pipeline folders under `services/api/app/miner/` (per D9). Phases 1–4 shipped; Phase 4.5+ (nrl.com stats / players-roster / Draft mode) and Phase 5 (historical backfill) outstanding. See [roadmap.md](roadmap.md). |
+| **Status**            | **Media side shipped:** deterministic + agentic discovery, recon API/UI, post-approval enumeration, daily video/channel-stats refresh, bounded audio drain helpers. **Data side largely shipped:** per the charter expansion, SuperCoach + NRL.com fetchers have migrated from `scripts/data/fetchers/` (and the now-retired `services/worker-scraper/`) into per-pipeline folders under `services/api/app/miner/` (per D9). Phases 1–4.5 and 6 shipped; Phase 5 historical backfill is ready for an operator run; Phase 7 multi-platform expansion is backlog. See [roadmap.md](roadmap.md). |
 | **Platform coverage** | Media: YouTube only today; podcasts/RSS/radio/TV/Twitter/Instagram/blogs/Reddit on backlog (most ride YouTube, already shipped). Data: SuperCoach API + NRL.com endpoints land in the charter rollout.            |
 | **Code**              | `services/api/app/miner/` — media-discovery agent in flat files (`loop.py`, `prompt.py`, `tools.py`), enumeration / refresh (`refresh.py`), audio acquisition (`audio.py`). **Data acquisition** modules land as **per-pipeline folders** under `miner/` per D9 of the charter: `miner/supercoach_roster/`, `miner/supercoach_stats/`, `miner/nrlcom_matches/`, `miner/nrlcom_teamlists/`, `miner/nrlcom_injuries/`, `miner/nrlcom_rounds/`. Each folder owns its fetcher, Pydantic models, admin route, and README. Transcription / diarisation is Analyst's surface — `services/api/app/analyst/transcribe.py`. Legacy: `services/worker-ingestion/` and `services/worker-scraper/` (Temporal, both superseded). |
 | **Trigger**           | Media-discovery agent: manual CLI `python -m app.miner.source_discovery.cli`. Deterministic pipelines (media refresh + all data acquisition modules): `POST /api/admin/miner/<pipeline>` admin endpoints driven by external cron. |
@@ -31,13 +31,13 @@ Scope is everything from *we don't know about this source* to *typed rows persis
 
 **Media acquisition (shipped):**
 
-1. **Discovering new channels** across platforms — deterministic YouTube-native search ([architecture.md §3.1](architecture.md), in design) for the bulk case; agentic web hunt today ([§3.2](architecture.md), shipped) for off-platform / long-tail. YouTube only today; podcasts / radio / TV / Twitter / Instagram / blogs / Reddit on backlog.
+1. **Discovering new channels** across platforms — deterministic YouTube-native search ([architecture.md §3.1](architecture.md), shipped) for the bulk case; agentic web hunt ([§3.2](architecture.md), shipped) for off-platform / long-tail. YouTube is shipped today; podcasts / radio / TV / Twitter / Instagram / blogs / Reddit are sequenced in the Phase 7 backlog.
 2. **Enumerating new sources from approved channels** — synchronous uploads-playlist walk on approval ([§3.3](architecture.md), shipped) plus incremental daily enumeration of fresh uploads on tracked channels ([§3.4](architecture.md), shipped).
 3. **Refreshing per-video metadata** — daily snapshot of views / likes / comments into `video_metrics` ([§3.4](architecture.md), shipped). Enables view-velocity ranking and breakout detection.
 4. **Extracting raw audio** — `acquire_audio()` pulls the m4a for an approved source and lands it in S3 ([§3.5](architecture.md), shipped). Diarised transcription of that audio is downstream — owned by Analyst, not Miner.
-5. **Refreshing channel-level metadata** — sub count, total views, video count, name changes, active/inactive detection. *Planned* — currently `channel_metrics` is only written at approval time, not periodically refreshed.
-6. **Source health / liveness monitoring** — detecting stalled channels, failed refresh/backfill runs, pending/failed audio or transcription work, and legacy caption-regeneration risk. *Internal classifier shipped* in `app.miner.source_health`; dashboard API/UI still separate.
-7. **Multi-platform expansion** — instantiate the same shape (discovery → approval → enumerate → refresh → extract) for podcasts (RSS), radio, TV shows, Twitter/X, Instagram, blogs/news, Reddit. *Backlog* — schema is platform-agnostic; code is YouTube-only.
+5. **Refreshing channel-level metadata** — sub count, total views, video count, name changes, active/inactive detection. *Shipped* — the daily refresh snapshots `channel_metrics` alongside `video_metrics`.
+6. **Source health / liveness monitoring** — detecting stalled channels, failed refresh/backfill runs, pending/failed audio or transcription work, and legacy caption-regeneration risk. *Internal classifier shipped* in `app.miner.source_health`; dashboard surfacing can layer on top when needed.
+7. **Multi-platform expansion** — instantiate the same shape (discovery → approval → enumerate → refresh → extract) for podcasts (RSS), radio, TV shows, Twitter/X, Instagram, blogs/news, Reddit. *Backlog* — the expanded plan now sequences MP0–MP6 in [roadmap.md](roadmap.md#multi-platform-expansion).
 
 **Data acquisition (per the charter expansion):**
 
@@ -115,7 +115,7 @@ These surface as Jaromelu-authored cards with internal mode = Miner. They report
 
 ## Status
 
-Media side shipped (YouTube discovery, enumeration, refresh, audio acquisition). Data side in design — charter decisions D1–D13 locked 2026-05-12; Phases 0–2 shipped (doc reconciliation + SuperCoach roster + stats), Phase 2.5 onward outstanding. Full status in [roadmap.md](roadmap.md).
+Media side shipped (YouTube discovery, enumeration, refresh, recon API/UI, channel/video stats, audio acquisition). Data side largely shipped — charter decisions D1–D13 locked 2026-05-12; Phases 1–4.5 and 6 shipped. Phase 5 historical backfill is ready for an operator run, and Phase 7 multi-platform expansion remains backlog. Full status in [roadmap.md](roadmap.md).
 
 ---
 

@@ -603,7 +603,7 @@ LIMIT 50;
 
 ## What's not in Slice 2
 
-- Admin review queue UI (`/admin/recon`) — backend endpoints exist; UI pending
+- Admin review queue UI (`/admin/recon`) — shipped 2026-05-30
 - Live Recon stream in `/pulse` (SSE) — Slice 3
 - Scheduled deterministic YouTube discovery runs — weekly cron now calls the
   admin endpoint via `scripts/miner-refresh.sh`; the agentic/off-platform CLI
