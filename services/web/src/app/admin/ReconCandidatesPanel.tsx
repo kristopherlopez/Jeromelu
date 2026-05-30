@@ -16,9 +16,9 @@ interface ReconCandidate {
   title: string;
   description: string | null;
   channel_external_id: string | null;
-  content_categories: string[];
+  content_categories: string[] | null;
   score: number | null;
-  score_reasons: unknown[];
+  score_reasons: unknown[] | null;
   discovered_via: string;
   discovered_at: string;
   status: string;
@@ -83,7 +83,12 @@ function kindBadgeClass(kind: CandidateKind): string {
     : "border-violet-800 text-violet-300";
 }
 
-function scoreReasons(reasons: unknown[]): string[] {
+function contentCategories(categories: string[] | null | undefined): string[] {
+  return Array.isArray(categories) ? categories : [];
+}
+
+function scoreReasons(reasons: unknown[] | null | undefined): string[] {
+  if (!Array.isArray(reasons)) return [];
   return reasons
     .map((reason) => formatMetadataValue(reason))
     .filter((reason) => reason !== "-");
@@ -97,7 +102,7 @@ async function fetchJson<T>(
   const res = await fetch(url, options);
   if (!res.ok) {
     if (res.status === 403) throw new Error("Invalid admin key.");
-    if (res.status === 422) throw new Error("Admin key is required.");
+    if (res.status === 422) throw new Error("Request validation failed.");
     throw new Error(`${emptyMessage}: ${res.status} ${res.statusText}`);
   }
   return (await res.json()) as T;
@@ -122,7 +127,10 @@ export default function ReconCandidatesPanel() {
   );
   const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null);
 
-  const [actionId, setActionId] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<{
+    id: string;
+    action: "approve" | "reject";
+  } | null>(null);
   const [notesById, setNotesById] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -156,7 +164,15 @@ export default function ReconCandidatesPanel() {
       limit: "100",
     });
     if (kindFilter !== "all") params.set("kind", kindFilter);
-    if (minScore.trim()) params.set("min_score", minScore.trim());
+    const minScoreValue = minScore.trim();
+    if (minScoreValue) {
+      const parsedMinScore = Number(minScoreValue);
+      if (!Number.isFinite(parsedMinScore)) {
+        setError("Min score must be a number.");
+        return;
+      }
+      params.set("min_score", String(parsedMinScore));
+    }
 
     setLoading(true);
     setError(null);
@@ -236,7 +252,7 @@ export default function ReconCandidatesPanel() {
         setError("Admin key is required.");
         return;
       }
-      setActionId(candidateId);
+      setPendingAction({ id: candidateId, action });
       setError(null);
       try {
         const note = notesById[candidateId]?.trim();
@@ -264,7 +280,7 @@ export default function ReconCandidatesPanel() {
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       } finally {
-        setActionId(null);
+        setPendingAction(null);
       }
     },
     [adminKey, base, headers, notesById, refreshCandidates],
@@ -387,10 +403,14 @@ export default function ReconCandidatesPanel() {
         <div className="divide-y divide-zinc-800 border-t border-zinc-800">
           {candidates.map((candidate) => {
             const reasons = scoreReasons(candidate.score_reasons);
+            const categories = contentCategories(candidate.content_categories);
             const detail = detailsById.get(candidate.id);
             const metadata = detail?.metadata_json ?? null;
             const metadataEntries = metadata ? Object.entries(metadata) : [];
-            const actionPending = actionId === candidate.id;
+            const approvePending =
+              pendingAction?.id === candidate.id && pendingAction.action === "approve";
+            const rejectPending =
+              pendingAction?.id === candidate.id && pendingAction.action === "reject";
             return (
               <div key={candidate.id} className="px-4 py-4 hover:bg-zinc-900/30">
                 <div className="flex flex-wrap items-start gap-3">
@@ -440,26 +460,26 @@ export default function ReconCandidatesPanel() {
                     </button>
                     <button
                       onClick={() => reviewCandidate(candidate.id, "approve")}
-                      disabled={actionId !== null}
+                      disabled={pendingAction !== null}
                       className="rounded bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 disabled:opacity-50"
                     >
-                      {actionPending ? "Approving..." : "Approve"}
+                      {approvePending ? "Approving..." : "Approve"}
                     </button>
                     <button
                       onClick={() => reviewCandidate(candidate.id, "reject")}
-                      disabled={actionId !== null}
+                      disabled={pendingAction !== null}
                       className="rounded bg-zinc-800 px-3 py-1.5 text-xs font-semibold text-zinc-300 hover:bg-zinc-700 disabled:opacity-50"
                     >
-                      {actionPending ? "Rejecting..." : "Reject"}
+                      {rejectPending ? "Rejecting..." : "Reject"}
                     </button>
                   </div>
                 </div>
 
                 <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_18rem]">
                   <div>
-                    {candidate.content_categories.length > 0 && (
+                    {categories.length > 0 && (
                       <div className="mb-2 flex flex-wrap gap-1.5">
-                        {candidate.content_categories.map((category) => (
+                        {categories.map((category) => (
                           <span
                             key={category}
                             className="rounded border border-zinc-800 bg-zinc-900 px-2 py-0.5 text-[10px] uppercase tracking-wider text-zinc-400"
