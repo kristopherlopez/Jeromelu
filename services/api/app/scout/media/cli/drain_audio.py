@@ -10,7 +10,12 @@ from collections.abc import Sequence
 from jeromelu_shared.db import SessionLocal, Source
 from sqlalchemy.orm import joinedload
 
-from ..drain import drain_source_ids, require_positive_limit, select_pending_audio_source_ids
+from ..drain import (
+    drain_source_ids,
+    pending_audio_source_criteria,
+    require_positive_limit,
+    select_pending_audio_source_ids,
+)
 
 
 DEFAULT_LIMIT = 5
@@ -60,11 +65,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         source_ids=source_ids,
         process_source=acquire_audio,
         load_options=(joinedload(Source.channel),),
+        eligibility_criteria=pending_audio_source_criteria(),
     )
 
     print("Audio drain")
     print(f"  selected:   {result.selected}")
     print(f"  succeeded:  {result.succeeded}")
+    print(f"  skipped:    {result.skipped}")
     print(f"  failed:     {result.failed}")
     for failure in result.failures:
         print(f"  failure:    {failure.source_id} :: {failure.error}", file=sys.stderr)

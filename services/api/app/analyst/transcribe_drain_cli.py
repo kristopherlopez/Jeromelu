@@ -11,6 +11,7 @@ from jeromelu_shared.db import SessionLocal, Source
 from sqlalchemy.orm import joinedload
 
 from app.scout.media.drain import (
+    collected_untranscribed_source_criteria,
     drain_source_ids,
     require_positive_limit,
     select_collected_untranscribed_source_ids,
@@ -64,11 +65,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         source_ids=source_ids,
         process_source=transcribe,
         load_options=(joinedload(Source.documents),),
+        eligibility_criteria=collected_untranscribed_source_criteria(),
     )
 
     print("Transcription drain")
     print(f"  selected:   {result.selected}")
     print(f"  succeeded:  {result.succeeded}")
+    print(f"  skipped:    {result.skipped}")
     print(f"  failed:     {result.failed}")
     for failure in result.failures:
         print(f"  failure:    {failure.source_id} :: {failure.error}", file=sys.stderr)
