@@ -15,6 +15,8 @@ from app.scout.youtube.refresh import (
     PIPELINE_YOUTUBE_CHANNEL_STATS,
     PIPELINE_YOUTUBE_CHANNEL_VIDEOS,
     PIPELINE_YOUTUBE_REFRESH_VIDEOS,
+    _source_ids_missing_initial_video_metrics,
+    refresh_channel_videos,
     run_youtube_channel_stats,
     run_youtube_channel_videos,
     run_youtube_refresh_videos,
@@ -61,7 +63,7 @@ def test_daily_refresh_success_records_completed_run_detail():
         "total_videos_inserted": 3,
         "per_channel": [
             {"channel_id": "channel-ok", "videos_inserted": 3},
-            {"channel_id": "channel-failed", "error": "quota exceeded"},
+            {"channel_id": "channel-noop", "videos_inserted": 0},
         ],
     }
     stats_result = {
@@ -90,9 +92,48 @@ def test_daily_refresh_success_records_completed_run_detail():
     assert not runs[0].failed
     assert runs[0].detail["pipeline"] == PIPELINE_YOUTUBE_REFRESH_VIDEOS
     assert runs[0].detail["enumerate"]["per_channel_count"] == 2
-    assert runs[0].detail["enumerate"]["channels_failed"] == 1
+    assert runs[0].detail["enumerate"]["channels_failed"] == 0
     assert "per_channel" not in runs[0].detail["enumerate"]
     assert runs[0].detail["stats"] == stats_result
+
+
+def test_daily_refresh_partial_enumeration_marks_run_failed_without_raising():
+    """HTTP-compatible partial failures still leave agent_runs.status=failed."""
+    runs, fake_start = _fake_start_factory()
+    enumerate_result = {
+        "channels_processed": 2,
+        "total_videos_inserted": 3,
+        "per_channel": [
+            {"channel_id": "channel-ok", "videos_inserted": 3},
+            {"channel_id": "channel-failed", "external_id": "UCfail", "error": "quota exceeded"},
+        ],
+    }
+    stats_result = {
+        "videos_total": 10,
+        "videos_refreshed": 4,
+        "videos_unchanged": 6,
+        "sources_synced": 10,
+        "batches": 1,
+    }
+
+    with (
+        patch("app.scout.youtube.refresh.start_deterministic_run", side_effect=fake_start) as mock_start,
+        patch("app.scout.youtube.refresh.refresh_all_channels_incremental", return_value=enumerate_result),
+        patch("app.scout.youtube.refresh.refresh_all_video_stats", return_value=stats_result),
+    ):
+        response = run_youtube_refresh_videos(MagicMock())
+
+    assert mock_start.call_args.kwargs["pipeline"] == PIPELINE_YOUTUBE_REFRESH_VIDEOS
+    assert response["ok"] is False
+    assert response["enumerate"] == enumerate_result
+    assert response["stats"] == stats_result
+    assert response["error"] == "1 of 2 YouTube channel enumerations failed"
+    assert runs[0].failed
+    assert not runs[0].completed
+    assert runs[0].detail["partial_failure"] is True
+    assert runs[0].detail["enumerate"]["channels_failed"] == 1
+    assert runs[0].detail["enumerate"]["channel_errors"] == [enumerate_result["per_channel"][1]]
+    assert runs[0].detail["error"] == "RuntimeError: 1 of 2 YouTube channel enumerations failed"
 
 
 def test_daily_refresh_failure_marks_run_failed_and_reraises():
@@ -177,6 +218,124 @@ def test_per_channel_refresh_failure_marks_run_failed_and_reraises():
     assert mock_start.call_args.kwargs["pipeline"] == PIPELINE_YOUTUBE_CHANNEL_VIDEOS
     assert runs[0].failed
     assert runs[0].detail["error"] == "RuntimeError: playlist failed"
+
+
+def test_missing_initial_metric_lookup_includes_retry_rows_only():
+    """Full-backfill retry heals existing sources that lack video_metrics."""
+    channel_id = uuid4()
+    source_missing_metric = uuid4()
+    source_with_metric = uuid4()
+    source_not_listed = uuid4()
+    session = MagicMock()
+    session.execute.return_value.all.return_value = [
+        (source_missing_metric, "https://www.youtube.com/watch?v=abcdefghijk"),
+        (source_with_metric, "https://youtu.be/lmnopqrstuv"),
+        (source_not_listed, "https://youtu.be/notlisted00"),
+    ]
+    session.scalars.return_value.all.return_value = [source_with_metric]
+
+    result = _source_ids_missing_initial_video_metrics(
+        session,
+        channel_id,
+        ["abcdefghijk", "lmnopqrstuv"],
+    )
+
+    assert result == {"abcdefghijk": source_missing_metric}
+
+
+def test_channel_refresh_full_backfill_records_metrics_for_existing_retry_source():
+    """ON CONFLICT no-op rows still get missing first metrics on retry."""
+    channel_id = uuid4()
+    existing_source_id = uuid4()
+    channel = SimpleNamespace(
+        channel_id=channel_id,
+        platform="youtube",
+        external_id="UCtest",
+        name="Test Channel",
+    )
+    videos = [
+        {
+            "video_id": "abcdefghijk",
+            "title": "Existing Video",
+            "description": "description",
+            "thumbnail_url": "https://example.test/thumb.jpg",
+            "url": "https://www.youtube.com/watch?v=abcdefghijk",
+            "published_at": "2026-01-01T00:00:00Z",
+        }
+    ]
+    session = MagicMock()
+    session.execute.return_value.first.return_value = None
+
+    with (
+        patch("app.scout.youtube.refresh.youtube_api.list_channel_videos", return_value=videos),
+        patch(
+            "app.scout.youtube.refresh._source_ids_missing_initial_video_metrics",
+            return_value={"abcdefghijk": existing_source_id},
+        ),
+        patch(
+            "app.scout.youtube.refresh.youtube_api.get_video_stats",
+            return_value={
+                "abcdefghijk": {
+                    "views": 100,
+                    "likes": 5,
+                    "comments": 2,
+                    "duration_seconds": 123,
+                }
+            },
+        ) as mock_stats,
+    ):
+        result = refresh_channel_videos(session, channel, full_backfill=True)
+
+    assert result["videos_inserted"] == 0
+    assert result["metrics_recorded"] == 1
+    mock_stats.assert_called_once_with(["abcdefghijk"])
+    metric = session.add.call_args.args[0]
+    assert metric.source_id == existing_source_id
+    assert metric.metrics == {"views": 100, "likes": 5, "comments": 2}
+    session.commit.assert_called_once()
+    session.rollback.assert_not_called()
+
+
+def test_channel_refresh_rolls_back_source_insert_when_initial_stats_fail():
+    """Stats failures cannot be committed later by run.fail on the same session."""
+    channel_id = uuid4()
+    new_source_id = uuid4()
+    channel = SimpleNamespace(
+        channel_id=channel_id,
+        platform="youtube",
+        external_id="UCtest",
+        name="Test Channel",
+    )
+    videos = [
+        {
+            "video_id": "abcdefghijk",
+            "title": "New Video",
+            "description": "description",
+            "thumbnail_url": "https://example.test/thumb.jpg",
+            "url": "https://www.youtube.com/watch?v=abcdefghijk",
+            "published_at": "2026-01-01T00:00:00Z",
+        }
+    ]
+    session = MagicMock()
+    session.execute.return_value.first.return_value = (new_source_id,)
+
+    with (
+        patch("app.scout.youtube.refresh.youtube_api.list_channel_videos", return_value=videos),
+        patch(
+            "app.scout.youtube.refresh._source_ids_missing_initial_video_metrics",
+            return_value={"abcdefghijk": new_source_id},
+        ),
+        patch(
+            "app.scout.youtube.refresh.youtube_api.get_video_stats",
+            side_effect=RuntimeError("videos.list failed"),
+        ),
+    ):
+        with pytest.raises(RuntimeError, match="videos.list failed"):
+            refresh_channel_videos(session, channel, full_backfill=True)
+
+    session.rollback.assert_called_once()
+    session.commit.assert_not_called()
+    session.add.assert_not_called()
 
 
 def test_channel_stats_failure_marks_run_failed_and_reraises():

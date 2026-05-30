@@ -14,7 +14,7 @@ tags: [area/operations, data-lineage]
 
 ## Writer
 
-- `services/api/app/scout/youtube/client.py` (called by `services/api/app/scout/youtube/refresh.py`) — sampled at video discovery time and daily thereafter via the admin refresh endpoint; INSERTs a row **only when views/likes/comments change** vs the latest snapshot (change-only storage, migration 070). First-snapshot writers (`refresh_channel_videos`, including approval-time `youtube-channel-videos` runs) always write — no prior row to compare. Daily all-video refreshes are audited as Scout pipeline `youtube-refresh-videos`.
+- `services/api/app/scout/youtube/client.py` (called by `services/api/app/scout/youtube/refresh.py`) — sampled at video discovery time and daily thereafter via the admin refresh endpoint; INSERTs a row **only when views/likes/comments change** vs the latest snapshot (change-only storage, migration 070). First-snapshot writers (`refresh_channel_videos`, including approval-time `youtube-channel-videos` runs) write rows that have no existing metric, so full-backfill retries can heal `sources` rows left metricless by older failed runs. Daily all-video refreshes are audited as Scout pipeline `youtube-refresh-videos`.
 
 ## Field mapping
 
@@ -24,7 +24,7 @@ tags: [area/operations, data-lineage]
 | `source_id` | scope | FK → sources (CASCADE) |
 | `sampled_at` | derived | DB default `now()`; UNIQUE with source_id |
 | `source` | refresher | `youtube_api`, `manual`, ... |
-| `metrics` | refresher (raw API slice) | Platform-specific JSONB. YouTube: `{views, likes, comments, duration_seconds}` |
+| `metrics` | refresher (raw API slice) | Platform-specific JSONB. YouTube: `{views, likes, comments}`. Identity fields such as `duration_seconds` live on [sources](sources.md). |
 
 ## Read pattern
 

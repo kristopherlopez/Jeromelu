@@ -43,4 +43,4 @@ tags: [area/operations, data-lineage]
 - Cost columns are estimated for budget gates and observability — not invoicing. Real cost comes from Anthropic's billing API.
 - The matching event trail is in [agent_events](agent_events.md), joined via `run_id`.
 - Per [[project_agent_audit_pattern]]: every agent has run_id / bounds / cost / 3-layer audit trail (live DB rows + S3 JSONL upload + per-event rows).
-- YouTube refresh labels: `youtube-refresh-videos` for the daily enumerate+video-stats endpoint, `youtube-channel-videos` for approval-time or ad-hoc one-channel enumeration, and `youtube-channel-stats` for channel metrics refresh.
+- YouTube refresh labels: `youtube-refresh-videos` for the daily enumerate+video-stats endpoint, `youtube-channel-videos` for approval-time or ad-hoc one-channel enumeration, and `youtube-channel-stats` for channel metrics refresh. The daily `youtube-refresh-videos` endpoint remains HTTP 200 for per-channel enumeration partial failures, but its `agent_runs.status` is `failed` and `detail_json` includes `partial_failure`, `channels_failed`, and sample `channel_errors`.
