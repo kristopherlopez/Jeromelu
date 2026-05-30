@@ -17,7 +17,6 @@ from app.miner.media.drain import (
     select_collected_untranscribed_source_ids,
 )
 
-
 DEFAULT_LIMIT = 3
 
 

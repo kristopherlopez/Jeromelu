@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .miner.routes import router as miner_router
 from .routers.admin import router as admin_router
 from .routers.ask import router as ask_router
 from .routers.crew import router as crew_router
@@ -14,7 +15,6 @@ from .routers.sources import router as sources_router
 from .routers.squad import router as squad_router
 from .routers.teams import router as teams_router
 from .routers.wiki import router as wiki_router
-from .miner.routes import router as miner_router
 
 app = FastAPI(title="Jeromelu API", version="0.3.1")
 
