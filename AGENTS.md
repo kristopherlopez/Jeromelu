@@ -13,6 +13,32 @@ Jaromelu is built through explicit Codex goals coordinated across bounded thread
 
 ---
 
+## Progressive Disclosure
+
+Before editing, read the nearest `AGENTS.md` files from the repo root down to the target path. Parent rules still apply; child files only add or narrow rules. If a change spans multiple domains, read each domain's `AGENTS.md`.
+
+Local `AGENTS.md` files should stay short. They route to the owning README, runbook, or best-practice doc rather than restating long procedures.
+
+| Target path | Also read |
+|---|---|
+| `docs/build/**` | [docs/build/AGENTS.md](./docs/build/AGENTS.md) |
+| `docs/**` | [docs/AGENTS.md](./docs/AGENTS.md) |
+| `.github/**` | [.github/AGENTS.md](./.github/AGENTS.md) |
+| `docker/**` | [docker/AGENTS.md](./docker/AGENTS.md) |
+| `services/**` | [services/AGENTS.md](./services/AGENTS.md) |
+| `services/api/**` | [services/api/AGENTS.md](./services/api/AGENTS.md) |
+| `services/api/app/scout/**` | [services/api/app/scout/AGENTS.md](./services/api/app/scout/AGENTS.md) |
+| `services/web/**` | [services/web/AGENTS.md](./services/web/AGENTS.md) |
+| `services/gpu/**` | [services/gpu/AGENTS.md](./services/gpu/AGENTS.md) |
+| `scripts/**` | [scripts/AGENTS.md](./scripts/AGENTS.md) |
+| `packages/shared/**` | [packages/shared/AGENTS.md](./packages/shared/AGENTS.md) |
+| `packages/db/**` | [packages/db/AGENTS.md](./packages/db/AGENTS.md) |
+| `scripts/data/populate/**` | [scripts/data/populate/AGENTS.md](./scripts/data/populate/AGENTS.md) |
+| `infra/terraform/**` | [infra/terraform/AGENTS.md](./infra/terraform/AGENTS.md) |
+| `tests/**` | [tests/AGENTS.md](./tests/AGENTS.md) |
+
+---
+
 ## Git Workflow
 
 Coordinator-integrated changes land on `main`; worker threads push scoped branches for coordinator integration. Don't batch unrelated work. Full commit / staging / push rules (session-scoped staging, no `--no-verify`, no force-push to main, worker branches only) live in [META.md → Git & commit discipline](./docs/build/META.md#git--commit-discipline).
