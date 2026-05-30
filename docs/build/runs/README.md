@@ -8,7 +8,7 @@ Newest first.
 
 | Date | Run | Status |
 |---|---|---|
-| 2026-05-30 | [Scout roadmap completion](./2026-05-30-scout-roadmap-completion.md) | In progress |
+| 2026-05-30 | [Scout roadmap completion](./2026-05-30-scout-roadmap-completion.md) | 🟢 Shipped (browser visual smoke unavailable; HTTP render smoke passed) |
 | 2026-05-28 | [Engineering quality hardening — Tier 1](./2026-05-28-eng-quality-tier-1.md) | 🟢 Shipped (6/6; CI dry-run + path-filter SHA-fidelity check deferred to operator) |
 | 2026-05-29 | [Scout Phase 5 — Historical backfill + standard-data-model conformance](./2026-05-28-scout-phase-5-historical-backfill.md) | 🟢 Shipped (10/10; 3 spec-side threshold over-estimates — actual data correct) |
 | 2026-05-28 | [Scout Phase 4.5 — nrl.com stats + players roster (D8 harden, schedule, seed)](./2026-05-28-scout-phase-4-5-stats-players-roster.md) | 🟢 Shipped (cron first-fire + extractor-scheduling deferred) |
