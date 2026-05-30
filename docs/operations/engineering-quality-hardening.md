@@ -25,7 +25,7 @@ _Updated 2026-05-28 — Tier 1 items 1–6 shipped via the [Engineering quality 
 - **Web lint runs in CI via `npm run lint`** — hard-fails on errors; warnings informational. React 19 advisory rules downgraded to `warn` pending incremental migration.
 - **Secret scanning runs in CI via Gitleaks** (config: `.gitleaks.toml`).
 - Terraform has `fmt`, `validate`, and `plan` CI.
-- Scout scraper drift tests exist as a strong subsystem pattern.
+- Miner scraper drift tests exist as a strong subsystem pattern.
 - `.env`, `.env.local`, and `.env.production` are ignored by git.
 - **Deploy gated on `tests.yml` success via `workflow_run`.** Emergency override: `workflow_dispatch` on `deploy.yml`.
 
@@ -138,12 +138,12 @@ error behavior.
 - Standardize status codes for admin endpoints wrapping upstream APIs.
 - Decide whether transient retry policy lives in shared helpers.
 
-**Why:** Scout and Analyst both depend on external services. Inconsistent
+**Why:** Miner and Analyst both depend on external services. Inconsistent
 failure behavior makes cron and operator recovery harder.
 
 ### 8. Idempotency for all cron and worker writes
 
-**Gap:** Scout documents idempotent natural-key upserts well, but the rule is
+**Gap:** Miner documents idempotent natural-key upserts well, but the rule is
 not repo-wide.
 
 **Do:**
@@ -200,7 +200,7 @@ agent pipelines.
 ### 12. Test seams and fakes
 
 **Gap:** Test tiers are well documented, but mocking/faking guidance is thin
-outside Scout drift tests.
+outside Miner drift tests.
 
 **Do:**
 - Prefer pure extraction helpers for parser/mapper logic.

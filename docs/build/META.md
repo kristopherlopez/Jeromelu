@@ -85,13 +85,13 @@ Use timezone-aware datetimes. Store and compare UTC at DB/API boundaries. Never 
 
 `pyannote`, `torch`, GPU-bound code stays in `services/gpu` or workers, behind RPC. The API container stays lean — lazy imports don't fix image bloat because pip runs at build time. Split helpers into `*_helpers.py` so CI and unit tests run without the GPU stack.
 
-### Scout scrapers need endpoint-drift tests
+### Miner scrapers need endpoint-drift tests
 
 Every scraper module ships with a fixture-backed test that fails on upstream schema change. **The agent does not auto-adapt** to schema drift — the human decides the fix. Tests catch drift; humans respond.
 
 ### Naming conventions
 
-- Agent-scoped working tables use `<agent>_<thing>` (e.g. `scout_candidates`, not `discovered_sources`).
+- Agent-scoped working tables use `<agent>_<thing>` (e.g. `miner_candidates`, not `discovered_sources`).
 - Voice cluster labels live in `source_speakers.cluster_label`; reads coalesce `cluster_label, speaker_label`.
 
 ### Agent audit pattern
@@ -144,7 +144,7 @@ If a file you edit imports from an `??` untracked file, your local build passes 
 
 ### On-box admin API calls need `--resolve`
 
-The Lightsail box cannot hairpin-NAT to its own public IP — a `curl` to `https://api.jeromelu.ai` *from the box itself* just times out. Admin endpoints invoked on the box (one-time seeds, manual refreshes) must route to loopback: `curl --resolve api.jeromelu.ai:443:127.0.0.1 ...` (the same trick `scripts/scout-refresh.sh` already uses). Calls from outside (local machine, CI) hit the public IP normally.
+The Lightsail box cannot hairpin-NAT to its own public IP — a `curl` to `https://api.jeromelu.ai` *from the box itself* just times out. Admin endpoints invoked on the box (one-time seeds, manual refreshes) must route to loopback: `curl --resolve api.jeromelu.ai:443:127.0.0.1 ...` (the same trick `scripts/miner-refresh.sh` already uses). Calls from outside (local machine, CI) hit the public IP normally.
 
 ### Prod secrets come from the box, not SSM
 

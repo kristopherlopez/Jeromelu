@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import ChannelCoveragePanel from "./ChannelCoveragePanel";
 import PresentersPanel from "./PresentersPanel";
 import ReconCandidatesPanel from "./ReconCandidatesPanel";
-import ScoutDashboardPanel from "./ScoutDashboardPanel";
+import MinerDashboardPanel from "./MinerDashboardPanel";
 import { ADMIN_API_TARGETS, AdminApiTarget, useAdminApiBase } from "./apiBase";
 
 // --- Types ---
@@ -290,11 +290,11 @@ function TranscriptDiffPanel() {
 
 // --- Component ---
 
-type AdminTab = "video" | "scout" | "coverage" | "recon" | "presenters" | "diff";
+type AdminTab = "video" | "miner" | "coverage" | "recon" | "presenters" | "diff";
 
 const TABS: { id: AdminTab; label: string }[] = [
   { id: "video", label: "Video Processing" },
-  { id: "scout", label: "Scout Dashboard" },
+  { id: "miner", label: "Miner Dashboard" },
   { id: "coverage", label: "Channel Coverage" },
   { id: "recon", label: "Recon Review" },
   { id: "presenters", label: "Presenters" },
@@ -782,9 +782,9 @@ export default function AdminClient() {
       </div>
       </div>
 
-      {/* Tab: Scout Dashboard - recent agent_runs rollups for Scout pipelines. */}
-      <div className={activeTab === "scout" ? "" : "hidden"}>
-        <ScoutDashboardPanel />
+      {/* Tab: Miner Dashboard - recent agent_runs rollups for Miner pipelines. */}
+      <div className={activeTab === "miner" ? "" : "hidden"}>
+        <MinerDashboardPanel />
       </div>
 
       {/* Tab: Channel Coverage — keep mounted to preserve fetched data */}

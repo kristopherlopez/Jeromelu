@@ -1,6 +1,6 @@
 """Phase 1 — backfill people.nrlcom_player_id and teams.nrlcom_team_id.
 
-Walks scout/nrlcom/match-centre/ for 2024-2026 and harvests
+Walks miner/nrlcom/match-centre/ for 2024-2026 and harvests
 (firstName, lastName, teamNickName, playerId) tuples from every roster.
 Matches against canonical_name + current team_id (via SCD-2 attributes)
 to populate the nrl.com IDs onto our existing people/teams rows.
@@ -149,7 +149,7 @@ def backfill_identity(
     # Collect candidate keys
     all_keys: list[str] = []
     for s in seasons:
-        keys = list_keys(f"scout/nrlcom/match-centre/{competition}/{s}/")
+        keys = list_keys(f"miner/nrlcom/match-centre/{competition}/{s}/")
         logger.info("phase_identity: %d archives in season %d", len(keys), s)
         all_keys.extend(keys)
     logger.info("phase_identity: %d total match-centre archives to scan", len(all_keys))

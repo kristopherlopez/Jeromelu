@@ -23,8 +23,8 @@ Jaromelu is never absent from the UI. His avatar is the persistent character anc
 
 **Active (working)**
 - Idle loop continues, status text shifts to reflect current internal mode:
-  - "Investigating new sources" — Scout mode (recon / source discovery)
-  - "Reading this week's pods" — Scout mode (transcript ingestion)
+  - "Investigating new sources" — Miner mode (recon / source discovery)
+  - "Reading this week's pods" — Miner mode (transcript ingestion)
   - "Cross-referencing claims" — Analyst mode (extraction)
   - "Doing the math on Cleary" — Bookkeeper mode (scraper math)
   - "Sleeping on a call" — Critic mode (pre-publish review)
@@ -78,7 +78,7 @@ Jaromelu has a focused library of ~15-20 clips covering the full emotional range
 **Self-aware moments**
 - Looking off-camera (2-3s) — internal Critic moment ("I almost talked myself out of it")
 - Slight nod (1-2s) — agreeing with the numbers
-- Browsing / scrolling (3-5s, looping) — Scout mode visible (the recon segment)
+- Browsing / scrolling (3-5s, looping) — Miner mode visible (the recon segment)
 
 **Cost estimate:** ~$1/8s on Kling. Library of ~20 clips averaging 3s each ≈ ~$8. One-time production cost.
 
@@ -138,7 +138,7 @@ When Jaromelu is in active source-discovery mode, the UI surfaces this as a visi
 - A live activity stream shows what he's looking at: current search query, page being fetched, candidate just spotted
 - Each judgement publishes as a Jaromelu-authored card ("Found a new pod — 'Tackles and Tinnies' — three episodes deep, mentions Munster a lot")
 
-This is the only place the *process* of recon is rendered visibly. Internally it's the Scout function (see [agents/crew/scout/README.md](../agents/crew/scout/README.md)), but on screen it's always Jaromelu.
+This is the only place the *process* of recon is rendered visibly. Internally it's the Miner function (see [agents/crew/miner/README.md](../agents/crew/miner/README.md)), but on screen it's always Jaromelu.
 
 ---
 

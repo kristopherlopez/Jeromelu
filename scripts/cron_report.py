@@ -61,8 +61,8 @@ RECIPIENT = "kristopher.lopez@gmail.com"
 BACKUP_BUCKET = "jeromelu-public-assets"
 BACKUP_PREFIX = "backups/postgres/"
 
-SCOUT_LOG = "/var/log/jeromelu/scout-refresh.log"
-SCOUT_POPULATE_LOG = "/var/log/jeromelu/scout-populate.log"
+MINER_LOG = "/var/log/jeromelu/miner-refresh.log"
+MINER_POPULATE_LOG = "/var/log/jeromelu/miner-populate.log"
 PG_BACKUP_LOG = "/var/log/jeromelu/pg-backup.log"
 
 GITHUB_REPO = "kristopherlopez/Jeromelu"
@@ -167,10 +167,10 @@ def count_video_metrics_24h(now: datetime) -> tuple[int, int, int]:
 
 # ---- Log parsing -----------------------------------------------------------
 
-# scout-refresh.log lines look like:
+# miner-refresh.log lines look like:
 #   [2026-05-23T23:00:12Z] channel-stats status=200 body={"updated":12,...}
 #   [2026-05-23T23:00:12Z] videos        curl_rc=28 err=...
-SCOUT_LINE = re.compile(
+MINER_LINE = re.compile(
     r"^\[(?P<ts>\S+)\]\s+(?P<job>\S+)\s+"
     r"(?:status=(?P<status>\d+)\s+body=(?P<body>.*)|curl_rc=(?P<rc>\d+)\s+err=(?P<err>.*))$"
 )
@@ -180,20 +180,20 @@ POPULATE_STATUS = re.compile(r"^status=(?P<status>\d+)$")
 POPULATE_PHASE_COMPLETE = re.compile(r"^phase=(?P<phase>\S+)\s+complete$")
 
 
-def latest_scout_line(job: str, now: datetime) -> dict[str, Any] | None:
+def latest_miner_line(job: str, now: datetime) -> dict[str, Any] | None:
     """Return the latest log entry for `job` within RUN_WINDOW, or None.
 
     Reads bottom-up so the file size doesn't matter — typical log is
     one line per job per day, but cron retries during incidents can
     push it to dozens.
     """
-    if not os.path.exists(SCOUT_LOG):
+    if not os.path.exists(MINER_LOG):
         return None
     cutoff = now - RUN_WINDOW
-    with open(SCOUT_LOG, encoding="utf-8", errors="replace") as f:
+    with open(MINER_LOG, encoding="utf-8", errors="replace") as f:
         lines = f.readlines()
     for line in reversed(lines):
-        m = SCOUT_LINE.match(line.strip())
+        m = MINER_LINE.match(line.strip())
         if not m or m.group("job") != job:
             continue
         ts = _parse_log_ts(m.group("ts"))
@@ -209,20 +209,20 @@ def latest_scout_line(job: str, now: datetime) -> dict[str, Any] | None:
     return None
 
 
-def latest_scout_populate_run(job: str, now: datetime) -> dict[str, Any] | None:
-    """Return the latest scout-populate run summary within RUN_WINDOW.
+def latest_miner_populate_run(job: str, now: datetime) -> dict[str, Any] | None:
+    """Return the latest miner-populate run summary within RUN_WINDOW.
 
-    scout-populate logs multiple lines per invocation. A successful run has a
+    miner-populate logs multiple lines per invocation. A successful run has a
     `job=<name> ... start`, zero-valued command `status=` lines, per-phase
     completion markers, and a final `job=<name> complete`. A failed run exits
     via `set -e`, so it has a non-zero command status and no final completion
     marker.
     """
-    if not os.path.exists(SCOUT_POPULATE_LOG):
+    if not os.path.exists(MINER_POPULATE_LOG):
         return None
     cutoff = now - RUN_WINDOW
     entries: list[tuple[datetime, str]] = []
-    with open(SCOUT_POPULATE_LOG, encoding="utf-8", errors="replace") as f:
+    with open(MINER_POPULATE_LOG, encoding="utf-8", errors="replace") as f:
         for line in f:
             m = POPULATE_LINE.match(line.strip())
             if not m:
@@ -397,11 +397,11 @@ def row_cost_report(now: datetime) -> Row:
 
 
 def row_channel_stats(now: datetime) -> Row:
-    log = latest_scout_line("channel-stats", now)
+    log = latest_miner_line("channel-stats", now)
     total, distinct = count_channel_metrics_24h(now)
     if log is None:
         return Row(
-            name="Scout: channel-stats",
+            name="Miner: channel-stats",
             schedule="23:00 UTC daily",
             status=FAIL,
             last_run="—",
@@ -410,7 +410,7 @@ def row_channel_stats(now: datetime) -> Row:
     last_run = log["ts"].isoformat().replace("+00:00", "Z")
     if log["curl_rc"] is not None:
         return Row(
-            name="Scout: channel-stats",
+            name="Miner: channel-stats",
             schedule="23:00 UTC daily",
             status=FAIL,
             last_run=last_run,
@@ -426,7 +426,7 @@ def row_channel_stats(now: datetime) -> Row:
     else:
         status = FAIL
     return Row(
-        name="Scout: channel-stats",
+        name="Miner: channel-stats",
         schedule="23:00 UTC daily",
         status=status,
         last_run=last_run,
@@ -435,11 +435,11 @@ def row_channel_stats(now: datetime) -> Row:
 
 
 def row_videos(now: datetime) -> Row:
-    log = latest_scout_line("videos", now)
+    log = latest_miner_line("videos", now)
     total, distinct, new_sources = count_video_metrics_24h(now)
     if log is None:
         return Row(
-            name="Scout: videos",
+            name="Miner: videos",
             schedule="23:15 UTC daily",
             status=FAIL,
             last_run="—",
@@ -448,7 +448,7 @@ def row_videos(now: datetime) -> Row:
     last_run = log["ts"].isoformat().replace("+00:00", "Z")
     if log["curl_rc"] is not None:
         return Row(
-            name="Scout: videos",
+            name="Miner: videos",
             schedule="23:15 UTC daily",
             status=FAIL,
             last_run=last_run,
@@ -466,7 +466,7 @@ def row_videos(now: datetime) -> Row:
         status = FAIL
     new_part = f", {new_sources} new" if new_sources else ""
     return Row(
-        name="Scout: videos",
+        name="Miner: videos",
         schedule="23:15 UTC daily",
         status=status,
         last_run=last_run,
@@ -474,15 +474,15 @@ def row_videos(now: datetime) -> Row:
     )
 
 
-def row_scout_populate_nrlcom_current(now: datetime) -> Row:
-    log = latest_scout_populate_run("nrlcom-current", now)
+def row_miner_populate_nrlcom_current(now: datetime) -> Row:
+    log = latest_miner_populate_run("nrlcom-current", now)
     if log is None:
         return Row(
-            name="Scout: populate nrlcom-current",
+            name="Miner: populate nrlcom-current",
             schedule="19:20 UTC daily",
             status=FAIL,
             last_run="—",
-            detail="No scout-populate log entry in last 25h",
+            detail="No miner-populate log entry in last 25h",
         )
 
     last_run = log["ts"].isoformat().replace("+00:00", "Z")
@@ -491,7 +491,7 @@ def row_scout_populate_nrlcom_current(now: datetime) -> Row:
     phase_count = len(log["phases_completed"])
     if failed_statuses:
         return Row(
-            name="Scout: populate nrlcom-current",
+            name="Miner: populate nrlcom-current",
             schedule="19:20 UTC daily",
             status=FAIL,
             last_run=last_run,
@@ -499,14 +499,14 @@ def row_scout_populate_nrlcom_current(now: datetime) -> Row:
         )
     if log["completed"]:
         return Row(
-            name="Scout: populate nrlcom-current",
+            name="Miner: populate nrlcom-current",
             schedule="19:20 UTC daily",
             status=OK,
             last_run=last_run,
             detail=f"completed {phase_count} phases; {len(statuses)} commands exited clean",
         )
     return Row(
-        name="Scout: populate nrlcom-current",
+        name="Miner: populate nrlcom-current",
         schedule="19:20 UTC daily",
         status=WARN,
         last_run=last_run,
@@ -648,7 +648,7 @@ def main() -> int:
         row_cost_report(now),
         row_channel_stats(now),
         row_videos(now),
-        row_scout_populate_nrlcom_current(now),
+        row_miner_populate_nrlcom_current(now),
         row_pg_backup(now),
     ]
     text = render_text(now, rows)

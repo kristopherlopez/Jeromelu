@@ -19,7 +19,7 @@ Use Kling 3.0 (or equivalent) to generate short video clips of the crew characte
 **How it works:**
 - Each crew member has a static photo/character image
 - Kling animates the photo into short clips (expressions, gestures, reactions)
-- Chain multiple clips together to compose a scene (Scout briefs Jaromelu, Critic pushes back, Jaromelu makes the call)
+- Chain multiple clips together to compose a scene (Miner briefs Jaromelu, Critic pushes back, Jaromelu makes the call)
 - Add TTS voiceover per character
 - Compose into 30-90 second clips for cross-posting
 
@@ -36,7 +36,7 @@ Use Kling 3.0 (or equivalent) to generate short video clips of the crew characte
 - Embedded in the Feed on the website
 
 **Reusable templates:**
-- Scout briefing Jaromelu (intel drop)
+- Miner briefing Jaromelu (intel drop)
 - Analyst presenting contradictions (tension)
 - Critic challenging the call (conflict)
 - Jaromelu making the call (commitment)
@@ -52,7 +52,7 @@ Build a pipeline to isolate individual speaker audio from YouTube podcast source
 
 **What's already in place** (since [extraction-method.md](sources/extraction-method.md) shipped 2026-05-02):
 
-1. **Audio retention** — every Scout audio pull (`app/scout/media/audio.py`) downloads the audio via yt-dlp and persists it to `s3://jeromelu-raw-audio/youtube/{channel_id}/{video_id}.m4a`. Long-term storage; never deleted.
+1. **Audio retention** — every Miner audio pull (`app/miner/media/audio.py`) downloads the audio via yt-dlp and persists it to `s3://jeromelu-raw-audio/youtube/{channel_id}/{video_id}.m4a`. Long-term storage; never deleted.
 2. **Speaker diarisation** — Deepgram nova-3 with `diarize=true` is the canonical extract (`app/analyst/transcribe.py`). Each video produces `source_speakers` *turns* (one row per contiguous speaker span — multiple per speaker, all sharing the raw `speaker_label`) and `source_chunks` rows linked to their turn via FK.
 3. **Speaker rename UI** — operators can name a speaker via `PATCH /api/sources/speakers/{segment_id}` (rename cascades to every turn sharing the current label). Visible in the transcript panel on `/wiki/source/{source_id}` — click any speaker label to rename inline.
 
@@ -142,4 +142,4 @@ The insight: every podcast ingested today is also a training data deposit for to
 - Voice cloning of real public figures requires careful handling
 - Commentary/parody context provides some latitude, but should be reviewed
 - Consider: attribution, consent norms in the podcast ecosystem, platform policies on synthetic media
-- Start with crew-original characters (Scout, Analyst, etc.) before using real voices
+- Start with crew-original characters (Miner, Analyst, etc.) before using real voices

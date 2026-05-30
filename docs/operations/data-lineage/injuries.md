@@ -16,7 +16,7 @@ Schema also allows `source='zerotackle'`, `'nrl_physio_twitter'`, `'manual'`, bu
 
 ## Extractor
 
-`scripts/data/populate/phase_aux.py` — `populate_injuries()` runs a state machine over chronologically-sorted casualty snapshots. For each daily snapshot under `scout/nrlcom/casualty-ward/{competition}/{YYYYMMDD}.json`:
+`scripts/data/populate/phase_aux.py` — `populate_injuries()` runs a state machine over chronologically-sorted casualty snapshots. For each daily snapshot under `miner/nrlcom/casualty-ward/{competition}/{YYYYMMDD}.json`:
 
 1. For each casualty in today's payload: if no open injury exists for `(player_id, team_id, description)`, INSERT a new row. If one exists, UPDATE its `expected_return_round` and `metadata_json.last_seen_snapshot`.
 2. For each previously-open injury whose `(name, team_nick)` key is **not** in today's snapshot: SET `resolved_at = snap_date`.

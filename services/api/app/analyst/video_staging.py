@@ -1,6 +1,6 @@
 """Ephemeral video staging for the Lineup pipeline.
 
-Background: ``services/api/app/scout/media/persistent_video.py`` was the
+Background: ``services/api/app/miner/media/persistent_video.py`` was the
 original Phase-4 acquisition path — it persisted the low-res mp4 under
 ``youtube/<channel>/<video_id>.video.mp4`` and stamped
 ``sources.video_s3_key`` so the review UI could presign the file for
@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 
 #: Quality cap for ephemeral downloads. Mirrors ``DEFAULT_QUALITY`` in
-#: ``scout/media/persistent_video.py`` so the face-detection pipeline sees the same pixel
+#: ``miner/media/persistent_video.py`` so the face-detection pipeline sees the same pixel
 #: density it was tuned against.
 DEFAULT_QUALITY = "360"
 
@@ -72,7 +72,7 @@ def _staging_key(request_id: str) -> str:
 
 def _yt_dlp_low_res_video(video_id: str, output_dir: Path, quality: str) -> Path:
     """Single-stream low-res download. Same selector as the persistent
-    Scout path, so the file format / codec the GPU container sees is
+    Miner path, so the file format / codec the GPU container sees is
     identical."""
     # Lazy-imported: yt-dlp is not in the API container per
     # feedback_api_container_lean.md. This module is on the API import path

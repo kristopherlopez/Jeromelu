@@ -26,7 +26,7 @@ Jaromelu is an agent-first product. Three kinds of agents, one folder per kind �
 
 | Kind | What | Docs |
 |------|------|------|
-| **Crew** | User-facing personas — Jaromelu, Scout, Analyst, Critic, Bookkeeper, Archivist | [agents/crew/](docs/agents/crew/README.md) |
+| **Crew** | User-facing personas — Jaromelu, Miner, Analyst, Critic, Bookkeeper, Archivist | [agents/crew/](docs/agents/crew/README.md) |
 | **System** | Backend Temporal workflows + LLM activities | [agents/system/](docs/agents/system/README.md) |
 | **Skills** | Claude Code dev-time skill agents | [agents/skills/](docs/agents/skills/README.md) |
 

@@ -10,7 +10,7 @@ tags: [area/operations, data-lineage]
 
 | Pipeline | Profile | Role |
 |---|---|---|
-| Presenter Scout review queue | — | **Primary** — confirmed presenter associations |
+| Presenter Miner review queue | — | **Primary** — confirmed presenter associations |
 
 ## Writer
 
@@ -33,9 +33,9 @@ Idempotent on `(channel_id, person_id)` — re-confirming the same candidate is 
 | `since_ts` | review | Optional join date if known |
 | `confirmed_at` | derived | DB default `now()` |
 | `confirmed_by` | review | Reviewer identity |
-| `candidate_id` | candidate | FK → scout_presenter_candidates (SET NULL). Provenance pointer |
+| `candidate_id` | candidate | FK → miner_presenter_candidates (SET NULL). Provenance pointer |
 
 ## Notes
 
 - Anchored at channel level — presenters are a property of the *show*, not the episode.
-- See migration 052 and `docs/agents/system/presenter-scout.md`.
+- See migration 052 and `docs/agents/system/presenter-miner.md`.

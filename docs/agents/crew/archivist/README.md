@@ -11,7 +11,7 @@ tags: [area/agents, subarea/crew]
 |                       |                                                                                                |
 | --------------------- | ---------------------------------------------------------------------------------------------- |
 | **Type**              | Crew worker (operates async, persists artifacts)                                               |
-| **Pipeline role**     | Compose. Reads downstream of Scout (sources), Analyst (claims), Bookkeeper (stats); writes the wiki. |
+| **Pipeline role**     | Compose. Reads downstream of Miner (sources), Analyst (claims), Bookkeeper (stats); writes the wiki. |
 | **Scope**             | `wiki_pages` content + `wiki_revisions` + curated `wiki_relations` (see [draft](../../../architecture/drafts/wiki-entity-connections.draft.md)) |
 | **Status**            | **In design.** The runtime "Managed Agent" is specced in [content-pipeline.md](../../../pages/wiki/content-pipeline.md); naming + responsibilities canonicalised here. |
 | **Trigger**           | Session-per-event: new claims uploaded · post-round stats arrive · team lists published · operator-triggered |
@@ -21,10 +21,10 @@ tags: [area/agents, subarea/crew]
 
 ## Pipeline position
 
-Where Scout/Analyst/Bookkeeper converge on the Thursday call, the Archivist runs **continuously and asynchronously** on its own rhythm — every time downstream data lands, it updates the affected pages. There is no weekly climax for the Archivist; the wiki should be quietly current at all times.
+Where Miner/Analyst/Bookkeeper converge on the Thursday call, the Archivist runs **continuously and asynchronously** on its own rhythm — every time downstream data lands, it updates the affected pages. There is no weekly climax for the Archivist; the wiki should be quietly current at all times.
 
 ```
-Scout      →  Analyst    →  Bookkeeper  →  Jaromelu
+Miner      →  Analyst    →  Bookkeeper  →  Jaromelu
 (acquire)     (extract)     (numbers)      (voice / Remarks)
                   ↓             ↓             ↓
                   ───────────► Archivist ◄────
@@ -88,7 +88,7 @@ Sharper boundaries than additional responsibilities. The Archivist:
 - **Does not make calls.** Those are Jaromelu's; the Archivist reports them.
 - **Does not compute math.** The Bookkeeper owns scores, breakevens, alignment indices; the Archivist surfaces the numbers in prose.
 - **Does not extract claims or quotes.** The source pipeline (Analyst's territory) does that; the Archivist consumes already-verified claims.
-- **Does not fetch or transcribe sources.** Scout's job.
+- **Does not fetch or transcribe sources.** Miner's job.
 - **Does not adjudicate truth when sources disagree.** It presents the contradiction (e.g. via the `Trust List` and `Verdict` callout boxes from [page-design.md](../../../pages/wiki/page-design.md)); calling who's right is Jaromelu's job, expressed in a Remark.
 - **Does not create new entity rows.** Entities are created upstream (by the source pipeline, scraper, or operator). The Archivist creates *wiki pages for entities that already exist* — see Page Lifecycle below.
 - **Does not invent new page sections without operator approval.** The section vocabulary per page type is fixed in [content-pipeline.md](../../../pages/wiki/content-pipeline.md); the Archivist writes within that scaffold.

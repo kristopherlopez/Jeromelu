@@ -29,10 +29,10 @@ The structural transform that *produces* that transcript — **Lineup** (transcr
 
 ## Pipeline position
 
-Scout drops audio in S3. Analyst picks it up and produces every downstream derivative. Today only the first derivative — the diarised transcript — is implemented.
+Miner drops audio in S3. Analyst picks it up and produces every downstream derivative. Today only the first derivative — the diarised transcript — is implemented.
 
 ```
-Scout                       Analyst                                           Bookkeeper / Critic / Jaromelu
+Miner                       Analyst                                           Bookkeeper / Critic / Jaromelu
 (audio in S3)         →     (transcript → claims → consensus)            →   (numbers + challenge + voice)
 ```
 
@@ -101,7 +101,7 @@ Lineup is the speaker-identification surface within Analyst's transcript materia
 | **1** — Pyannote side-by-side | A/B pyannote 3.1 vs Deepgram diarizer on real podcast audio. | ✅ Shipped 2026-05-03. 83.6 % agreement with Deepgram; pyannote chosen. |
 | **2** — Pyannote + voice embeddings | Replace Deepgram diarize with pyannote turns; ECAPA/wespeaker embeddings (256-dim) on every `source_speakers` row. | ✅ Shipped 2026-05-03. |
 | **3** — Voice enrollment + identification | `person_voiceprints` registry; `enroll-voice` CLI; sliding-window k-NN + majority-vote matching. | ✅ Shipped 2026-05-03. 92.9 % precision on the audited source. |
-| **4a** — Visual ID + fusion | Scout video acquisition; InsightFace face detection + 512-dim ArcFace; `person_face_embeddings` registry; voice/face fusion table on `source_speakers`. | ✅ Shipped 2026-05-03. |
+| **4a** — Visual ID + fusion | Miner video acquisition; InsightFace face detection + 512-dim ArcFace; `person_face_embeddings` registry; voice/face fusion table on `source_speakers`. | ✅ Shipped 2026-05-03. |
 | **4-asd** — Mouth-opening ASD heuristic | Per-frame "active speaker" picked by `landmark_3d_68` inner-mouth opening; per-turn density gate at 30 %. | ✅ Shipped 2026-05-04. Visual precision 55 % → 77 %. |
 | **4b-display** — Review-UI overlay | HTML5 `<video>` + canvas face-box overlay coloured by `match_method`. Read-only. | ✅ Shipped 2026-05-04. |
 | **4b-display-v2** — Ephemeral video + canvas-on-iframe overlay | Stop persisting per-source video. `video_staging.staged_video` yt-dlps into a 24 h-lifecycle staging key, deletes after `visual_identify` returns. `YouTubeFaceOverlay` draws bboxes on the YouTube iframe directly. | ✅ Shipped 2026-05-05. |

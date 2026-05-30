@@ -151,7 +151,7 @@ def get_source(source_id: uuid.UUID, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Source not found")
 
     doc = db.query(SourceDocument).filter(SourceDocument.source_id == source_id).first()
-    # No document yet (Scout hasn't ingested or GPU hasn't transcribed): the
+    # No document yet (Miner hasn't ingested or GPU hasn't transcribed): the
     # viewer still renders — video plays, transcript/claims tabs show an
     # empty state — so the user can at least watch in-app instead of being
     # bounced to a 404.

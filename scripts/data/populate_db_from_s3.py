@@ -1,4 +1,4 @@
-"""Walk scout/* archives in S3 and project into DB tables.
+"""Walk miner/* archives in S3 and project into DB tables.
 
 Usage:
     python -m scripts.data.populate_db_from_s3 --phase identity
@@ -9,7 +9,7 @@ Phases run in FK-dependency order. `--phase all` runs every phase in
 sequence. Re-running is idempotent — each phase uses UPSERT semantics on
 natural keys.
 
-This is a one-shot backfill driver. Day-to-day, the Scout pipelines
+This is a one-shot backfill driver. Day-to-day, the Miner pipelines
 (nrlcom-match-centre, nrlcom-ladder, etc.) keep the archives current and
 their attached extractors keep the DB current. This script only exists to
 project the historical backlog of archives that exist in S3 but never had

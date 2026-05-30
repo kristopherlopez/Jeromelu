@@ -2,29 +2,29 @@
 tags: [area/agents, subarea/system, status/live]
 ---
 
-# Source Discovery (Scout)
+# Source Discovery (Miner)
 
 | | |
 |---|---|
-| **Package** | `services/api/app/scout/` |
+| **Package** | `services/api/app/miner/` |
 | **Trigger** | Deterministic YouTube: admin endpoint / CLI; agentic long tail: manual CLI |
-| **Crew counterpart** | [Scout](../crew/scout/README.md) — this is Scout's source-discovery surface |
-| **ETL role** | **Extract only.** No Transform. (Cleaning, diarisation, parsing, embedding are downstream — see [crew/scout/architecture.md § Hand-off contract](../crew/scout/architecture.md#hand-off-contract).) |
+| **Crew counterpart** | [Miner](../crew/miner/README.md) — this is Miner's source-discovery surface |
+| **ETL role** | **Extract only.** No Transform. (Cleaning, diarisation, parsing, embedding are downstream — see [crew/miner/architecture.md § Hand-off contract](../crew/miner/architecture.md#hand-off-contract).) |
 | **Status** | Deterministic YouTube discovery + agentic long-tail discovery + admin recon API + post-approval video enumeration shipped |
 
-Scout's "find new sources" job. The YouTube-native bulk path is deterministic: it calls the YouTube Data API, dedupes against server-side DB state, scores candidates with transparent metadata-based reasons, and files only novel rows to `scout_candidates` for human review. The autonomous Anthropic agent remains available for off-platform and long-tail discovery where structured YouTube search is not enough. **Not Temporal-based** — runs in-process, see [project-temporal-not-in-prod note](../../operations/aws-resource-inventory.md).
+Miner's "find new sources" job. The YouTube-native bulk path is deterministic: it calls the YouTube Data API, dedupes against server-side DB state, scores candidates with transparent metadata-based reasons, and files only novel rows to `miner_candidates` for human review. The autonomous Anthropic agent remains available for off-platform and long-tail discovery where structured YouTube search is not enough. **Not Temporal-based** — runs in-process, see [project-temporal-not-in-prod note](../../operations/aws-resource-inventory.md).
 
 Approval of a channel candidate triggers deterministic post-processing: the channel's full uploads playlist is enumerated and each video is inserted as a `sources` row, with an initial popularity snapshot in `video_metrics`. A daily refresh job re-walks each channel for new uploads and re-snapshots view/like/comment counts so we can rank videos by influence and detect breakouts. See [§ Post-approval video enumeration](#post-approval-video-enumeration) below.
 
 ### Extract-only boundary
 
-Per Scout's [ETL role](../crew/scout/README.md), this surface only writes **raw inventory**:
-- `scout_candidates` (full row at discovery)
+Per Miner's [ETL role](../crew/miner/README.md), this surface only writes **raw inventory**:
+- `miner_candidates` (full row at discovery)
 - `channels` (full row at approval)
 - `sources` (full row at enumeration; `ingestion_status='pending'`, `cleaned_text` left for Transform)
 - `video_metrics` / `channel_metrics` (snapshots from API output)
 
-It does not write `source_documents` (that's [ingestion](ingestion.md)), nor anything in the Transform layer — `cleaned_text`, `source_chunks.clean_text`/`embedding`, `source_speakers`, `source_chapters`, `source_annotations`, `quotes`, `claims`. If a feature would interpret, clean, normalise, or enrich the raw bytes, it does not belong in `services/api/app/scout/`.
+It does not write `source_documents` (that's [ingestion](ingestion.md)), nor anything in the Transform layer — `cleaned_text`, `source_chunks.clean_text`/`embedding`, `source_speakers`, `source_chapters`, `source_annotations`, `quotes`, `claims`. If a feature would interpret, clean, normalise, or enrich the raw bytes, it does not belong in `services/api/app/miner/`.
 
 ---
 
@@ -34,39 +34,39 @@ It does not write `source_documents` (that's [ingestion](ingestion.md)), nor any
 YOUTUBE_API_KEY
         │
         ▼
-  YouTube Data API helpers (services/api/app/scout/youtube/client.py)
+  YouTube Data API helpers (services/api/app/miner/youtube/client.py)
         │
         ├── search_channels / harvest_channels_from_videos / search_videos
         ├── get_channel_stats / get_video_stats
         └── server-side dedupe filter:
               channels.external_id
               sources.canonical_url -> video_id
-              scout_candidates.(platform, kind, external_id)
+              miner_candidates.(platform, kind, external_id)
         │
         ▼
   deterministic_youtube.py
         │
         ├── enriches IDs with useful metadata
         ├── scores with explicit score_reasons
-        └── INSERT scout_candidates (status='pending')
+        └── INSERT miner_candidates (status='pending')
             ON CONFLICT DO NOTHING
 
 ANTHROPIC_API_KEY
         │
         ▼
-  Anthropic Messages API ◀── Scout system prompt (cacheable, ~1.1k tokens)
+  Anthropic Messages API ◀── Miner system prompt (cacheable, ~1.1k tokens)
         │                  ◀── Tools: web_search, web_fetch, dedupe_check, persist_candidate
         │                  ◀── User brief (NRL scope; can be overridden per run)
         ▼
-  Multi-turn streaming loop  (services/api/app/scout/source_discovery/agent.py)
+  Multi-turn streaming loop  (services/api/app/miner/source_discovery/agent.py)
         │
         ├── text deltas → stdout (theatre)
         │
         ├── server-side tools (web_search, web_fetch) — executed by Anthropic
         │
         └── client-side tools — executed locally:
-              dedupe_check     → SELECT against channels / sources / scout_candidates
-              persist_candidate → INSERT scout_candidates (status='pending')
+              dedupe_check     → SELECT against channels / sources / miner_candidates
+              persist_candidate → INSERT miner_candidates (status='pending')
                                    ON CONFLICT DO NOTHING
         │
         ▼
@@ -77,17 +77,17 @@ ANTHROPIC_API_KEY
 
 | File | Purpose |
 |---|---|
-| `app/scout/prompt.py` | System prompt (Scout voice + scope + tagging taxonomy) and default user brief |
-| `app/scout/source_discovery/deterministic_youtube.py` | Deterministic YouTube discovery, scoring, DB dedupe, and candidate persistence |
-| `app/scout/source_discovery/deterministic_youtube_cli.py` | `python -m app.scout.source_discovery.deterministic_youtube_cli` entry point |
-| `app/scout/source_discovery/routes.py` | Admin endpoint for cron-friendly deterministic YouTube discovery |
-| `app/scout/source_discovery/tools.py` | Anthropic tool definitions + Python handlers (`dedupe_check`, `persist_candidate`) |
-| `app/scout/source_discovery/agent.py` | Multi-turn streaming loop with bounds (turns, tool calls, wall-clock, USD budget) |
-| `app/scout/source_discovery/cli.py` | Agentic discovery entry point |
-| `app/scout/youtube/client.py` | YouTube Data API v3 client (search, channel stats, playlist enumeration, video stats) |
-| `app/scout/youtube/refresh.py` | Post-approval video enumeration + daily stats refresh (deterministic, not agent-driven) |
+| `app/miner/prompt.py` | System prompt (Miner voice + scope + tagging taxonomy) and default user brief |
+| `app/miner/source_discovery/deterministic_youtube.py` | Deterministic YouTube discovery, scoring, DB dedupe, and candidate persistence |
+| `app/miner/source_discovery/deterministic_youtube_cli.py` | `python -m app.miner.source_discovery.deterministic_youtube_cli` entry point |
+| `app/miner/source_discovery/routes.py` | Admin endpoint for cron-friendly deterministic YouTube discovery |
+| `app/miner/source_discovery/tools.py` | Anthropic tool definitions + Python handlers (`dedupe_check`, `persist_candidate`) |
+| `app/miner/source_discovery/agent.py` | Multi-turn streaming loop with bounds (turns, tool calls, wall-clock, USD budget) |
+| `app/miner/source_discovery/cli.py` | Agentic discovery entry point |
+| `app/miner/youtube/client.py` | YouTube Data API v3 client (search, channel stats, playlist enumeration, video stats) |
+| `app/miner/youtube/refresh.py` | Post-approval video enumeration + daily stats refresh (deterministic, not agent-driven) |
 | `app/routers/recon.py` | Admin recon endpoints (list/approve/reject candidates) + the daily refresh entry point |
-| `packages/db/migrations/017_discovered_sources.sql` | Candidate inbox table (renamed to `scout_candidates` in mig 035) |
+| `packages/db/migrations/017_discovered_sources.sql` | Candidate inbox table (renamed to `miner_candidates` in mig 035) |
 | `packages/db/migrations/023_channel_metrics.sql` | Time-series channel popularity (subs/views/videos) |
 | `packages/db/migrations/024_video_metrics.sql` | Time-series video popularity (views/likes/comments) |
 
@@ -99,13 +99,13 @@ ANTHROPIC_API_KEY
 | `web_fetch` | Anthropic built-in (`web_fetch_20250209`) | Drill into a channel/video page to confirm details. |
 | `dedupe_check_bulk` | Custom | Batched dedupe: pass an array of `{kind, url}`, get a verdict for each in one call. **Preferred** for filtering a fresh search-result page. |
 | `dedupe_check` | Custom | Single-item dedupe. Use only when investigating one candidate (e.g. after a `web_fetch`). |
-| `persist_candidate` | Custom | Writes to `scout_candidates` with `status='pending'`. Idempotent on `(platform, kind, external_id)`. |
+| `persist_candidate` | Custom | Writes to `miner_candidates` with `status='pending'`. Idempotent on `(platform, kind, external_id)`. |
 
 ## Deterministic YouTube discovery
 
 The deterministic path is first-class for YouTube-native discovery:
 
-1. Load known IDs from `channels`, YouTube `sources`, and `scout_candidates`.
+1. Load known IDs from `channels`, YouTube `sources`, and `miner_candidates`.
 2. Pass those known IDs into the YouTube helper calls so the API-facing server code filters repeat channels/videos before scoring.
 3. Enrich novel channel IDs with `channels.list` and novel video IDs with `videos.list`.
 4. Compute `content_categories`, `score`, and `score_reasons` from explicit metadata signals such as NRL wording, subscriber/video/view counts, AU country, parent channel ID, and harvest context.
@@ -114,7 +114,7 @@ The deterministic path is first-class for YouTube-native discovery:
 Cron-friendly endpoint:
 
 ```http
-POST /api/admin/scout/source-discovery/youtube
+POST /api/admin/miner/source-discovery/youtube
   ?dry_run=true
   ?max_results=10
   ?max_videos=25
@@ -132,14 +132,14 @@ surfaces. The endpoint writes `agent_runs` rows under
 Scheduled/operator wrapper:
 
 ```bash
-/opt/jeromelu/scripts/scout-refresh.sh source-discovery-youtube --dry-run
-/opt/jeromelu/scripts/scout-refresh.sh source-discovery-youtube
+/opt/jeromelu/scripts/miner-refresh.sh source-discovery-youtube --dry-run
+/opt/jeromelu/scripts/miner-refresh.sh source-discovery-youtube
 ```
 
-The wrapper uses the same on-box admin path as other Scout refreshes: it
+The wrapper uses the same on-box admin path as other Miner refreshes: it
 sources `/opt/jeromelu/.env`, sends `X-Admin-Key`, routes Caddy locally with
 `curl --resolve api.jeromelu.ai:443:127.0.0.1`, and appends the HTTP result
-to `/var/log/jeromelu/scout-refresh.log`. The wrapper-level `--dry-run` is a
+to `/var/log/jeromelu/miner-refresh.log`. The wrapper-level `--dry-run` is a
 static/no-op verification: it prints the resolved admin URL and exits before
 sourcing prod env, calling the API, touching the DB, or spending YouTube
 quota. Scheduled runs use `max_results=10`, `max_videos=25`, and the default
@@ -148,22 +148,22 @@ minimum score.
 Manual CLI:
 
 ```bash
-python -m app.scout.source_discovery.deterministic_youtube_cli --dry-run
-python -m app.scout.source_discovery.deterministic_youtube_cli --channel-query "NRL injury podcast" --json
-python -m app.scout.source_discovery.deterministic_youtube_cli --no-video-search --max-results 25
+python -m app.miner.source_discovery.deterministic_youtube_cli --dry-run
+python -m app.miner.source_discovery.deterministic_youtube_cli --channel-query "NRL injury podcast" --json
+python -m app.miner.source_discovery.deterministic_youtube_cli --no-video-search --max-results 25
 ```
 
 The older agentic CLI remains:
 
 ```bash
-python -m app.scout.source_discovery.cli --brief "Find off-platform NRL podcasts and blogs"
+python -m app.miner.source_discovery.cli --brief "Find off-platform NRL podcasts and blogs"
 ```
 
 ## Anti-rediscovery — Tier 1 (built)
 
-The first version of Scout kept re-discovering the same popular channels because `web_search` is server-side and we couldn't filter results before the agent saw them. Tier 1 fixes this:
+The first version of Miner kept re-discovering the same popular channels because `web_search` is server-side and we couldn't filter results before the agent saw them. Tier 1 fixes this:
 
-1. **Known-set injection** — at run-start, `summarise_known_sources(session)` builds a compact list of every YouTube channel Scout already tracks (`channels` table) plus every channel previously surfaced as a candidate (`scout_candidates`, any status). This list is prepended to the per-run user brief (NOT the system prompt — system stays cached) with the rule: *"do not search for these by name. Search adjacent."*
+1. **Known-set injection** — at run-start, `summarise_known_sources(session)` builds a compact list of every YouTube channel Miner already tracks (`channels` table) plus every channel previously surfaced as a candidate (`miner_candidates`, any status). This list is prepended to the per-run user brief (NOT the system prompt — system stays cached) with the rule: *"do not search for these by name. Search adjacent."*
 2. **`dedupe_check_bulk`** — a batched dedupe tool the agent calls once per search-result page, instead of one `dedupe_check` per candidate. Stops the agent from drilling into already-known URLs.
 
 Together these turn dedupe from a *post-hoc filter* into a *front-door firewall*.
@@ -179,29 +179,29 @@ Defaults (override via CLI flags or `AgentBounds`):
 
 ## DB interactions
 
-- Reads: `channels.external_id`, `sources.canonical_url`, `scout_candidates.(platform,kind,external_id)` — all dedup checks.
-- Writes: `scout_candidates` rows (candidates), `agent_runs` rows for run-level start/end summaries, and `agent_events` rows for the agentic loop.
+- Reads: `channels.external_id`, `sources.canonical_url`, `miner_candidates.(platform,kind,external_id)` — all dedup checks.
+- Writes: `miner_candidates` rows (candidates), `agent_runs` rows for run-level start/end summaries, and `agent_events` rows for the agentic loop.
 
 Approval flow (writes to `channels` / `sources`) is handled by the admin recon endpoints in `app/routers/recon.py`.
 
 ## Audit trail
 
-Scout uses the standardised audit pattern that every Claude-Agent-SDK-based agent follows. Full pattern doc: [`agent-audit.md`](agent-audit.md). Scout-specific surface summarised below.
+Miner uses the standardised audit pattern that every Claude-Agent-SDK-based agent follows. Full pattern doc: [`agent-audit.md`](agent-audit.md). Miner-specific surface summarised below.
 
 ### 1. `agent_runs` — run-level summary (DB)
 
-Two rows per run, both with `agent_id='scout'` and a shared top-level `run_id`. Joins cleanly to `agent_events` on `(run_id, agent_id)`.
+Two rows per run, both with `agent_id='miner'` and a shared top-level `run_id`. Joins cleanly to `agent_events` on `(run_id, agent_id)`.
 
 **Started row** — written before the agent's first turn:
 
 ```json
 {
-  "agent_id": "scout",
-  "agent_name": "Scout",
+  "agent_id": "miner",
+  "agent_name": "Miner",
   "activity_type": "started",
-  "summary": "Scout run started — model=claude-sonnet-4-6, budget=$3.0",
+  "summary": "Miner run started — model=claude-sonnet-4-6, budget=$3.0",
   "detail_json": {
-    "run_id": "scout-20260427T103045-a1b2c3",
+    "run_id": "miner-20260427T103045-a1b2c3",
     "model": "claude-sonnet-4-6",
     "brief_preview": "<first 500 chars of the brief>",
     "bounds": {"max_turns": 20, "max_tool_calls": 60, ...}
@@ -214,9 +214,9 @@ Two rows per run, both with `agent_id='scout'` and a shared top-level `run_id`. 
 ```json
 {
   "activity_type": "completed",   // or "failed"
-  "summary": "Scout run completed — 12 filed, 3 dupes, 8 turns, 24 tool calls, $0.428",
+  "summary": "Miner run completed — 12 filed, 3 dupes, 8 turns, 24 tool calls, $0.428",
   "detail_json": {
-    "run_id": "scout-20260427T103045-a1b2c3",
+    "run_id": "miner-20260427T103045-a1b2c3",
     "status": "completed",                // 'completed' | 'aborted' | 'failed'
     "turns_used": 8, "tool_calls": 24,
     "candidates_filed": 12, "duplicates_skipped": 3,
@@ -227,9 +227,9 @@ Two rows per run, both with `agent_id='scout'` and a shared top-level `run_id`. 
     "notes": [],
     "model": "claude-sonnet-4-6",
     "started_at": "...", "ended_at": "...",
-    "s3_log_key": "scout-logs/2026/04/27/scout-20260427T103045-a1b2c3.jsonl",
+    "s3_log_key": "miner-logs/2026/04/27/miner-20260427T103045-a1b2c3.jsonl",
     "s3_log_bucket": "jeromelu-clean-documents",
-    "local_log_path": "data/scout-logs/scout-20260427T103045-a1b2c3.jsonl"
+    "local_log_path": "data/miner-logs/miner-20260427T103045-a1b2c3.jsonl"
   }
 }
 ```
@@ -240,7 +240,7 @@ Two rows per run, both with `agent_id='scout'` and a shared top-level `run_id`. 
 
 The forensic record. Each event becomes a row in `agent_events` as it happens (so you can `SELECT` from another connection while a run is in progress). At run end the buffered events are also uploaded to S3 as a single JSONL bundle for long-term archive.
 
-S3 key format: `agent-logs/scout/{YYYY}/{MM}/{DD}/{run_id}.jsonl` on `s3_agent_logs_bucket` (defaults to `jeromelu-clean-documents`, prod-overridable).
+S3 key format: `agent-logs/miner/{YYYY}/{MM}/{DD}/{run_id}.jsonl` on `s3_agent_logs_bucket` (defaults to `jeromelu-clean-documents`, prod-overridable).
 
 No local files. DB is the live store, S3 is the archive.
 
@@ -261,14 +261,14 @@ Event types:
 
 Every event has `t` (UTC ISO timestamp) and `run_id`. Large strings/dicts are truncated at 5–20KB to keep the log bounded; for a typical 15-min run expect 100–300 events / 50–500KB.
 
-### 3. `scout_candidates` (already documented above)
+### 3. `miner_candidates` (already documented above)
 
 Per-candidate record, joined to a run via `run_id`.
 
 ### Following the trail
 
 ```sql
--- Most recent Scout runs with status, cost, and S3 log location
+-- Most recent Miner runs with status, cost, and S3 log location
 SELECT
   start_row.created_at                              AS started_at,
   start_row.run_id,
@@ -282,21 +282,21 @@ FROM agent_runs start_row
 LEFT JOIN agent_runs end_row
   ON end_row.run_id = start_row.run_id
  AND end_row.activity_type IN ('completed', 'failed')
-WHERE start_row.agent_id='scout' AND start_row.activity_type='started'
+WHERE start_row.agent_id='miner' AND start_row.activity_type='started'
 ORDER BY start_row.created_at DESC
 LIMIT 20;
 
 -- Candidates from one specific run
 SELECT kind, title, score, content_categories, url
-FROM scout_candidates
-WHERE run_id = 'scout-20260427T103045-a1b2c3'
+FROM miner_candidates
+WHERE run_id = 'miner-20260427T103045-a1b2c3'
 ORDER BY score DESC NULLS LAST;
 
 -- Run summary + event count via clean JOIN
 SELECT ar.run_id, ar.activity_type, ar.summary, count(ae.event_id) AS events
 FROM agent_runs ar
 LEFT JOIN agent_events ae USING (run_id, agent_id)
-WHERE ar.agent_id='scout'
+WHERE ar.agent_id='miner'
 GROUP BY ar.run_id, ar.activity_type, ar.summary, ar.created_at
 ORDER BY ar.created_at DESC LIMIT 10;
 ```
@@ -304,26 +304,26 @@ ORDER BY ar.created_at DESC LIMIT 10;
 Reading the live trace:
 
 ```sql
--- All events from one Scout run, in order
+-- All events from one Miner run, in order
 SELECT sequence, t, type, turn,
        payload->>'name'  AS tool_name,
        LEFT(payload::text, 200) AS preview
 FROM agent_events
-WHERE run_id = 'scout-20260427T103045-a1b2c3'
+WHERE run_id = 'miner-20260427T103045-a1b2c3'
 ORDER BY sequence;
 
 -- Just the candidates filed during this run
 SELECT t, payload->'input' AS candidate
 FROM agent_events
-WHERE run_id = 'scout-20260427T103045-a1b2c3'
+WHERE run_id = 'miner-20260427T103045-a1b2c3'
   AND type = 'tool_use'
   AND payload->>'name' = 'persist_candidate'
 ORDER BY sequence;
 
--- Just Scout's narration (text blocks)
+-- Just Miner's narration (text blocks)
 SELECT sequence, payload->>'text' AS text
 FROM agent_events
-WHERE run_id = 'scout-20260427T103045-a1b2c3'
+WHERE run_id = 'miner-20260427T103045-a1b2c3'
   AND type = 'text'
 ORDER BY sequence;
 ```
@@ -331,7 +331,7 @@ ORDER BY sequence;
 Reading the S3 bundle:
 
 ```bash
-aws s3 cp s3://jeromelu-clean-documents/agent-logs/scout/2026/04/27/scout-20260427T103045-a1b2c3.jsonl - | jq
+aws s3 cp s3://jeromelu-clean-documents/agent-logs/miner/2026/04/27/miner-20260427T103045-a1b2c3.jsonl - | jq
 ```
 
 For cross-agent SQL (weekly spend, all errors today, etc.), see [`agent-audit.md`](agent-audit.md#following-the-trail).
@@ -342,16 +342,16 @@ From `services/api` with venv active and `ANTHROPIC_API_KEY` exported:
 
 ```bash
 # default — sonnet 4.6, 20 turns, $3 budget
-python -m app.scout.source_discovery.cli
+python -m app.miner.source_discovery.cli
 
 # safer first run
-python -m app.scout.source_discovery.cli --dry-run
+python -m app.miner.source_discovery.cli --dry-run
 
 # tighter run for cost-watching
-python -m app.scout.source_discovery.cli --max-turns 5 --budget 0.50
+python -m app.miner.source_discovery.cli --max-turns 5 --budget 0.50
 
 # narrow brief
-python -m app.scout.source_discovery.cli --brief "Find injury-focused NRL podcasts only"
+python -m app.miner.source_discovery.cli --brief "Find injury-focused NRL podcasts only"
 ```
 
 Console shows:
@@ -368,14 +368,14 @@ Until the admin UI lands (later slice), use SQL:
 ```sql
 -- Most recent run's candidates
 SELECT kind, title, score, content_categories, url, score_reasons
-FROM scout_candidates
-WHERE run_id = (SELECT run_id FROM scout_candidates
+FROM miner_candidates
+WHERE run_id = (SELECT run_id FROM miner_candidates
                 ORDER BY discovered_at DESC LIMIT 1)
 ORDER BY score DESC NULLS LAST;
 
 -- Pending review queue
 SELECT kind, title, score, content_categories, discovered_via
-FROM scout_candidates
+FROM miner_candidates
 WHERE status='pending'
 ORDER BY score DESC NULLS LAST, discovered_at DESC;
 ```
@@ -406,7 +406,7 @@ refresh.
 Re-runs `refresh_channel_videos()` for a single channel on demand:
 
 ```
-POST /api/admin/scout/channels/{channel_ref}/refresh-videos
+POST /api/admin/miner/channels/{channel_ref}/refresh-videos
   ?full_backfill=true     # ignore the incremental cursor (default: false)
   ?max_results=N          # walker cap, range [1, 15000] (default: 200)
   Header: X-Admin-Key
@@ -444,7 +444,7 @@ A single admin endpoint runs both the incremental enumerate and the stats
 refresh:
 
 ```
-POST /api/admin/scout/refresh-videos
+POST /api/admin/miner/refresh-videos
   ?skip_stats=true        # enumerate only
   ?skip_enumerate=true    # stats only
   Header: X-Admin-Key
@@ -474,13 +474,13 @@ video / view counts for every active YouTube channel into
 `channel_metrics`:
 
 ```
-POST /api/admin/scout/refresh-channel-stats
+POST /api/admin/miner/refresh-channel-stats
   Header: X-Admin-Key
 ```
 
 Or via Make: `make prod-refresh-channel-stats ADMIN_KEY=xxx`.
 
-Backed by `refresh_all_channel_stats()` in `app/scout/youtube/refresh.py`. Walks
+Backed by `refresh_all_channel_stats()` in `app/miner/youtube/refresh.py`. Walks
 every `channel` where `platform='youtube'` and `active=true`, batches the
 external_ids 50 at a time into `channels.list`, and writes one
 `channel_metrics` row per channel using the canonical shape from migration
@@ -497,7 +497,7 @@ Wired to cron — see [Production schedule](#production-schedule) below.
 
 ## Production schedule
 
-Scout's YouTube refresh and deterministic discovery jobs run on the Lightsail
+Miner's YouTube refresh and deterministic discovery jobs run on the Lightsail
 box via a checked-in cron file:
 
 - **Schedule:** [`scripts/cron.d/jeromelu`](../../../scripts/cron.d/jeromelu)
@@ -505,9 +505,9 @@ box via a checked-in cron file:
   09:15 AEST (23:15 UTC), and weekly deterministic YouTube discovery at
   Monday 06:30 AEST (Sunday 20:30 UTC). DST drifts the local hour one hour
   later during summer; accepted.
-- **Wrapper:** [`scripts/scout-refresh.sh`](../../../scripts/scout-refresh.sh)
+- **Wrapper:** [`scripts/miner-refresh.sh`](../../../scripts/miner-refresh.sh)
   — sources `/opt/jeromelu/.env` for `ADMIN_KEY`, hits the API, appends
-  status + body to `/var/log/jeromelu/scout-refresh.log`, exits non-zero
+  status + body to `/var/log/jeromelu/miner-refresh.log`, exits non-zero
   on non-2xx so cron / monitoring can surface failures. Use
   `--dry-run` for a static URL check with no API call, DB write, env read, or
   YouTube quota spend.
@@ -516,12 +516,12 @@ box via a checked-in cron file:
   in this repo and redeploy — never hand-edit on the box. The same cron
   file also schedules the nightly `pg-backup.sh` at 02:30 AEST.
 
-To inspect: `ssh jeromelu-prod 'tail -n 50 /var/log/jeromelu/scout-refresh.log'`.
+To inspect: `ssh jeromelu-prod 'tail -n 50 /var/log/jeromelu/miner-refresh.log'`.
 
 To trigger a one-off run by hand (e.g. after fixing a quota error):
 `make prod-refresh-channel-stats ADMIN_KEY=xxx` or
 `make prod-refresh-videos ADMIN_KEY=xxx`. On the box, operators can also run
-`/opt/jeromelu/scripts/scout-refresh.sh source-discovery-youtube --dry-run`
+`/opt/jeromelu/scripts/miner-refresh.sh source-discovery-youtube --dry-run`
 to confirm the deterministic discovery URL, then drop `--dry-run` to spend
 roughly 1.3k YouTube quota units and file novel candidates for review.
 
@@ -539,7 +539,7 @@ filter to channels where Tracked < Reported.
 **Raw API:**
 
 ```
-GET /api/admin/scout/channel-coverage
+GET /api/admin/miner/channel-coverage
   ?only_gaps=true         # filter to channels where tracked < reported
 ```
 
@@ -549,7 +549,7 @@ GET /api/admin/scout/channel-coverage
 **Make target** (prod, with key):
 `make prod-channel-coverage ADMIN_KEY=xxx [ONLY_GAPS=1]`.
 
-Backed by `audit_channel_coverage()` in `app/scout/youtube/refresh.py`. Per-channel
+Backed by `audit_channel_coverage()` in `app/miner/youtube/refresh.py`. Per-channel
 funnel stages — same vocabulary as `/admin/pipeline`:
 
 | Column | Definition |
@@ -603,10 +603,10 @@ LIMIT 50;
 
 ## What's not in Slice 2
 
-- Admin review queue UI (`/admin/recon`) — backend endpoints exist; UI pending
+- Admin review queue UI (`/admin/recon`) — shipped 2026-05-30
 - Live Recon stream in `/pulse` (SSE) — Slice 3
 - Scheduled deterministic YouTube discovery runs — weekly cron now calls the
-  admin endpoint via `scripts/scout-refresh.sh`; the agentic/off-platform CLI
+  admin endpoint via `scripts/miner-refresh.sh`; the agentic/off-platform CLI
   remains manual
 - `Event` rows for the agent's reasoning trace — TBD when the live stream lands
 - Transcript-ingestion automation for newly-enumerated videos — single-source
@@ -621,11 +621,11 @@ LIMIT 50;
 
 Today the deterministic query bank is even-handed across the full NRL ecosystem. In practice it can still over-surface whatever YouTube ranks highest — likely SuperCoach + match highlights, since those dominate volume.
 
-Next step: pre-run, count `scout_candidates.content_categories` to find which tags are underrepresented (e.g. zero candidates for `nrlw`, `junior`, `classic`) and add a targeted query set for the next deterministic run:
+Next step: pre-run, count `miner_candidates.content_categories` to find which tags are underrepresented (e.g. zero candidates for `nrlw`, `junior`, `classic`) and add a targeted query set for the next deterministic run:
 
 ```
 Coverage gaps: nrlw (0 candidates), junior (0), classic (1).
 This run: add NRLW / junior / classic query terms.
 ```
 
-Cheap to add (one query + one result paragraph). Naturally rotates Scout through the long tail without relying on the agentic loop for YouTube-native gaps. Best added once we have a few deterministic runs of data so "underrepresented" actually means something.
+Cheap to add (one query + one result paragraph). Naturally rotates Miner through the long tail without relying on the agentic loop for YouTube-native gaps. Best added once we have a few deterministic runs of data so "underrepresented" actually means something.

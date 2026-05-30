@@ -176,8 +176,8 @@ const YouTubeFaceOverlay = forwardRef<YouTubeFaceOverlayHandle, Props>(
     const frames = useMemo(() => faceTrack?.frames ?? [], [faceTrack]);
     // Source pixel space the bboxes were extracted in. v4 JSONs carry
     // these directly; v3 falls back to a 360p 16:9 default that matches
-    // the historical Scout download quality (DEFAULT_QUALITY="360" in
-    // services/api/app/scout/media/persistent_video.py). Wrong only if a 240p/480p
+    // the historical Miner download quality (DEFAULT_QUALITY="360" in
+    // services/api/app/miner/media/persistent_video.py). Wrong only if a 240p/480p
     // source slipped through — would skew bbox positions but not break.
     const sourceW = faceTrack?.frame_width ?? 640;
     const sourceH = faceTrack?.frame_height ?? 360;

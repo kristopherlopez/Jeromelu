@@ -61,7 +61,7 @@ Visible to the audience:
 - consensus tracking
 - event timeline (The Feed)
 - alignment index (commentator leaderboard, audience scores, Jaromelu's record)
-- crew activity — status and recent actions from all six crew members (Jaromelu, Scout, Analyst, Critic, Bookkeeper, Archivist; see [agents/crew/](../agents/crew/README.md))
+- crew activity — status and recent actions from all six crew members (Jaromelu, Miner, Analyst, Critic, Bookkeeper, Archivist; see [agents/crew/](../agents/crew/README.md))
 
 ## Private State
 Internal only:

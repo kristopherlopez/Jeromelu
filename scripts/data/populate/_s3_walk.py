@@ -1,4 +1,4 @@
-"""Shared helpers for walking scout/* archives.
+"""Shared helpers for walking miner/* archives.
 
 Provides:
   - list_keys(prefix)           — paginated list of all keys under a prefix

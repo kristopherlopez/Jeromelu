@@ -14,15 +14,15 @@ tags: [area/operations, data-lineage]
 
 ## Extractor
 
-`scripts/data/populate/phase_aux.py` — `populate_stat_leaderboards()`. Walks `scout/nrlcom/stats/{competition}/...`, flattens nested `playerStats[].groups[].stats[].leaders[]` (and parallel `teamStats[]`) into one wide table. Idempotent UPSERT on `(competition, season, scope, category, subgroup, stat_title, leader_position)`. As of Phase 4.5 seed (2026-05-28): **4,595 rows across 14 seasons (2013-2026)**; for 2026/comp=111 specifically: **347 rows** — **100% person_id resolution** (182/182 player rows) and **98.8% team_id resolution** (343/347 overall). The pure projection seam `_extract_leader_rows(payload, *, key, competition, season, team_map, player_map)` is the test seam used by `tests/unit/scripts/data/populate/test_phase_leaderboards.py`.
+`scripts/data/populate/phase_aux.py` — `populate_stat_leaderboards()`. Walks `miner/nrlcom/stats/{competition}/...`, flattens nested `playerStats[].groups[].stats[].leaders[]` (and parallel `teamStats[]`) into one wide table. Idempotent UPSERT on `(competition, season, scope, category, subgroup, stat_title, leader_position)`. As of Phase 4.5 seed (2026-05-28): **4,595 rows across 14 seasons (2013-2026)**; for 2026/comp=111 specifically: **347 rows** — **100% person_id resolution** (182/182 player rows) and **98.8% team_id resolution** (343/347 overall). The pure projection seam `_extract_leader_rows(payload, *, key, competition, season, team_map, player_map)` is the test seam used by `tests/unit/scripts/data/populate/test_phase_leaderboards.py`.
 
 ## Field mapping
 
 | DB column | Source | Source field | Notes |
 |---|---|---|---|
 | `id` | derived | — | UUID |
-| `competition` | S3 key | `scout/.../{competition}/...` | |
-| `season` | S3 key | `scout/.../{season}.json` | |
+| `competition` | S3 key | `miner/.../{competition}/...` | |
+| `season` | S3 key | `miner/.../{season}.json` | |
 | `scope` | extractor | `'player'` or `'team'` | Branch on `playerStats` vs `teamStats` block |
 | `category` | stats | `<scope>Stats[*].title` | `Scoring`, `Attack`, `Passing`, ... |
 | `subgroup` | stats | `<scope>Stats[*].groups[*].title` | `Points`, `Tries`, `Goals`, ... |

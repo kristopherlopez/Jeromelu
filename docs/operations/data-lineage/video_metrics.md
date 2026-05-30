@@ -14,7 +14,7 @@ tags: [area/operations, data-lineage]
 
 ## Writer
 
-- `services/api/app/scout/youtube/client.py` (called by `services/api/app/scout/youtube/refresh.py`) — sampled at video discovery time and daily thereafter via the admin refresh endpoint; INSERTs a row **only when views/likes/comments change** vs the latest snapshot (change-only storage, migration 070). First-snapshot writers (`refresh_channel_videos`, including approval-time `youtube-channel-videos` runs) write rows that have no existing metric, so full-backfill retries can heal `sources` rows left metricless by older failed runs. Daily all-video refreshes are audited as Scout pipeline `youtube-refresh-videos`.
+- `services/api/app/miner/youtube/client.py` (called by `services/api/app/miner/youtube/refresh.py`) — sampled at video discovery time and daily thereafter via the admin refresh endpoint; INSERTs a row **only when views/likes/comments change** vs the latest snapshot (change-only storage, migration 070). First-snapshot writers (`refresh_channel_videos`, including approval-time `youtube-channel-videos` runs) write rows that have no existing metric, so full-backfill retries can heal `sources` rows left metricless by older failed runs. Daily all-video refreshes are audited as Miner pipeline `youtube-refresh-videos`.
 
 ## Field mapping
 

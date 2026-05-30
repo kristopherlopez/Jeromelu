@@ -4,7 +4,7 @@ Usage:
     python -m app.analyst.diarize_cli <source_id>
     python -m app.analyst.diarize_cli <source_id> --force
 
-Refuses to run if Scout hasn't collected the audio. Phase 1 makes no DB
+Refuses to run if Miner hasn't collected the audio. Phase 1 makes no DB
 writes — it persists the diarization JSON to S3 alongside the Deepgram
 JSON. Use ``app.analyst.diarize_compare`` to inspect the result.
 """

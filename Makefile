@@ -1,4 +1,4 @@
-.PHONY: up down db-shell migrate migrate-status seed-teams seed-venues fetch-players seed-players api web logs clean collect-audio collect-audio-drain collect-video transcribe transcribe-drain extract-transcript diarize diarize-compare voice-cluster enroll-voice enroll-face scout-presenters lineup-build lineup-deploy lineup-status lineup-delete test test-eval lint lint-python format-python typecheck-python lint-web prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all prod-refresh-videos prod-refresh-channel-stats prod-channel-coverage prod-seed-teams prod-seed-players prod-refresh-players prod-fetch-and-refresh-players prod-refresh-players-nrlcom deploy-prod prod-shell prod-logs
+.PHONY: up down db-shell migrate migrate-status seed-teams seed-venues fetch-players seed-players api web logs clean collect-audio collect-audio-drain collect-video transcribe transcribe-drain extract-transcript diarize diarize-compare voice-cluster enroll-voice enroll-face miner-presenters lineup-build lineup-deploy lineup-status lineup-delete test test-eval lint lint-python format-python typecheck-python lint-web prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all prod-refresh-videos prod-refresh-channel-stats prod-channel-coverage prod-seed-teams prod-seed-players prod-refresh-players prod-fetch-and-refresh-players prod-refresh-players-nrlcom deploy-prod prod-shell prod-logs
 
 # Start local infrastructure
 up:
@@ -43,26 +43,26 @@ fetch-players:
 seed-players:
 	python scripts/data/seed_players_prod.py
 
-# Scout — acquire audio for one source (yt-dlp → s3://jeromelu-raw-audio).
+# Miner — acquire audio for one source (yt-dlp → s3://jeromelu-raw-audio).
 # Sets sources.audio_s3_key and ingestion_status='collected'. Idempotent on
 # the S3 object — safe to re-run.
 # Usage: make collect-audio SOURCE_ID=<uuid>
 collect-audio:
 	@test -n "$(SOURCE_ID)" || (echo "SOURCE_ID is required: make collect-audio SOURCE_ID=<uuid>" && exit 2)
-	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.scout.media.cli.audio $(SOURCE_ID)
+	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.miner.media.cli.audio $(SOURCE_ID)
 
-# Scout — bounded drain over approved pending YouTube sources.
+# Miner — bounded drain over approved pending YouTube sources.
 # Usage: make collect-audio-drain [LIMIT=5]
 collect-audio-drain:
-	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.scout.media.cli.drain_audio --limit $(or $(LIMIT),5)
+	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.miner.media.cli.drain_audio --limit $(or $(LIMIT),5)
 
-# Scout — acquire low-res video for one source (yt-dlp 360p by default →
+# Miner — acquire low-res video for one source (yt-dlp 360p by default →
 # s3://jeromelu-raw-audio with .video.mp4 suffix). Used by Phase 4 visual
 # identification. Independent of audio acquisition; idempotent.
 # Usage: make collect-video SOURCE_ID=<uuid> [QUALITY=240|360|480|720]
 collect-video:
 	@test -n "$(SOURCE_ID)" || (echo "SOURCE_ID is required: make collect-video SOURCE_ID=<uuid>" && exit 2)
-	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.scout.media.cli.persistent_video $(SOURCE_ID) $(if $(QUALITY),--quality $(QUALITY))
+	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.miner.media.cli.persistent_video $(SOURCE_ID) $(if $(QUALITY),--quality $(QUALITY))
 
 # Analyst — transcribe a collected source via Deepgram (diarisation + keyterm).
 # Requires audio_s3_key to be set (run collect-audio first). Writes the
@@ -78,7 +78,7 @@ transcribe:
 transcribe-drain:
 	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.analyst.transcribe_drain_cli --limit $(or $(LIMIT),3)
 
-# Convenience target: run Scout (collect-audio) then Analyst (transcribe) in
+# Convenience target: run Miner (collect-audio) then Analyst (transcribe) in
 # sequence for a single source. The two steps stay independent — a Deepgram
 # failure leaves the audio in S3 for retry without re-downloading.
 # Usage: make extract-transcript SOURCE_ID=<uuid> [FORCE=1]
@@ -141,14 +141,14 @@ enroll-face:
 	fi
 
 # Presenter Research — research a channel's regular presenters via web search
-# and file findings into scout_presenter_candidates for human review. Pass
+# and file findings into miner_presenter_candidates for human review. Pass
 # either CHANNEL_ID directly or SOURCE_ID (resolved to its channel server-
 # side). DRY_RUN=1 streams the research without writing rows.
-# Usage: make scout-presenters CHANNEL_ID=<uuid> [DRY_RUN=1] [MODEL=claude-opus-4-7]
-#        make scout-presenters SOURCE_ID=<uuid>
-scout-presenters:
+# Usage: make miner-presenters CHANNEL_ID=<uuid> [DRY_RUN=1] [MODEL=claude-opus-4-7]
+#        make miner-presenters SOURCE_ID=<uuid>
+miner-presenters:
 	@test -n "$(CHANNEL_ID)$(SOURCE_ID)" || (echo "Need CHANNEL_ID=<uuid> or SOURCE_ID=<uuid>" && exit 2)
-	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.scout.presenter_research.cli \
+	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.miner.presenter_research.cli \
 		$(if $(CHANNEL_ID),--channel-id $(CHANNEL_ID)) \
 		$(if $(SOURCE_ID),--source-id $(SOURCE_ID)) \
 		$(if $(MODEL),--model $(MODEL)) \
@@ -184,7 +184,7 @@ db-shell:
 	docker exec -it jeromelu-postgres psql -U jeromelu_admin -d jeromelu
 
 # Run API locally. S3_ENDPOINT="" flips to real AWS — matches the
-# transcribe / scout / analyst CLIs so presigned URLs (Phase 4b video
+# transcribe / miner / analyst CLIs so presigned URLs (Phase 4b video
 # overlay, Phase 1+ Deepgram URL handoff) point at the actual buckets
 # the data lives in.
 #
@@ -303,12 +303,12 @@ prod-update-clean:
 		-H "X-Admin-Key: $(ADMIN_KEY)" \
 		-d '{"video_id":"$(VIDEO)","channel_id":"$(CHANNEL)"}' | python -m json.tool
 
-# Daily Scout refresh — incrementally enumerate new videos on every active
+# Daily Miner refresh — incrementally enumerate new videos on every active
 # YouTube channel, then refresh view/like/comment counts on every YouTube
 # source into video_metrics. Idempotent. Wired to cron on the Lightsail box.
 # Usage: make prod-refresh-videos ADMIN_KEY=xxx
 prod-refresh-videos:
-	curl -s -X POST $(PROD_API)/api/admin/scout/refresh-videos \
+	curl -s -X POST $(PROD_API)/api/admin/miner/refresh-videos \
 		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
 
 # Per-channel ad-hoc refresh — enumerate uploads + snapshot stats for one
@@ -319,7 +319,7 @@ prod-refresh-videos:
 # a single channel without waiting for the daily cron.
 # Usage: make prod-refresh-channel-videos CHANNEL=<uuid-or-slug> [FULL_BACKFILL=1] [MAX_RESULTS=1000] ADMIN_KEY=xxx
 prod-refresh-channel-videos:
-	curl -s -X POST "$(PROD_API)/api/admin/scout/channels/$(CHANNEL)/refresh-videos?$(if $(FULL_BACKFILL),full_backfill=true&,)$(if $(MAX_RESULTS),max_results=$(MAX_RESULTS),)" \
+	curl -s -X POST "$(PROD_API)/api/admin/miner/channels/$(CHANNEL)/refresh-videos?$(if $(FULL_BACKFILL),full_backfill=true&,)$(if $(MAX_RESULTS),max_results=$(MAX_RESULTS),)" \
 		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
 
 # Daily channel stats refresh — snapshot subscriber/video/view counts for
@@ -327,7 +327,7 @@ prod-refresh-channel-videos:
 # channels, safe to run daily. Wire to cron alongside prod-refresh-videos.
 # Usage: make prod-refresh-channel-stats ADMIN_KEY=xxx
 prod-refresh-channel-stats:
-	curl -s -X POST $(PROD_API)/api/admin/scout/refresh-channel-stats \
+	curl -s -X POST $(PROD_API)/api/admin/miner/refresh-channel-stats \
 		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
 
 # Channel coverage audit — for each active YouTube channel, compare
@@ -335,7 +335,7 @@ prod-refresh-channel-stats:
 # `sources` rows we have. Pure DB read, no API quota cost.
 # Usage: make prod-channel-coverage ADMIN_KEY=xxx [ONLY_GAPS=1]
 prod-channel-coverage:
-	curl -s -G $(PROD_API)/api/admin/scout/channel-coverage \
+	curl -s -G $(PROD_API)/api/admin/miner/channel-coverage \
 		$(if $(ONLY_GAPS),--data-urlencode "only_gaps=true",) \
 		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
 
@@ -380,111 +380,111 @@ prod-refresh-players:
 # JSON from a laptop" step. Cron-friendly. Wire to crontab on the
 # Lightsail box for the weekly Tuesday refresh.
 # Usage: make prod-fetch-and-refresh-players ADMIN_KEY=xxx [SEASON=2026]
-# DEPRECATED: prefer scout-supercoach-roster below — the new canonical name
-# per the Scout charter expansion (D9 / agent-aligned URL structure).
+# DEPRECATED: prefer miner-supercoach-roster below — the new canonical name
+# per the Miner charter expansion (D9 / agent-aligned URL structure).
 prod-fetch-and-refresh-players:
 	curl -s -X POST "$(PROD_API)/api/admin/players/fetch-and-refresh$(if $(SEASON),?season=$(SEASON))" \
 		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
 
-# Canonical name for the SuperCoach roster refresh per the Scout charter
-# expansion. Hits the new POST /api/admin/scout/supercoach-roster endpoint,
-# which is audit-wrapped (one agent_runs row per call, agent_id='scout',
+# Canonical name for the SuperCoach roster refresh per the Miner charter
+# expansion. Hits the new POST /api/admin/miner/supercoach-roster endpoint,
+# which is audit-wrapped (one agent_runs row per call, agent_id='miner',
 # detail_json.pipeline='supercoach-roster') and parsed through strict
 # Pydantic models per D8.
-# Usage: make scout-supercoach-roster ADMIN_KEY=xxx [SEASON=2026] [API=$PROD_API|http://localhost:8000]
+# Usage: make miner-supercoach-roster ADMIN_KEY=xxx [SEASON=2026] [API=$PROD_API|http://localhost:8000]
 API ?= $(PROD_API)
-scout-supercoach-roster:
-	curl -s -X POST "$(API)/api/admin/scout/supercoach-roster$(if $(SEASON),?season=$(SEASON))" \
+miner-supercoach-roster:
+	curl -s -X POST "$(API)/api/admin/miner/supercoach-roster$(if $(SEASON),?season=$(SEASON))" \
 		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
 
 # Per-round (or Totals) SuperCoach stats fetch + upsert into player_rounds.
 # ROUND is required: 0 = Totals (cumulative / pre-season), 1-30 = per-round.
-# Audit-wrapped under agent_id='scout', detail_json.pipeline='supercoach-stats'.
-# Usage: make scout-supercoach-stats ADMIN_KEY=xxx ROUND=N [SEASON=2026] [API=...]
-scout-supercoach-stats:
+# Audit-wrapped under agent_id='miner', detail_json.pipeline='supercoach-stats'.
+# Usage: make miner-supercoach-stats ADMIN_KEY=xxx ROUND=N [SEASON=2026] [API=...]
+miner-supercoach-stats:
 ifndef ROUND
 	$(error ROUND= required (0 for Totals, 1-30 for per-round))
 endif
-	curl -s -X POST "$(API)/api/admin/scout/supercoach-stats?round=$(ROUND)$(if $(SEASON),&season=$(SEASON))" \
+	curl -s -X POST "$(API)/api/admin/miner/supercoach-stats?round=$(ROUND)$(if $(SEASON),&season=$(SEASON))" \
 		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
 
 # SuperCoach teams — cross-references SC team IDs into teams.metadata_json.
-# Usage: make scout-supercoach-teams ADMIN_KEY=xxx [SEASON=2026] [API=...]
-scout-supercoach-teams:
-	curl -s -X POST "$(API)/api/admin/scout/supercoach-teams$(if $(SEASON),?season=$(SEASON))" \
+# Usage: make miner-supercoach-teams ADMIN_KEY=xxx [SEASON=2026] [API=...]
+miner-supercoach-teams:
+	curl -s -X POST "$(API)/api/admin/miner/supercoach-teams$(if $(SEASON),?season=$(SEASON))" \
 		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
 
 # SuperCoach settings — snapshots SC game rules per season into sc_settings.
-# Usage: make scout-supercoach-settings ADMIN_KEY=xxx [SEASON=2026] [MODE=classic|draft]
-scout-supercoach-settings:
-	curl -s -X POST "$(API)/api/admin/scout/supercoach-settings?mode=$(or $(MODE),classic)$(if $(SEASON),&season=$(SEASON))" \
+# Usage: make miner-supercoach-settings ADMIN_KEY=xxx [SEASON=2026] [MODE=classic|draft]
+miner-supercoach-settings:
+	curl -s -X POST "$(API)/api/admin/miner/supercoach-settings?mode=$(or $(MODE),classic)$(if $(SEASON),&season=$(SEASON))" \
 		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
 
 # nrl.com draw — fixtures per (competition, season, round). Archives JSON to S3.
-# Usage: make scout-nrlcom-draw ADMIN_KEY=xxx SEASON=2026 [COMPETITION=111] [ROUND=N]
-scout-nrlcom-draw:
+# Usage: make miner-nrlcom-draw ADMIN_KEY=xxx SEASON=2026 [COMPETITION=111] [ROUND=N]
+miner-nrlcom-draw:
 ifndef SEASON
 	$(error SEASON= required)
 endif
-	curl -s -X POST "$(API)/api/admin/scout/nrlcom-draw?competition=$(or $(COMPETITION),111)&season=$(SEASON)$(if $(ROUND),&round=$(ROUND))" \
+	curl -s -X POST "$(API)/api/admin/miner/nrlcom-draw?competition=$(or $(COMPETITION),111)&season=$(SEASON)$(if $(ROUND),&round=$(ROUND))" \
 		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
 
 # nrl.com match-centre — walks the round's fixtures, fetches each match's full JSON.
 # ROUND optional: omit it and the endpoint resolves the current round from the draw.
-# Usage: make scout-nrlcom-match-centre ADMIN_KEY=xxx SEASON=2026 [ROUND=N] [COMPETITION=111]
-scout-nrlcom-match-centre:
+# Usage: make miner-nrlcom-match-centre ADMIN_KEY=xxx SEASON=2026 [ROUND=N] [COMPETITION=111]
+miner-nrlcom-match-centre:
 ifndef SEASON
 	$(error SEASON= required)
 endif
-	curl -s -X POST "$(API)/api/admin/scout/nrlcom-match-centre?competition=$(or $(COMPETITION),111)&season=$(SEASON)$(if $(ROUND),&round=$(ROUND))" \
+	curl -s -X POST "$(API)/api/admin/miner/nrlcom-match-centre?competition=$(or $(COMPETITION),111)&season=$(SEASON)$(if $(ROUND),&round=$(ROUND))" \
 		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
 
 # nrl.com casualty ward — daily injury snapshot, timestamped key.
-# Usage: make scout-nrlcom-casualty-ward ADMIN_KEY=xxx [SEASON=2026] [COMPETITION=111]
-scout-nrlcom-casualty-ward:
-	curl -s -X POST "$(API)/api/admin/scout/nrlcom-casualty-ward?competition=$(or $(COMPETITION),111)$(if $(SEASON),&season=$(SEASON))" \
+# Usage: make miner-nrlcom-casualty-ward ADMIN_KEY=xxx [SEASON=2026] [COMPETITION=111]
+miner-nrlcom-casualty-ward:
+	curl -s -X POST "$(API)/api/admin/miner/nrlcom-casualty-ward?competition=$(or $(COMPETITION),111)$(if $(SEASON),&season=$(SEASON))" \
 		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
 
 # nrl.com ladder — team standings per round.
-# Usage: make scout-nrlcom-ladder ADMIN_KEY=xxx SEASON=2026 [COMPETITION=111] [ROUND=N]
-scout-nrlcom-ladder:
+# Usage: make miner-nrlcom-ladder ADMIN_KEY=xxx SEASON=2026 [COMPETITION=111] [ROUND=N]
+miner-nrlcom-ladder:
 ifndef SEASON
 	$(error SEASON= required)
 endif
-	curl -s -X POST "$(API)/api/admin/scout/nrlcom-ladder?competition=$(or $(COMPETITION),111)&season=$(SEASON)$(if $(ROUND),&round=$(ROUND))" \
+	curl -s -X POST "$(API)/api/admin/miner/nrlcom-ladder?competition=$(or $(COMPETITION),111)&season=$(SEASON)$(if $(ROUND),&round=$(ROUND))" \
 		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
 
 # nrl.com stats leaderboards — top-25 leaders per category, per season.
-# Usage: make scout-nrlcom-stats ADMIN_KEY=xxx SEASON=2026 [COMPETITION=111]
-scout-nrlcom-stats:
+# Usage: make miner-nrlcom-stats ADMIN_KEY=xxx SEASON=2026 [COMPETITION=111]
+miner-nrlcom-stats:
 ifndef SEASON
 	$(error SEASON= required)
 endif
-	curl -s -X POST "$(API)/api/admin/scout/nrlcom-stats?competition=$(or $(COMPETITION),111)&season=$(SEASON)" \
+	curl -s -X POST "$(API)/api/admin/miner/nrlcom-stats?competition=$(or $(COMPETITION),111)&season=$(SEASON)" \
 		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
 
 # nrl.com players roster — per-team profile listing.
-# Usage: make scout-nrlcom-players-roster ADMIN_KEY=xxx TEAM=500011 [COMPETITION=111]
-scout-nrlcom-players-roster:
+# Usage: make miner-nrlcom-players-roster ADMIN_KEY=xxx TEAM=500011 [COMPETITION=111]
+miner-nrlcom-players-roster:
 ifndef TEAM
 	$(error TEAM= required (nrl.com team_id; e.g. Storm=500011))
 endif
-	curl -s -X POST "$(API)/api/admin/scout/nrlcom-players-roster?competition=$(or $(COMPETITION),111)&team=$(TEAM)" \
+	curl -s -X POST "$(API)/api/admin/miner/nrlcom-players-roster?competition=$(or $(COMPETITION),111)&team=$(TEAM)" \
 		-H "X-Admin-Key: $(ADMIN_KEY)" | python -m json.tool
 
 # Generic backfill helper — runs the named pipeline across a year+round range.
 # Iterates seasons SEASON_FROM..SEASON_TO and (where applicable) rounds 1..30,
 # rate-limited at ~1 req/sec to be polite.
-# Usage: make scout-backfill SOURCE=nrlcom-draw SEASON_FROM=2000 [SEASON_TO=2026]
+# Usage: make miner-backfill SOURCE=nrlcom-draw SEASON_FROM=2000 [SEASON_TO=2026]
 #                            [ROUND_FROM=1] [ROUND_TO=30] [COMPETITION=111] ADMIN_KEY=xxx
-scout-backfill:
+miner-backfill:
 ifndef SOURCE
 	$(error SOURCE= required (e.g. nrlcom-draw, nrlcom-match-centre, supercoach-stats))
 endif
 ifndef SEASON_FROM
 	$(error SEASON_FROM= required)
 endif
-	python scripts/data/scout_backfill.py \
+	python scripts/data/miner_backfill.py \
 		--source $(SOURCE) \
 		--season-from $(SEASON_FROM) \
 		--season-to $(or $(SEASON_TO),$(SEASON_FROM)) \

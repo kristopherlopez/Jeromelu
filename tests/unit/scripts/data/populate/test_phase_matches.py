@@ -31,7 +31,7 @@ from scripts.data.populate.phase_matches import (
 )
 
 
-_KEY = "scout/nrlcom/match-centre/111/2026/round-12/raiders-v-dolphins.json"
+_KEY = "miner/nrlcom/match-centre/111/2026/round-12/raiders-v-dolphins.json"
 _HOME_UUID = "11111111-1111-1111-1111-111111111111"
 _AWAY_UUID = "22222222-2222-2222-2222-222222222222"
 
@@ -39,7 +39,7 @@ _AWAY_UUID = "22222222-2222-2222-2222-222222222222"
 @pytest.fixture(scope="module")
 def payload(fixtures_dir: Path) -> dict:
     """The real FullTime match-centre fixture (reused from Phase 3)."""
-    path = fixtures_dir / "scout" / "nrlcom_match_centre" / "canonical_response.json"
+    path = fixtures_dir / "miner" / "nrlcom_match_centre" / "canonical_response.json"
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -129,7 +129,7 @@ def test_timeline_only_match_centre_emits_data_coverage_timeline_only(team_map):
         ],
         "venue": "Some Old Ground",
     }
-    key = "scout/nrlcom/match-centre/111/1995/round-01/some-match.json"
+    key = "miner/nrlcom/match-centre/111/1995/round-01/some-match.json"
     row = _extract_one(timeline_only, key, team_map, venue_map={})
     assert row is not None
     assert row["data_coverage"] == "timeline_only"
@@ -156,7 +156,7 @@ def test_lineups_no_stats_emits_lineups_plus_timeline(team_map):
         # No stats block.
         "timeline": [],
     }
-    key = "scout/nrlcom/match-centre/111/2010/round-05/some-match.json"
+    key = "miner/nrlcom/match-centre/111/2010/round-05/some-match.json"
     row = _extract_one(lineups_only, key, team_map, venue_map={})
     assert row is not None
     assert row["data_coverage"] == "lineups+timeline"
@@ -281,7 +281,7 @@ def test_draw_external_id_prefers_slug_over_synthetic():
 def test_draw_key_regex_parses_components():
     """The walker uses _DRAW_KEY_RE to extract (comp, season, round) per draw archive."""
     m = _DRAW_KEY_RE.search(
-        "scout/nrlcom/draw/111/2010/round-05.json"
+        "miner/nrlcom/draw/111/2010/round-05.json"
     )
     assert m is not None
     assert m.group("comp") == "111"

@@ -4,8 +4,8 @@ Usage:
     python -m app.analyst.transcribe_cli <source_id>
     python -m app.analyst.transcribe_cli <source_id> --force
 
-Refuses to run if Scout hasn't already collected the audio (audio_s3_key
-must be set). Use `python -m app.scout.media.cli.audio <source_id>` first.
+Refuses to run if Miner hasn't already collected the audio (audio_s3_key
+must be set). Use `python -m app.miner.media.cli.audio <source_id>` first.
 """
 
 from __future__ import annotations

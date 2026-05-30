@@ -14,7 +14,7 @@ The user arrives — probably from a shared clip, a social post, or a link in a 
 
 What they see:
 
-1. **The Crew Bar** — not text labels, but **character portraits**. Small animated avatars with names. Some are moving (active), some are greyed out (dormant). Immediately: "These are characters. Something is happening." Scout's avatar is scanning. Jaromelu's is reviewing. There are people here — even if they're AI.
+1. **The Crew Bar** — not text labels, but **character portraits**. Small animated avatars with names. Some are moving (active), some are greyed out (dormant). Immediately: "These are characters. Something is happening." Miner's avatar is scanning. Jaromelu's is reviewing. There are people here — even if they're AI.
 
 2. **The Stream** — already populated with recent content. Not empty. Not a blank state. Crew activity cards with avatars, a Remark with Jaromelu's face alongside it. The show was happening before they arrived.
 
@@ -39,13 +39,13 @@ No tooltips. No coach marks. No "Did you know?" pop-ups. The interface is simple
 
 ### What They Discover Naturally
 
-**See the Crew Bar avatars** → "Wait, there's a whole team of AI characters? Scout, Analyst, Critic..." The animated avatars make this discovery immediate — faces are more noticeable than text labels.
+**See the Crew Bar avatars** → "Wait, there's a whole team of AI characters? Miner, Analyst, Critic..." The animated avatars make this discovery immediate — faces are more noticeable than text labels.
 
 **See Jaromelu's avatar on a Remark** → "This character is making the calls. He has a face. He has personality." The avatar alongside the voice text creates the "someone is here" feeling.
 
 **Tap a player name** → Wiki panel opens with the entity's page preview. "Oh, I can drill into any player and see what the crew knows."
 
-**Scroll up** → More content appears. Crew activity cards with different avatars. "Oh, Scout found the intel, then Analyst processed it. There's a pipeline with characters."
+**Scroll up** → More content appears. Crew activity cards with different avatars. "Oh, Miner found the intel, then Analyst processed it. There's a pipeline with characters."
 
 **See agree/disagree buttons** → "I can weigh in on this call." Tap. Now they're a participant.
 
@@ -68,7 +68,7 @@ The user's first visit depends on when in the episode arc they arrive.
 
 ### During Intel Drops (Monday)
 
-The Stream is busy with Scout activity. The most recent Reckoning from last round is scrolled past but accessible. The Crew Bar shows Scout active.
+The Stream is busy with Miner activity. The most recent Reckoning from last round is scrolled past but accessible. The Crew Bar shows Miner active.
 
 **First impression:** "Things are moving. Information is coming in."
 
@@ -119,7 +119,7 @@ On day one of the entire product — before any episodes have aired — the Stre
 ### Solve With a Pilot Episode
 
 Before launch, run one full episode cycle manually. Populate the Stream with:
-- Scout discovering sources
+- Miner discovering sources
 - Analyst cross-referencing
 - At least 2-3 Remarks from Jaromelu
 - If timing allows, resolved Remarks from a completed round
@@ -161,13 +161,13 @@ First visit:  "Wait, an AI made this? And it has a face?"
               ↓
 Second visit: "Was Jaromelu right about Cleary?" [sees resolution video clip]
               ↓
-Third visit:  "What's the crew saying this week?" [recognises Scout's avatar]
+Third visit:  "What's the crew saying this week?" [recognises Miner's avatar]
               ↓
 Habitual:     "It's Tuesday, Analyst should be cross-referencing by now."
               [knows the characters, anticipates the rhythm]
 ```
 
-The transition from "novelty" to "habit" happens when the user starts anticipating the episode arc. They come back not because they were notified, but because they know the rhythm — and they know the characters. Scout's face means intel is coming. Analyst's face means tension is building. Jaromelu leaning in means the call is about to drop.
+The transition from "novelty" to "habit" happens when the user starts anticipating the episode arc. They come back not because they were notified, but because they know the rhythm — and they know the characters. Miner's face means intel is coming. Analyst's face means tension is building. Jaromelu leaning in means the call is about to drop.
 
 ---
 

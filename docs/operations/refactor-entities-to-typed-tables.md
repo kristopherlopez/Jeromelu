@@ -296,7 +296,7 @@ Existing match queries that don't care about byes filter `WHERE status<>'bye'` o
 
 #### `channels` — already lean, no promotions needed.
 
-#### `scout_candidates` — leave as-is.
+#### `miner_candidates` — leave as-is.
 
 Working table for the agent. metadata_json is intentionally heavy because it captures discovery-time platform-specific JSON (subs/views/duration from YouTube). Promoting would tightly couple to the response shape; flexibility is right for an agent inbox.
 
@@ -604,7 +604,7 @@ ALTER TABLE wiki_pages
 Everywhere `entity_id` or `subject_entity_id` appears in `services/api/app/`. Initial grep hot spots:
 
 - `app/routers/` — claims, predictions, decisions, wiki, kb endpoints
-- `app/scout/` — entity references in dedupe and persistence logic
+- `app/miner/` — entity references in dedupe and persistence logic
 - Any ingestion scripts in `services/workers/` or `scripts/`
 - `app/wiki/` — channel/entity wiki dispatch
 - Knowledge base RAG retrieval
@@ -619,7 +619,7 @@ Once executed:
 
 - **`docs/operations/data-catalogue/`** — biggest update. Identity layer now lives in per-table files: `people.md`, `player_attributes.md`, `people_roles.md`, `rounds.md` (replacing the old `entities` + `entity_roles`). Output tables get FK updates and `*_associations.md` junction files. Schema overview diagram in `README.md` redrawn.
 - **`docs/architecture/01-information-architecture.md`** — describes the entity model conceptually; needs rewrite around typed tables.
-- **`docs/agents/system/source-discovery.md`** — Scout's dedupe references entity_id; update to match.
+- **`docs/agents/system/source-discovery.md`** — Miner's dedupe references entity_id; update to match.
 - **`docs/concepts/entity-roles.md`** — rename to `people-roles.md`; rewrite around `people` table.
 - This file (`refactor-entities-to-typed-tables.md`) — gets archived once execution is complete.
 

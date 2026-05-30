@@ -94,10 +94,10 @@ No new tables in Phase 0. Wiki tables already exist; relations table is deferred
 The smallest thing that proves the architecture: one player page rewrite, hand-triggered, with full audit.
 
 - **MCP server (`services/api/app/mcp/wiki_mcp.py`)** — minimal toolset: `get_wiki_page`, `update_wiki_page`, `get_claims`, `get_player_stats`, `search_wiki_pages`. FastMCP-mounted route on the existing API. Auth: the agent runs in-process, MCP is bound to localhost, no auth in V1. Tools speak typed FKs (`person_id`/`team_id`/etc) and read claim subjects via `claim_associations`.
-- **Archivist loop (`services/api/app/archivist/loop.py`)** — close clone of the Source Discovery skeleton: `AgentAuditLog`, `AgentBounds`, `record_agent_started/ended`, manual streaming loop, dispatch on client-side tool calls. Default model `claude-sonnet-4-6`. Default bounds tighter than Scout's because sessions are smaller: `max_turns=15, max_tool_calls=40, max_wall_seconds=600, max_budget_usd=0.50` per page.
+- **Archivist loop (`services/api/app/archivist/loop.py`)** — close clone of the Source Discovery skeleton: `AgentAuditLog`, `AgentBounds`, `record_agent_started/ended`, manual streaming loop, dispatch on client-side tool calls. Default model `claude-sonnet-4-6`. Default bounds tighter than Miner's because sessions are smaller: `max_turns=15, max_tool_calls=40, max_wall_seconds=600, max_budget_usd=0.50` per page.
 - **System prompt (`services/api/app/archivist/prompt.py`)** — skip-threshold heuristic from principle 7, the section vocabulary for player pages, encyclopedic voice rules, `[[slug]]` link convention, the explicit rule that `update_wiki_page` is the only mutation path and must include a revision summary.
 - **Custom tools (`services/api/app/archivist/tools.py`)** — `update_wiki_page` (calls MCP), section diffing helpers if the agent needs them, `create_stub` (for principle 4 — when prose links to a missing page).
-- **CLI (`services/api/app/archivist/cli.py`)** — `python -m app.archivist.cli --slug jarome-luai --trigger manual`. Mirrors the Scout CLI structure exactly.
+- **CLI (`services/api/app/archivist/cli.py`)** — `python -m app.archivist.cli --slug jarome-luai --trigger manual`. Mirrors the Miner CLI structure exactly.
 - **Test fixtures** — a sample brief plus the four-Tigers payload, runnable as a smoke test against a local DB seeded from `seed_wiki.py`.
 
 **Phase 1 done = one operator runs `--slug jarome-luai`, sees the prose update, sees the row in `wiki_revisions`, sees the run summary in `agent_runs`, and the diff is something the operator would publish.**
@@ -133,7 +133,7 @@ The smallest thing that proves the architecture: one player page rewrite, hand-t
 
 The things that hurt if we get them wrong and discover late.
 
-1. **Prompt-cache thrash across pages.** Each page rewrite needs the page's current content in the prompt — that's per-page input that doesn't cache. If we don't structure the multi-page session as "static system prompt cached + per-page user message", we burn the cache hit rate and per-page cost balloons. Mitigation: explicit cache_control on the system block (Scout's pattern) and per-page user messages within one session, not separate sessions.
+1. **Prompt-cache thrash across pages.** Each page rewrite needs the page's current content in the prompt — that's per-page input that doesn't cache. If we don't structure the multi-page session as "static system prompt cached + per-page user message", we burn the cache hit rate and per-page cost balloons. Mitigation: explicit cache_control on the system block (Miner's pattern) and per-page user messages within one session, not separate sessions.
 
 2. **The MCP write surface is dangerous.** `update_wiki_page` mutates published prose. A bad agent loop could overwrite the entire content with a partial section. Mitigation: the MCP `update_wiki_page` operation must take `section_heading` + `section_content` and merge into existing markdown server-side, not accept a full content blob. The agent never sends complete page content. Bound: a single `update_wiki_page` call updates exactly one section.
 
@@ -160,7 +160,7 @@ Per-page Sonnet 4.6 cost estimate, assuming ~3k input tokens per page (current c
 - Per-page output (~1.5k): ~$0.022
 - Per-page net: ~$0.03 with cache hit, ~$0.05 cold
 
-A 30-page Tigers session: ~$1.00. Default `max_budget_usd=0.50` per *page-equivalent* — for a 30-page session the bound becomes session-level and lifts to ~$2.00. Document this — Scout's `max_budget_usd` is per-run, the Archivist's effectively scales with session size and the bound logic needs to reflect that.
+A 30-page Tigers session: ~$1.00. Default `max_budget_usd=0.50` per *page-equivalent* — for a 30-page session the bound becomes session-level and lifts to ~$2.00. Document this — Miner's `max_budget_usd` is per-run, the Archivist's effectively scales with session size and the bound logic needs to reflect that.
 
 ### Testing
 
@@ -195,9 +195,9 @@ Per CLAUDE.md doc discipline. Treat this list as the changeset checklist for the
 | `docs/architecture/drafts/wiki-entity-connections.draft.md` | (Phase 0a) `wiki_relations` schema needs typed-FK pair instead of `(a_entity_id, b_entity_id)` — likely `(a_kind, a_id, b_kind, b_id)` or per-kind tables. Material redesign, not just a rename. |
 | `docs/agents/system/agent-audit.md` | Add `archivist` to the example agent_id list; add a note on session-scaled budget bounds (Archivist's wrinkle). |
 | `docs/agents/system/README.md` | Add Archivist to the crew list with link. |
-| New: `docs/agents/system/archivist-runtime.md` | Companion to `archivist.md` (which is role spec), this is the operational doc — CLI usage, environment, debugging a run, reading the audit trail. Pattern lifted from Scout's docs. |
+| New: `docs/agents/system/archivist-runtime.md` | Companion to `archivist.md` (which is role spec), this is the operational doc — CLI usage, environment, debugging a run, reading the audit trail. Pattern lifted from Miner's docs. |
 | `packages/db/migrations/0NN_extend_agent_runs_archivist.sql` | The CHECK-constraint extension. |
-| `services/api/app/archivist/README.md` | Module-level README describing layout (`loop.py`, `prompt.py`, `tools.py`, `cli.py`) — mirrors Scout's directory comment style. |
+| `services/api/app/archivist/README.md` | Module-level README describing layout (`loop.py`, `prompt.py`, `tools.py`, `cli.py`) — mirrors Miner's directory comment style. |
 | `CLAUDE.md` | Add a one-liner that the Archivist owns wiki prose mutation — no other code path writes to `wiki_pages.content`. |
 | Once relations land: `wiki-entity-connections.draft.md` | Move from draft to merged; cross-link from this draft. |
 

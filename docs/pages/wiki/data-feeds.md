@@ -6,7 +6,7 @@ tags: [area/pages, subarea/wiki]
 
 > Status: **Reference doc** (created 2026-05-12).
 >
-> Single-page view of every upstream data input the wiki depends on, the pipeline that owns each input, current population state, and which wiki sections each input unblocks. Doubles as a **charter document for Scout** — Scout's eventual scope is *all* data acquisition, not just media inventory. This doc maps that expanded territory.
+> Single-page view of every upstream data input the wiki depends on, the pipeline that owns each input, current population state, and which wiki sections each input unblocks. Doubles as a **charter document for Miner** — Miner's eventual scope is *all* data acquisition, not just media inventory. This doc maps that expanded territory.
 >
 > **See also:** [`docs/architecture/data-lineage.md`](../../architecture/data-lineage.md) — the architecture-level end-to-end lineage (source → S3 → DB → app), with the reverse-view "per DB table → what S3 archives feed it" table. This doc is wiki-centric; the lineage doc is the system-wide map.
 
@@ -19,12 +19,12 @@ Two questions kept coming up that no single doc could answer:
 1. *"What has to be populated for a wiki page to be more than a stub?"*
 2. *"Which acquisition pipeline produces each input the wiki needs?"*
 
-Pieces of the answer were scattered across [`content-pipeline.md`](content-pipeline.md), [`scout.md`](../../agents/crew/scout/README.md), [`scraper.md`](../../agents/system/scraper.md), [`sources/README.md`](../../sources/README.md), and [`01-information-architecture.md`](../../architecture/01-information-architecture.md). This doc consolidates that view in one place and uses it to define **Scout's expanded charter** — the user-stated intent that Scout should eventually own all data gathering, not just transcripts and media.
+Pieces of the answer were scattered across [`content-pipeline.md`](content-pipeline.md), [`miner.md`](../../agents/crew/miner/README.md), [`scraper.md`](../../agents/system/scraper.md), [`sources/README.md`](../../sources/README.md), and [`01-information-architecture.md`](../../architecture/01-information-architecture.md). This doc consolidates that view in one place and uses it to define **Miner's expanded charter** — the user-stated intent that Miner should eventually own all data gathering, not just transcripts and media.
 
 This is the doc to read when:
 - Asking "why is Wests Tigers still a stub?"
 - Asking "what would the Archivist actually have to write from?"
-- Planning Scout work, including pipelines outside the current media-only scope.
+- Planning Miner work, including pipelines outside the current media-only scope.
 - Onboarding to the data layer.
 
 ---
@@ -116,23 +116,23 @@ Advisor pages are blocked on **speaker diarisation + person attribution** (Layer
 
 ## Per-table feed pipelines
 
-This is the inventory: every input table the wiki depends on, what populates it, current state, where the code lives, and the proposed Scout-scope future.
+This is the inventory: every input table the wiki depends on, what populates it, current state, where the code lives, and the proposed Miner-scope future.
 
-| Layer | Table | Populated by | Current state | Code | Proposed Scout scope |
+| Layer | Table | Populated by | Current state | Code | Proposed Miner scope |
 |---|---|---|---|---|---|
 | **L1** | `people` | SuperCoach roster fetch | ✅ 557 rows | `scripts/data/fetchers/fetch_supercoach_players.py` | **Yes** — roster acquisition |
 | **L1** | `player_attributes` | SuperCoach roster fetch | ✅ 550 rows | Same as above | **Yes** — roster attributes |
 | **L1** | `people_roles` | SuperCoach roster fetch + manual | ✅ 550 rows | Same as above | **Yes** — role assignment derives from roster |
 | **L1** | `teams` | Seed scripts | ✅ 58 rows | `scripts/data/seed_teams.py` | **Yes** — seed → ongoing refresh |
 | **L1** | `venues` | Seed scripts | ✅ 27 rows | `scripts/data/seed_venues.py` | **Yes** — seed → ongoing |
-| **L1** | `channels` | Scout discovery + recon approval | ✅ 14 rows | `services/api/app/scout/`, `routers/recon.py` | **Yes** — already in scope |
-| **L2** | `player_rounds` | SuperCoach scraper (per-round stats) | ❌ 0 rows | `scripts/data/fetchers/fetch_player_stats.py`; shipped Phase 2 module `services/api/app/scout/supercoach_stats/` (was: `services/worker-scraper/`, retired 2026-05-28) | **Yes** (Scout — Phase 2 shipped) |
+| **L1** | `channels` | Miner discovery + recon approval | ✅ 14 rows | `services/api/app/miner/`, `routers/recon.py` | **Yes** — already in scope |
+| **L2** | `player_rounds` | SuperCoach scraper (per-round stats) | ❌ 0 rows | `scripts/data/fetchers/fetch_player_stats.py`; shipped Phase 2 module `services/api/app/miner/supercoach_stats/` (was: `services/worker-scraper/`, retired 2026-05-28) | **Yes** (Miner — Phase 2 shipped) |
 | **L2** | `matches` | NRL.com fetcher | ❌ 0 rows | `scripts/data/fetchers/fetch_match_stats.py` | **Yes** (currently scraper) |
-| **L2** | `match_team_lists` | NRL.com team list fetcher | ❌ 0 rows | `scripts/data/fetchers/fetch_teamlists.py`; shipped via Scout `services/api/app/scout/nrlcom_match_centre/` (Phase 3 ingest) + `scripts/data/populate/phase_team_lists.py` (Phase 3.5 extractor). Previously stub-only in `services/worker-scraper/app/activities/teamlists.py` (retired 2026-05-28). | **Yes** (Scout — Phase 3/3.5 shipped) |
+| **L2** | `match_team_lists` | NRL.com team list fetcher | ❌ 0 rows | `scripts/data/fetchers/fetch_teamlists.py`; shipped via Miner `services/api/app/miner/nrlcom_match_centre/` (Phase 3 ingest) + `scripts/data/populate/phase_team_lists.py` (Phase 3.5 extractor). Previously stub-only in `services/worker-scraper/app/activities/teamlists.py` (retired 2026-05-28). | **Yes** (Miner — Phase 3/3.5 shipped) |
 | **L2** | `injuries` | NRL.com casualty ward fetcher | ❌ 0 rows | *Code does not exist yet* | **Yes** (new pipeline to build) |
 | **L2** | `rounds` | NRL.com draw fetcher | ❌ 0 rows | *Code does not exist yet* | **Yes** (new pipeline to build) |
-| **L3** | `sources` | Scout discovery | ✅ 2,235 rows | `services/api/app/scout/source_discovery/agent.py`, `youtube/refresh.py` | **Yes** — already in scope |
-| **L3** | `source_documents` | Scout audio acquisition + Analyst transcription | ⚠️ 88 rows; only 4 have chunk text | `services/api/app/scout/media/audio.py`, `services/api/app/analyst/transcribe.py` | Acquisition: yes (Scout). Transcription: no (Analyst). |
+| **L3** | `sources` | Miner discovery | ✅ 2,235 rows | `services/api/app/miner/source_discovery/agent.py`, `youtube/refresh.py` | **Yes** — already in scope |
+| **L3** | `source_documents` | Miner audio acquisition + Analyst transcription | ⚠️ 88 rows; only 4 have chunk text | `services/api/app/miner/media/audio.py`, `services/api/app/analyst/transcribe.py` | Acquisition: yes (Miner). Transcription: no (Analyst). |
 | **L3** | `source_chunks` | Analyst transcription | ⚠️ 2,470 rows; **0 cleaned** | `services/api/app/analyst/transcribe.py` + cleaning skill | Analyst |
 | **L3** | `source_speakers` | Analyst diarisation | ✅ 4,401 rows; person attribution unknown | `services/api/app/analyst/transcribe.py` (pyannote) | Analyst |
 | **L4** | `quotes` | Analyst extraction | ❌ 0 rows | `clean-transcript` + `process-transcript` skills | Analyst |
@@ -147,21 +147,21 @@ This is the inventory: every input table the wiki depends on, what populates it,
 
 ---
 
-## Scout's expanded charter
+## Miner's expanded charter
 
-### What Scout owns today
+### What Miner owns today
 
-Per [`docs/agents/crew/scout/README.md`](../../agents/crew/scout/README.md): **media inventory only** — Extract for podcasts/video. Numeric NRL data and player rosters are explicitly *out* of Scout's current scope; they're owned by the [scraper](../../agents/system/scraper.md) (Bookkeeper) and `player-roster` systems.
+Per [`docs/agents/crew/miner/README.md`](../../agents/crew/miner/README.md): **media inventory only** — Extract for podcasts/video. Numeric NRL data and player rosters are explicitly *out* of Miner's current scope; they're owned by the [scraper](../../agents/system/scraper.md) (Bookkeeper) and `player-roster` systems.
 
-### What Scout should own (proposed)
+### What Miner should own (proposed)
 
-**All external data acquisition.** Acquisition is one job: find an external source of truth, fetch it, persist it raw, do not interpret. The Analyst owns interpretation downstream. Splitting acquisition into "Scout for media" + "scraper for SuperCoach" + "player-roster for identity" creates artificial seams that make it impossible to ask "which feeds are healthy?" in one place.
+**All external data acquisition.** Acquisition is one job: find an external source of truth, fetch it, persist it raw, do not interpret. The Analyst owns interpretation downstream. Splitting acquisition into "Miner for media" + "scraper for SuperCoach" + "player-roster for identity" creates artificial seams that make it impossible to ask "which feeds are healthy?" in one place.
 
 The proposal:
 
-After full endpoint enumeration (2026-05-12), Scout's pipelines fan out across **three external sources**: nrl.com (canonical NRL data), supercoach.com.au (SC-specific overlay), and nrlsupercoachstats.com (third-party SC scoring breakdown).
+After full endpoint enumeration (2026-05-12), Miner's pipelines fan out across **three external sources**: nrl.com (canonical NRL data), supercoach.com.au (SC-specific overlay), and nrlsupercoachstats.com (third-party SC scoring breakdown).
 
-| Source | Pipeline | Endpoint | Status | S3 path under `scout/` |
+| Source | Pipeline | Endpoint | Status | S3 path under `miner/` |
 |---|---|---|---|---|
 | YouTube | media discovery + audio + refresh | YouTube Data API + yt-dlp | ✅ shipped (legacy flat files) | — (separate media path) |
 | supercoach.com.au | `supercoach_roster` | `/api/nrl/classic/v1/players-cf` | ✅ shipped Phase 1 | `supercoach/classic/players-cf/{season}/{YYYYMMDD}.json` |
@@ -178,7 +178,7 @@ After full endpoint enumeration (2026-05-12), Scout's pipelines fan out across *
 
 ★ `nrlcom_match_centre` is the highest-leverage pipeline — one call per match yields lineups, per-player 58-field stat sheets, 100+ typed timeline events (try at 53', sin bin, etc.), officials, scoring narrative. 25 years of accessible history.
 
-### Trust hierarchy (per Scout charter D11)
+### Trust hierarchy (per Miner charter D11)
 
 When the same field exists in multiple sources, the higher-trust source is canonical:
 
@@ -200,7 +200,7 @@ When the same field exists in multiple sources, the higher-trust source is canon
 
 D11 applies at **DB extraction time** (per D13). Every source's full response goes to S3; the extractor picks the winner when projecting to DB rows.
 
-### Historical depth (per Scout charter D12)
+### Historical depth (per Miner charter D12)
 
 Verified 2026-05-12 — what's reachable for one-time backfill:
 
@@ -216,9 +216,9 @@ Verified 2026-05-12 — what's reachable for one-time backfill:
 
 Total one-time backfill across all sources: ~4-5 hours wall-clock at 1 req/sec rate-limit, ~1-2GB S3.
 
-### Storage architecture (per Scout charter D10 / D13)
+### Storage architecture (per Miner charter D10 / D13)
 
-**Every Scout fetch writes the raw upstream response to S3 first.** The DB layer is downstream — extractors read S3 snapshots and project them into structured tables. Implications:
+**Every Miner fetch writes the raw upstream response to S3 first.** The DB layer is downstream — extractors read S3 snapshots and project them into structured tables. Implications:
 
 - **Re-extractable.** Adding a new DB field replays against S3, no re-fetch.
 - **Drift-detectable.** The D8 fixture is just a trimmed copy of a real S3 object.
@@ -226,9 +226,9 @@ Total one-time backfill across all sources: ~4-5 hours wall-clock at 1 req/sec r
 - **Schema-decoupled.** DB schema can evolve without touching the fetcher.
 - **Cheap.** ~1-2GB S3 covers years of NRL data.
 
-### What Scout still does NOT do (after the expansion)
+### What Miner still does NOT do (after the expansion)
 
-The Extract-only rule still applies — Scout fetches raw, Analyst transforms:
+The Extract-only rule still applies — Miner fetches raw, Analyst transforms:
 
 - **Cleaning, parsing, diarisation, embedding** — Analyst.
 - **Speaker → Person attribution** — Analyst.
@@ -238,13 +238,13 @@ The Extract-only rule still applies — Scout fetches raw, Analyst transforms:
 
 ### Implications of the expansion
 
-- [`scout.md`](../../agents/crew/scout/README.md) needs a scope rewrite: §"What Scout DOES NOT cover" currently lists "Numeric NRL data" and "Player roster registry" as out-of-scope; both move into scope.
-- [`scraper.md`](../../agents/system/scraper.md) was a *system component* under Scout (the `services/worker-scraper/` Temporal worker) rather than a Bookkeeper-owned subsystem; the worker is **retired and deleted 2026-05-28** (Phase 4 closure / TASK-28) and the doc remains as historical reference. Bookkeeper consumes the data; Scout produces it.
+- [`miner.md`](../../agents/crew/miner/README.md) needs a scope rewrite: §"What Miner DOES NOT cover" currently lists "Numeric NRL data" and "Player roster registry" as out-of-scope; both move into scope.
+- [`scraper.md`](../../agents/system/scraper.md) was a *system component* under Miner (the `services/worker-scraper/` Temporal worker) rather than a Bookkeeper-owned subsystem; the worker is **retired and deleted 2026-05-28** (Phase 4 closure / TASK-28) and the doc remains as historical reference. Bookkeeper consumes the data; Miner produces it.
 - The [Bookkeeper crew doc](../../agents/crew/bookkeeper/README.md) needs a corresponding scope clarification — it becomes a *consumer* and *math-runner*, not a fetcher.
-- The fetcher scripts under `scripts/data/fetchers/` migrate into per-pipeline folders under `services/api/app/scout/<pipeline_name>/` (per D9 of the charter), each with its own fetcher, models, route, and README — alongside the legacy flat-file media-inventory code.
-- Audit pattern (`agent_runs` with `agent_id='scout'`) extends to all acquisition pipelines, giving us one dashboard for "is data acquisition healthy?"
+- The fetcher scripts under `scripts/data/fetchers/` migrate into per-pipeline folders under `services/api/app/miner/<pipeline_name>/` (per D9 of the charter), each with its own fetcher, models, route, and README — alongside the legacy flat-file media-inventory code.
+- Audit pattern (`agent_runs` with `agent_id='miner'`) extends to all acquisition pipelines, giving us one dashboard for "is data acquisition healthy?"
 
-This scope expansion is formalised in [Scout charter](../../agents/crew/scout/charter.md), with decisions **D1–D13** locked 2026-05-12. Phase 0 (doc reconciliation) and Phases 1–2 (SuperCoach roster + stats pipelines) have shipped; Phase 2.5 (S3-first retrofit + SC siblings), Phase 3 (NRL.com draw + match-centre), Phases 4–4.5 (casualty ward, ladder, stats, players-roster), and Phase 5 (historical backfill) are the remaining work.
+This scope expansion is formalised in [Miner charter](../../agents/crew/miner/charter.md), with decisions **D1–D13** locked 2026-05-12. Phase 0 (doc reconciliation) and Phases 1–2 (SuperCoach roster + stats pipelines) have shipped; Phase 2.5 (S3-first retrofit + SC siblings), Phase 3 (NRL.com draw + match-centre), Phases 4–4.5 (casualty ward, ladder, stats, players-roster), and Phase 5 (historical backfill) are the remaining work.
 
 ---
 
@@ -273,38 +273,38 @@ The unblock order, ranked by leverage (most pages affected per unit of work):
 3. **L3 cleanup — get the existing 88 transcripts cleaned.** None of the 2,470 chunks have `clean_text`. The cleaning pass is one skill (`clean-transcript`) per document. Unblocks Layer 4 for whichever players the existing transcripts discuss.
 4. **L4 — claim extraction over the cleaned chunks.** `process-transcript` → `verify-claims` → `upload-transcript`. Unblocks `## Expert Opinions` for the players that come up in the corpus. *Note: Apisai Koroisau is not in the current corpus.*
 5. **L3.5 — speaker diarisation + person attribution.** Required for `quotes.speaker_person_id` to resolve to actual advisor entities. Without this, claims are anonymous. Unblocks advisor pages entirely.
-6. **L2 — wider transcript ingestion.** Of the 2,235 sources Scout has discovered, 88 have been transcribed. Working through the rest is the long-tail content unlock.
+6. **L2 — wider transcript ingestion.** Of the 2,235 sources Miner has discovered, 88 have been transcribed. Working through the rest is the long-tail content unlock.
 
-**Concretely for the user's "populate Api Koroisau" question:** none of the above unblocks it directly, because Api isn't mentioned in the current source corpus. To make Api's page non-trivial, the path is: (a) get L2 running so his stats appear, and (b) ingest fresh Tigers-focused content via Scout that actually mentions him.
+**Concretely for the user's "populate Api Koroisau" question:** none of the above unblocks it directly, because Api isn't mentioned in the current source corpus. To make Api's page non-trivial, the path is: (a) get L2 running so his stats appear, and (b) ingest fresh Tigers-focused content via Miner that actually mentions him.
 
 ---
 
 ## Open questions
 
-These need answers before Scout's charter expansion ships, and most influence the Archivist build downstream.
+These need answers before Miner's charter expansion ships, and most influence the Archivist build downstream.
 
-1. ~~**Where exactly does the scraper code live after the move?**~~ *Resolved (2026-05-12) by charter D9.* Each pipeline lives in its own folder under `services/api/app/scout/<pipeline_name>/`; **`services/worker-scraper/` was retired and deleted 2026-05-28** (Phase 4 closure / TASK-28).
-2. ~~**Cron orchestration — who runs the L2 fetchers, and how often?**~~ *Resolved by charter D3 + Phase 3/4 closure.* External cron on the prod box (`scripts/cron.d/jeromelu`) hits the admin endpoints — see `scripts/scout-refresh.sh`. (Option (d) above — the `worker-scraper` service running a schedule loop — is moot now that the worker is retired.)
-3. **Should fetchers populate via the same `agent_runs` audit pattern as Scout's media-discovery loops?** Yes if Scout's expanded charter is real — gives one dashboard. Means the deterministic fetcher runs need a `record_agent_started/ended` wrapper.
-4. **Does Bookkeeper become consume-only after this move?** Yes — Bookkeeper becomes a math/derivation layer over the data Scout fetches. Bookkeeper docs need updating.
+1. ~~**Where exactly does the scraper code live after the move?**~~ *Resolved (2026-05-12) by charter D9.* Each pipeline lives in its own folder under `services/api/app/miner/<pipeline_name>/`; **`services/worker-scraper/` was retired and deleted 2026-05-28** (Phase 4 closure / TASK-28).
+2. ~~**Cron orchestration — who runs the L2 fetchers, and how often?**~~ *Resolved by charter D3 + Phase 3/4 closure.* External cron on the prod box (`scripts/cron.d/jeromelu`) hits the admin endpoints — see `scripts/miner-refresh.sh`. (Option (d) above — the `worker-scraper` service running a schedule loop — is moot now that the worker is retired.)
+3. **Should fetchers populate via the same `agent_runs` audit pattern as Miner's media-discovery loops?** Yes if Miner's expanded charter is real — gives one dashboard. Means the deterministic fetcher runs need a `record_agent_started/ended` wrapper.
+4. **Does Bookkeeper become consume-only after this move?** Yes — Bookkeeper becomes a math/derivation layer over the data Miner fetches. Bookkeeper docs need updating.
 5. **NRL.com endpoint stability.** The casualty ward and round-metadata endpoints (per memory note) are public JSON but undocumented. Building the injury and round fetchers means committing to maintaining them when NRL.com changes shape.
-6. **Source-of-truth for `people_roles`.** Today it's seeded from SuperCoach. Once advisor diarisation lands, role assignments for advisors come from Analyst's attribution — that's an Analyst write, not a Scout write. The doc needs a clarifying note when that lands.
+6. **Source-of-truth for `people_roles`.** Today it's seeded from SuperCoach. Once advisor diarisation lands, role assignments for advisors come from Analyst's attribution — that's an Analyst write, not a Miner write. The doc needs a clarifying note when that lands.
 
 ---
 
 ## Documentation Updates
 
-If the Scout-charter expansion is approved, the following docs need updating as part of the implementing changeset:
+If the Miner-charter expansion is approved, the following docs need updating as part of the implementing changeset:
 
 | Doc | Change |
 |-----|--------|
-| [`docs/agents/crew/scout/README.md`](../../agents/crew/scout/README.md) | §"What Scout DOES cover" gains all L2 acquisition pipelines. §"What Scout DOES NOT cover" loses "Numeric NRL data" and "Player roster registry". §"Pipeline position" diagram updated. |
-| [`docs/agents/system/scraper.md`](../../agents/system/scraper.md) | Reframed as a Scout component (the `worker-scraper` service), not a Bookkeeper subsystem. Cross-link to Scout. **(Worker retired and deleted 2026-05-28; doc kept as historical reference.)** |
-| [`docs/agents/crew/bookkeeper/README.md`](../../agents/crew/bookkeeper/README.md) | Scope clarification: Bookkeeper is consume-only over the data Scout fetches. |
+| [`docs/agents/crew/miner/README.md`](../../agents/crew/miner/README.md) | §"What Miner DOES cover" gains all L2 acquisition pipelines. §"What Miner DOES NOT cover" loses "Numeric NRL data" and "Player roster registry". §"Pipeline position" diagram updated. |
+| [`docs/agents/system/scraper.md`](../../agents/system/scraper.md) | Reframed as a Miner component (the `worker-scraper` service), not a Bookkeeper subsystem. Cross-link to Miner. **(Worker retired and deleted 2026-05-28; doc kept as historical reference.)** |
+| [`docs/agents/crew/bookkeeper/README.md`](../../agents/crew/bookkeeper/README.md) | Scope clarification: Bookkeeper is consume-only over the data Miner fetches. |
 | [`docs/agents/crew/README.md`](../../agents/crew/README.md) | Update the Bookkeeper one-liner to reflect consume-only scope. |
-| [`docs/agents/crew/dynamics.md`](../../agents/crew/dynamics.md) | Cadence table — Bookkeeper trigger becomes "Scout scrape complete" instead of "scraper sweep complete". |
-| [`docs/agents/crew/scout/charter.md`](../../agents/crew/scout/charter.md) | ✅ Created 2026-05-12; decisions locked. Phase 0 reconciliation lands alongside this row. |
-| Eventually: `docs/agents/crew/archivist.md` "Hand-off contract" reads | The `claims`/`player_rounds`/`teamlists` rows the Archivist consumes will all be Scout-produced under the new model. Footnote the source. |
+| [`docs/agents/crew/dynamics.md`](../../agents/crew/dynamics.md) | Cadence table — Bookkeeper trigger becomes "Miner scrape complete" instead of "scraper sweep complete". |
+| [`docs/agents/crew/miner/charter.md`](../../agents/crew/miner/charter.md) | ✅ Created 2026-05-12; decisions locked. Phase 0 reconciliation lands alongside this row. |
+| Eventually: `docs/agents/crew/archivist.md` "Hand-off contract" reads | The `claims`/`player_rounds`/`teamlists` rows the Archivist consumes will all be Miner-produced under the new model. Footnote the source. |
 
 ---
 
@@ -313,7 +313,7 @@ If the Scout-charter expansion is approved, the following docs need updating as 
 - [Wiki overview](overview.md) — page types and routes
 - [Wiki content pipeline](content-pipeline.md) — Archivist runtime that consumes these feeds
 - [Archivist (role spec)](../../agents/crew/archivist/README.md) — primary downstream consumer
-- [Scout (current scope)](../../agents/crew/scout/README.md) — to be reframed per the charter expansion above
-- [Scraper system](../../agents/system/scraper.md) — currently Bookkeeper-owned; moves under Scout
-- [Source pipeline](../../sources/README.md) — Scout → Analyst → wiki end-to-end stages
+- [Miner (current scope)](../../agents/crew/miner/README.md) — to be reframed per the charter expansion above
+- [Scraper system](../../agents/system/scraper.md) — currently Bookkeeper-owned; moves under Miner
+- [Source pipeline](../../sources/README.md) — Miner → Analyst → wiki end-to-end stages
 - [NRL.com endpoints (memory)](../../../README.md) — `/draw/data`, match-centre `/data`, `/casualty-ward/data` (referenced in `MEMORY.md`)

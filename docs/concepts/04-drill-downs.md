@@ -80,7 +80,7 @@ Conviction: HIGH
 **Current Remark** — the active Remark about this player, if one exists. Tappable to scroll to it in the Stream.
 
 **The Crew's Intel**
-- Latest Scout findings: what sources said about this player this week
+- Latest Miner findings: what sources said about this player this week
 - Analyst's consensus: bullish/bearish split across sources, with chart
 - Bookkeeper's numbers: price, breakeven, scoring trend, PPM
 - Archivist's history: Jaromelu's past calls on this player and their outcomes

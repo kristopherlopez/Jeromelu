@@ -16,7 +16,7 @@ tags: [area/architecture]
 - ✅ Chat with the agent (Ask Me, `/ask` + inline in Feed)
 - ✅ Admin controls (source approval, pipeline view, sync status, manual ingest)
 - ✅ Immutable event log (`events` table with SHA256 dedup)
-- ✅ Crew (Jaromelu + Scout, Analyst, Critic, Bookkeeper, Archivist)
+- ✅ Crew (Jaromelu + Miner, Analyst, Critic, Bookkeeper, Archivist)
 
 > The Analysis (`/insights`) editorial hub was also built, but is **deferred as a core V1 surface** — its useful pieces fold into the Feed and the Wiki's round pages. See [02 — The Show](../vision/02-the-show.md).
 

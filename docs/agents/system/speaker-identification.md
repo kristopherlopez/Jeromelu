@@ -69,11 +69,11 @@ The system improves itself over time: every operator confirmation and every high
 The Transcription stage runs **two parallel branches** on the same audio: pyannote diarization (turn segmentation + voice embeddings) and Deepgram nova-3 (transcript text). Speaker Identification depends on **pyannote and the video stream** — not Deepgram.
 
 ```
-audio (Scout)  ─┬─> pyannote ───────────> turns + 256-dim voice embeddings  ──┐
+audio (Miner)  ─┬─> pyannote ───────────> turns + 256-dim voice embeddings  ──┐
                 │                                                              │
                 └─> Deepgram nova-3 ────> words → source_chunks (text)        │  ← not consumed
                                                                                │
-video (Scout)  ────> InsightFace @ 1 fps > face detections + 512-dim embeds  ─┤
+video (Miner)  ────> InsightFace @ 1 fps > face detections + 512-dim embeds  ─┤
                                                                                │
                                                                                ▼
                                                               Speaker Identification
@@ -87,7 +87,7 @@ video (Scout)  ────> InsightFace @ 1 fps > face detections + 512-dim emb
 - **Direct inputs:** pyannote's per-turn voice embeddings (`source_speakers.embedding`) **and** 1 fps video frames. Both are required for full coverage; either alone produces partial attribution.
 - **Not an input:** Deepgram's text. Speaker Identification would still populate `speaker_person_id` correctly with Deepgram disabled — you'd just have no readable transcript text to attribute *to*. Deepgram and Speaker ID are parallel: they fill different columns on the same source.
 - **Predecessor:** [Transcription](transcription-pipeline.md) — owns both audio branches (pyannote + Deepgram) and the merge that creates the `source_speakers` and `source_chunks` rows. Speaker ID reads from `source_speakers` and writes back to it.
-- **Priors source:** [Presenter Scout](presenter-scout.md) — curates *which* hosts are confirmed for a channel, giving Identification a starting roster before manual enrollment is needed (presenter-scout Phase 3, planned).
+- **Priors source:** [Presenter Miner](presenter-miner.md) — curates *which* hosts are confirmed for a channel, giving Identification a starting roster before manual enrollment is needed (presenter-miner Phase 3, planned).
 - **Consumers:**
   - The in-app stream viewer's face overlay (`YouTubeFaceOverlay.tsx`) — reads the face-track JSON live.
   - Claim extraction + the wiki — attribute opinions and predictions to the named `Person` rather than a `SPEAKER_NN` label.

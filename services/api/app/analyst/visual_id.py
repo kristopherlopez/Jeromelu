@@ -1,6 +1,6 @@
 """Visual speaker identification — Phase 4a.
 
-For a source whose video has been collected by Scout (`sources.video_s3_key`):
+For a source whose video has been collected by Miner (`sources.video_s3_key`):
 
     1. Sample frames at 1 fps (configurable via FRAME_SAMPLE_RATE).
     2. Run InsightFace `buffalo_l` (RetinaFace + ArcFace) on each frame

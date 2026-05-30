@@ -1,7 +1,7 @@
 """Transcript materialisation — Analyst's first Transform surface.
 
 Phase 2 pipeline: Deepgram for words, pyannote for diarization. Reads
-audio Scout has already collected (`sources.audio_s3_key`,
+audio Miner has already collected (`sources.audio_s3_key`,
 ``ingestion_status='collected'``), runs both diarizers, merges by
 timestamp, and writes the structured transcript:
 
@@ -15,7 +15,7 @@ timestamp, and writes the structured transcript:
 
 Boundary:
 - This module **does not** acquire audio. If `audio_s3_key` is NULL,
-  raises `MissingAudioError`. Run Scout's `acquire_audio` first.
+  raises `MissingAudioError`. Run Miner's `acquire_audio` first.
 - This module **does not** produce quotes / claims / consensus. Those
   are later Analyst surfaces, run on the chunks this module produces.
 
@@ -120,7 +120,7 @@ class TranscriptionError(Exception):
 
 
 class MissingAudioError(TranscriptionError):
-    """Raised when transcribe() is called on a source whose audio Scout
+    """Raised when transcribe() is called on a source whose audio Miner
     has not yet acquired (`audio_s3_key IS NULL`)."""
 
 
@@ -174,10 +174,10 @@ def transcribe(
     *,
     force: bool = False,
 ) -> TranscribeResult:
-    """Run pyannote + Deepgram on Scout's audio and materialise the transcript.
+    """Run pyannote + Deepgram on Miner's audio and materialise the transcript.
 
     Preconditions:
-        - source.audio_s3_key IS NOT NULL  (Scout has done its job)
+        - source.audio_s3_key IS NOT NULL  (Miner has done its job)
         - source has no existing SourceDocument, OR force=True
 
     Postcondition (success):
@@ -193,7 +193,7 @@ def transcribe(
         - TranscriptionError raised
     """
     if not source.audio_s3_key:
-        raise MissingAudioError(f"source {source.source_id} has no audio_s3_key — run Scout's acquire_audio first")
+        raise MissingAudioError(f"source {source.source_id} has no audio_s3_key — run Miner's acquire_audio first")
 
     if source.documents and not force:
         raise TranscriptionError(
@@ -463,7 +463,7 @@ def transcribe(
             session.add(chunk)
             char_offset += len(text) + 1
 
-        # 5) Mark transcription complete (Scout's ingestion_status stays
+        # 5) Mark transcription complete (Miner's ingestion_status stays
         #    'collected' — that step succeeded).
         source.transcription_status = "transcribed"
         source.extraction_method = EXTRACTION_METHOD

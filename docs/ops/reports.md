@@ -57,9 +57,9 @@ All emails ship through AWS SES (sandbox mode — verified sender + verified rec
 | Job | "Did it run?" | "What it did" |
 |---|---|---|
 | GHA cost-report | GitHub Actions REST API | Workflow conclusion |
-| Scout: channel-stats | `scout-refresh.log` — `status=` and `curl_rc=` | DB: rows + distinct channels in `channel_metrics` |
-| Scout: videos | Same file, `videos` lines | DB: rows + distinct videos in `video_metrics`, plus count of new `sources(source_type='youtube')` rows |
-| Scout: populate nrlcom-current | `scout-populate.log` — `job=... start/complete` and command `status=` lines | Completed phase count and command exit status |
+| Miner: channel-stats | `miner-refresh.log` — `status=` and `curl_rc=` | DB: rows + distinct channels in `channel_metrics` |
+| Miner: videos | Same file, `videos` lines | DB: rows + distinct videos in `video_metrics`, plus count of new `sources(source_type='youtube')` rows |
+| Miner: populate nrlcom-current | `miner-populate.log` — `job=... start/complete` and command `status=` lines | Completed phase count and command exit status |
 | pg-backup | S3 `list_objects_v2` on `backups/postgres/` — newest object | Backup key + size |
 
 Status logic:
@@ -159,7 +159,7 @@ Each cron writes its full stdout to a per-report file under `/var/log/jeromelu/`
 | `error-report.log` | error-report |
 | `content-report.log` | content-report |
 | `disk-report.log` | disk-report |
-| `scout-refresh.log` | scout-refresh.sh runs (consumed by cron-report) |
+| `miner-refresh.log` | miner-refresh.sh runs (consumed by cron-report) |
 | `pg-backup.log` | pg-backup runs |
 
 No log rotation today. The disk-report will catch it when `/var/log/jeromelu` grows visibly.

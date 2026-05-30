@@ -69,8 +69,8 @@ extend-immutable-calls = [
 # email bodies for SES reports. Breaking a sentence mid-prompt or
 # an HTML attribute mid-style="..." damages the artifact; we ignore
 # E501 here.
-"services/api/app/scout/source_discovery/prompt.py" = ["E501"]
-"services/api/app/scout/presenter_research/agent.py" = ["E501"]
+"services/api/app/miner/source_discovery/prompt.py" = ["E501"]
+"services/api/app/miner/presenter_research/agent.py" = ["E501"]
 "scripts/insights/seed_mock_articles.py" = ["E501"]
 "scripts/content_report.py" = ["E501"]
 "scripts/cost_report.py" = ["E501"]

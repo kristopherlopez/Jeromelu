@@ -14,7 +14,7 @@ tags: [area/operations, data-lineage]
 
 ## Extractor
 
-`scripts/data/populate/phase_aux.py` — `populate_team_standings()` (with the pure `_extract_standing_rows(...)` test seam, unit-tested in `tests/unit/scripts/data/populate/test_phase_aux.py`). Walks `scout/nrlcom/ladder/{competition}/...`, idempotent UPSERT on `(nrlcom_team_nickname, competition, season, round)`. 51 rows for 2026 / comp 111 across 3 captured rounds after the 2026-05-28 seed (94% team_id resolution); historical seasons remain Phase 5 backfill scope.
+`scripts/data/populate/phase_aux.py` — `populate_team_standings()` (with the pure `_extract_standing_rows(...)` test seam, unit-tested in `tests/unit/scripts/data/populate/test_phase_aux.py`). Walks `miner/nrlcom/ladder/{competition}/...`, idempotent UPSERT on `(nrlcom_team_nickname, competition, season, round)`. 51 rows for 2026 / comp 111 across 3 captured rounds after the 2026-05-28 seed (94% team_id resolution); historical seasons remain Phase 5 backfill scope.
 
 ## Field mapping
 
@@ -23,8 +23,8 @@ tags: [area/operations, data-lineage]
 | `id` | derived | — | UUID |
 | `team_id` | resolved | via `teams.slug`/`short_name`/`aliases` (lower-cased) | NULL if no match |
 | `nrlcom_team_nickname` | ladder | `$.positions[*].teamNickname` | Used for lookup; part of unique key |
-| `competition` | S3 key | `scout/.../{competition}/...` | |
-| `season` | S3 key | `scout/.../{season}/round-{NN}.json` | |
+| `competition` | S3 key | `miner/.../{competition}/...` | |
+| `season` | S3 key | `miner/.../{season}/round-{NN}.json` | |
 | `round` | S3 key | Same | |
 | `ladder_position` | ladder | `$.positions[*].position` (or enumerate index) | |
 | `movement` | ladder | `$.positions[*].movement` | `up`, `down`, `none` |

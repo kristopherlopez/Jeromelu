@@ -12,7 +12,7 @@ These profiles are the **upstream-side ground truth** for [data-catalogue](../da
 
 ## Layout
 
-Profiles live at `docs/operations/data-sources/<source>/<pipeline>.md` mirroring the S3 layout `s3://jeromelu-clean-documents/scout/<source>/<pipeline>/...`.
+Profiles live at `docs/operations/data-sources/<source>/<pipeline>.md` mirroring the S3 layout `s3://jeromelu-clean-documents/miner/<source>/<pipeline>/...`.
 
 ### nrl.com
 
@@ -55,16 +55,16 @@ Paths use jsonpath-style notation. `[*]` denotes an array element; per-element v
 ```bash
 # One pipeline, default 10 samples from the most-recent objects under the prefix
 services/api/.venv/Scripts/python scripts/profile_s3_json.py \
-  "scout/nrlcom/match-centre/111/2026/round-07/" \
+  "miner/nrlcom/match-centre/111/2026/round-07/" \
   --out docs/operations/data-sources/nrlcom/match-centre.md
 
 # Larger sample, spread strategy (evenly across the historical archive)
-python scripts/profile_s3_json.py "scout/nrlcom/stats/" --samples 20 --strategy spread
+python scripts/profile_s3_json.py "miner/nrlcom/stats/" --samples 20 --strategy spread
 
 # Defaults: bucket=jeromelu-clean-documents, samples=10, strategy=last
 ```
 
-When an upstream feed's shape changes (a Scout endpoint-drift test fails, or you add a new field on a partner site), regenerate the affected profile in the same PR. The profile diff is the human-readable record of what changed.
+When an upstream feed's shape changes (a Miner endpoint-drift test fails, or you add a new field on a partner site), regenerate the affected profile in the same PR. The profile diff is the human-readable record of what changed.
 
 ---
 

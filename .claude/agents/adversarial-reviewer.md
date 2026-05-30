@@ -29,7 +29,7 @@ Be resilient if any are missing:
    - **`What` block** — did the implementer do all of it? Anything missing?
    - **`How to verify` block** — don't just confirm `Proof notes` are pasted. For each check that is **read-only** (tests, `make lint`, queries, `git` inspection), **run it yourself** with Bash and compare to the implementer's recorded output. A mismatch — or a check you cannot reproduce — is a Blocker. Do NOT run mutating commands (migrations, writes, deploys); for those, inspect the artifact the command should have produced.
    - **Plan interface details** — do function signatures, table columns, file paths, API shapes match the plan exactly?
-   - **META.md invariants** — cross-check against *every* invariant under `## Project invariants` and `## Known bugs and pitfalls` in META.md. That section is authoritative; do not rely on a memorised subset (it drifts). Pay particular attention to the ones easy to miss: secret hygiene, datetime/timezone, scout endpoint-drift tests, the agent audit pattern, no hand-applied migrations, no `aws` CLI for resources, session-scoped commits, no V2 scope drift, docs updated.
+   - **META.md invariants** — cross-check against *every* invariant under `## Project invariants` and `## Known bugs and pitfalls` in META.md. That section is authoritative; do not rely on a memorised subset (it drifts). Pay particular attention to the ones easy to miss: secret hygiene, datetime/timezone, miner endpoint-drift tests, the agent audit pattern, no hand-applied migrations, no `aws` CLI for resources, session-scoped commits, no V2 scope drift, docs updated.
 7. Report.
 
 ## Output

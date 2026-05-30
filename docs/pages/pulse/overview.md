@@ -44,7 +44,7 @@ Pulse uses the theme-aware `--wiki-*` token family (`--wiki-surface`, `--wiki-bo
 ```ts
 type PulseResponse = {
   context: PulseContext;     // round, phase, marquee fixture
-  crew: CrewMember[];        // 5 named agents (Scout, Scribe, Analyst, Stats, Fixtures)
+  crew: CrewMember[];        // 5 named agents (Miner, Scribe, Analyst, Stats, Fixtures)
   timeline: TimelineEntry[]; // ordered by `t`, ascending
 };
 

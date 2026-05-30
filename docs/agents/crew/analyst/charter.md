@@ -6,7 +6,7 @@ tags: [area/architecture, subarea/agents]
 
 > Last reviewed: 2026-05-24. **Decisions A1–A11 below; A2 (Lineup is a service boundary) locked 2026-05-23.**
 >
-> The decision record for Analyst's scope. Where the [Scout charter](../scout/charter.md) *expands* one agent to own all external acquisition, this charter does the opposite: it **draws a boundary that sheds work**. Analyst's largest current surface — *Lineup* (transcript materialisation + speaker identification: pyannote, Deepgram, voice/face/fusion, the GPU stack) — is being moved **out of this repo** into an external service. What remains, and what this charter formalises, is Analyst's durable identity: **the interpretive layer** — the agent that turns a speaker-attributed transcript into *meaning* (cleaning, embedding, entity/quote/claim extraction, cross-source consensus and contradiction detection).
+> The decision record for Analyst's scope. Where the [Miner charter](../miner/charter.md) *expands* one agent to own all external acquisition, this charter does the opposite: it **draws a boundary that sheds work**. Analyst's largest current surface — *Lineup* (transcript materialisation + speaker identification: pyannote, Deepgram, voice/face/fusion, the GPU stack) — is being moved **out of this repo** into an external service. What remains, and what this charter formalises, is Analyst's durable identity: **the interpretive layer** — the agent that turns a speaker-attributed transcript into *meaning* (cleaning, embedding, entity/quote/claim extraction, cross-source consensus and contradiction detection).
 
 ---
 
@@ -21,7 +21,7 @@ This charter exists to record that inversion before it confuses anyone:
 - It declares the in-repo Lineup code **legacy** (kept alive, not extended) and says what that means in practice.
 - It stages the **forward build** — cleaning, embedding, extraction, consensus — the work that was always Analyst's but has so far lived only as local Claude Code skill prototypes, never production code ([A11](#a11-production-runs-in-workers-not-claude-code-skills)).
 
-It does **not** change what Scout, Bookkeeper, Critic, or the Archivist do. It only redraws the line between Analyst and the structural transcript-materialisation that used to be lumped in with it.
+It does **not** change what Miner, Bookkeeper, Critic, or the Archivist do. It only redraws the line between Analyst and the structural transcript-materialisation that used to be lumped in with it.
 
 ---
 
@@ -39,11 +39,11 @@ It does **not** change what Scout, Bookkeeper, Critic, or the Archivist do. It o
 | **Entity / quote / claim extraction** | `quotes`, `claims`, `claim_chunks`, `claim_associations` — multi-pass LLM extraction with stance/strength shaping, dedup, falsifiability + resolution capture ([A10](#a10-claims-carry-falsifiability--resolution-criteria)), and automated verification | Not built | [`/process-transcript`](../../skills/transcript-pipeline.md), [`/verify-claims`](../../system/extraction.md), [`/upload-transcript`](../../skills/transcript-pipeline.md) |
 | **Cross-reference / consensus** | `consensus_snapshots` — *semantic* consensus shifts and contradictions across sources ("4 say sell, 1 says hold") | Not built | [consensus-engine](../../../todo/consensus-engine.md) |
 
-Every one of these reads a transcript and writes a *derivative of meaning*. None of them acquires raw bytes (Scout/bronze), and none of them does the structural audio→attributed-transcript transform (Lineup, externalising — see [A2](#a2-lineup-is-a-service-boundary-not-a-sub-module)). **No interpretive pass is in production yet** — the rightmost column lists *local prototypes* (Claude Code skills, plus one backfill endpoint) used to validate the approach. Production runs in workers, never skills ([A11](#a11-production-runs-in-workers-not-claude-code-skills)).
+Every one of these reads a transcript and writes a *derivative of meaning*. None of them acquires raw bytes (Miner/bronze), and none of them does the structural audio→attributed-transcript transform (Lineup, externalising — see [A2](#a2-lineup-is-a-service-boundary-not-a-sub-module)). **No interpretive pass is in production yet** — the rightmost column lists *local prototypes* (Claude Code skills, plus one backfill endpoint) used to validate the approach. Production runs in workers, never skills ([A11](#a11-production-runs-in-workers-not-claude-code-skills)).
 
 ## What Analyst does NOT own
 
-- **Raw acquisition** — discovery, enumeration, audio/video pull, structured-feed fetching. That's [Scout](../scout/README.md) (bronze). Analyst never reaches outside Jeromelu for source bytes.
+- **Raw acquisition** — discovery, enumeration, audio/video pull, structured-feed fetching. That's [Miner](../miner/README.md) (bronze). Analyst never reaches outside Jeromelu for source bytes.
 - **Transcript materialisation + speaker identification (Lineup)** — pyannote diarization, Deepgram ASR, the merge, voice/face/fusion, enrollment, clustering, the review-UI overlays, the SageMaker GPU path. **Going forward this is an external service** ([A2](#a2-lineup-is-a-service-boundary-not-a-sub-module)); the in-repo code is legacy ([A8](#a8-disposition-of-the-in-repo-lineup-code--legacy-not-deleted)).
 - **Numeric derivations** — alignment indices, advisor-accuracy scores, breakeven trajectories, consensus *math*. Those are derivations over fetched/extracted data — owned by [Bookkeeper](../bookkeeper/README.md). Analyst detects that two sources *disagree*; Bookkeeper computes *by how much, weighted by historical accuracy*.
 - **The final call** — committing to a position and voicing it is [Jaromelu](../jaromelu/README.md)'s integrated voice. Analyst presents both sides; it does not resolve them.
@@ -55,7 +55,7 @@ For the exact tables Analyst reads and writes per pass, see [architecture.md § 
 
 ## How it works
 
-The pass chain (receive attributed transcript → clean → resolve references → chapter/annotate → embed → extract & shape claims/quotes → verify → cross-reference) and the current-vs-target architecture (in-repo legacy Lineup + Claude Code skills today; external Lineup API + workerised passes tomorrow) live in [architecture.md](architecture.md). In brief: each pass is an idempotent transform over the previous pass's output, validated first as a Claude Code skill and then workerised, with LLM passes gated by eval suites ([A5](#a5-extraction--skill-validated-then-workerised-llm-graded)) rather than the drift tests Scout's deterministic fetchers use.
+The pass chain (receive attributed transcript → clean → resolve references → chapter/annotate → embed → extract & shape claims/quotes → verify → cross-reference) and the current-vs-target architecture (in-repo legacy Lineup + Claude Code skills today; external Lineup API + workerised passes tomorrow) live in [architecture.md](architecture.md). In brief: each pass is an idempotent transform over the previous pass's output, validated first as a Claude Code skill and then workerised, with LLM passes gated by eval suites ([A5](#a5-extraction--skill-validated-then-workerised-llm-graded)) rather than the drift tests Miner's deterministic fetchers use.
 
 ---
 
@@ -67,13 +67,13 @@ The full forward plan lives in [roadmap.md](roadmap.md). Two tracks run in paral
 
 ## Decisions register (A1–A11)
 
-> The Analyst decision record. Prefixed **A** to disambiguate from Scout's **D**-series (a bare "per D8" always means Scout). Cited by number across the repo (`per A2`, `per A5`, …).
+> The Analyst decision record. Prefixed **A** to disambiguate from Miner's **D**-series (a bare "per D8" always means Miner). Cited by number across the repo (`per A2`, `per A5`, …).
 
 ### A1. The boundary principle — Analyst owns the interpretive layer
 
 **Decision: Analyst owns every transform that turns a transcript into *meaning*.** Cleaning, chapter detection, annotation, embedding, entity/quote/claim extraction, and cross-source consensus/contradiction detection are Analyst's. In medallion terms:
 
-- **Bronze — [Scout](../scout/README.md).** Raw external data landed faithfully, plus the mechanical typed-projection of structured feeds. No interpretation.
+- **Bronze — [Miner](../miner/README.md).** Raw external data landed faithfully, plus the mechanical typed-projection of structured feeds. No interpretation.
 - **Structural transform — Lineup (externalising).** Audio (+video) → a speaker-attributed transcript. Mechanical/ML, but it makes *structure*, not *meaning* — it says "Person X spoke these words from 45.2–51.8s," not "Person X is bullish on Cleary." Moving to a service ([A2](#a2-lineup-is-a-service-boundary-not-a-sub-module)).
 - **Interpretive transform (silver) — Analyst.** Transcript → cleaned text, embeddings, entities, quotes, claims, consensus. This is where *meaning* is made.
 - **Gold — [Bookkeeper](../bookkeeper/README.md) + [Archivist](../archivist/README.md).** Numeric derivations and the curated wiki.
@@ -86,7 +86,7 @@ The dividing question between Lineup and Analyst: **does the step decide *who sa
 
 **Why:** Treating Lineup as a service boundary lets the speaker-ID stack iterate independently — its own models, GPU infra, and fusion heuristics — without dragging Jaromelu's release cadence or container size along with it. It also aligns with the *API-container-lean* principle: heavy/GPU dependencies (pyannote, torch, InsightFace, SageMaker plumbing) should not live in the API image. See `memory/project_lineup_external.md`.
 
-**Scope of the move** (stages 2–5 of the [transcription pipeline](../../system/transcription-pipeline.md)): pyannote diarization, Deepgram ASR, the merge, voice match, visual match, fusion, voice/face enrollment, per-source face clustering, identity alignment, the review-UI overlays, and the SageMaker `LINEUP_REMOTE` pathway (`services/gpu/`). **Stage 1 (audio acquisition) stays with Scout; everything downstream of the transcript (clean, extract, consensus, wiki, ledger) stays with Analyst and the other crew.**
+**Scope of the move** (stages 2–5 of the [transcription pipeline](../../system/transcription-pipeline.md)): pyannote diarization, Deepgram ASR, the merge, voice match, visual match, fusion, voice/face enrollment, per-source face clustering, identity alignment, the review-UI overlays, and the SageMaker `LINEUP_REMOTE` pathway (`services/gpu/`). **Stage 1 (audio acquisition) stays with Miner; everything downstream of the transcript (clean, extract, consensus, wiki, ledger) stays with Analyst and the other crew.**
 
 This is a **directional decision, not yet a completed migration** — the external API does not exist yet. Until it does, the in-repo path still produces transcripts (see [A8](#a8-disposition-of-the-in-repo-lineup-code--legacy-not-deleted)).
 
@@ -118,11 +118,11 @@ Because Analyst consumes the *contract* and not the producer, the Lineup externa
 
 Today **only a local prototype exists** — the [`/clean-transcript`](../../skills/transcript-pipeline.md) skill (plus the `POST /api/admin/update-clean-text` endpoint, which backfills `clean_text` onto existing chunks from a cleaned S3 document). There is **no production cleaning pass yet.** The prototype's job is to settle the prompt and pass structure — that settled form *is* the spec the worker encodes.
 
-> **Coupling to leave intact:** the cleaning pass and the SuperCoach roster regeneration (now run via `make fetch-players`) currently share the `data/players.yaml` registry. Rehoming that — cleaning reads the roster from the DB instead of yaml — is the open loop that would drop the last yaml dependency; tracked in the [Scout roadmap, Phase 1](../scout/roadmap.md), surfaced here because it touches Analyst's input. (The legacy `scrape-supercoach` skill was retired 2026-05-27; being a wrapper around `make fetch-players`, it never actually gated this rehoming.)
+> **Coupling to leave intact:** the cleaning pass and the SuperCoach roster regeneration (now run via `make fetch-players`) currently share the `data/players.yaml` registry. Rehoming that — cleaning reads the roster from the DB instead of yaml — is the open loop that would drop the last yaml dependency; tracked in the [Miner roadmap, Phase 1](../miner/roadmap.md), surfaced here because it touches Analyst's input. (The legacy `scrape-supercoach` skill was retired 2026-05-27; being a wrapper around `make fetch-players`, it never actually gated this rehoming.)
 
 ### A5. Extraction — skill-validated, then workerised; LLM-graded
 
-**Decision: claim/quote/entity extraction ships as a production worker pass, gated by eval suites (not drift tests); any Claude Code skill is local prototyping only ([A11](#a11-production-runs-in-workers-not-claude-code-skills)).** This is the defining testing contrast with Scout: Scout's deterministic fetchers need *endpoint-drift tests* (the upstream shape is the only thing that can change); Analyst's extraction passes are *LLM-graded* (the model's judgement is what can regress), so they need [DeepEval suites under `tests/evals/`](../../../../tests/README.md).
+**Decision: claim/quote/entity extraction ships as a production worker pass, gated by eval suites (not drift tests); any Claude Code skill is local prototyping only ([A11](#a11-production-runs-in-workers-not-claude-code-skills)).** This is the defining testing contrast with Miner: Miner's deterministic fetchers need *endpoint-drift tests* (the upstream shape is the only thing that can change); Analyst's extraction passes are *LLM-graded* (the model's judgement is what can regress), so they need [DeepEval suites under `tests/evals/`](../../../../tests/README.md).
 
 **Shaping a claim is more than finding it.** Over (cleaned, reference-resolved — [A9](#a9-referential-resolution--attribution-is-claim-level-not-turn-level)) chunks, the extraction pass must also:
 
@@ -131,7 +131,7 @@ Today **only a local prototype exists** — the [`/clean-transcript`](../../skil
 - **Type + structure** — `claim_type` (buy/sell/hold/start/bench/captain/trade/injury/price/role/match-result), subject entity, polarity, strength. Map hedging / conditionals / negation to strength: "lock him in" (strong), "you could start him I guess" (weak), "I'm *not* selling Cleary" (a HOLD via negation).
 - **Anchor in time** — stamp the round/window the claim *pertains to* ("this week", "after Origin"), not just when it was said. Predictions need a horizon ([A10](#a10-claims-carry-falsifiability--resolution-criteria)).
 - **Deduplicate** — a host repeating "Cleary's a buy" four times is one claim, within and across chapters.
-- **Link to canonical entities** — so claims aggregate across sources and can later be grounded against Scout's actual price/breakeven data.
+- **Link to canonical entities** — so claims aggregate across sources and can later be grounded against Miner's actual price/breakeven data.
 
 Today **only local prototypes exist**, multi-pass: [`/process-transcript`](../../skills/transcript-pipeline.md) (multi-pass extraction), [`/verify-claims`](../../system/extraction.md) (per-claim Haiku cross-check), [`/analyse-transcript`](../../skills/analyse-transcript.md) (chapter-scoped enrichment), [`/upload-transcript`](../../skills/transcript-pipeline.md) (persist). The production surface — the `services/worker-extraction/` worker — is a skeleton; it is built only once the eval suite locks acceptable precision/recall on a graded corpus. See [extraction-worker](../../../todo/extraction-worker.md).
 
@@ -143,7 +143,7 @@ The seam matters because both are tempting to call "consensus." The rule: if the
 
 ### A7. Audit — `agent_id='analyst'`, pass discriminator in `detail_json`
 
-**Decision: every Analyst pass lands on the shared audit tables**, mirroring Scout's pattern ([agent-audit.md](../../system/agent-audit.md)): one `agent_runs` row per pass with `agent_id='analyst'` and `detail_json.pass` discriminating which pass ran (`transcribe`, `clean`, `embed`, `extract`, `verify`, `consensus`). This gives one "is Analyst healthy?" dashboard that breaks down by pass and unifies cost/latency reporting with Scout's agentic surface.
+**Decision: every Analyst pass lands on the shared audit tables**, mirroring Miner's pattern ([agent-audit.md](../../system/agent-audit.md)): one `agent_runs` row per pass with `agent_id='analyst'` and `detail_json.pass` discriminating which pass ran (`transcribe`, `clean`, `embed`, `extract`, `verify`, `consensus`). This gives one "is Analyst healthy?" dashboard that breaks down by pass and unifies cost/latency reporting with Miner's agentic surface.
 
 **Today this is unmet for the transcription path** — the in-repo transcription pipeline writes no canonical `agent_runs` row (it predates the convention, and it's legacy per [A8](#a8-disposition-of-the-in-repo-lineup-code--legacy-not-deleted), so it won't be retrofitted). The *new* passes (clean, embed, extract, consensus) adopt it from day one.
 
@@ -183,7 +183,7 @@ Per claim, Analyst marks:
 
 ### A11. Production runs in workers, not Claude Code skills
 
-**Decision: every Analyst pass ships as a worker/service; Claude Code skills are local developer tools only and are never on the production path.** Production cannot depend on a skill — skills run in a developer's local Claude Code session, not in the deployed API/worker fleet. This mirrors [Scout D5](../scout/charter.md#d5-skills-disposition) ("the endpoint is the universal surface; skills are off the critical path entirely").
+**Decision: every Analyst pass ships as a worker/service; Claude Code skills are local developer tools only and are never on the production path.** Production cannot depend on a skill — skills run in a developer's local Claude Code session, not in the deployed API/worker fleet. This mirrors [Miner D5](../miner/charter.md#d5-skills-disposition) ("the endpoint is the universal surface; skills are off the critical path entirely").
 
 **What skills are for:** prototyping a pass's prompt, exploring an extraction approach, and generating eval fixtures against real transcripts. **What they are not:** a deployable surface, a cron target, or a dependency of any production pass.
 
@@ -224,7 +224,7 @@ The expensive part of Analyst's *current* footprint — Deepgram (~$0.30/source)
 | **Evals** (`tests/evals/`) | The distinguishing tier. DeepEval LLM-graded suites over a fixed corpus — claim extraction precision/recall, verification accuracy, cleaning fidelity. Gates workerisation per [A5](#a5-extraction--skill-validated-then-workerised-llm-graded). Costs $$ per run. |
 | Integration (`tests/integration/api/analyst/`) | Round-trip a fixture transcript through a pass; assert DB writes + `agent_runs` row + idempotency on re-run. |
 
-No drift tests — Analyst doesn't fetch from upstream sources (that's Scout's concern). The thing that can change underneath Analyst is *model behaviour*, which is what the eval tier guards.
+No drift tests — Analyst doesn't fetch from upstream sources (that's Miner's concern). The thing that can change underneath Analyst is *model behaviour*, which is what the eval tier guards.
 
 ### Rollout
 
@@ -243,7 +243,7 @@ Each interpretive pass follows the same shape — the **worker is the deliverabl
 1. **When does the external Lineup API land?** Until it does, the legacy in-repo path is load-bearing ([A8](#a8-disposition-of-the-in-repo-lineup-code--legacy-not-deleted)). The contract ([A3](#a3-the-input-contract--a-speaker-attributed-transcript)) is the hedge, but the cutover date is unknown — and gates whether the recurring drain job is built in-repo or against the API.
 2. **Embedding ownership** — text-chunk embedding is claimed for Analyst here ([risk #6](#architectural-risks)); the "indexer" framing elsewhere needs reconciling. Which model (OpenAI vs Voyage) and where the index lives (pgvector in-repo vs external) is undecided.
 3. **Chapter detection placement** — `source_chapters` is produced by the [`/analyse-transcript`](../../skills/analyse-transcript.md) pipeline. Is it a first-class Analyst pass in its own right, or a sub-step of extraction? Leaning: its own pass, because annotation and claim-scoping both depend on it.
-4. **Advisor / Person identity creation.** `people_roles` for advisors (podcast hosts) is largely empty. Under the externalised Lineup, where do advisor entities get created — manually, or derived by the Lineup service and written back? Shared open question with [Scout charter Q6](../scout/charter.md#open-questions).
+4. **Advisor / Person identity creation.** `people_roles` for advisors (podcast hosts) is largely empty. Under the externalised Lineup, where do advisor entities get created — manually, or derived by the Lineup service and written back? Shared open question with [Miner charter Q6](../miner/charter.md#open-questions).
 5. **Where `consensus_snapshots` is written** — the publishing surface (`update_consensus_snapshots`) or an Analyst consensus worker? [A6](#a6-consensus--contradiction-detection-is-semantic-not-numeric) names the table; the owning process is open.
 
 ---
@@ -253,7 +253,7 @@ Each interpretive pass follows the same shape — the **worker is the deliverabl
 - [README.md](README.md) — Analyst's identity, scope, and voice
 - [architecture.md](architecture.md) — pipeline position, hand-off contract, pass chain, current-vs-target architecture
 - [roadmap.md](roadmap.md) — status and the two-track forward plan
-- [Scout charter](../scout/charter.md) — the bronze-layer charter Analyst's silver boundary abuts (decisions D1–D13)
+- [Miner charter](../miner/charter.md) — the bronze-layer charter Analyst's silver boundary abuts (decisions D1–D13)
 - [Transcription pipeline](../../system/transcription-pipeline.md) — the in-repo Lineup surface (legacy), stages 1–5
 - [Speaker identification](../../system/speaker-identification.md) — voice + face + fusion (legacy Lineup detail)
 - [Extraction](../../system/extraction.md) — claim/entity/quote extraction surface (local prototype today; production worker not built)

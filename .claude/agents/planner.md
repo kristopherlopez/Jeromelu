@@ -35,7 +35,7 @@ If the task is satisfied exactly as written, the human would trust the result wi
 A plan section looks like:
 
 ```
-## 2026-05-23: Scout phase 1 — supercoach roster
+## 2026-05-23: Miner phase 1 — supercoach roster
 
 **Goal:** <one sentence>
 

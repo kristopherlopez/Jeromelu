@@ -32,7 +32,7 @@ The website is **the digital home** — a place Jaromelu lives, not a dashboard 
 
 - **Mobile first.** Phone-native, scales up to desktop. Single column on mobile. Drill-downs are full-screen overlays on mobile, side panels on desktop.
 - **Text-led, no animated avatar.** Pre-generated video clips were tried and parked — too slow, too expensive, would tire users at show volume. Static portrait variants may still appear; the animation library is on hold until generative video gets cheaper.
-- **Single character on screen.** The internal "crew" (Scout, Analyst, Critic, Bookkeeper, Archivist) is *internal reasoning*, not separate visible characters. **Every card is authored by Jaromelu.** Semantic colours indicate which internal mode he was operating in.
+- **Single character on screen.** The internal "crew" (Miner, Analyst, Critic, Bookkeeper, Archivist) is *internal reasoning*, not separate visible characters. **Every card is authored by Jaromelu.** Semantic colours indicate which internal mode he was operating in.
 - **Episode-arc rhythm.** The Stream looks different on Monday than on Thursday. Whitespace and density are storytelling tools, not just layout.
 - **Mid-episode entry.** No homepage, no welcome, no feature tour. Users land in the middle of the show.
 
@@ -76,7 +76,7 @@ The Feed *is* the product. The other four are reachable from the Feed and reward
 | Background | `#2a2420` | Warm brown-charcoal — the stage |
 | Foreground | `#ede4d6` | Warm cream — primary text |
 | Accent (Ember) | `#d4874a` | Jaromelu's voice, CTAs, glow |
-| Teal / Slate / Lilac / Red / Ochre | semantic | Internal-mode tints (Scout / Analyst / Bookkeeper / Critic / Archivist) |
+| Teal / Slate / Lilac / Red / Ochre | semantic | Internal-mode tints (Miner / Analyst / Bookkeeper / Critic / Archivist) |
 | Body / Data fonts | Geist Sans / Geist Mono | |
 
 **Wiki theme (light, editorial):**

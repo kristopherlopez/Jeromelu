@@ -32,9 +32,9 @@ Deepgram remains the words+timestamps source. We only stop using its `diarize` f
 ## Architecture (target)
 
 ```
-Scout audio (m4a)  ──┐
+Miner audio (m4a)  ──┐
                      │
-Scout video (240p) ──┤
+Miner video (240p) ──┤
                      │
                      ▼
    ┌─────────────────────────────────────────────────────────┐
@@ -194,7 +194,7 @@ The lone false positive was a 1.3 s turn at exactly the cosine threshold — the
 ### Phase 4a — Visual ID (no ASD) + Fusion — **SHIPPED 2026-05-03**
 
 - ✅ Migrations `049_person_face_embeddings.sql` + `050_speaker_match_provenance.sql`. Face registry table mirrors voiceprints; `source_speakers` gains `audio_match_*`, `visual_match_*`, `match_method`, `match_confidence`. `sources` gains `video_s3_key`, `video_format`.
-- ✅ Scout video acquisition (`make collect-video`): single-stream low-res mp4 (default 360p) to S3. `youtube_utils.download_video`'s post-merge filename detection was broken; bypassed with an inline yt-dlp call selecting a combined-stream format.
+- ✅ Miner video acquisition (`make collect-video`): single-stream low-res mp4 (default 360p) to S3. `youtube_utils.download_video`'s post-merge filename detection was broken; bypassed with an inline yt-dlp call selecting a combined-stream format.
 - ✅ `services/api/app/analyst/visual_id.py`: ffmpeg + cv2 frame sampling at 1 fps, InsightFace `buffalo_l` face detection + 512-dim ArcFace embeddings, in-memory k-NN match against `person_face_embeddings`, face-track JSON to S3, format heuristic (multi_cam vs single_cam).
 - ✅ `services/api/app/analyst/enroll_face_cli.py` + `make enroll-face` (image file or video frame at TS).
 - ✅ `services/api/app/analyst/fusion.py`: voice + face vote per turn. Both agree → `voice+face`. One fires → that modality. Disagree → NULL (flagged for review).
@@ -323,7 +323,7 @@ Shipped alongside Phase 4b-display-v2 (canvas-on-iframe overlay) in commit `87b1
 
 The big one. Lands the visual modality, the fusion logic, and the review/override surface together so they're tested as a system.
 
-**Acquisition.** Scout downloads a low-res video stream alongside the audio:
+**Acquisition.** Miner downloads a low-res video stream alongside the audio:
 - `yt-dlp -f "worst[height>=240]"` → `s3://jeromelu-raw-audio/.../{video_id}.video.mp4`.
 - 30-day S3 lifecycle rule discards after processing window.
 - New columns: `sources.video_s3_key TEXT`, `sources.video_format TEXT`.
@@ -482,8 +482,8 @@ The asymmetry that makes this work: face ID + ASD is *easier to bootstrap* (few 
 
 | Path | Purpose |
 |---|---|
-| `services/api/app/scout/media/persistent_video.py` | Legacy/debug low-res persistent video acquisition |
-| `services/api/app/scout/media/cli/persistent_video.py` | `make collect-video SOURCE_ID=…` |
+| `services/api/app/miner/media/persistent_video.py` | Legacy/debug low-res persistent video acquisition |
+| `services/api/app/miner/media/cli/persistent_video.py` | `make collect-video SOURCE_ID=…` |
 | `services/api/app/analyst/diarize.py` | pyannote pipeline wrapper |
 | `services/api/app/analyst/diarize_cli.py` | `make diarize SOURCE_ID=…` |
 | `services/api/app/analyst/identify_voice.py` | ECAPA enroll + match |
@@ -551,9 +551,9 @@ Combined with Phase 5: the scraped headshot identifies the host on first appeara
 
 Open: which sources are licensable for scraping; how to handle stale photos (host changed appearance — covered partially by append-only growth, but a strict-newest-N policy may be wanted).
 
-### Layer 3 — Channel presenters as priors (presenter-scout Phase 3, planned)
+### Layer 3 — Channel presenters as priors (presenter-miner Phase 3, planned)
 
-[presenter-scout.md](../agents/system/presenter-scout.md) curates `(channel_id, person_id)` confirmations agentically. Presenter-scout's own Phase 3 (planned) feeds those into Lineup as the channel's expected roster — lowering match thresholds for in-roster Persons and short-circuiting first-appearance enrollment when a headshot exists.
+[presenter-miner.md](../agents/system/presenter-miner.md) curates `(channel_id, person_id)` confirmations agentically. Presenter-miner's own Phase 3 (planned) feeds those into Lineup as the channel's expected roster — lowering match thresholds for in-roster Persons and short-circuiting first-appearance enrollment when a headshot exists.
 
 This is the obvious cross-link between two surfaces; both half-done. Wiring is the only blocker.
 
@@ -564,7 +564,7 @@ The Deepgram transcript already names hosts during intros and outros — *"What'
 A small-LLM pass over the first/last 60 seconds of each transcript could:
 
 1. Detect self-identification or peer-naming patterns.
-2. Match each name to the channel's known presenter list (from presenter-scout) or the `people` registry — high precision because the candidate set is tiny.
+2. Match each name to the channel's known presenter list (from presenter-miner) or the `people` registry — high precision because the candidate set is tiny.
 3. Identify which `SPEAKER_NN` was speaking or being addressed by joining Deepgram word timestamps to pyannote turn boundaries.
 4. Insert voice embeddings (and optionally face embeddings from corresponding video frames) with `created_by='auto-llm'` (a new provenance value to add).
 
@@ -578,7 +578,7 @@ Schema impact: extend the `created_by` enum to include `'auto-llm'` so post-hoc 
 
 When N episodes of a channel are processed without enrollments, pyannote produces N independent SPEAKER_NN labels per source. Across episodes, the same actual host appears repeatedly. Cosine-clustering the per-turn embeddings across all episodes of one channel agglomerates them — the largest clusters are regular hosts, smaller clusters are guests, singletons are noise.
 
-Match the largest clusters against the channel's known presenters (from presenter-scout, or LLM annotations from Layer 4) and auto-enroll each cluster as a Person.
+Match the largest clusters against the channel's known presenters (from presenter-miner, or LLM annotations from Layer 4) and auto-enroll each cluster as a Person.
 
 Cost: bigger lift than Layer 4 (a clustering pipeline + cluster-to-Person matching logic), but it bootstraps an entire channel from a folder of audio + a list of host names with zero human annotation.
 
@@ -595,7 +595,7 @@ Even with all five layers:
 If the goal is fastest path to "human-in-the-loop is just an audit, not a labelling job":
 
 1. **Headshot scraper (Layer 2)** — cheapest, most leveraged. One-time per host.
-2. **Wire presenter-scout Phase 3 priors into Lineup (Layer 3)** — already designed, needs hooking up.
+2. **Wire presenter-miner Phase 3 priors into Lineup (Layer 3)** — already designed, needs hooking up.
 3. **LLM transcript annotator (Layer 4)** — one new model integration; high signal-to-noise.
 4. **Phase 5 compounding** (already in plan) — closes the loop with all the above feeding it.
 5. **Cross-source clustering (Layer 5)** — bigger lift, lower marginal value once 1–4 are in.
@@ -621,7 +621,7 @@ If the goal is fastest path to "human-in-the-loop is just an audit, not a labell
 - **NEW `docs/operations/identification-runbook.md`** — operator runbook: how to enroll a host (face + voice), how to clean up bad embeddings, threshold tuning, format heuristic interpretation.
 - **`docs/agents/system/transcription-pipeline.md`** — rewrite "What it does" steps 3–5 to reflect Deepgram-without-diarize. Move "Speaker → Person resolution" out of Backlog into the active pipeline. Reference migrations 047–050.
 - **`docs/agents/crew/analyst.md`** — add Identification surface alongside Transform.
-- **`docs/agents/system/ingestion.md`** — Scout now acquires video alongside audio; document the new path and S3 lifecycle rule.
+- **`docs/agents/system/ingestion.md`** — Miner now acquires video alongside audio; document the new path and S3 lifecycle rule.
 - **`docs/sources/extraction-method.md`** — extraction method labels evolve: `deepgram_words+pyannote_v1` → `…+visual_v1` after Phase 4.
 - **`docs/vision/02-the-show.md`** — update data-flow diagram if it references Deepgram diarize.
 - **`docs/operations/data-catalogue/`** — add `person_voiceprints.md` and `person_face_embeddings.md`; update `source_speakers.md` provenance columns and `sources.md` (`video_s3_key`, `video_format`); link them from `README.md`.
@@ -631,5 +631,5 @@ If the goal is fastest path to "human-in-the-loop is just an audit, not a labell
 
 - [Transcription (Analyst's first Transform)](../agents/system/transcription-pipeline.md) — predecessor surface this plan extends.
 - [Analyst (crew)](../agents/crew/analyst/README.md)
-- [Ingestion (Scout)](../agents/system/ingestion.md) — gains the video acquisition step.
+- [Ingestion (Miner)](../agents/system/ingestion.md) — gains the video acquisition step.
 - [Migration 044](../../packages/db/migrations/044_audio_first_extract.sql), [045](../../packages/db/migrations/045_split_ingestion_transcription.sql), [046](../../packages/db/migrations/046_chunk_paragraph_break.sql) — current schema.

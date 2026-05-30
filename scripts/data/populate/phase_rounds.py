@@ -1,4 +1,4 @@
-"""Phase 2a — extract rounds from scout/nrlcom/draw/* archives.
+"""Phase 2a — extract rounds from miner/nrlcom/draw/* archives.
 
 One row per (season, round_number). Idempotent upsert keyed on the existing
 unique constraint `rounds_season_round_number_key`.
@@ -22,8 +22,8 @@ from ._s3_walk import list_keys, read_json_concurrent
 logger = logging.getLogger(__name__)
 
 
-# Filename pattern: scout/nrlcom/draw/111/<season>/round-<NN>.json
-_KEY_RE = re.compile(r"scout/nrlcom/draw/\d+/(\d{4})/round-(\d+)\.json$")
+# Filename pattern: miner/nrlcom/draw/111/<season>/round-<NN>.json
+_KEY_RE = re.compile(r"miner/nrlcom/draw/\d+/(\d{4})/round-(\d+)\.json$")
 
 
 def _extract_one(payload: dict[str, Any], key: str) -> dict[str, Any] | None:
@@ -66,7 +66,7 @@ def populate_rounds(
     competition: int = 111,
     commit: bool = True,
 ) -> dict[str, Any]:
-    keys = list_keys(f"scout/nrlcom/draw/{competition}/")
+    keys = list_keys(f"miner/nrlcom/draw/{competition}/")
     if seasons:
         seasons_set = {str(s) for s in seasons}
         keys = [k for k in keys if any(f"/{s}/" in k for s in seasons_set)]

@@ -1,7 +1,7 @@
 # `scripts/data/populate/` — S3 → DB extractors
 
-Projects the `scout/*` archives in S3 into the relational tables. Day-to-day,
-the Scout pipelines + their attached extractors keep the DB current; this
+Projects the `miner/*` archives in S3 into the relational tables. Day-to-day,
+the Miner pipelines + their attached extractors keep the DB current; this
 package is the **backfill driver** that re-projects the historical backlog of
 archives, and the place the per-table extraction logic lives.
 
@@ -25,7 +25,7 @@ python -m scripts.data.populate_db_from_s3 --phase matches   --seasons 2026 --dr
 
 ## The nrl.com match-centre phases (Phase 3.5)
 
-Read `scout/nrlcom/match-centre/{comp}/{season}/round-{NN}/{slug}.json`; resolve
+Read `miner/nrlcom/match-centre/{comp}/{season}/round-{NN}/{slug}.json`; resolve
 identity via `teams.nrlcom_team_id` / `people.nrlcom_player_id` /
 `matches.external_match_id`; UPSERT.
 
@@ -39,7 +39,7 @@ identity via `teams.nrlcom_team_id` / `people.nrlcom_player_id` /
 The pure `_extract_*` functions take a parsed payload + identity maps and return
 `list[dict]` rows — **no S3, no DB** — so they're unit-tested in
 `tests/unit/scripts/data/populate/test_phase_*.py` against the checked-in
-match-centre fixtures (`tests/fixtures/scout/nrlcom_match_centre/`). The phase's
+match-centre fixtures (`tests/fixtures/miner/nrlcom_match_centre/`). The phase's
 `populate_*` function builds the maps from the DB, calls the pure extractor, and
 UPSERTs the rows.
 
@@ -50,9 +50,9 @@ Phase 3.5 — the mapping is testable without S3/DB; the caller does the DB work
 
 | Phase module function | Reads | Writes | Pure extractor (test seam) |
 |---|---|---|---|
-| `populate_team_standings` | `scout/nrlcom/ladder/{comp}/*` | `team_standings` (UPSERT per `(team, comp, season, round)`) | `_extract_standing_rows(payload, key, competition, season, round_no, team_map)` |
-| `populate_injuries` | `scout/nrlcom/casualty-ward/{comp}/*` (chronological) | `injuries` (state machine: open/close/UPDATE) | `_casualty_to_row(c, team_map, people_lookup)`, `_bucket_status(text, current_round)` |
-| `populate_stat_leaderboards` (Phase 4.5) | `scout/nrlcom/stats/{comp}/*` | `stat_leaderboards` (UPSERT per `(competition, season, scope, category, subgroup, stat_title, leader_position)`) | `_extract_leader_rows(payload, key, competition, season, team_map, player_map)` |
+| `populate_team_standings` | `miner/nrlcom/ladder/{comp}/*` | `team_standings` (UPSERT per `(team, comp, season, round)`) | `_extract_standing_rows(payload, key, competition, season, round_no, team_map)` |
+| `populate_injuries` | `miner/nrlcom/casualty-ward/{comp}/*` (chronological) | `injuries` (state machine: open/close/UPDATE) | `_casualty_to_row(c, team_map, people_lookup)`, `_bucket_status(text, current_round)` |
+| `populate_stat_leaderboards` (Phase 4.5) | `miner/nrlcom/stats/{comp}/*` | `stat_leaderboards` (UPSERT per `(competition, season, scope, category, subgroup, stat_title, leader_position)`) | `_extract_leader_rows(payload, key, competition, season, team_map, player_map)` |
 
 The injuries extractor is a state machine — it walks daily snapshots in order,
 opens new rows for unseen casualties, UPDATEs `metadata_json` for casualties
@@ -83,15 +83,15 @@ back at the end. `--dry-run` now computes counts and writes nothing.
 The prod box has no standalone Python env with these deps (`sqlalchemy`,
 `psycopg`, `pydantic`, `httpx`, `boto3` + `jeromelu_shared`). The deps live in
 the `jeromelu-api` container, so production runs go through
-`scripts/scout-populate.sh`. The wrapper stages `scripts/` and `packages/` into
-`/runtmp/scout-populate` inside the running container, sets
-`PYTHONPATH=/runtmp/scout-populate/packages/shared:/runtmp/scout-populate`, runs
-the existing orchestrator, and logs to `/var/log/jeromelu/scout-populate.log`.
+`scripts/miner-populate.sh`. The wrapper stages `scripts/` and `packages/` into
+`/runtmp/miner-populate` inside the running container, sets
+`PYTHONPATH=/runtmp/miner-populate/packages/shared:/runtmp/miner-populate`, runs
+the existing orchestrator, and logs to `/var/log/jeromelu/miner-populate.log`.
 
 ```bash
-/opt/jeromelu/scripts/scout-populate.sh nrlcom-current
-/opt/jeromelu/scripts/scout-populate.sh phase leaderboards --seasons 2026 --dry-run
-/opt/jeromelu/scripts/scout-populate.sh nrlcom-current --no-op
+/opt/jeromelu/scripts/miner-populate.sh nrlcom-current
+/opt/jeromelu/scripts/miner-populate.sh phase leaderboards --seasons 2026 --dry-run
+/opt/jeromelu/scripts/miner-populate.sh nrlcom-current --no-op
 ```
 
 `nrlcom-current` is the scheduled projection used by `scripts/cron.d/jeromelu`

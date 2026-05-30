@@ -169,7 +169,7 @@ When the user taps "Evidence trail", the Remark card expands to show the full li
 ```
 ▾ Evidence trail
 
-  [👤] Scout · Tue 8:14 AM
+  [👤] Miner · Tue 8:14 AM
   "Picked up 3 new takes on Cleary from this week's pods"
 
   [👤] Bookkeeper · Tue 10:30 AM

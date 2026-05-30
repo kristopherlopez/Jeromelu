@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from app.scout.youtube.client import validate_channel
+from app.miner.youtube.client import validate_channel
 from jeromelu_shared.db import Channel, ChannelMetric, SessionLocal
 from sqlalchemy import select
 

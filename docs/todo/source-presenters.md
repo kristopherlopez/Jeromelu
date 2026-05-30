@@ -2,13 +2,13 @@
 tags: [area/todo, status/in-progress]
 ---
 
-# Presenter Scout — Auto-discover the regular presenters of a channel
+# Presenter Miner — Auto-discover the regular presenters of a channel
 
 > **Status:** Phase 1 ✅ + Phase 2 ✅ shipped 2026-05-05. Verified end-to-end on `Bloke In A Bar` — 3 candidates filed (Denan Kemp host + Tyson Jackson and Blake Austin regulars), 7 turns, $0.148, agent_runs + S3 forensic upload populated. Confirm/reject endpoints exercised via TestClient. Phase 3 (Lineup priors) and post-ingestion auto-trigger remain.
 
-**Phase:** Scout extension / identification feeder
+**Phase:** Miner extension / identification feeder
 **Priority:** Compounds with speaker-identification — confirmed presenters become strong priors for the voice/face fusion matchers, so each new channel goes from "cold start" to "first turn auto-resolved" much faster.
-**Service:** `services/api/app/scout/presenter_research/agent.py` (+ CLI), admin panel.
+**Service:** `services/api/app/miner/presenter_research/agent.py` (+ CLI), admin panel.
 
 ## Problem
 
@@ -34,14 +34,14 @@ Step (a) is a Google search. Step (b) is two SQL inserts. Step (c) is a real cos
 ## Architecture (target)
 
 ```
-channel_id ──► presenter_scout (agent loop)
+channel_id ──► presenter_miner (agent loop)
                    │
                    ├─ web_search (Anthropic-hosted)
                    ├─ web_fetch  (Anthropic-hosted)
                    └─ persist_presenter_candidate (custom tool)
                                        │
                                        ▼
-                       scout_presenter_candidates (status='pending')
+                       miner_presenter_candidates (status='pending')
                                        │
                                   human review
                                        │
@@ -52,16 +52,16 @@ channel_id ──► presenter_scout (agent loop)
                        source_presenters (channel_id, person_id, role, ...)
 ```
 
-The agent runs entirely in the API process, same shape as the existing Scout. `agent_audit` tracks turns / tokens / cost / S3 forensics. New `agent_id = 'presenter_scout'` so the budget/observability buckets stay clean.
+The agent runs entirely in the API process, same shape as the existing Miner. `agent_audit` tracks turns / tokens / cost / S3 forensics. New `agent_id = 'presenter_miner'` so the budget/observability buckets stay clean.
 
 ## Data model
 
 Two new tables, plus one CHECK extension. (Migration `052_source_presenters.sql`.)
 
-### `scout_presenter_candidates` — staging inbox
+### `miner_presenter_candidates` — staging inbox
 
 ```sql
-CREATE TABLE scout_presenter_candidates (
+CREATE TABLE miner_presenter_candidates (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     channel_id          UUID NOT NULL REFERENCES channels(channel_id) ON DELETE CASCADE,
     name                TEXT NOT NULL,                        -- "Denan Kemp"
@@ -79,17 +79,17 @@ CREATE TABLE scout_presenter_candidates (
     run_id              TEXT,                                 -- agent_runs.run_id
     discovered_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    CONSTRAINT ck_scout_pres_role
+    CONSTRAINT ck_miner_pres_role
         CHECK (role IN ('host','co-host','regular','frequent-guest')),
-    CONSTRAINT ck_scout_pres_status
+    CONSTRAINT ck_miner_pres_status
         CHECK (status IN ('pending','confirmed','rejected'))
 );
 
-CREATE INDEX idx_scout_pres_channel_status
-    ON scout_presenter_candidates (channel_id, status);
+CREATE INDEX idx_miner_pres_channel_status
+    ON miner_presenter_candidates (channel_id, status);
 
-CREATE UNIQUE INDEX uq_scout_pres_channel_name_pending
-    ON scout_presenter_candidates (channel_id, lower(name))
+CREATE UNIQUE INDEX uq_miner_pres_channel_name_pending
+    ON miner_presenter_candidates (channel_id, lower(name))
     WHERE status = 'pending';
 ```
 
@@ -107,7 +107,7 @@ CREATE TABLE source_presenters (
     since_ts      TIMESTAMPTZ,                                -- when did they join, if known
     confirmed_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     confirmed_by  TEXT,
-    candidate_id  UUID REFERENCES scout_presenter_candidates(id),
+    candidate_id  UUID REFERENCES miner_presenter_candidates(id),
 
     CONSTRAINT ck_src_pres_role
         CHECK (role IN ('host','co-host','regular','frequent-guest')),
@@ -121,11 +121,11 @@ Anchored at `channel_id`, not `source_id` — presenters are a property of the s
 
 ### `agent_runs.agent_id` CHECK extension
 
-Existing: `('scout', 'scribe', 'analyst', 'stats', 'fixtures')`. Add `'presenter_scout'`.
+Existing: `('miner', 'scribe', 'analyst', 'stats', 'fixtures')`. Add `'presenter_miner'`.
 
 ## Agent shape
 
-`services/api/app/scout/presenter_research/agent.py` — mirrors Source Discovery with a tighter tool palette and a per-channel brief.
+`services/api/app/miner/presenter_research/agent.py` — mirrors Source Discovery with a tighter tool palette and a per-channel brief.
 
 **Tools:**
 - `web_search` (Anthropic-hosted, capped 3/run)
@@ -172,7 +172,7 @@ No streaming UI in v1. The agent run is fast (~30s); a spinner is fine.
 1. Migration `052_source_presenters.sql` (the two tables + CHECK extension).
 2. SQLAlchemy models + re-exports.
 3. `presenter_research/agent.py` agent loop (same shape as Source Discovery, swap prompt + tools).
-4. `presenter_research/cli.py` + `make scout-presenters CHANNEL_ID=…`.
+4. `presenter_research/cli.py` + `make miner-presenters CHANNEL_ID=…`.
 5. End-to-end test on one channel (the "Bloke In A Bar" Apple/Spotify entry once it's onboarded as a `channels` row, or a YouTube channel like `bloke.shop`).
 
 ### Phase 2 — Review API + admin UI
@@ -183,7 +183,7 @@ No streaming UI in v1. The agent run is fast (~30s); a spinner is fine.
 ### Phase 3 — Compound with identification
 
 8. After confirm, expose `(channel_id, person_id)` to the visual_id / voice_id matchers as a strong prior. (This is "if the source's channel has 3 confirmed presenters and one of them face-matches at 0.7, that's enough" — softens the threshold for confirmed roster.)
-9. *(Stretch)* Auto-trigger a Presenter Scout run as the last step of `make collect-audio` for any new source whose channel has zero confirmed presenters. Background — never blocks ingestion.
+9. *(Stretch)* Auto-trigger a Presenter Miner run as the last step of `make collect-audio` for any new source whose channel has zero confirmed presenters. Background — never blocks ingestion.
 
 ## Open decisions
 
@@ -200,20 +200,20 @@ No streaming UI in v1. The agent run is fast (~30s); a spinner is fine.
 
 ## Documentation Updates
 
-- **NEW `docs/agents/system/presenter-scout.md`** — surface doc: tools, prompt, bounds, hand-off contract (candidate → Person + source_presenters), running, backlog. Mirrors `transcription-pipeline.md` shape.
+- **NEW `docs/agents/system/presenter-miner.md`** — surface doc: tools, prompt, bounds, hand-off contract (candidate → Person + source_presenters), running, backlog. Mirrors `transcription-pipeline.md` shape.
 - **`docs/agents/crew/analyst.md`** — note that confirmed `source_presenters` rows are surfaced to the visual_id / voice_id matchers as priors (after Phase 3).
-- **`docs/agents/system/README.md`** — add Presenter Scout to the agent registry.
-- **`docs/operations/data-catalogue/`** — `scout_presenter_candidates.md` and `source_presenters.md` already exist; keep them in sync if the schema changes.
-- **`README.md`** — add `make scout-presenters` to the dev cheatsheet.
+- **`docs/agents/system/README.md`** — add Presenter Miner to the agent registry.
+- **`docs/operations/data-catalogue/`** — `miner_presenter_candidates.md` and `source_presenters.md` already exist; keep them in sync if the schema changes.
+- **`README.md`** — add `make miner-presenters` to the dev cheatsheet.
 - **`docs/todo/speaker-identification-plan.md`** — cross-link Phase 5 (cross-modal compounding) with this plan: confirmed presenters are the natural starting roster for face/voice priors.
 
 ## Success criteria
 
-- Running `make scout-presenters CHANNEL_ID=<bloke-in-a-bar-channel-id>` writes 3–5 pending candidates (Denan Kemp, plus the regular panel) within 60s and under $0.10.
+- Running `make miner-presenters CHANNEL_ID=<bloke-in-a-bar-channel-id>` writes 3–5 pending candidates (Denan Kemp, plus the regular panel) within 60s and under $0.10.
 - Confirming the host candidate creates a `people` row + `source_presenters` row in one POST.
 - Re-running on the same channel does *not* re-file the still-pending or already-confirmed presenters.
 
 ## Related
 
 - [Speaker Identification](./speaker-identification-plan.md) — the matchers that consume confirmed presenters as priors (Phase 5).
-- [Scout (the original source-discovery agent)](../agents/system/ingestion.md) — same loop shape and audit pattern this extends.
+- [Miner (the original source-discovery agent)](../agents/system/ingestion.md) — same loop shape and audit pattern this extends.

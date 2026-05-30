@@ -14,7 +14,7 @@ tags: [area/operations, data-lineage]
 
 ## Extractor
 
-`scripts/data/populate/phase_stats.py` — `populate_player_match_stats()` walks `scout/nrlcom/match-centre/{competition}/...`, idempotent UPSERT on `(nrlcom_match_id, nrlcom_player_id)`. ~10,384 rows × 59 fields shipped.
+`scripts/data/populate/phase_stats.py` — `populate_player_match_stats()` walks `miner/nrlcom/match-centre/{competition}/...`, idempotent UPSERT on `(nrlcom_match_id, nrlcom_player_id)`. ~10,384 rows × 59 fields shipped.
 
 Resolution:
 - `match_id`: lookup on `matches.external_match_id`

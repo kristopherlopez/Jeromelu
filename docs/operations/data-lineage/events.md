@@ -17,7 +17,7 @@ tags: [area/operations, data-lineage]
 - `services/worker-publishing/app/activities/generate_events.py` — Temporal activity that emits feed events. Per [[project_temporal_not_in_prod]] the worker isn't deployed today.
 - `services/api/app/routers/feed.py` — API surface for the activity feed; reads + can emit events directly
 - Plus opportunistic emitters across the system:
-  - Scout pipelines emit `display_mode='watching'` / `'thinking'` events as they discover content
+  - Miner pipelines emit `display_mode='watching'` / `'thinking'` events as they discover content
   - Reasoning agents emit `display_mode='signal'` / `'prediction'` / `'action'` events
   - Wiki edits emit `display_mode='review'` events
   - System lifecycle emits `display_mode='sys'` events
@@ -28,7 +28,7 @@ tags: [area/operations, data-lineage]
 | DB column | Source | Notes |
 |---|---|---|
 | `event_id` | derived | UUID, DB-side default |
-| `event_type` | writer | Free-text category (e.g. `scout.discovered`, `analyst.diarised`) |
+| `event_type` | writer | Free-text category (e.g. `miner.discovered`, `analyst.diarised`) |
 | `related_entity_ids` | writer | UUID array (legacy polymorphic — pre-mig-038) |
 | `related_decision_id` | writer | FK → decisions |
 | `related_prediction_id` | writer | FK → predictions |

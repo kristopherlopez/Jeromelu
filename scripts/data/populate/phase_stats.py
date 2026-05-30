@@ -1,4 +1,4 @@
-"""Phase 2d — extract player_match_stats from scout/nrlcom/match-centre/* archives.
+"""Phase 2d — extract player_match_stats from miner/nrlcom/match-centre/* archives.
 
 One row per (match, player). Idempotent UPSERT on the
 uq_player_match_stats_match_player unique index (nrlcom_match_id, nrlcom_player_id).
@@ -208,7 +208,7 @@ def populate_player_match_stats(
         len(team_map), len(match_map), len(player_map),
     )
 
-    keys = list_keys(f"scout/nrlcom/match-centre/{competition}/")
+    keys = list_keys(f"miner/nrlcom/match-centre/{competition}/")
     if seasons:
         season_strs = {f"/{s}/" for s in seasons}
         keys = [k for k in keys if any(s in k for s in season_strs)]

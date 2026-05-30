@@ -1,7 +1,7 @@
-"""Admin endpoints for reviewing and promoting Scout's discovered candidates.
+"""Admin endpoints for reviewing and promoting Miner's discovered candidates.
 
 Workflow:
-  Scout fills `scout_candidates` (status='pending').
+  Miner fills `miner_candidates` (status='pending').
   Reviewer hits these endpoints to approve / reject candidates.
   Approval promotes a row into the canonical tables:
     - kind='channel' → INSERT channels row + INSERT channel-type wiki_pages row
@@ -22,13 +22,13 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
-from jeromelu_shared.db import Channel, ChannelMetric, ScoutCandidate, Source, WikiPage
+from jeromelu_shared.db import Channel, ChannelMetric, MinerCandidate, Source, WikiPage
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from ..deps import get_db
-from ..scout.youtube.refresh import (
+from ..miner.youtube.refresh import (
     audit_channel_coverage,
     run_youtube_channel_stats,
     run_youtube_channel_videos,
@@ -65,9 +65,9 @@ def _unique_slug(session: Session, model, slug_col, base: str) -> str:
 
 
 def _normalised_youtube_metrics(metadata: dict[str, Any] | None) -> dict[str, Any]:
-    """Pull YouTube stats from a scout_candidates.metadata_json dict and
+    """Pull YouTube stats from a miner_candidates.metadata_json dict and
     normalise into the canonical channel_metrics shape. Handles the early
-    'subs' / 'subscribers' key inconsistency Scout produced before we pinned
+    'subs' / 'subscribers' key inconsistency Miner produced before we pinned
     the schema."""
     md = metadata or {}
     subs = md.get("subscribers") or md.get("subs")
@@ -122,17 +122,17 @@ def list_candidates(
     db: Session = Depends(get_db),
 ):
     """List discovered candidates, default to status=pending."""
-    q = db.query(ScoutCandidate)
+    q = db.query(MinerCandidate)
     if status:
-        q = q.filter(ScoutCandidate.status == status)
+        q = q.filter(MinerCandidate.status == status)
     if kind:
-        q = q.filter(ScoutCandidate.kind == kind)
+        q = q.filter(MinerCandidate.kind == kind)
     if min_score is not None:
-        q = q.filter(ScoutCandidate.score >= min_score)
+        q = q.filter(MinerCandidate.score >= min_score)
     rows = (
         q.order_by(
-            ScoutCandidate.score.desc().nullslast(),
-            ScoutCandidate.discovered_at.desc(),
+            MinerCandidate.score.desc().nullslast(),
+            MinerCandidate.discovered_at.desc(),
         )
         .limit(limit)
         .all()
@@ -164,7 +164,7 @@ def list_candidates(
 
 @router.get("/admin/recon/candidates/{candidate_id}", dependencies=[Depends(require_admin)])
 def get_candidate(candidate_id: UUID, db: Session = Depends(get_db)):
-    row = db.get(ScoutCandidate, candidate_id)
+    row = db.get(MinerCandidate, candidate_id)
     if not row:
         raise HTTPException(status_code=404, detail="Candidate not found")
     return {
@@ -205,14 +205,14 @@ def approve_candidate(
     body: dict[str, Any] = Body(default_factory=dict),
     db: Session = Depends(get_db),
 ):
-    """Promote a scout_candidates row into the canonical tables.
+    """Promote a miner_candidates row into the canonical tables.
 
     For kind='channel': insert into channels + wiki_pages.
     For kind='video':   insert into sources.
 
     Idempotent — re-approving an already-approved row is a no-op.
     """
-    row = db.get(ScoutCandidate, candidate_id)
+    row = db.get(MinerCandidate, candidate_id)
     if not row:
         raise HTTPException(status_code=404, detail="Candidate not found")
 
@@ -317,7 +317,7 @@ def approve_candidate(
 
         # Backfill the channel's videos as `sources` rows + snapshot initial
         # video stats. Wrapped in a try/except so a YouTube API hiccup never
-        # rolls back the approval — the admin can re-run via /admin/scout/
+        # rolls back the approval — the admin can re-run via /admin/miner/
         # refresh-videos to recover.
         enumerate_result: dict[str, Any] | None = None
         if channel_id and row.platform == "youtube":
@@ -404,7 +404,7 @@ def reject_candidate(
     body: dict[str, Any] = Body(default_factory=dict),
     db: Session = Depends(get_db),
 ):
-    row = db.get(ScoutCandidate, candidate_id)
+    row = db.get(MinerCandidate, candidate_id)
     if not row:
         raise HTTPException(status_code=404, detail="Candidate not found")
 
@@ -429,8 +429,8 @@ def reject_candidate(
 @router.get("/admin/recon/stats", dependencies=[Depends(require_admin)])
 def stats(db: Session = Depends(get_db)):
     rows = (
-        db.query(ScoutCandidate.status, ScoutCandidate.kind, func.count())
-        .group_by(ScoutCandidate.status, ScoutCandidate.kind)
+        db.query(MinerCandidate.status, MinerCandidate.kind, func.count())
+        .group_by(MinerCandidate.status, MinerCandidate.kind)
         .all()
     )
     by_status: dict[str, dict[str, int]] = {}
@@ -440,12 +440,12 @@ def stats(db: Session = Depends(get_db)):
 
 
 # ---------------------------------------------------------------------------
-# POST — daily Scout refresh job
+# POST — daily Miner refresh job
 # ---------------------------------------------------------------------------
 
 
 @router.post(
-    "/admin/scout/refresh-videos",
+    "/admin/miner/refresh-videos",
     dependencies=[Depends(require_admin)],
 )
 def refresh_videos(
@@ -491,7 +491,7 @@ def _resolve_channel(db: Session, channel_ref: str) -> Channel:
 
 
 @router.post(
-    "/admin/scout/channels/{channel_ref}/refresh-videos",
+    "/admin/miner/channels/{channel_ref}/refresh-videos",
     dependencies=[Depends(require_admin)],
 )
 def refresh_one_channel_videos(
@@ -522,7 +522,7 @@ def refresh_one_channel_videos(
 
 
 @router.post(
-    "/admin/scout/refresh-channel-stats",
+    "/admin/miner/refresh-channel-stats",
     dependencies=[Depends(require_admin)],
 )
 def refresh_channel_stats(db: Session = Depends(get_db)):
@@ -530,7 +530,7 @@ def refresh_channel_stats(db: Session = Depends(get_db)):
 
     Cheap (~1 quota unit per 50 channels — 3 units for the projected ~150
     channel scale). Kept on its own endpoint so the channel-stats snapshot
-    runs even if the heavier /admin/scout/refresh-videos job fails.
+    runs even if the heavier /admin/miner/refresh-videos job fails.
     """
     return run_youtube_channel_stats(db)
 
@@ -540,7 +540,7 @@ def refresh_channel_stats(db: Session = Depends(get_db)):
 # ---------------------------------------------------------------------------
 
 
-@router.get("/admin/scout/channel-coverage")
+@router.get("/admin/miner/channel-coverage")
 def channel_coverage(
     only_gaps: bool = Query(default=False),
     db: Session = Depends(get_db),
@@ -551,7 +551,7 @@ def channel_coverage(
 
     `?only_gaps=true` filters to channels where ingested < reported. Pure DB
     read — no YouTube API calls. Freshness depends on the daily
-    /admin/scout/refresh-channel-stats cron keeping channel_metrics current.
+    /admin/miner/refresh-channel-stats cron keeping channel_metrics current.
 
     Read-only — matches the unauthenticated pattern of other inspection
     endpoints (/admin/pipeline, /admin/sync-status) so the dev-only admin UI

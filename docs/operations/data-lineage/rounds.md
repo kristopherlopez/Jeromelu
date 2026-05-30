@@ -14,15 +14,15 @@ tags: [area/operations, data-lineage]
 
 ## Extractor
 
-`scripts/data/populate/phase_rounds.py` — `populate_rounds()` walks `scout/nrlcom/draw/{competition}/{season}/round-{NN}.json`, idempotent UPSERT on `(season, round_number)`.
+`scripts/data/populate/phase_rounds.py` — `populate_rounds()` walks `miner/nrlcom/draw/{competition}/{season}/round-{NN}.json`, idempotent UPSERT on `(season, round_number)`.
 
 ## Field mapping
 
 | DB column | Source | Source field | Notes |
 |---|---|---|---|
 | `round_id` | derived | — | UUID, DB-side default |
-| `season` | S3 key | `scout/.../{season}/...` | Parsed from key path |
-| `round_number` | S3 key | `scout/.../round-{NN}.json` | Parsed from key path |
+| `season` | S3 key | `miner/.../{season}/...` | Parsed from key path |
+| `round_number` | S3 key | `miner/.../round-{NN}.json` | Parsed from key path |
 | `round_label` | draw | `$.filterRounds[*].name` where `value == round_number` | Falls back to `"Round {N}"` if no match |
 | `starts_at` | draw | `MIN($.fixtures[*].clock.kickOffTimeLong)` | |
 | `ends_at` | draw | `MAX($.fixtures[*].clock.kickOffTimeLong)` | |

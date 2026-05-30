@@ -15,9 +15,9 @@ tags: [area/architecture, area/operations]
 >
 > Other related docs:
 > - [`docs/pages/wiki/data-feeds.md`](../pages/wiki/data-feeds.md) — wiki-centric "what feeds the wiki" view
-> - [`docs/agents/crew/scout/README.md`](../agents/crew/scout/README.md) — Scout's pipeline inventory
-> - [`docs/architecture/../agents/crew/scout/charter.md`](../agents/crew/scout/charter.md) — the charter governing all this
-> - Per-pipeline `services/api/app/scout/{pipeline}/README.md` — implementation details
+> - [`docs/agents/crew/miner/README.md`](../agents/crew/miner/README.md) — Miner's pipeline inventory
+> - [`docs/architecture/../agents/crew/miner/charter.md`](../agents/crew/miner/charter.md) — the charter governing all this
+> - Per-pipeline `services/api/app/miner/{pipeline}/README.md` — implementation details
 
 ---
 
@@ -30,11 +30,11 @@ Every piece of structured NRL data in Jeromelu transits three layers:
 │ LAYER 1 — Source (external)                                  │
 │   nrl.com · supercoach.com.au · nrlsupercoachstats.com        │
 └──────────────────────────────────────────────────────────────┘
-                       │  (Scout pipelines per D9)
+                       │  (Miner pipelines per D9)
                        ▼
 ┌──────────────────────────────────────────────────────────────┐
 │ LAYER 2 — S3 archive (durable, idempotent)                   │
-│   s3://jeromelu-clean-documents/scout/{source}/{pipeline}/   │
+│   s3://jeromelu-clean-documents/miner/{source}/{pipeline}/   │
 │   Raw JSON snapshots. 8,940+ objects, 557 MB.                │
 └──────────────────────────────────────────────────────────────┘
                        │  (Extractors, downstream per D13)
@@ -54,7 +54,7 @@ Every piece of structured NRL data in Jeromelu transits three layers:
 
 - L1 → L2: every fetch is idempotent (deterministic S3 key per identity). Re-runs overwrite the same key.
 - L2 → L3: extractors are derived. Drop a DB table, replay extractors, the table comes back. No need to re-fetch L1.
-- **L1 is never trusted as authoritative for derived facts** — L2 is. The trust hierarchy ([D11](../agents/crew/scout/charter.md)) is applied at extraction time, not capture time.
+- **L1 is never trusted as authoritative for derived facts** — L2 is. The trust hierarchy ([D11](../agents/crew/miner/charter.md)) is applied at extraction time, not capture time.
 
 ---
 
@@ -62,19 +62,19 @@ Every piece of structured NRL data in Jeromelu transits three layers:
 
 > **Note (2026-05-15):** the tables below are a frozen snapshot. Authoritative per-table lineage now lives at [`docs/operations/data-lineage/<table>.md`](../operations/data-lineage/README.md). Don't edit these tables in place — open the per-table file instead.
 
-For each domain concept, we trace: **external source → Scout pipeline → S3 path → extractor → DB table(s)**.
+For each domain concept, we trace: **external source → Miner pipeline → S3 path → extractor → DB table(s)**.
 
 ### Players (identity layer)
 
 | Field | Source | S3 archive | Extractor | DB target |
 |---|---|---|---|---|
-| `canonical_name`, `slug`, `aliases` | SC `players-cf` (first_name + last_name) | `scout/supercoach/classic/players-cf/{season}/{YYYYMMDD}.json` | `scout/supercoach_roster/` (shipped) | `people.canonical_name`, `.slug`, `.aliases` |
-| `supercoach_id` | SC `players-cf` `id` | same as above | `scout/supercoach_roster/` | `people.supercoach_id` |
-| `nrlcom_player_id` | nrl.com match-centre `players[].playerId`, players-data `playerId`, casualty `url` slug | `scout/nrlcom/match-centre/*` ⊕ `scout/nrlcom/players-roster/*` | Future extractor — name-match against `people` rows, set `people.nrlcom_player_id` | `people.nrlcom_player_id` (column added in migration 062) |
-| `dob`, `country`, `image_url` | nrl.com `players-data` profile fields | `scout/nrlcom/players-roster/{comp}/team-{id}.json` | Existing `jeromelu_shared/players/nrlcom_refresh.py` (folder-organise as Phase 4.5) | `people.dob`, `.country`, `.image_url` |
-| `position` (eligibility) | SC `players-cf` `positions[0]` (primary), `positions[]` (all eligible) | SC archive | `scout/supercoach_roster/` (existing) | `player_attributes.primary_position` (SCD-2); full list in `player_attributes.metadata_json.eligible_positions` |
-| `team` (SCD-2) | SC `players-cf` `team.abbrev` → slug lookup | SC archive | `scout/supercoach_roster/` | `player_attributes.team_id` (SCD-2 close-current-open-new on diff) |
-| Role tenure | SC roster (player), nrl.com match-centre coaches (coach), Analyst diarisation (advisor, future) | various | `scout/supercoach_roster/` (player); `scout/nrlcom_match_centre/` extractor (coach) | `people_roles` (one row per tenure window per role) |
+| `canonical_name`, `slug`, `aliases` | SC `players-cf` (first_name + last_name) | `miner/supercoach/classic/players-cf/{season}/{YYYYMMDD}.json` | `miner/supercoach_roster/` (shipped) | `people.canonical_name`, `.slug`, `.aliases` |
+| `supercoach_id` | SC `players-cf` `id` | same as above | `miner/supercoach_roster/` | `people.supercoach_id` |
+| `nrlcom_player_id` | nrl.com match-centre `players[].playerId`, players-data `playerId`, casualty `url` slug | `miner/nrlcom/match-centre/*` ⊕ `miner/nrlcom/players-roster/*` | Future extractor — name-match against `people` rows, set `people.nrlcom_player_id` | `people.nrlcom_player_id` (column added in migration 062) |
+| `dob`, `country`, `image_url` | nrl.com `players-data` profile fields | `miner/nrlcom/players-roster/{comp}/team-{id}.json` | Existing `jeromelu_shared/players/nrlcom_refresh.py` (folder-organise as Phase 4.5) | `people.dob`, `.country`, `.image_url` |
+| `position` (eligibility) | SC `players-cf` `positions[0]` (primary), `positions[]` (all eligible) | SC archive | `miner/supercoach_roster/` (existing) | `player_attributes.primary_position` (SCD-2); full list in `player_attributes.metadata_json.eligible_positions` |
+| `team` (SCD-2) | SC `players-cf` `team.abbrev` → slug lookup | SC archive | `miner/supercoach_roster/` | `player_attributes.team_id` (SCD-2 close-current-open-new on diff) |
+| Role tenure | SC roster (player), nrl.com match-centre coaches (coach), Analyst diarisation (advisor, future) | various | `miner/supercoach_roster/` (player); `miner/nrlcom_match_centre/` extractor (coach) | `people_roles` (one row per tenure window per role) |
 
 **Identity-resolution note:** `people` is a **union** of all three external sources. The SC roster is the primary writer (550 current SC-eligible). nrlsupercoachstats expands the historical set (1,292 distinct 2018-2026). nrl.com match-centre adds anyone who's played a match since 2000 (potentially ~2,000 in total). Cross-source IDs are stored on the same `people` row as `supercoach_id` / `nrlcom_player_id`.
 
@@ -83,16 +83,16 @@ For each domain concept, we trace: **external source → Scout pipeline → S3 p
 | Field | Source | S3 archive | Extractor | DB target |
 |---|---|---|---|---|
 | `slug`, `name`, `short_name`, `aliases` | Seed scripts | n/a | `scripts/data/seed_teams.py` (one-shot) | `teams` (seeded once per season) |
-| `nrlcom_team_id` | nrl.com match-centre `homeTeam.teamId` / `awayTeam.teamId`; `/draw/data` `filterTeams[].value` | `scout/nrlcom/draw/*` (filterTeams), `scout/nrlcom/match-centre/*` | Future extractor — name/short-name match | `teams.nrlcom_team_id` (column added in migration 062) |
-| `metadata_json.supercoach` (SC id + abbrev + competition) | SC `/teams` endpoint | `scout/supercoach/classic/teams/{season}.json` | `scout/supercoach_teams/` (shipped) | `teams.metadata_json.supercoach = {id, abbrev, feed_name, name, competition}` |
+| `nrlcom_team_id` | nrl.com match-centre `homeTeam.teamId` / `awayTeam.teamId`; `/draw/data` `filterTeams[].value` | `miner/nrlcom/draw/*` (filterTeams), `miner/nrlcom/match-centre/*` | Future extractor — name/short-name match | `teams.nrlcom_team_id` (column added in migration 062) |
+| `metadata_json.supercoach` (SC id + abbrev + competition) | SC `/teams` endpoint | `miner/supercoach/classic/teams/{season}.json` | `miner/supercoach_teams/` (shipped) | `teams.metadata_json.supercoach = {id, abbrev, feed_name, name, competition}` |
 | `logo_url`, `competition` | Seed + manual | — | — | `teams.logo_url`, `.competition` |
 
 ### Matches (the fixture spine)
 
 | Field | Source | S3 archive | Extractor | DB target |
 |---|---|---|---|---|
-| `external_match_id` | nrl.com match-centre `matchId` | `scout/nrlcom/match-centre/*` | Future `extract_matches` | `matches.external_match_id` |
-| `season`, `round`, `round_label` | nrl.com `/draw/data` filterRounds + match-centre `roundNumber`/`roundTitle` | `scout/nrlcom/draw/*` ⊕ `scout/nrlcom/match-centre/*` | `extract_matches` | `matches.season`, `.round`, `.round_label` |
+| `external_match_id` | nrl.com match-centre `matchId` | `miner/nrlcom/match-centre/*` | Future `extract_matches` | `matches.external_match_id` |
+| `season`, `round`, `round_label` | nrl.com `/draw/data` filterRounds + match-centre `roundNumber`/`roundTitle` | `miner/nrlcom/draw/*` ⊕ `miner/nrlcom/match-centre/*` | `extract_matches` | `matches.season`, `.round`, `.round_label` |
 | `home_team_id`, `away_team_id` | nrl.com `homeTeam.teamId` / `awayTeam.teamId` | match-centre | `extract_matches` (JOIN on `teams.nrlcom_team_id`) | `matches.home_team_id`, `.away_team_id` |
 | `home_score`, `away_score` | nrl.com match-centre `homeTeam.score`, `awayTeam.score` | match-centre | `extract_matches` | `matches.home_score`, `.away_score` |
 | `kickoff_at` | nrl.com `/draw/data` `clock.kickOffTimeLong` | draw | `extract_matches` | `matches.kickoff_at` |
@@ -104,11 +104,11 @@ For each domain concept, we trace: **external source → Scout pipeline → S3 p
 
 ### Match team lists (lineups)
 
-Per [D11](../agents/crew/scout/charter.md) trust hierarchy + the captured shape:
+Per [D11](../agents/crew/miner/charter.md) trust hierarchy + the captured shape:
 
 | Field | Source | S3 archive | Extractor | DB target |
 |---|---|---|---|---|
-| `match_id` | Resolved from match-centre `matchId` | `scout/nrlcom/match-centre/*` | `extract_match_team_lists` | `match_team_lists.match_id` |
+| `match_id` | Resolved from match-centre `matchId` | `miner/nrlcom/match-centre/*` | `extract_match_team_lists` | `match_team_lists.match_id` |
 | `team_id` | `homeTeam.teamId` / `awayTeam.teamId` (via `teams.nrlcom_team_id`) | match-centre | extractor | `match_team_lists.team_id` |
 | `player_id` | match-centre `homeTeam.players[].playerId` | match-centre | extractor — `JOIN people ON nrlcom_player_id` | `match_team_lists.player_id` |
 | `jersey_number` | match-centre `homeTeam.players[].number` | match-centre | extractor | `match_team_lists.jersey_number` |
@@ -122,7 +122,7 @@ Per [D11](../agents/crew/scout/charter.md) trust hierarchy + the captured shape:
 
 | Field | Source | S3 archive | Extractor | DB target |
 |---|---|---|---|---|
-| All 59 fields (tries, tackles, run metres, kicks, etc.) | nrl.com match-centre `stats.players.{homeTeam,awayTeam}[]` | `scout/nrlcom/match-centre/*` | `extract_player_match_stats` | `player_match_stats` (migration 056 — has all 59 columns) |
+| All 59 fields (tries, tackles, run metres, kicks, etc.) | nrl.com match-centre `stats.players.{homeTeam,awayTeam}[]` | `miner/nrlcom/match-centre/*` | `extract_player_match_stats` | `player_match_stats` (migration 056 — has all 59 columns) |
 | `nrlcom_player_id` | match-centre `stats.players[*].playerId` | same | extractor | `player_match_stats.nrlcom_player_id` |
 | `person_id` (FK) | Resolved via `people.nrlcom_player_id = nrlcom_player_id` | — | extractor | `player_match_stats.person_id` |
 | `raw_payload` | Full per-player block (forensic capture) | same | extractor | `player_match_stats.raw_payload` (JSONB) |
@@ -131,7 +131,7 @@ Per [D11](../agents/crew/scout/charter.md) trust hierarchy + the captured shape:
 
 | Field | Source | S3 archive | Extractor | DB target |
 |---|---|---|---|---|
-| `event_type` | match-centre `timeline[].type` (Try, Goal, Penalty, KickBomb, etc.) | `scout/nrlcom/match-centre/*` | `extract_match_timeline` | `match_timeline.event_type` |
+| `event_type` | match-centre `timeline[].type` (Try, Goal, Penalty, KickBomb, etc.) | `miner/nrlcom/match-centre/*` | `extract_match_timeline` | `match_timeline.event_type` |
 | `title`, `game_seconds`, `nrlcom_team_id` | match-centre `timeline[].title`, `.gameSeconds`, `.teamId` | same | extractor | `match_timeline.title`, `.game_seconds`, `.nrlcom_team_id` |
 | `team_id` | Resolved via teams.nrlcom_team_id | same | extractor | `match_timeline.team_id` |
 | `nrlcom_player_id`, `person_id` | match-centre `timeline[].playerId` (present on Try/Goal/Error/etc.) | same | extractor (JOIN people on nrlcom_player_id) | `match_timeline.nrlcom_player_id`, `.person_id` |
@@ -148,21 +148,21 @@ Per [D11](../agents/crew/scout/charter.md) trust hierarchy + the captured shape:
 
 ### Player rounds (SuperCoach overlay)
 
-`player_rounds` is the SC scoring-breakdown table. Per [D11](../agents/crew/scout/charter.md), the SC scoring components (`base`/`attack`/`playmaking`/`power`/`negative`) only exist in nrlsupercoachstats.
+`player_rounds` is the SC scoring-breakdown table. Per [D11](../agents/crew/miner/charter.md), the SC scoring components (`base`/`attack`/`playmaking`/`power`/`negative`) only exist in nrlsupercoachstats.
 
 | Field | Source | S3 archive | Extractor | DB target |
 |---|---|---|---|---|
-| Identity (`player_id`, `player_name`, `team`, `position`, `round`, `season`) | nrlsupercoachstats jqGrid row identity | `scout/nrlsupercoachstats/stats/{season}/round-{NN}.json` | `extract_player_rounds` (currently inline in `scout/supercoach_stats/routes.py`) | `player_rounds.player_id`, etc. |
+| Identity (`player_id`, `player_name`, `team`, `position`, `round`, `season`) | nrlsupercoachstats jqGrid row identity | `miner/nrlsupercoachstats/stats/{season}/round-{NN}.json` | `extract_player_rounds` (currently inline in `miner/supercoach_stats/routes.py`) | `player_rounds.player_id`, etc. |
 | SC scoring breakdown + raw counts + percentages (50+ fields) | jqGrid extracted columns | same | extractor | `player_rounds.base`, `.attack`, `.playmaking`, `.power`, `.negative`, tries, tackles, etc. |
 | `price`, `start_price`, `end_price`, `magic_number`, etc. | jqGrid Price/StartPrice/EndPrice/etc. | same | extractor | `player_rounds.price`, … |
-| Lookahead overlay (SC.com.au): `opp1/opp2/opp3`, `ven1/ven2/ven3`, `ppts`, `owned`, `mvp_value`, `position_ranks` | SC `players-cf` `player_stats[]` | `scout/supercoach/classic/players-cf/*` | Future SC overlay extractor | `player_rounds.metadata_json.sc_lookahead` (after Tier 2 migration adds `metadata_json` to player_rounds) |
+| Lookahead overlay (SC.com.au): `opp1/opp2/opp3`, `ven1/ven2/ven3`, `ppts`, `owned`, `mvp_value`, `position_ranks` | SC `players-cf` `player_stats[]` | `miner/supercoach/classic/players-cf/*` | Future SC overlay extractor | `player_rounds.metadata_json.sc_lookahead` (after Tier 2 migration adds `metadata_json` to player_rounds) |
 | `match_id` (FK) | Resolved via (team, season, round) → `matches` | — | extractor | `player_rounds.match_id` |
 
 ### Injuries (casualty ward)
 
 | Field | Source | S3 archive | Extractor | DB target |
 |---|---|---|---|---|
-| `first_name`, `last_name`, `team`, `injury` (body part), `expected_return` | nrl.com casualty `casualties[].firstName/.lastName/.teamNickname/.injury/.expectedReturn` | `scout/nrlcom/casualty-ward/{comp}/{YYYYMMDD}.json` | `extract_injuries` | `injuries.first_name` (no — `people` JOIN), `.body_part` (from `injury` text), `.expected_return_round` (parse "Round 11" → 11), `.team_id`, `.player_id` |
+| `first_name`, `last_name`, `team`, `injury` (body part), `expected_return` | nrl.com casualty `casualties[].firstName/.lastName/.teamNickname/.injury/.expectedReturn` | `miner/nrlcom/casualty-ward/{comp}/{YYYYMMDD}.json` | `extract_injuries` | `injuries.first_name` (no — `people` JOIN), `.body_part` (from `injury` text), `.expected_return_round` (parse "Round 11" → 11), `.team_id`, `.player_id` |
 | `player_id` | Resolved via name+team → `people` | — | extractor | `injuries.player_id` |
 | `reported_at`, `resolved_at` | Diffing snapshots — first appearance = reported, first absence = resolved | same | extractor (state-machine over daily snapshots) | `injuries.reported_at`, `.resolved_at` |
 | `source` | `"nrl.com/casualty-ward"` | — | extractor | `injuries.source` |
@@ -171,7 +171,7 @@ Per [D11](../agents/crew/scout/charter.md) trust hierarchy + the captured shape:
 
 | Field | Source | S3 archive | Extractor | DB target |
 |---|---|---|---|---|
-| `team_id`, `nrlcom_team_nickname` | nrl.com ladder `positions[].teamNickname` | `scout/nrlcom/ladder/{comp}/{season}/round-{NN}.json` | `extract_team_standings` | `team_standings.team_id` (via name lookup), `.nrlcom_team_nickname` |
+| `team_id`, `nrlcom_team_nickname` | nrl.com ladder `positions[].teamNickname` | `miner/nrlcom/ladder/{comp}/{season}/round-{NN}.json` | `extract_team_standings` | `team_standings.team_id` (via name lookup), `.nrlcom_team_nickname` |
 | `ladder_position`, `movement` | `positions[]` order + `.movement` | same | extractor | `team_standings.ladder_position`, `.movement` |
 | 22 metrics: `played`, `wins`, `lost`, `drawn`, `byes`, `points`, `points_for`, `points_against`, `points_difference`, `bonus_points`, `form`, `streak`, `home_record`, `away_record`, `day_record`, `night_record`, `average_winning_margin`, `average_losing_margin`, `close_games`, `golden_point`, `players_used`, `odds` | `positions[].stats.*` (dict with 22 keys) | same | extractor | `team_standings.*` (migration 059 has all 22 columns) |
 | `raw_payload` | Full position dict | same | extractor | `team_standings.raw_payload` (JSONB) |
@@ -180,18 +180,18 @@ Per [D11](../agents/crew/scout/charter.md) trust hierarchy + the captured shape:
 
 | Field | Source | S3 archive | Extractor | DB target |
 |---|---|---|---|---|
-| `scope` ('player' / 'team'), `category`, `subgroup`, `stat_title`, `stat_id` | nrl.com stats `playerStats[]` / `teamStats[]` (with `groups[].title`, `groups[].stats[]`) | `scout/nrlcom/stats/{comp}/{season}.json` | `extract_stat_leaderboards` | `stat_leaderboards.scope`, `.category`, `.subgroup`, `.stat_title`, `.stat_id` |
+| `scope` ('player' / 'team'), `category`, `subgroup`, `stat_title`, `stat_id` | nrl.com stats `playerStats[]` / `teamStats[]` (with `groups[].title`, `groups[].stats[]`) | `miner/nrlcom/stats/{comp}/{season}.json` | `extract_stat_leaderboards` | `stat_leaderboards.scope`, `.category`, `.subgroup`, `.stat_title`, `.stat_id` |
 | `leader_position`, `leader_first_name`, `leader_last_name`, `leader_team_nickname`, `leader_value` | `stats[].leaders[]` array (top-25 per stat) | same | extractor | `stat_leaderboards.leader_*` |
 | `person_id` (player scope) | Resolved via `people.nrlcom_player_id = leader.playerId` | same | extractor | `stat_leaderboards.person_id` |
 | `team_id` (team scope) | Resolved via teams.nrlcom_team_id | same | extractor | `stat_leaderboards.team_id` |
 
 ### SC editorial claims (notes → wiki content)
 
-This pipeline is **already shipped end-to-end** — no extractor needed. It runs inline in `scout/supercoach_roster/` and writes directly to DB.
+This pipeline is **already shipped end-to-end** — no extractor needed. It runs inline in `miner/supercoach_roster/` and writes directly to DB.
 
 | Field | Source | S3 archive | Code path | DB target |
 |---|---|---|---|---|
-| `quoted_text` | SC `notes[].note` | `scout/supercoach/classic/players-cf/*` | `scout/supercoach_roster/notes_extractor.py` (shipped) | `quotes.quoted_text` |
+| `quoted_text` | SC `notes[].note` | `miner/supercoach/classic/players-cf/*` | `miner/supercoach_roster/notes_extractor.py` (shipped) | `quotes.quoted_text` |
 | `speaker_person_id` | Synthetic SC Editorial entity (UUID `aaaaaaaa-...-000000000001`) | seeded via migration 061 | same | `quotes.speaker_person_id` |
 | `said_at_reference` | SC `notes[].created_on` (ISO timestamp) | same | same | `quotes.said_at_reference` |
 | `claim_type` | Keyword heuristic over note text | same | `notes_extractor.classify_claim_type()` | `claims.claim_type` |
@@ -205,7 +205,7 @@ This pipeline is **already shipped end-to-end** — no extractor needed. It runs
 
 | Field | Source | S3 archive | Extractor | DB target |
 |---|---|---|---|---|
-| All settings (competition/content/game/system) | SC `/settings` JSON envelope (4 top-level keys, ~100 leaf fields) | `scout/supercoach/{mode}/settings/{season}/{YYYYMMDD}.json` | Inline in `scout/supercoach_settings/routes.py` (shipped) | `sc_settings.payload` (JSONB — whole payload stored unsliced) |
+| All settings (competition/content/game/system) | SC `/settings` JSON envelope (4 top-level keys, ~100 leaf fields) | `miner/supercoach/{mode}/settings/{season}/{YYYYMMDD}.json` | Inline in `miner/supercoach_settings/routes.py` (shipped) | `sc_settings.payload` (JSONB — whole payload stored unsliced) |
 | `season`, `mode` | Captured per call | same | same | `sc_settings.season`, `.mode` (idempotent on `(season, captured_date, mode)`) |
 
 ---
@@ -214,28 +214,28 @@ This pipeline is **already shipped end-to-end** — no extractor needed. It runs
 
 For each DB table, which S3 archives populate it, and via which code path.
 
-| DB table | S3 archive(s) | Extractor | Status | Trust source per [D11](../agents/crew/scout/charter.md) |
+| DB table | S3 archive(s) | Extractor | Status | Trust source per [D11](../agents/crew/miner/charter.md) |
 |---|---|---|---|---|
-| `people` | `scout/supercoach/classic/players-cf/*` (primary) + `scout/nrlcom/match-centre/*` (coaches + nrlcom IDs) + `scout/nrlsupercoachstats/stats/*` (historical union, pending) | `scout/supercoach_roster/` + `scripts/data/populate/phase_identity.py` (nrlcom IDs + coaches) ⊕ future `extract_people_history` (for the 735 historical-only players) | ✅ shipped (593 = 572 SC + 21 coaches; 516 have nrlcom_player_id) / 🟡 history pending | SC for SC-eligible roster; nrl.com for biographical (DOB, image) + coaches |
-| `player_attributes` | SC roster + nrl.com profile enrichment | `scout/supercoach_roster/` (SCD-2 close/open on diff) | ✅ shipped | SC for team/position; nrl.com for height/weight/contract |
-| `people_roles` | SC roster (player), match-centre coaches (coach), Analyst diarisation (advisor) | `scout/supercoach_roster/` (player); coach role is set via `people.metadata_json.role_class='coach'` from phase_identity (a proper `people_roles` row per coach tenure is a follow-up) | ✅ player roles shipped; ⚠️ coach roles tracked via metadata only; advisor pending | per role-class |
-| `teams` | Seeded once; `scout/supercoach/classic/teams/*` for SC ID enrichment; `scout/nrlcom/match-centre/*` for nrl.com ID | Seed + `scout/supercoach_teams/` + `scripts/data/populate/phase_identity.py` (nrl.com IDs) | ✅ shipped (17/19 NRL teams have nrlcom_team_id) | Seed for identity; nrl.com IDs from match-centre |
+| `people` | `miner/supercoach/classic/players-cf/*` (primary) + `miner/nrlcom/match-centre/*` (coaches + nrlcom IDs) + `miner/nrlsupercoachstats/stats/*` (historical union, pending) | `miner/supercoach_roster/` + `scripts/data/populate/phase_identity.py` (nrlcom IDs + coaches) ⊕ future `extract_people_history` (for the 735 historical-only players) | ✅ shipped (593 = 572 SC + 21 coaches; 516 have nrlcom_player_id) / 🟡 history pending | SC for SC-eligible roster; nrl.com for biographical (DOB, image) + coaches |
+| `player_attributes` | SC roster + nrl.com profile enrichment | `miner/supercoach_roster/` (SCD-2 close/open on diff) | ✅ shipped | SC for team/position; nrl.com for height/weight/contract |
+| `people_roles` | SC roster (player), match-centre coaches (coach), Analyst diarisation (advisor) | `miner/supercoach_roster/` (player); coach role is set via `people.metadata_json.role_class='coach'` from phase_identity (a proper `people_roles` row per coach tenure is a follow-up) | ✅ player roles shipped; ⚠️ coach roles tracked via metadata only; advisor pending | per role-class |
+| `teams` | Seeded once; `miner/supercoach/classic/teams/*` for SC ID enrichment; `miner/nrlcom/match-centre/*` for nrl.com ID | Seed + `miner/supercoach_teams/` + `scripts/data/populate/phase_identity.py` (nrl.com IDs) | ✅ shipped (17/19 NRL teams have nrlcom_team_id) | Seed for identity; nrl.com IDs from match-centre |
 | `venues` | Seeded; future enrichment from match-centre venue strings | Seed | ✅ seeded | Manual; nrl.com text is informational |
-| `matches` | `scout/nrlcom/match-centre/*` (primary) + `scout/nrlcom/draw/*` (round metadata, kickoff_at) | `scripts/data/populate/phase_matches.py` | ✅ shipped (408 rows 2025-2026, historical backfill in progress) | nrl.com canonical |
-| `match_team_lists` | `scout/nrlcom/match-centre/*` (positionGroups + players[] + coaches[]) | `scripts/data/populate/phase_team_lists.py` | ✅ shipped (10,447 rows incl. 584 coaches) | nrl.com canonical |
-| `player_match_stats` (migration 056) | `scout/nrlcom/match-centre/*` (stats.players.{homeTeam,awayTeam}[]) | `scripts/data/populate/phase_stats.py` | ✅ shipped (10,384 rows × 59 fields) | nrl.com canonical |
-| `match_timeline` (migration 057) | `scout/nrlcom/match-centre/*` (timeline[]) | `scripts/data/populate/phase_timeline.py` | ✅ shipped (31,563 events, running scores) | nrl.com canonical |
-| `match_officials` (migration 058) | `scout/nrlcom/match-centre/*` (officials[]) | `scripts/data/populate/phase_timeline.py` (combined w/ timeline) | ✅ shipped (948 rows) | nrl.com canonical |
-| `team_standings` (migration 059) | `scout/nrlcom/ladder/*` | `scripts/data/populate/phase_aux.py` | ✅ shipped (481 rows historical ladders) | nrl.com canonical |
-| `stat_leaderboards` (migration 060) | `scout/nrlcom/stats/*` | `scripts/data/populate/phase_aux.py` | ✅ shipped (4,594 rows 2013-2025) | nrl.com canonical |
-| `injuries` | `scout/nrlcom/casualty-ward/*` (daily diff) | `scripts/data/populate/phase_aux.py` (state-machine over snapshots) | ✅ shipped (98 active) | nrl.com canonical |
-| `rounds` | `scout/nrlcom/draw/*` (round-level metadata) | `scripts/data/populate/phase_rounds.py` | ✅ shipped (756 rounds 1908-2026) | nrl.com canonical |
-| `player_rounds` | `scout/nrlsupercoachstats/stats/*` (primary — SC scoring breakdown) + `scout/supercoach/classic/players-cf/*.player_stats[]` (SC lookahead overlay) | `scout/supercoach_stats/` (shipped, primary path) + future SC overlay extractor | ✅ primary shipped; 🟡 SC overlay pending | nrlsupercoachstats for scoring breakdown (only source); SC for lookahead/projection |
-| `sc_settings` (migration 055) | `scout/supercoach/{mode}/settings/*` | Inline in `scout/supercoach_settings/` | ✅ shipped | SC (only source) |
-| `quotes` | `scout/supercoach/classic/players-cf/*` (notes[]) — and future Analyst transcript extraction | `scout/supercoach_roster/notes_extractor.py` (shipped) + future Analyst pipeline | ✅ SC notes shipped (846 rows) | Analyst per-source attribution; synthetic SC Editorial for notes |
+| `matches` | `miner/nrlcom/match-centre/*` (primary) + `miner/nrlcom/draw/*` (round metadata, kickoff_at) | `scripts/data/populate/phase_matches.py` | ✅ shipped (408 rows 2025-2026, historical backfill in progress) | nrl.com canonical |
+| `match_team_lists` | `miner/nrlcom/match-centre/*` (positionGroups + players[] + coaches[]) | `scripts/data/populate/phase_team_lists.py` | ✅ shipped (10,447 rows incl. 584 coaches) | nrl.com canonical |
+| `player_match_stats` (migration 056) | `miner/nrlcom/match-centre/*` (stats.players.{homeTeam,awayTeam}[]) | `scripts/data/populate/phase_stats.py` | ✅ shipped (10,384 rows × 59 fields) | nrl.com canonical |
+| `match_timeline` (migration 057) | `miner/nrlcom/match-centre/*` (timeline[]) | `scripts/data/populate/phase_timeline.py` | ✅ shipped (31,563 events, running scores) | nrl.com canonical |
+| `match_officials` (migration 058) | `miner/nrlcom/match-centre/*` (officials[]) | `scripts/data/populate/phase_timeline.py` (combined w/ timeline) | ✅ shipped (948 rows) | nrl.com canonical |
+| `team_standings` (migration 059) | `miner/nrlcom/ladder/*` | `scripts/data/populate/phase_aux.py` | ✅ shipped (481 rows historical ladders) | nrl.com canonical |
+| `stat_leaderboards` (migration 060) | `miner/nrlcom/stats/*` | `scripts/data/populate/phase_aux.py` | ✅ shipped (4,594 rows 2013-2025) | nrl.com canonical |
+| `injuries` | `miner/nrlcom/casualty-ward/*` (daily diff) | `scripts/data/populate/phase_aux.py` (state-machine over snapshots) | ✅ shipped (98 active) | nrl.com canonical |
+| `rounds` | `miner/nrlcom/draw/*` (round-level metadata) | `scripts/data/populate/phase_rounds.py` | ✅ shipped (756 rounds 1908-2026) | nrl.com canonical |
+| `player_rounds` | `miner/nrlsupercoachstats/stats/*` (primary — SC scoring breakdown) + `miner/supercoach/classic/players-cf/*.player_stats[]` (SC lookahead overlay) | `miner/supercoach_stats/` (shipped, primary path) + future SC overlay extractor | ✅ primary shipped; 🟡 SC overlay pending | nrlsupercoachstats for scoring breakdown (only source); SC for lookahead/projection |
+| `sc_settings` (migration 055) | `miner/supercoach/{mode}/settings/*` | Inline in `miner/supercoach_settings/` | ✅ shipped | SC (only source) |
+| `quotes` | `miner/supercoach/classic/players-cf/*` (notes[]) — and future Analyst transcript extraction | `miner/supercoach_roster/notes_extractor.py` (shipped) + future Analyst pipeline | ✅ SC notes shipped (846 rows) | Analyst per-source attribution; synthetic SC Editorial for notes |
 | `claims` | Same as `quotes` (1:1 from notes) — and future Analyst extraction | same | ✅ SC notes shipped (846 claims) | per-source |
 | `claim_associations` | Same (links claims to subjects) | same | ✅ shipped | — |
-| `agent_runs`, `agent_events` | Every Scout pipeline writes one `agent_runs` row per invocation | All Scout pipelines | ✅ shipped | — |
+| `agent_runs`, `agent_events` | Every Miner pipeline writes one `agent_runs` row per invocation | All Miner pipelines | ✅ shipped | — |
 
 ---
 
@@ -263,14 +263,14 @@ The three external sources don't share player IDs. The `people` table is the mer
         │   - fuzzy: canonical_name + team (for nrlsupercoachstats hash → people row)
         │
    ┌──────────────────────────────────────────────────────────────┐
-   │   extractors (Scout downstream)                               │
+   │   extractors (Miner downstream)                               │
    │     player_match_stats → JOIN people ON nrlcom_player_id     │
    │     player_rounds      → name+team match to people           │
    │     claims/quotes      → JOIN people ON supercoach_id (notes)│
    └──────────────────────────────────────────────────────────────┘
 ```
 
-**`nrlcom_player_id` is the missing piece** — added in migration 062. Until populated, match-centre extractors fall back to name matching (slower, fragile). The future `extract_nrlcom_identity` job walks `scout/nrlcom/players-roster/*` and `scout/nrlcom/match-centre/*` to populate `people.nrlcom_player_id` by name+team match against existing rows.
+**`nrlcom_player_id` is the missing piece** — added in migration 062. Until populated, match-centre extractors fall back to name matching (slower, fragile). The future `extract_nrlcom_identity` job walks `miner/nrlcom/players-roster/*` and `miner/nrlcom/match-centre/*` to populate `people.nrlcom_player_id` by name+team match against existing rows.
 
 ---
 
@@ -325,7 +325,7 @@ This document only changes when the **conceptual** model changes (L1/L2/L3 bound
 ## Related
 
 - [`docs/pages/wiki/data-feeds.md`](../pages/wiki/data-feeds.md) — wiki-centric reverse view
-- [`docs/agents/crew/scout/README.md`](../agents/crew/scout/README.md) — pipeline inventory + hand-off contract
+- [`docs/agents/crew/miner/README.md`](../agents/crew/miner/README.md) — pipeline inventory + hand-off contract
 - [`docs/architecture/01-information-architecture.md`](01-information-architecture.md) — domain model
-- [`docs/architecture/../agents/crew/scout/charter.md`](../agents/crew/scout/charter.md) — locked D1–D13 governing the lineage
-- Per-pipeline READMEs in `services/api/app/scout/{pipeline}/README.md`
+- [`docs/architecture/../agents/crew/miner/charter.md`](../agents/crew/miner/charter.md) — locked D1–D13 governing the lineage
+- Per-pipeline READMEs in `services/api/app/miner/{pipeline}/README.md`

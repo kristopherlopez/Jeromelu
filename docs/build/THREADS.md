@@ -14,4 +14,4 @@ Live coordination state for Codex background threads working on the current goal
 
 | Thread ID | Role | Work order | Branch/worktree | Touches | Status | Notes |
 |---|---|---|---|---|---|---|
-| _none_ | _none_ | _none_ | _none_ | _none_ | _none_ | Scout roadmap completion recorded in `docs/build/runs/2026-05-30-scout-roadmap-completion.md`. |
+| _none_ | _none_ | _none_ | _none_ | _none_ | _none_ | Miner roadmap completion recorded in `docs/build/runs/2026-05-30-miner-roadmap-completion.md`. |

@@ -18,8 +18,8 @@ Confirmed `(channel_id, person_id, role)` association. Anchored at channel level
 | since_ts | timestamptz | yes | | Optional join date if known |
 | confirmed_at | timestamptz | no | now() | |
 | confirmed_by | text | yes | | Reviewer identity |
-| candidate_id | UUID | yes | | FK → scout_presenter_candidates (SET NULL). Provenance pointer. |
+| candidate_id | UUID | yes | | FK → miner_presenter_candidates (SET NULL). Provenance pointer. |
 
 **Unique:** (channel_id, person_id) — one row per (show, person). Re-confirming the same candidate is idempotent on this constraint.
 **Indexes:** person_id (for "what shows is X on?" queries).
-**FK:** channel_id → channels (CASCADE); person_id → people (CASCADE); candidate_id → scout_presenter_candidates (SET NULL).
+**FK:** channel_id → channels (CASCADE); person_id → people (CASCADE); candidate_id → miner_presenter_candidates (SET NULL).
