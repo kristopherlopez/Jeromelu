@@ -1,6 +1,6 @@
 # Jaromelu Build META
 
-Non-negotiable process rules and project invariants for the implementer session. Read this at session start, every session. When you catch yourself making a mistake the rules here would have prevented, the rule wins.
+Non-negotiable process rules and project invariants for Codex coordinator, worker, reviewer, and tester sessions. Read this at session start for build work. When you catch yourself making a mistake the rules here would have prevented, the rule wins.
 
 When you find a mistake that isn't captured here, add it (or surface it to the human to add). Simon Last's tip #8: spend 20%+ of your time on the meta — every avoided mistake compounds across all future tasks.
 
@@ -10,7 +10,8 @@ When you find a mistake that isn't captured here, add it (or surface it to the h
 
 ### Git & commit discipline
 
-- After every change, **commit and push to `main` immediately**. Don't batch.
+- The coordinator owns `main`. Worker threads never push directly to `main`; they commit and push scoped `codex/<goal>-<slice>` branches for coordinator integration.
+- A coordinator working alone may commit and push directly to `main` after each isolated change. When worker branches are involved, the coordinator integrates reviewed work, runs final verification, then commits/pushes `main`.
 - **Session-scoped staging only.** Never `git add -A` or `git add .`. Stage explicit pathspecs for files this session created or modified.
 - Before committing, run `git diff --cached --stat` to verify the index. If a file you didn't touch is staged, unstage it.
 - If a file you need to commit has been modified by another session (unexpected diff), **flag to the human** before staging.
@@ -19,7 +20,7 @@ When you find a mistake that isn't captured here, add it (or surface it to the h
 
 ### Documentation discipline
 
-Every task that changes code MUST update the affected docs in the same changeset:
+Every work order that changes code MUST update the affected docs in the same changeset:
 - `README.md` if entry points change
 - `docs/` pages for affected subsystems
 - Inline docstrings for public functions
@@ -27,32 +28,34 @@ Every task that changes code MUST update the affected docs in the same changeset
 
 If a plan doesn't list which docs change, treat that as a planner bug and add a Concern in proof notes.
 
-### Background execution
+### Codex thread execution
 
-Background execution is **pre-approved by default** for any task that is already in `TASKS.md` and matches its `What` block. This overrides the global "ask before backgrounding" rule for this repository and this session only.
+Background execution is **pre-approved by default** for any work order already in `WORK_ORDERS.md` and matching its `What` block. This overrides the global "ask before backgrounding" rule for this repository and this session only.
 
-Ad-hoc background commands outside the queue still require human approval.
+The coordinator may spawn worker/reviewer/tester threads for work orders whose dependencies are satisfied and whose `Touches` set is disjoint from other in-flight work. Record the thread, branch/worktree, work order, and status in `THREADS.md`.
+
+Ad-hoc background commands or threads outside the current Codex goal still require human approval.
 
 ### Failure handling
 
-- Stuck 3+ iterations on the same error → STOP. Add a `[BLOCKED: reason]` tag to the task and pick the next unblocked one. Don't grind.
-- If a task is ambiguous, don't improvise the spec. Tag `[BLOCKED: spec unclear — <question>]`.
-- Don't fix tangential bugs you spot during a task. Add a new task for them (or hand to `issue-triager`).
+- Stuck 3+ iterations on the same error -> STOP. Add a `[BLOCKED: reason]` tag to the work order and return control to the coordinator. Don't grind.
+- If a work order is ambiguous, don't improvise the spec. Tag `[BLOCKED: spec unclear - <question>]`.
+- Don't fix tangential bugs you spot during a work order. Add a new work order for them (or hand to `issue-triager`).
 
 ### Status updates
 
 During long-running work (builds, deploys, polls), report only on **phase transitions** or errors. Don't echo routine progress lines.
 
-### Run reports — the durable record (completion condition)
+### Run reports - the durable record (completion condition)
 
-`PLAN.md` and `TASKS.md` are **working documents that get reused** — they hold only active/future plans and the live queue, never the history. The durable account of completed work lives in **`docs/build/runs/`**, one report per plan/initiative (`YYYY-MM-DD-<slug>.md`), written as a status update to the human: what **each task** delivered (not just a count), how it was verified, decisions/deviations, what's outstanding, and lessons learned. Git history is the immutable log; the run report is the readable one.
+`PLAN.md`, `WORK_ORDERS.md`, and `THREADS.md` are **working documents that get reused** - they hold only active/future goals, dispatchable work, and live coordination state, never the history. The durable account of completed work lives in **`docs/build/runs/`**, one report per goal/initiative (`YYYY-MM-DD-<slug>.md`), written as a status update to the human: what **each work order** delivered (not just a count), how it was verified, decisions/deviations, worker branches/thread IDs where relevant, what's outstanding, and lessons learned. Git history is the immutable log; the run report is the readable one.
 
-**Producing the run report is a completion condition for every run** — a plan is not "done" until its report exists and reflects every task.
+**Producing the run report is a completion condition for every run** — a plan is not "done" until its report exists and reflects every work order.
 
 Ritual:
-1. When a plan's first task is checked off, create its report under `docs/build/runs/` and add a row to `docs/build/runs/README.md` (newest first).
-2. As each task passes review and is checked off, record what it delivered (files, proof, commit SHA) in the report — then **remove the task from `TASKS.md`**. TASKS.md keeps no completed-task graveyard.
-3. When all the plan's tasks are done, set the report status to Shipped (note any deferred verification), and **remove the plan from `PLAN.md`'s "Active plan"**.
+1. When a goal's first work order starts, create its report under `docs/build/runs/` and add a row to `docs/build/runs/README.md` (newest first).
+2. As each work order passes review/test and is integrated, record what it delivered (files, proof, branch, thread ID, commit SHA) in the report — then **remove the work order from `WORK_ORDERS.md`**. WORK_ORDERS.md keeps no completed-work graveyard.
+3. When all work orders for the goal are done, set the report status to Shipped (note any deferred verification), clear/archive the matching rows in `THREADS.md`, and **remove the plan from `PLAN.md`'s "Active plan"**.
 4. Promote any reusable lessons to the invariants / "Known bugs and pitfalls" sections below.
 
 ---
@@ -162,10 +165,10 @@ The human IAM user (`kristopher.lopez`) has `ssm:DescribeParameters` but **not**
 
 ## Open questions
 
-_(implementer adds questions here when stuck; human resolves and migrates them into rules above)_
+_(coordinator or worker adds questions here when stuck; human resolves and migrates them into rules above)_
 
 ---
 
 ## Source
 
-Project invariants distilled from `~/.claude/projects/C--Users-krist-ClaudeProjects-Jeromelu/memory/` (feedback_*.md, project_*.md). When in doubt, check the source memories — they include "Why" and "How to apply" context. This file is the authoritative copy for the implementer session.
+Project invariants distilled from `~/.claude/projects/C--Users-krist-ClaudeProjects-Jeromelu/memory/` (feedback_*.md, project_*.md). When in doubt, check the source memories — they include "Why" and "How to apply" context. This file is the authoritative copy for build sessions.

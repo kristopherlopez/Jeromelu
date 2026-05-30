@@ -1,8 +1,8 @@
 # Build run reports
 
-The durable, human-readable record of completed build work — one report per plan/initiative ("a run"), written as a status update: what each task delivered, how it was verified, the decisions/deviations made, what's outstanding, and lessons learned.
+The durable, human-readable record of completed build work — one report per plan/initiative ("a run"), written as a status update: what each work order delivered, how it was verified, the decisions/deviations made, what's outstanding, and lessons learned.
 
-This folder is the system of record for *what happened*. `PLAN.md` holds only active/future plans; `TASKS.md` holds only the live queue; both get reused. Git history is the immutable log. See the run-report ritual in [META.md](../META.md).
+This folder is the system of record for *what happened*. `PLAN.md` holds only active/future goal plans; `WORK_ORDERS.md` holds only live/future dispatchable work; `THREADS.md` holds only live coordination state. All three get reused. Git history is the immutable log. See the run-report ritual in [META.md](../META.md).
 
 Newest first.
 
