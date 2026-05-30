@@ -130,8 +130,19 @@ GitHub Actions only handles `cost-report.yml`. Everything else recurring runs as
 | When (UTC / AEST) | Job | What it does |
 |---|---|---|
 | `30 16 * * *` / 02:30 | `pg-backup.sh` | Streams `pg_dump` to `s3://jeromelu-public-assets/backups/postgres/`. 14-day S3 lifecycle retention. |
+| `0 18 * * *` / 04:00 | `scout-refresh.sh nrlcom-draw` | Archives current-round nrl.com draw JSON to S3. |
+| `15 18 * * *` / 04:15 | `scout-refresh.sh nrlcom-match-centre` | Archives current-round match-centre JSON to S3. |
+| `30 18 * * *` / 04:30 | `scout-refresh.sh nrlcom-casualty-ward` | Archives daily nrl.com casualty-ward snapshot to S3. |
+| `45 18 * * *` / 04:45 | `scout-refresh.sh nrlcom-ladder` | Archives current-round nrl.com ladder JSON to S3. |
+| `50 18 * * *` / 04:50 | `scout-refresh.sh nrlcom-stats` | Archives nrl.com stat leaderboards to S3. |
+| `20 19 * * *` / 05:20 | `scout-populate.sh nrlcom-current` | Projects current-season Scout S3 archives into relational DB tables inside `jeromelu-api`. |
+| `45 22 * * *` / 08:45 | `scout-refresh.sh supercoach-roster` | Archives SuperCoach roster and applies the SCD-2 people/player-attributes refresh. |
+| `55 22 * * 0,2,4` / Mon/Wed/Fri 08:55 | `scout-refresh.sh supercoach-stats current` | Resolves SuperCoach `current_round` and upserts current-round `player_rounds`. |
 | `0 23 * * *` / 09:00 | `scout-refresh.sh channel-stats` | POSTs to `/api/admin/scout/refresh-channel-stats`. Snapshots subscriber/video/view counts into `channel_metrics`. ~3 YouTube quota units. |
 | `15 23 * * *` / 09:15 | `scout-refresh.sh videos` | POSTs to `/api/admin/scout/refresh-videos`. Enumerates new videos per channel + snapshots `video_metrics`. ~750 quota units. Staggered 15 min after channel-stats to avoid DB-connection contention. |
+| `30 23 * * 1` / Tue 09:30 | `scout-refresh.sh supercoach-teams` | Enriches `teams.metadata_json.supercoach`. |
+| `35 23 * * 1` / Tue 09:35 | `scout-refresh.sh supercoach-settings` | Snapshots SuperCoach classic settings into `sc_settings`. |
+| `40 23 * * 1` / Tue 09:40 | `scout-refresh.sh nrlcom-players-roster` | Archives nrl.com player profile listings for all NRL teams. |
 | `30 0 * * *` / 10:30 | `cron-report.sh` | Cron-health digest email — see [`reports.md`](./reports.md). |
 | `35 0 * * *` / 10:35 | `error-report.sh` | App-error digest email — see [`reports.md`](./reports.md). |
 | `0 22 * * 1` / Tue 08:00 | `content-report.sh` | Weekly content digest — see [`reports.md`](./reports.md). |
@@ -143,7 +154,8 @@ Per-job log files under `/var/log/jeromelu/`:
 
 | Log file | Producer |
 |---|---|
-| `scout-refresh.log` | both scout-refresh runs; one line per run with timestamp + HTTP status + response body |
+| `scout-refresh.log` | Scout endpoint refreshes; one line per run with timestamp + HTTP status + response body |
+| `scout-populate.log` | Scout S3-to-DB projection wrapper; command/status lines plus populate output |
 | `pg-backup.log` | pg-backup runs; one line per successful run |
 | `cron-report.log` · `error-report.log` · `content-report.log` · `disk-report.log` | full text version of each digest sent |
 

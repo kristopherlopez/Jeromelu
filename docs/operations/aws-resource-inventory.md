@@ -390,13 +390,25 @@ Cron is repo-managed: schedule lives at `scripts/cron.d/jeromelu`, synced into `
 
 | Cron | Wrapper | Purpose | Local time |
 |---|---|---|---|
+| `0 18 * * *` | `scout-refresh.sh nrlcom-draw` | Archive current-round nrl.com draw JSON to S3 | 04:00 AEST |
+| `15 18 * * *` | `scout-refresh.sh nrlcom-match-centre` | Archive current-round match-centre JSON to S3 | 04:15 AEST |
+| `30 18 * * *` | `scout-refresh.sh nrlcom-casualty-ward` | Archive daily casualty-ward snapshot to S3 | 04:30 AEST |
+| `45 18 * * *` | `scout-refresh.sh nrlcom-ladder` | Archive current-round ladder JSON to S3 | 04:45 AEST |
+| `50 18 * * *` | `scout-refresh.sh nrlcom-stats` | Archive nrl.com stat leaderboards to S3 | 04:50 AEST |
+| `20 19 * * *` | `scout-populate.sh nrlcom-current` | Project current-season Scout S3 archives into DB tables inside `jeromelu-api` | 05:20 AEST |
+| `45 22 * * *` | `scout-refresh.sh supercoach-roster` | Archive SuperCoach roster and apply SCD-2 people/player-attributes refresh | 08:45 AEST |
+| `55 22 * * 0,2,4` | `scout-refresh.sh supercoach-stats current` | Resolve SuperCoach `current_round` and upsert current-round `player_rounds` | Mon/Wed/Fri 08:55 AEST |
 | `0 23 * * *` | `scout-refresh.sh channel-stats` | Snapshot subscriber/video/view counts into `channel_metrics` (~3 quota units) | 09:00 AEST / 10:00 AEDT |
 | `15 23 * * *` | `scout-refresh.sh videos` | Enumerate new videos per channel + snapshot `video_metrics` (~750 quota units, offset 15 min from channel-stats to avoid DB connection contention) | 09:15 AEST / 10:15 AEDT |
+| `30 23 * * 1` | `scout-refresh.sh supercoach-teams` | Enrich `teams.metadata_json.supercoach` | Tue 09:30 AEST |
+| `35 23 * * 1` | `scout-refresh.sh supercoach-settings` | Snapshot SuperCoach classic settings into `sc_settings` | Tue 09:35 AEST |
+| `40 23 * * 1` | `scout-refresh.sh nrlcom-players-roster` | Archive nrl.com player profile listings for all NRL teams | Tue 09:40 AEST |
 | `30 16 * * *` | `pg-backup.sh` | Stream `pg_dump` from postgres container → `s3://jeromelu-public-assets/backups/postgres/` (S3 lifecycle expires after 14d) | 02:30 AEST / 03:30 AEDT |
 
 Logs:
 - pg-backup → `/var/log/jeromelu/pg-backup.log`
 - scout-refresh → `/var/log/jeromelu/scout-refresh.log`
+- scout-populate → `/var/log/jeromelu/scout-populate.log`
 
 `scout-refresh.sh` sources `/opt/jeromelu/.env` for `ADMIN_KEY`, calls the matching admin endpoint, and exits non-zero on non-2xx so cron failures are observable. Box is in UTC — schedules target AEST clock times, so jobs drift +1 hour during AEDT.
 

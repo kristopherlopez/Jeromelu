@@ -6,7 +6,7 @@ refresh to `people` / `people_attributes` / `people_roles`.
 | Field | Value |
 |---|---|
 | Source of truth | `supercoach.com.au` `players-cf` endpoint (unauthenticated GET) |
-| Cadence | Daily |
+| Cadence | Daily cron via `scripts/scout-refresh.sh supercoach-roster` at 22:45 UTC (08:45 AEST) |
 | Natural key | `external_id` on `people` (the SuperCoach `id` field) |
 | Owner | Scout |
 | Pipeline label | `supercoach-roster` (kebab; appears in `agent_runs.detail_json.pipeline` and the admin URL) |

@@ -82,7 +82,12 @@ D8-hardened ingest (envelope **and** item/stats strict — deeper than draw/matc
 - ✅ Shipped: DB extractors `populate_injuries` (state-machine over daily snapshots → `injuries`) and `populate_team_standings` (UPSERT per `(team, comp, season, round)` → `team_standings`) in `scripts/data/populate/phase_aux.py`, with pure-function unit tests (`tests/unit/scripts/data/populate/test_phase_aux.py`). Latent `jsonb_build_object` parameter-typing bug in the injuries UPDATE branch fixed during seed verification (surfaced on the first real-archive run). Prod DB post-seed: `team_standings` 51 rows / 94% team_id resolution; `injuries` 130 rows / 99 open / 93% team_id resolution.
 - ✅ Done: retired `services/worker-scraper/` — directory deleted + live doc references swept (Phase 4 closure, TASK-28, 2026-05-28). Per D4: it was orphaned (no code, compose, CI, or deploy-script refs); [`scraper.md`](../../system/scraper.md) remains as historical reference.
 
-**Follow-up (cross-cutting, surfaced — not self-queued):** the extractors stay **manual / backfill-driven** for now (the Phase 3.5 precedent), so the daily ingest cron archives to S3 but the DB only refreshes when an operator runs `populate_db_from_s3`. The same gap applies to the Phase 3.5 match-centre extractors. The durable fix — bake `scripts/` + `packages/shared` into the api image (or a managed ops venv) so a scheduled `docker exec jeromelu-api python -m scripts.data.populate_db_from_s3 …` just works — is an infra decision for the human/planner.
+**Ops scheduling follow-up shipped (SCOUT-OPS-SCHED):** `scripts/scout-populate.sh`
+now stages `scripts/` + `packages/` into the running `jeromelu-api` container and
+executes `populate_db_from_s3` there. `scripts/cron.d/jeromelu` runs
+`scout-populate.sh nrlcom-current` daily after the nrl.com archive jobs, so the
+current-season S3 captures project into DB tables without a manual operator run.
+Historical backfills remain deliberate one-off runs.
 
 ### Phase 4.5 — NRL.com stats + players roster ✅ Shipped (2026-05-28)
 
@@ -94,7 +99,6 @@ Hardening replay of the existing (but unhardened) `scout/nrlcom_stats/` + `scout
 **Deferred (out of scope, surfaced not self-queued):**
 - SuperCoach Draft mode (`scout/supercoach_draft_*`) — parallel of classic, if Draft becomes a product concern.
 - Folding `jeromelu_shared/players/nrlcom_refresh.py` (HTML profile scraper) into the `scout/nrlcom_players_roster/` folder per D9. The HTML-scrape and JSON-fetch are different upstream sources reaching different enrichment fields; the fold is a refactor concern, not a hardening one.
-- Extractor scheduling (cross-cutting Phase 4 follow-up — daily ingest cron archives to S3 but DB only refreshes when an operator runs `populate_db_from_s3`; same gap applies here for `--phase leaderboards`).
 - Tightening `Profile` identity-field types from `str | None` to `str` non-null when a future `/players/data` extractor lands.
 
 ### Phase 5 — Historical backfill (one-time, ~4-5 hours operationally) — In design

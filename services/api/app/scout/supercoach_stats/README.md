@@ -6,7 +6,7 @@ Fetches per-round (or Totals) SuperCoach stats from
 | Field | Value |
 |---|---|
 | Source of truth | `nrlsupercoachstats.com` jqGrid endpoint (unauthenticated, third party) |
-| Cadence | Mon (post-Sunday games) / Wed (mid-round) / Thu (post-Thursday game). Defaults assume weekly cron; ad-hoc runs supported. |
+| Cadence | Cron via `scripts/scout-refresh.sh supercoach-stats current` at Sun/Tue/Thu 22:55 UTC (Mon/Wed/Fri 08:55 AEST). The wrapper resolves the current round from SuperCoach settings; ad-hoc runs pass an explicit `ROUND`. |
 | Natural key | `(player_id, season, round)` on `player_rounds` |
 | Owner | Scout |
 | Pipeline label | `supercoach-stats` (kebab; in `agent_runs.detail_json.pipeline` and the admin URL) |
