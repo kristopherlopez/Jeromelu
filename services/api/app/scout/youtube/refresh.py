@@ -45,6 +45,11 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from ..common.pipeline_run import start_deterministic_run
+from ..common.pipelines import (
+    PIPELINE_YOUTUBE_CHANNEL_STATS,
+    PIPELINE_YOUTUBE_CHANNEL_VIDEOS,
+    PIPELINE_YOUTUBE_REFRESH_VIDEOS,
+)
 from . import client as youtube_api
 
 logger = logging.getLogger(__name__)
@@ -57,11 +62,6 @@ _METRIC_FIELDS = ("views", "likes", "comments")
 
 
 _video_id_from_url = extract_video_id
-
-
-PIPELINE_YOUTUBE_REFRESH_VIDEOS = "youtube-refresh-videos"
-PIPELINE_YOUTUBE_CHANNEL_VIDEOS = "youtube-channel-videos"
-PIPELINE_YOUTUBE_CHANNEL_STATS = "youtube-channel-stats"
 
 
 def _most_recent_known_video_id(session: Session, channel_id: UUID) -> str | None:

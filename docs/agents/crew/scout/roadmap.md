@@ -140,7 +140,7 @@ The multi-platform roadmap items below (podcasts, radio, TV shows, Twitter/X, In
 | `Event` rows for the reasoning trace (Pulse feed integration) | Backlog | TBD when live stream lands |
 | Scheduled Scout runs (cron / APScheduler) for the agentic surface | Planned | Manual CLI only today |
 | **Weekly channel-metadata refresh** — periodic re-snapshot of subs/views/video count and active/inactive detection (extends §3.4) | Planned | Channel metadata only written at approval today |
-| **Source health / liveness monitoring** — detect stalled channels, 404 sources, transcript fetch failures, caption regenerations | Backlog | Not built |
+| **Source health / liveness monitoring** — detect stalled channels, failed refresh/backfill runs, pending/failed audio or transcription work, caption-regeneration risk | Shipped (internal classifier) | `app.scout.source_health` returns route-free structured summaries from DB metadata. Dashboard API/UI remain separate Phase 6 slices. |
 | Audio acquisition surface (Scout owns yt-dlp → S3) | Shipped (2026-05-03) | `make collect-audio SOURCE_ID=...`. Diarised transcription split out to Analyst. |
 | Recurring drain job for `ingestion_status='pending'` sources | Backlog | Single-source CLI today; APScheduler / cron driver is the next slice. |
 | Backfill of legacy `source_chunks_v1` (221k auto-caption chunks) | Backlog | Re-extract via Scout audio + Analyst transcribe on highest-leverage channels first; ~$50 for top-5. |
