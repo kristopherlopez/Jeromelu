@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import ChannelCoveragePanel from "./ChannelCoveragePanel";
 import PresentersPanel from "./PresentersPanel";
+import ReconCandidatesPanel from "./ReconCandidatesPanel";
 import { ADMIN_API_TARGETS, AdminApiTarget, useAdminApiBase } from "./apiBase";
 
 // --- Types ---
@@ -288,11 +289,12 @@ function TranscriptDiffPanel() {
 
 // --- Component ---
 
-type AdminTab = "video" | "coverage" | "presenters" | "diff";
+type AdminTab = "video" | "coverage" | "recon" | "presenters" | "diff";
 
 const TABS: { id: AdminTab; label: string }[] = [
   { id: "video", label: "Video Processing" },
   { id: "coverage", label: "Channel Coverage" },
+  { id: "recon", label: "Recon Review" },
   { id: "presenters", label: "Presenters" },
   { id: "diff", label: "Transcript Diff" },
 ];
@@ -782,6 +784,9 @@ export default function AdminClient() {
       <div className={activeTab === "coverage" ? "" : "hidden"}>
         <ChannelCoveragePanel />
       </div>
+
+      {/* Tab: Recon Review — admin-key gated endpoints, mounted only when active. */}
+      {activeTab === "recon" && <ReconCandidatesPanel />}
 
       {/* Tab: Presenters — only mount when active so the channel-coverage
           fetch and the by-channel fetch don't fire on every load. */}
