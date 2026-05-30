@@ -8,6 +8,7 @@ Newest first.
 
 | Date | Run | Status |
 |---|---|---|
+| 2026-05-30 | [Miner rename integration](./2026-05-30-miner-rename-integration.md) | 🟡 Blocked at protected-branch review |
 | 2026-05-30 | [Miner roadmap completion](./2026-05-30-miner-roadmap-completion.md) | 🟢 Shipped (browser visual smoke unavailable; HTTP render smoke passed) |
 | 2026-05-28 | [Engineering quality hardening — Tier 1](./2026-05-28-eng-quality-tier-1.md) | 🟢 Shipped (6/6; CI dry-run + path-filter SHA-fidelity check deferred to operator) |
 | 2026-05-29 | [Miner Phase 5 — Historical backfill + standard-data-model conformance](./2026-05-28-miner-phase-5-historical-backfill.md) | 🟢 Shipped (10/10; 3 spec-side threshold over-estimates — actual data correct) |
