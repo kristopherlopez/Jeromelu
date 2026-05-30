@@ -831,9 +831,7 @@ def run_youtube_refresh_videos(
     videos_refreshed = (stats_result or {}).get("videos_refreshed", 0)
     enumerate_failures = _enumerate_channel_failures(enumerate_result)
     if enumerate_failures:
-        error = RuntimeError(
-            f"{len(enumerate_failures)} of {channels_processed} YouTube channel enumerations failed"
-        )
+        error = RuntimeError(f"{len(enumerate_failures)} of {channels_processed} YouTube channel enumerations failed")
         run.detail["partial_failure"] = True
         run.fail(
             error,

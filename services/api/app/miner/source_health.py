@@ -170,12 +170,8 @@ def build_source_health_summary(
     config = config or SourceHealthConfig()
     generated_at = _normalise_datetime(now or datetime.now(UTC))
     normalised_runs = tuple(_normalise_run(run) for run in runs)
-    active_youtube_channels = tuple(
-        channel for channel in channels if channel.active and channel.platform == "youtube"
-    )
-    youtube_sources = tuple(
-        source for source in sources if source.approved_flag and source.source_type == "youtube"
-    )
+    active_youtube_channels = tuple(channel for channel in channels if channel.active and channel.platform == "youtube")
+    youtube_sources = tuple(source for source in sources if source.approved_flag and source.source_type == "youtube")
 
     checks = (
         _pipeline_recency_check(
@@ -612,11 +608,7 @@ def _agent_run_observed_at(row: AgentRun) -> datetime:
 
 def _is_recent_failed_run(run: PipelineRunInput, cutoff: datetime) -> bool:
     observed_at = _run_observed_at(run)
-    return (
-        run.status in TERMINAL_FAILURE_STATUSES
-        and observed_at is not None
-        and observed_at >= cutoff
-    )
+    return run.status in TERMINAL_FAILURE_STATUSES and observed_at is not None and observed_at >= cutoff
 
 
 def _latest_metric_by_channel(
@@ -645,11 +637,7 @@ def _is_collected_missing_audio(source: SourceStatusInput) -> bool:
 
 
 def _is_collected_untranscribed(source: SourceStatusInput) -> bool:
-    return (
-        source.ingestion_status == "collected"
-        and bool(source.audio_s3_key)
-        and source.transcription_status is None
-    )
+    return source.ingestion_status == "collected" and bool(source.audio_s3_key) and source.transcription_status is None
 
 
 def _has_caption_regeneration_risk(source: SourceStatusInput) -> bool:

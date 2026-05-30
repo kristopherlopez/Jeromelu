@@ -119,9 +119,7 @@ def drain_source_ids(
                 for option in load_options:
                     query = query.options(option)
                 source = (
-                    _with_drain_lock(query)
-                    .filter(Source.source_id == source_id, *eligibility_criteria)
-                    .one_or_none()
+                    _with_drain_lock(query).filter(Source.source_id == source_id, *eligibility_criteria).one_or_none()
                 )
                 if source is None:
                     skipped += 1
