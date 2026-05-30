@@ -30,10 +30,9 @@ from sqlalchemy.orm import Session
 from ..deps import get_db
 from ..scout.youtube.refresh import (
     audit_channel_coverage,
-    refresh_all_channel_stats,
-    refresh_all_channels_incremental,
-    refresh_all_video_stats,
-    refresh_channel_videos,
+    run_youtube_channel_stats,
+    run_youtube_channel_videos,
+    run_youtube_refresh_videos,
 )
 from .admin import require_admin
 
@@ -325,7 +324,7 @@ def approve_candidate(
             channel_obj = db.get(Channel, channel_id)
             if channel_obj is not None:
                 try:
-                    enumerate_result = refresh_channel_videos(db, channel_obj, full_backfill=True)
+                    enumerate_result = run_youtube_channel_videos(db, channel_obj, full_backfill=True)
                 except Exception as e:
                     logger.warning(
                         "Post-approval video enumeration failed for channel %s: %s",
@@ -465,19 +464,11 @@ def refresh_videos(
     Both jobs are idempotent. Use `?skip_stats=true` to do enumerate only,
     or `?skip_enumerate=true` to do stats only.
     """
-    enumerate_result: dict[str, Any] | None = None
-    stats_result: dict[str, Any] | None = None
-
-    if not skip_enumerate:
-        enumerate_result = refresh_all_channels_incremental(db)
-    if not skip_stats:
-        stats_result = refresh_all_video_stats(db)
-
-    return {
-        "ok": True,
-        "enumerate": enumerate_result,
-        "stats": stats_result,
-    }
+    return run_youtube_refresh_videos(
+        db,
+        skip_stats=skip_stats,
+        skip_enumerate=skip_enumerate,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -517,8 +508,12 @@ def refresh_one_channel_videos(
     sized for broadcaster archives).
     """
     channel = _resolve_channel(db, channel_ref)
-    result = refresh_channel_videos(db, channel, max_results=max_results, full_backfill=full_backfill)
-    return {"ok": True, **result}
+    return run_youtube_channel_videos(
+        db,
+        channel,
+        max_results=max_results,
+        full_backfill=full_backfill,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -537,8 +532,7 @@ def refresh_channel_stats(db: Session = Depends(get_db)):
     channel scale). Kept on its own endpoint so the channel-stats snapshot
     runs even if the heavier /admin/scout/refresh-videos job fails.
     """
-    result = refresh_all_channel_stats(db)
-    return {"ok": True, **result}
+    return run_youtube_channel_stats(db)
 
 
 # ---------------------------------------------------------------------------

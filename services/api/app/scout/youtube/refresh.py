@@ -44,6 +44,7 @@ from sqlalchemy import Integer, distinct, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
+from ..common.pipeline_run import start_deterministic_run
 from . import client as youtube_api
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,11 @@ _METRIC_FIELDS = ("views", "likes", "comments")
 
 
 _video_id_from_url = extract_video_id
+
+
+PIPELINE_YOUTUBE_REFRESH_VIDEOS = "youtube-refresh-videos"
+PIPELINE_YOUTUBE_CHANNEL_VIDEOS = "youtube-channel-videos"
+PIPELINE_YOUTUBE_CHANNEL_STATS = "youtube-channel-stats"
 
 
 def _most_recent_known_video_id(session: Session, channel_id: UUID) -> str | None:
@@ -83,6 +89,46 @@ def _parse_published_at(raw: str | None) -> datetime | None:
         return datetime.fromisoformat(raw.replace("Z", "+00:00"))
     except ValueError:
         return None
+
+
+def _source_ids_missing_initial_video_metrics(
+    session: Session,
+    channel_id: UUID,
+    video_ids: list[str],
+) -> dict[str, UUID]:
+    """Return listed video_id -> source_id for rows still missing their first metric.
+
+    Full-backfill retries need this because an older failed approval-time run
+    may have committed `sources` rows before `video_metrics` were written.
+    """
+    wanted = set(video_ids)
+    if not wanted:
+        return {}
+
+    rows = session.execute(
+        select(Source.source_id, Source.canonical_url)
+        .where(Source.channel_id == channel_id)
+        .where(Source.source_type == "youtube")
+        .where(Source.canonical_url.is_not(None))
+    ).all()
+
+    source_ids_by_video_id: dict[str, UUID] = {}
+    for source_id, canonical_url in rows:
+        video_id = _video_id_from_url(canonical_url)
+        if video_id in wanted:
+            source_ids_by_video_id[video_id] = source_id
+
+    if not source_ids_by_video_id:
+        return {}
+
+    source_ids = list(source_ids_by_video_id.values())
+    metric_stmt = select(VideoMetric.source_id).where(VideoMetric.source_id.in_(source_ids)).distinct()
+    source_ids_with_metrics = set(session.scalars(metric_stmt).all())
+    return {
+        video_id: source_id
+        for video_id, source_id in source_ids_by_video_id.items()
+        if source_id not in source_ids_with_metrics
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -155,8 +201,8 @@ def refresh_channel_videos(
     daily runs only fetch what's new. Pass `full_backfill=True` to ignore
     the cursor and pull up to `max_results` videos regardless.
 
-    For each new video inserted into `sources`, also writes a snapshot row
-    into `video_metrics` (one batched stats call per 50 videos).
+    For each listed video whose `sources` row has no metrics yet, also writes
+    a snapshot row into `video_metrics` (one batched stats call per 50 videos).
 
     Returns a small dict with counts for logging / API responses.
     """
@@ -180,59 +226,71 @@ def refresh_channel_videos(
 
     # Insert with the metadata that playlistItems already gave us at no extra
     # cost — description, thumbnail. duration_seconds requires a videos.list
-    # call (handled below for newly-inserted rows only).
+    # call (handled below for rows still missing their first metrics).
     inserted_source_ids: dict[str, UUID] = {}  # video_id → source_id
-    for v in videos:
-        published_at = _parse_published_at(v.get("published_at"))
-        stmt = (
-            pg_insert(Source)
-            .values(
-                channel_id=channel.channel_id,
-                source_type="youtube",
-                title=v["title"] or v["video_id"],
-                description=v.get("description") or None,
-                thumbnail_url=v.get("thumbnail_url"),
-                creator_name=channel.name,
-                canonical_url=v["url"],
-                approved_flag=True,  # parent channel is already approved
-                ingestion_status="pending",
-                published_at=published_at,
-            )
-            .on_conflict_do_nothing(index_elements=["canonical_url"])
-            .returning(Source.source_id)
-        )
-        result = session.execute(stmt).first()
-        if result:
-            inserted_source_ids[v["video_id"]] = result[0]
-
-    # Snapshot stats for the videos we just inserted. Skip the call entirely
-    # if we inserted nothing (incremental no-op case).
     metrics_recorded = 0
-    if inserted_source_ids:
-        stats = youtube_api.get_video_stats(list(inserted_source_ids.keys()))
-        sampled_at = datetime.now(UTC)
-        for video_id, source_id in inserted_source_ids.items():
-            entry = stats.get(video_id)
-            if not entry:
-                continue
-            # Patch identity fields that videos.list returns but playlistItems
-            # didn't (duration in particular).
-            duration = entry.get("duration_seconds")
-            if duration is not None:
-                session.execute(update(Source).where(Source.source_id == source_id).values(duration_seconds=duration))
-            metric_payload = {k: entry[k] for k in _METRIC_FIELDS if k in entry}
-            if metric_payload:
-                session.add(
-                    VideoMetric(
-                        source_id=source_id,
-                        sampled_at=sampled_at,
-                        source="youtube_api",
-                        metrics=metric_payload,
-                    )
-                )
-                metrics_recorded += 1
 
-    session.commit()
+    try:
+        for v in videos:
+            published_at = _parse_published_at(v.get("published_at"))
+            stmt = (
+                pg_insert(Source)
+                .values(
+                    channel_id=channel.channel_id,
+                    source_type="youtube",
+                    title=v["title"] or v["video_id"],
+                    description=v.get("description") or None,
+                    thumbnail_url=v.get("thumbnail_url"),
+                    creator_name=channel.name,
+                    canonical_url=v["url"],
+                    approved_flag=True,  # parent channel is already approved
+                    ingestion_status="pending",
+                    published_at=published_at,
+                )
+                .on_conflict_do_nothing(index_elements=["canonical_url"])
+                .returning(Source.source_id)
+            )
+            result = session.execute(stmt).first()
+            if result:
+                inserted_source_ids[v["video_id"]] = result[0]
+
+        # Snapshot stats for newly inserted rows and for retry rows left without
+        # a first metric by an older failed approval-time run.
+        source_ids_for_metrics = _source_ids_missing_initial_video_metrics(
+            session,
+            channel.channel_id,
+            [v["video_id"] for v in videos],
+        )
+        if source_ids_for_metrics:
+            stats = youtube_api.get_video_stats(list(source_ids_for_metrics.keys()))
+            sampled_at = datetime.now(UTC)
+            for video_id, source_id in source_ids_for_metrics.items():
+                entry = stats.get(video_id)
+                if not entry:
+                    continue
+                # Patch identity fields that videos.list returns but playlistItems
+                # didn't (duration in particular).
+                duration = entry.get("duration_seconds")
+                if duration is not None:
+                    session.execute(
+                        update(Source).where(Source.source_id == source_id).values(duration_seconds=duration)
+                    )
+                metric_payload = {k: entry[k] for k in _METRIC_FIELDS if k in entry}
+                if metric_payload:
+                    session.add(
+                        VideoMetric(
+                            source_id=source_id,
+                            sampled_at=sampled_at,
+                            source="youtube_api",
+                            metrics=metric_payload,
+                        )
+                    )
+                    metrics_recorded += 1
+
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
 
     logger.info(
         "Enumerated channel %s (%s): %d listed, %d inserted, %d metrics recorded",
@@ -274,9 +332,10 @@ def refresh_all_video_stats(session: Session) -> dict[str, Any]:
          of the metric skip — identity always syncs.
 
     The skip applies only here. The first-snapshot writers — `refresh_channel_videos`
-    (new-video discovery), the channel-approval snapshot in `routers/recon.py`,
-    and the `canonicalise_handles` backfill — have no prior row, so a skip
-    would be a no-op; they're intentionally left unconditional.
+    (new-video discovery plus retry rows with no metrics), the channel-approval
+    snapshot in `routers/recon.py`, and the `canonicalise_handles` backfill —
+    have no prior metric row, so a skip would be a no-op; they're intentionally
+    left unconditional.
 
     Quota: ~1 unit per 50 videos. ~180 channels × ~200 videos = ~720 units.
     """
@@ -699,3 +758,185 @@ def refresh_all_channels_incremental(session: Session) -> dict[str, Any]:
         "total_videos_inserted": total_inserted,
         "per_channel": per_channel,
     }
+
+
+# ---------------------------------------------------------------------------
+# Audited job wrappers
+# ---------------------------------------------------------------------------
+
+
+def _enumerate_channel_failures(result: dict[str, Any] | None) -> list[dict[str, Any]]:
+    per_channel = (result or {}).get("per_channel") or []
+    return [row for row in per_channel if row.get("error")]
+
+
+def _compact_enumerate_detail(result: dict[str, Any]) -> dict[str, Any]:
+    """Summarise the per-channel enumerate result for agent_runs.detail_json."""
+    per_channel = result.get("per_channel") or []
+    failed = _enumerate_channel_failures(result)
+    detail = {k: v for k, v in result.items() if k != "per_channel"}
+    detail["per_channel_count"] = len(per_channel)
+    detail["channels_failed"] = len(failed)
+    if failed:
+        detail["channel_errors"] = failed[:20]
+    return detail
+
+
+def _channel_detail(channel: Channel) -> dict[str, Any]:
+    return {
+        "channel_id": str(channel.channel_id),
+        "channel_slug": getattr(channel, "slug", None),
+        "channel_name": channel.name,
+        "external_id": channel.external_id,
+    }
+
+
+def run_youtube_refresh_videos(
+    session: Session,
+    *,
+    skip_stats: bool = False,
+    skip_enumerate: bool = False,
+) -> dict[str, Any]:
+    """Run the daily YouTube refresh endpoint under a Scout agent_runs row."""
+    run = start_deterministic_run(
+        session,
+        pipeline=PIPELINE_YOUTUBE_REFRESH_VIDEOS,
+        brief=(
+            "YouTube refresh: incremental channel video enumeration "
+            f"and video stats (skip_enumerate={skip_enumerate}, skip_stats={skip_stats})"
+        ),
+        detail={"skip_stats": skip_stats, "skip_enumerate": skip_enumerate},
+        max_wall_seconds=1800,
+    )
+    enumerate_result: dict[str, Any] | None = None
+    stats_result: dict[str, Any] | None = None
+
+    try:
+        if not skip_enumerate:
+            enumerate_result = refresh_all_channels_incremental(session)
+            run.detail["enumerate"] = _compact_enumerate_detail(enumerate_result)
+        if not skip_stats:
+            stats_result = refresh_all_video_stats(session)
+            run.detail["stats"] = stats_result
+    except Exception as e:
+        if enumerate_result is not None:
+            run.detail["enumerate"] = _compact_enumerate_detail(enumerate_result)
+        if stats_result is not None:
+            run.detail["stats"] = stats_result
+        run.fail(e, summary_text=f"YouTube refresh-videos failed: {e}")
+        raise
+
+    channels_processed = (enumerate_result or {}).get("channels_processed", 0)
+    videos_inserted = (enumerate_result or {}).get("total_videos_inserted", 0)
+    videos_refreshed = (stats_result or {}).get("videos_refreshed", 0)
+    enumerate_failures = _enumerate_channel_failures(enumerate_result)
+    if enumerate_failures:
+        error = RuntimeError(
+            f"{len(enumerate_failures)} of {channels_processed} YouTube channel enumerations failed"
+        )
+        run.detail["partial_failure"] = True
+        run.fail(
+            error,
+            summary_text=(
+                "YouTube refresh-videos partial failure: "
+                f"channels_processed={channels_processed}, "
+                f"channels_failed={len(enumerate_failures)}, "
+                f"videos_inserted={videos_inserted}, "
+                f"videos_refreshed={videos_refreshed}"
+            ),
+        )
+        return {
+            "run_id": run.run_id,
+            "ok": False,
+            "enumerate": enumerate_result,
+            "stats": stats_result,
+            "error": str(error),
+        }
+
+    run.complete(
+        summary_text=(
+            "YouTube refresh-videos: "
+            f"channels_processed={channels_processed}, "
+            f"videos_inserted={videos_inserted}, "
+            f"videos_refreshed={videos_refreshed}"
+        )
+    )
+
+    return {
+        "run_id": run.run_id,
+        "ok": True,
+        "enumerate": enumerate_result,
+        "stats": stats_result,
+    }
+
+
+def run_youtube_channel_videos(
+    session: Session,
+    channel: Channel,
+    *,
+    max_results: int = 200,
+    full_backfill: bool = False,
+) -> dict[str, Any]:
+    """Enumerate one channel's uploads under a Scout agent_runs row."""
+    run = start_deterministic_run(
+        session,
+        pipeline=PIPELINE_YOUTUBE_CHANNEL_VIDEOS,
+        brief=(
+            f"YouTube channel video enumerate: {channel.name} "
+            f"(full_backfill={full_backfill}, max_results={max_results})"
+        ),
+        detail={
+            **_channel_detail(channel),
+            "full_backfill": full_backfill,
+            "max_results": max_results,
+        },
+        max_wall_seconds=900,
+    )
+    try:
+        result = refresh_channel_videos(
+            session,
+            channel,
+            max_results=max_results,
+            full_backfill=full_backfill,
+        )
+        run.detail.update(result)
+    except Exception as e:
+        run.fail(e, summary_text=f"YouTube channel video enumerate failed: {e}")
+        raise
+
+    run.complete(
+        summary_text=(
+            "YouTube channel video enumerate: "
+            f"channel_id={channel.channel_id}, "
+            f"videos_inserted={result.get('videos_inserted', 0)}, "
+            f"metrics_recorded={result.get('metrics_recorded', 0)}"
+        )
+    )
+    return {"run_id": run.run_id, "ok": True, **result}
+
+
+def run_youtube_channel_stats(session: Session) -> dict[str, Any]:
+    """Run the YouTube channel metrics refresh under a Scout agent_runs row."""
+    run = start_deterministic_run(
+        session,
+        pipeline=PIPELINE_YOUTUBE_CHANNEL_STATS,
+        brief="YouTube channel stats refresh",
+        detail={},
+        max_wall_seconds=600,
+    )
+    try:
+        result = refresh_all_channel_stats(session)
+        run.detail.update(result)
+    except Exception as e:
+        run.fail(e, summary_text=f"YouTube channel stats refresh failed: {e}")
+        raise
+
+    run.complete(
+        summary_text=(
+            "YouTube channel stats refresh: "
+            f"channels_total={result.get('channels_total', 0)}, "
+            f"metrics_recorded={result.get('metrics_recorded', 0)}, "
+            f"channels_unchanged={result.get('channels_unchanged', 0)}"
+        )
+    )
+    return {"run_id": run.run_id, "ok": True, **result}
