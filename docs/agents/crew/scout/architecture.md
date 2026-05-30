@@ -77,7 +77,7 @@ The full Scout function decomposes into two phases joined by a human-approval ga
 All current components are YouTube-only. Multi-platform expansion (podcasts, Twitter, blogs, Reddit) is roadmap — see [roadmap.md](roadmap.md). The diagrams below describe the YouTube path; each platform added later will instantiate the same shape (discovery surface → approval → enumerate → refresh → extract).
 
 The architectural intent for the discovery phase is **deterministic-first for the bulk case, LLM for the long tail**:
-- **Deterministic discovery** *(in design)* owns the cheap, fast, reproducible work: YouTube-native search and related-channel walks against a fixed seed-query bank, with server-side filtering against known IDs.
+- **Deterministic discovery** *(shipped)* owns the cheap, fast, reproducible work: YouTube-native search and related-channel walks against a fixed seed-query bank, with server-side filtering against known IDs.
 - **Agentic discovery** *(shipped)* owns what the LLM is uniquely good at: off-platform reach (blog / news / Reddit mentions YouTube doesn't see), semantic quality filtering, and coverage-gap targeting.
 
 Both surfaces file into the same `scout_candidates` table. Human approval is the seam where LLM judgement stops and idempotent pipelines take over.
@@ -89,8 +89,8 @@ flowchart LR
     YT(["YouTube Data API"])
     Web(["Web<br/>blogs · news · Reddit"])
 
-    subgraph Det["Deterministic surface — in design"]
-      DetJob["§3.1<br/>youtube_search<br/>find_related_channels<br/><i>filter_known=True</i>"]
+    subgraph Det["Deterministic surface — shipped"]
+      DetJob["§3.1<br/>deterministic_youtube<br/>channel/video/harvest search<br/><i>known-ID filter</i>"]
     end
 
     subgraph Ag["Agentic surface — shipped"]
@@ -105,28 +105,25 @@ flowchart LR
     DetJob -->|"persist (det)"| Pending
     AgJob  -->|"persist_candidate"| Pending
     Pending --> Approve
-
-    classDef proposed stroke-dasharray: 5 5,stroke:#888
-    class Det,DetJob proposed
 ```
 
-**Legend:** rounded ovals = external systems · cylinders = DB tables · hexagon = human gate · dashed = in design.
+**Legend:** rounded ovals = external systems · cylinders = DB tables · hexagon = human gate.
 
 **Trace:**
-1. **Daily deterministic sweep** (§3.1, in design) — cron runs `youtube_search` over the seed-query bank and `find_related_channels` over every tracked channel. `filter_known=True` means the API call returns only novel IDs. Results persist with `discovered_via='youtube_search' | 'related_channels'`.
+1. **Deterministic YouTube sweep** (§3.1, shipped) — the admin endpoint / CLI runs channel search, video search, video-harvest channel discovery, and optional related-channel walks. The server loads known IDs from `channels`, `sources`, and `scout_candidates`, passes them into the YouTube helper filters, scores enriched results with metadata-backed reasons, and persists novel candidates.
 2. **Weekly agentic sweep** (§3.2) — Scout LLM loop runs on a slower cadence with a brief that says *"deterministic covers YouTube-native; your job is off-platform reach and the long tail."* Uses `web_search` for blog/news/Reddit mentions, `web_fetch` to read About pages and judge quality, persists what survives.
 3. **Human reviews** — admin lists pending candidates via the recon API (regardless of source) and approves or rejects.
 
-**Today vs target:**
+**Current surfaces:**
 
-| Aspect | Today (shipped) | Target (after deterministic surface lands) |
-|---|---|---|
-| Bulk YouTube discovery | LLM with `web_search` (slow, expensive) | YouTube API (sub-second, ~$0) |
-| Adjacency expansion | LLM intuition | `find_related_channels` (deterministic) |
-| Off-platform mentions | LLM with `web_search` | LLM with `web_search` (unchanged) |
-| Semantic quality filter | LLM (during search) | LLM (focused, on a smaller candidate set) |
-| Cost / run | ~$0.40–$1.00 per agentic run | ~$0 deterministic + ~$0.20 weekly LLM |
-| Cadence | Manual CLI | Daily deterministic + weekly LLM |
+| Aspect | Current surface |
+|---|---|
+| Bulk YouTube discovery | YouTube Data API via deterministic endpoint / CLI |
+| Adjacency expansion | Optional related-channel IDs plus video-harvest channel discovery |
+| Off-platform mentions | LLM with `web_search` |
+| Semantic quality filter | Deterministic metadata score for YouTube-native; LLM for long-tail/off-platform |
+| Cost / run | ~$0 deterministic + agentic runs only when scheduled manually |
+| Cadence | Endpoint/CLI available; cron not added in this slice |
 
 ### Tracked-source operations — *how do we keep approved sources current and extract their content?*
 
@@ -182,32 +179,34 @@ flowchart LR
 
 Each component follows the same internal structure — trigger, inputs, processing, outputs, audit — so the five are directly comparable. Components are listed **deterministic-first** to reflect architectural intent (the deterministic surface owns the bulk; the agentic surface is the long-tail layer once both ship), not current build status.
 
-### 3.1 Deterministic discovery `[deterministic, in design]`
+### 3.1 Deterministic discovery `[deterministic, shipped]`
 
-Cheap, fast, reproducible YouTube-native discovery. Owns the bulk case (new uploads, adjacent channels) so the agentic surface is freed for off-platform and semantic work. Not yet built — design intent recorded here.
+Cheap, fast, reproducible YouTube-native discovery. Owns the bulk case (new channels, relevant videos, adjacent channels) so the agentic surface is freed for off-platform and semantic work.
 
-**Trigger** — Daily cron (proposed: 06:00 AET to land before morning content windows).
+**Trigger** — Admin endpoint `POST /api/admin/scout/source-discovery/youtube` or manual CLI `python -m app.scout.source_discovery.deterministic_youtube_cli`. Cron is not added in this slice.
 
 **Inputs**
-- Seed query bank (versioned config) — broad NRL terms ("NRL podcast", "supercoach analysis", "NRLW review", "Cowboys breakdown", etc.)
-- Every active channel in `channels` (for related-channel walks)
+- Default query bank in `deterministic_youtube.py`, overridable by repeated endpoint/CLI query args.
+- Optional related-channel IDs.
 - YouTube Data API key
 - Read-side: `channels.external_id`, `sources.canonical_url`, `scout_candidates.(platform,kind,external_id)` for the server-side filter
 
 **Processing**
-1. **`youtube_search(query, filter_known=True)`** — for each seed query, calls `search.list?type=channel,video&regionCode=AU`. Implementation filters returned IDs against the known-set in-process *before* returning to the caller. The agent / persist layer never sees a known result.
-2. **`find_related_channels(known_channel_id, limit=10)`** — for each tracked channel, pulls related channels via YouTube's "channels related to" signal (or scrapes the channel's featured-channels surface as fallback). Filters known.
-3. Persists novel results directly to `scout_candidates` with `status='pending'` and `discovered_via='youtube_search' | 'related_channels'`. Idempotent on `(platform, kind, external_id)`.
+1. Load known YouTube channel IDs and video IDs from DB.
+2. Run `search_channels`, `harvest_channels_from_videos`, optional `get_channel_sections`, and `search_videos`, passing known IDs into helper filters before scoring.
+3. Enrich novel IDs with `get_channel_stats` / `get_video_stats`.
+4. Compute `content_categories`, `score`, and `score_reasons` from explicit metadata signals.
+5. Persist novel results directly to `scout_candidates` with `status='pending'`. Idempotent on `(platform, kind, external_id)`.
 
-**Outputs** — rows in `scout_candidates` (same table as §3.2, distinguished by `discovered_via`). No score / content_categories on first pass — those are added post-hoc by a lightweight scoring pass (could be deterministic heuristics or a small LLM batch).
+**Outputs** — rows in `scout_candidates` (same table as §3.2, distinguished by `discovered_via='deterministic_youtube:...'`) with score, score reasons, categories, and useful metadata captured at discovery.
 
 **Quota budget** — `search.list` = 100 units/call. ~10 seed queries × daily = 7,000 units/week. ~150 channels × `channels.list?relatedToChannelId` = depends on endpoint cost (verify during implementation). Target: stay within 10,000-unit/day free tier including the daily refresh job (§3.4, ~750 units/day).
 
-**Audit** — needs to land on `agent_runs` even though there's no LLM (treat the cron run as an "agent" of `agent_id='scout-det'` for unified cost/health dashboards). Open question — see [roadmap.md](roadmap.md).
+**Audit** — the admin endpoint writes `agent_runs` rows under `agent_id='scout'`, `model='deterministic'`, and `detail_json.pipeline='youtube-discovery'`.
 
 ### 3.2 Discovery agent `[agentic]`
 
-The web-hunting LLM loop. Files candidate channels and videos to `scout_candidates`. Today this is the *only* discovery surface; once the deterministic surface (§3.1) ships, it becomes the long-tail / off-platform surface.
+The web-hunting LLM loop. Files candidate channels and videos to `scout_candidates`. With deterministic discovery shipped, this is the long-tail / off-platform surface.
 
 **Trigger** — Manual CLI: `python -m app.scout.source_discovery.cli` (flags: `--dry-run`, `--max-turns`, `--budget`, `--brief`). Scheduled runs are planned.
 
