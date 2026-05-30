@@ -9,24 +9,25 @@ BEGIN;
 
 -- Persisted agent ids and the CHECK constraint must move before new Miner
 -- runs can be written.
-UPDATE agent_runs
-SET agent_id = 'miner'
-WHERE agent_id = 'scout';
-
-UPDATE agent_runs
-SET agent_id = 'presenter_miner'
-WHERE agent_id = 'presenter_scout';
-
-UPDATE agent_events
-SET agent_id = 'miner'
-WHERE agent_id = 'scout';
-
-UPDATE agent_events
-SET agent_id = 'presenter_miner'
-WHERE agent_id = 'presenter_scout';
-
 ALTER TABLE agent_runs
     DROP CONSTRAINT IF EXISTS ck_agent_runs_agent_id;
+
+UPDATE agent_runs
+SET agent_id = 'miner'
+WHERE agent_id = 'scout';
+
+UPDATE agent_runs
+SET agent_id = 'presenter_miner'
+WHERE agent_id = 'presenter_scout';
+
+UPDATE agent_events
+SET agent_id = 'miner'
+WHERE agent_id = 'scout';
+
+UPDATE agent_events
+SET agent_id = 'presenter_miner'
+WHERE agent_id = 'presenter_scout';
+
 ALTER TABLE agent_runs
     ADD CONSTRAINT ck_agent_runs_agent_id
     CHECK (agent_id IN (
