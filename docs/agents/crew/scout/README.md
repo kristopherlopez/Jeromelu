@@ -36,7 +36,7 @@ Scope is everything from *we don't know about this source* to *typed rows persis
 3. **Refreshing per-video metadata** — daily snapshot of views / likes / comments into `video_metrics` ([§3.4](architecture.md), shipped). Enables view-velocity ranking and breakout detection.
 4. **Extracting raw audio** — `acquire_audio()` pulls the m4a for an approved source and lands it in S3 ([§3.5](architecture.md), shipped). Diarised transcription of that audio is downstream — owned by Analyst, not Scout.
 5. **Refreshing channel-level metadata** — sub count, total views, video count, name changes, active/inactive detection. *Planned* — currently `channel_metrics` is only written at approval time, not periodically refreshed.
-6. **Source health / liveness monitoring** — detecting stalled channels, 404 sources, transcript fetch failures, caption regenerations. *Backlog* — not built.
+6. **Source health / liveness monitoring** — detecting stalled channels, failed refresh/backfill runs, pending/failed audio or transcription work, and legacy caption-regeneration risk. *Internal classifier shipped* in `app.scout.source_health`; dashboard API/UI still separate.
 7. **Multi-platform expansion** — instantiate the same shape (discovery → approval → enumerate → refresh → extract) for podcasts (RSS), radio, TV shows, Twitter/X, Instagram, blogs/news, Reddit. *Backlog* — schema is platform-agnostic; code is YouTube-only.
 
 **Data acquisition (per the charter expansion):**

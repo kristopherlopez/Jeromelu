@@ -4,7 +4,7 @@ tags: [area/agents, subarea/crew]
 
 # Scout — Architecture
 
-> Last reviewed: 2026-05-24.
+> Last reviewed: 2026-05-30.
 
 How Scout works in depth: where it sits in the pipeline, what it writes (the hand-off contract), the discovery and tracked-source flows, the component internals, and the architecture under the expanded charter. For Scout's identity, scope, and voice see [README.md](README.md); for the locked design decisions see [charter.md](charter.md); for status and roadmap see [roadmap.md](roadmap.md).
 
@@ -298,6 +298,41 @@ Scout's last Extract step. Pulls audio from approved-but-pending YouTube sources
 - Embedding pass (`source_chunks.embedding`)
 - Speaker → Person resolution (`source_speakers.speaker_person_id`)
 - Claim / quote extraction
+
+### 3.6 Source health classification `[internal, shipped]`
+
+Scout now has a route-free internal health layer in `app.scout.source_health`.
+It reads DB metadata only and returns serialisable summaries for a future
+dashboard/API surface; it does not call YouTube, S3, yt-dlp, or transcription.
+
+**Inputs**
+- `agent_runs` rows where `agent_id='scout'` and
+  `detail_json.pipeline` is one of `youtube-refresh-videos`,
+  `youtube-channel-videos`, or `youtube-channel-stats`
+- active YouTube `channels`
+- latest `channel_metrics.sampled_at` per channel
+- approved YouTube `sources` status fields:
+  `ingestion_status`, `transcription_status`, `audio_s3_key`, and
+  `extraction_method`
+
+**Classifications**
+- `channel_stats_run` — warns when the latest successful
+  `youtube-channel-stats` run is older than the freshness window; unknown when
+  no completed run exists.
+- `video_refresh_run` — warns when the latest successful
+  `youtube-refresh-videos` run is stale; unknown when no completed run exists.
+- `channel_metadata` — warns when active YouTube channels have no
+  `channel_metrics` row or only stale metric metadata.
+- `recent_failed_runs` — fails when recent refresh/backfill rows are
+  `failed`/`aborted`, including per-channel `youtube-channel-videos` recovery
+  attempts.
+- `source_backlog` — warns for pending audio, collected-but-untranscribed
+  sources, and legacy caption-regeneration risk; fails for `ingestion_status`
+  or `transcription_status` failure states.
+
+Missing run/source data is never treated as healthy: it returns `unknown` or
+`warn`, with counts and sampled IDs so the dashboard can point operators at the
+right recovery loop.
 
 ---
 
