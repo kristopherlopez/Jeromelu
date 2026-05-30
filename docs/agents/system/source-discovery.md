@@ -127,7 +127,23 @@ Optional repeated query params override the default query bank:
 `related_channel_id=UC...`. `no_channel_search=true`,
 `no_video_search=true`, and `no_harvest_search=true` disable individual
 surfaces. The endpoint writes `agent_runs` rows under
-`detail_json.pipeline='youtube-discovery'`; it does not add cron.
+`detail_json.pipeline='youtube-discovery'`.
+
+Scheduled/operator wrapper:
+
+```bash
+/opt/jeromelu/scripts/scout-refresh.sh source-discovery-youtube --dry-run
+/opt/jeromelu/scripts/scout-refresh.sh source-discovery-youtube
+```
+
+The wrapper uses the same on-box admin path as other Scout refreshes: it
+sources `/opt/jeromelu/.env`, sends `X-Admin-Key`, routes Caddy locally with
+`curl --resolve api.jeromelu.ai:443:127.0.0.1`, and appends the HTTP result
+to `/var/log/jeromelu/scout-refresh.log`. The wrapper-level `--dry-run` is a
+static/no-op verification: it prints the resolved admin URL and exits before
+sourcing prod env, calling the API, touching the DB, or spending YouTube
+quota. Scheduled runs use `max_results=10`, `max_videos=25`, and the default
+minimum score.
 
 Manual CLI:
 
@@ -481,16 +497,20 @@ Wired to cron — see [Production schedule](#production-schedule) below.
 
 ## Production schedule
 
-Both refreshes run on the Lightsail box via a checked-in cron file:
+Scout's YouTube refresh and deterministic discovery jobs run on the Lightsail
+box via a checked-in cron file:
 
 - **Schedule:** [`scripts/cron.d/jeromelu`](../../../scripts/cron.d/jeromelu)
   — daily channel-stats at 09:00 AEST (23:00 UTC), daily videos at
-  09:15 AEST (23:15 UTC). DST drifts the local hour to 10:00 / 10:15
-  AEDT during summer; accepted.
+  09:15 AEST (23:15 UTC), and weekly deterministic YouTube discovery at
+  Monday 06:30 AEST (Sunday 20:30 UTC). DST drifts the local hour one hour
+  later during summer; accepted.
 - **Wrapper:** [`scripts/scout-refresh.sh`](../../../scripts/scout-refresh.sh)
   — sources `/opt/jeromelu/.env` for `ADMIN_KEY`, hits the API, appends
   status + body to `/var/log/jeromelu/scout-refresh.log`, exits non-zero
-  on non-2xx so cron / monitoring can surface failures.
+  on non-2xx so cron / monitoring can surface failures. Use
+  `--dry-run` for a static URL check with no API call, DB write, env read, or
+  YouTube quota spend.
 - **Install:** `lightsail-deploy.sh` runs `sudo install` on every deploy
   to sync the cron file into `/etc/cron.d/jeromelu`. Edit the source file
   in this repo and redeploy — never hand-edit on the box. The same cron
@@ -500,7 +520,10 @@ To inspect: `ssh jeromelu-prod 'tail -n 50 /var/log/jeromelu/scout-refresh.log'`
 
 To trigger a one-off run by hand (e.g. after fixing a quota error):
 `make prod-refresh-channel-stats ADMIN_KEY=xxx` or
-`make prod-refresh-videos ADMIN_KEY=xxx`.
+`make prod-refresh-videos ADMIN_KEY=xxx`. On the box, operators can also run
+`/opt/jeromelu/scripts/scout-refresh.sh source-discovery-youtube --dry-run`
+to confirm the deterministic discovery URL, then drop `--dry-run` to spend
+roughly 1.3k YouTube quota units and file novel candidates for review.
 
 ## Channel coverage audit
 
@@ -582,7 +605,9 @@ LIMIT 50;
 
 - Admin review queue UI (`/admin/recon`) — backend endpoints exist; UI pending
 - Live Recon stream in `/pulse` (SSE) — Slice 3
-- Scheduled deterministic discovery runs (cron / APScheduler) — endpoint and CLI exist; no schedule is added here
+- Scheduled deterministic YouTube discovery runs — weekly cron now calls the
+  admin endpoint via `scripts/scout-refresh.sh`; the agentic/off-platform CLI
+  remains manual
 - `Event` rows for the agent's reasoning trace — TBD when the live stream lands
 - Transcript-ingestion automation for newly-enumerated videos — single-source
   CLI shipped (`make extract-transcript SOURCE_ID=...`, audio-first via

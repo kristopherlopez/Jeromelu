@@ -136,6 +136,7 @@ GitHub Actions only handles `cost-report.yml`. Everything else recurring runs as
 | `45 18 * * *` / 04:45 | `scout-refresh.sh nrlcom-ladder` | Archives current-round nrl.com ladder JSON to S3. |
 | `50 18 * * *` / 04:50 | `scout-refresh.sh nrlcom-stats` | Archives nrl.com stat leaderboards to S3. |
 | `20 19 * * *` / 05:20 | `scout-populate.sh nrlcom-current` | Projects latest Scout S3 archives into relational DB tables inside `jeromelu-api`; season-aware phases use the current season, identity/re-resolution phases may inspect existing DB rows. |
+| `30 20 * * 0` / Mon 06:30 | `scout-refresh.sh source-discovery-youtube` | POSTs to `/api/admin/scout/source-discovery/youtube` weekly. Runs deterministic YouTube source discovery with `max_results=10` / `max_videos=25`, writes novel pending `scout_candidates`, and costs roughly 1.3k YouTube quota units. Use wrapper `--dry-run` for a static no-op URL check. |
 | `45 22 * * *` / 08:45 | `scout-refresh.sh supercoach-roster` | Archives SuperCoach roster and applies the SCD-2 people/player-attributes refresh. |
 | `55 22 * * 0,2,4` / Mon/Wed/Fri 08:55 | `scout-refresh.sh supercoach-stats current` | Resolves SuperCoach `current_round` and upserts current-round `player_rounds`. |
 | `0 23 * * *` / 09:00 | `scout-refresh.sh channel-stats` | POSTs to `/api/admin/scout/refresh-channel-stats`. Snapshots subscriber/video/view counts into `channel_metrics`. ~3 YouTube quota units. |

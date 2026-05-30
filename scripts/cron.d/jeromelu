@@ -32,6 +32,13 @@ MAILTO=""
 # has 1-day resolution; comfortably under the 10k daily quota even at peak.
 15 23 * * *     ubuntu  /opt/jeromelu/scripts/scout-refresh.sh videos
 
+# Weekly deterministic YouTube source discovery — Sunday 20:30 UTC = Monday
+# 06:30 AEST / 07:30 AEDT. Uses the default deterministic query bank with
+# max_results=10 and max_videos=25; costs roughly 1.3k YouTube quota units
+# (13 search.list calls plus low-cost metadata batches). Weekly keeps the
+# candidate inbox fresh without crowding the daily YouTube refresh budget.
+30 20 * * 0     ubuntu  /opt/jeromelu/scripts/scout-refresh.sh source-discovery-youtube
+
 # Daily SuperCoach roster refresh — 22:45 UTC = 08:45 AEST / 09:45 AEDT.
 # Fetches the canonical players-cf roster, archives to S3, and applies the
 # SCD-2 people/player_attributes refresh via /api/admin/scout/supercoach-roster.
