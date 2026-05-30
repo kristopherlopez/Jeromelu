@@ -18,6 +18,36 @@ Plans link to the work orders they spawn. Work orders link back to the plan sect
 
 ## Active plan
 
+### 2026-05-30 - Scout roadmap completion
+
+**Objective.** Close the implementable Scout roadmap gaps that remain after Phase 5, using disjoint worker branches/worktrees and read-only review before coordinator integration.
+
+**Source.** [`docs/agents/crew/scout/roadmap.md`](../agents/crew/scout/roadmap.md), especially Phase 6 and the YouTube-depth backlog rows.
+
+**Dependency graph.**
+
+| Slice | Depends on | Notes |
+|---|---|---|
+| SCOUT-OPS-SCHEDULES | none | Cron/wrapper/docs only. Independent. |
+| SCOUT-YT-AGENT-RUNS | none | Adds deterministic YouTube/recon audit rows. Unblocks dashboard and source health. |
+| SCOUT-RECON-UI | none | Admin review queue UI. Independent, but later dashboard web work must merge around `AdminClient.tsx`. |
+| SCOUT-MEDIA-DRAIN | none | Recurring drain CLI/job surface. Independent. |
+| SCOUT-DETERMINISTIC-YT | none | Deterministic discovery surface. Unblocks source-discovery scheduling. |
+| SCOUT-DASHBOARD-API | SCOUT-YT-AGENT-RUNS | Reads `agent_runs` by Scout pipeline. |
+| SCOUT-DASHBOARD-WEB | SCOUT-DASHBOARD-API, SCOUT-RECON-UI | Adds `/admin/scout` or admin tab UI after API shape lands. |
+| SCOUT-SOURCE-DISCOVERY-SCHED | SCOUT-DETERMINISTIC-YT | Cron/APScheduler wrapper for deterministic discovery. |
+| SCOUT-SOURCE-HEALTH | SCOUT-YT-AGENT-RUNS | Liveness/stalled-channel checks need audit/run semantics. |
+
+**Parallelism rule.** Run all first-wave branches in parallel because their code touches are disjoint, then review them in parallel. Start second-wave workers only after their dependency branches pass review or are integrated. Keep dashboard API and dashboard web sequential because the web depends on API response shape and overlaps the admin UI area touched by recon.
+
+**Verification strategy.**
+
+- Python unit tests for changed API/Scout modules.
+- Typecheck/lint for web changes.
+- CLI `--help` and dry-run checks for schedulers/drain/discovery commands.
+- Read-only adversarial review per worker branch before integration.
+- Final coordinator verification from a clean integration worktree before landing.
+
 ## Completed work
 
 Completed plans are **not** archived in this file. When a plan's work orders are all done, its durable record is a run report under [`docs/build/runs/`](./runs/) (see the [index](./runs/README.md)) and the plan is removed from "Active plan" above. This document holds only active/future plans; the run reports are the system of record for what shipped.
