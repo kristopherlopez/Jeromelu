@@ -1,4 +1,4 @@
-.PHONY: up down db-shell migrate migrate-status seed-teams seed-venues fetch-players seed-players api web logs clean collect-audio collect-video transcribe extract-transcript diarize diarize-compare voice-cluster enroll-voice enroll-face scout-presenters lineup-build lineup-deploy lineup-status lineup-delete test test-eval lint lint-python format-python typecheck-python lint-web prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all prod-refresh-videos prod-refresh-channel-stats prod-channel-coverage prod-seed-teams prod-seed-players prod-refresh-players prod-fetch-and-refresh-players prod-refresh-players-nrlcom deploy-prod prod-shell prod-logs
+.PHONY: up down db-shell migrate migrate-status seed-teams seed-venues fetch-players seed-players api web logs clean collect-audio collect-audio-drain collect-video transcribe transcribe-drain extract-transcript diarize diarize-compare voice-cluster enroll-voice enroll-face scout-presenters lineup-build lineup-deploy lineup-status lineup-delete test test-eval lint lint-python format-python typecheck-python lint-web prod-pull-raw prod-pull-raw-all prod-upload-clean prod-upload-claims prod-ingest prod-update-clean prod-sync prod-sync-dry-run prod-sync-all prod-refresh-videos prod-refresh-channel-stats prod-channel-coverage prod-seed-teams prod-seed-players prod-refresh-players prod-fetch-and-refresh-players prod-refresh-players-nrlcom deploy-prod prod-shell prod-logs
 
 # Start local infrastructure
 up:
@@ -51,6 +51,11 @@ collect-audio:
 	@test -n "$(SOURCE_ID)" || (echo "SOURCE_ID is required: make collect-audio SOURCE_ID=<uuid>" && exit 2)
 	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.scout.media.cli.audio $(SOURCE_ID)
 
+# Scout — bounded drain over approved pending YouTube sources.
+# Usage: make collect-audio-drain [LIMIT=5]
+collect-audio-drain:
+	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.scout.media.cli.drain_audio --limit $(or $(LIMIT),5)
+
 # Scout — acquire low-res video for one source (yt-dlp 360p by default →
 # s3://jeromelu-raw-audio with .video.mp4 suffix). Used by Phase 4 visual
 # identification. Independent of audio acquisition; idempotent.
@@ -67,6 +72,11 @@ collect-video:
 transcribe:
 	@test -n "$(SOURCE_ID)" || (echo "SOURCE_ID is required: make transcribe SOURCE_ID=<uuid>" && exit 2)
 	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.analyst.transcribe_cli $(SOURCE_ID) $(if $(FORCE),--force)
+
+# Analyst — bounded drain over collected sources without materialised documents.
+# Usage: make transcribe-drain [LIMIT=3]
+transcribe-drain:
+	. services/api/.venv/Scripts/activate && S3_ENDPOINT='' PYTHONPATH=services/api python -m app.analyst.transcribe_drain_cli --limit $(or $(LIMIT),3)
 
 # Convenience target: run Scout (collect-audio) then Analyst (transcribe) in
 # sequence for a single source. The two steps stay independent — a Deepgram

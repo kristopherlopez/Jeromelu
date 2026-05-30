@@ -78,11 +78,11 @@ Stages run **sequentially** in the order shown. Each block lists the technologie
 | | |
 |---|---|
 | **Modules** | `services/api/app/analyst/transcribe.py` (orchestrator), `services/api/app/analyst/diarize.py` (pyannote stage). Speaker-identification modules — `identify_voice.py`, `visual_id.py`, `fusion.py` — are run inline by the orchestrator; see [speaker-identification.md](speaker-identification.md). |
-| **Driver** | `python -m app.analyst.transcribe_cli <source_id>` · `make transcribe SOURCE_ID=<uuid>` |
+| **Driver** | `python -m app.analyst.transcribe_cli <source_id>` · `make transcribe SOURCE_ID=<uuid>` · `python -m app.analyst.transcribe_drain_cli --limit N` · `make transcribe-drain LIMIT=N` |
 | **Crew counterpart** | [Analyst](../crew/analyst/README.md) — Analyst's first surface, sitting in front of cleaning / claim extraction. |
 | **ETL role** | **Transform.** Reads Scout's audio (and video, when speaker ID is in scope); produces the structured transcript artefacts every later stage depends on. |
 | **Cost** | Deepgram ~$0.30 per 90-min video (nova-3 batch, words only). Pyannote 3.1 + InsightFace combined: ~50 min CPU per 45-min source locally; ~3 min wall time on the SageMaker Async GPU endpoint when `LINEUP_REMOTE=1`. End-to-end **~$0.43/source** with remote GPU enabled. |
-| **Status** | Diarization + ASR + merge + voice ID + visual ID + fusion all live. Single-source CLI shipped. Recurring drain job not yet built. |
+| **Status** | Diarization + ASR + merge + voice ID + visual ID + fusion all live. Single-source CLI and bounded drain CLI shipped. No cron entry yet. |
 
 > **For audio acquisition** — see [ingestion.md](ingestion.md). That's Scout's job; this module refuses to run if Scout hasn't already populated `audio_s3_key`.
 
@@ -162,9 +162,19 @@ make transcribe SOURCE_ID=<uuid> FORCE=1
 
 # Convenience: collect-audio + transcribe in sequence (does NOT run enrollment).
 make extract-transcript SOURCE_ID=<uuid>
+
+# Bounded batch: transcribe collected sources that do not yet have a document.
+make transcribe-drain LIMIT=3
 ```
 
 Pulls `DEEPGRAM_API_KEY` and `HUGGINGFACE_API_KEY` from project root `.env`. Sets `S3_ENDPOINT=''` so boto3 talks to real AWS.
+
+The drain selects at most `LIMIT` sources where `approved_flag=true`,
+`ingestion_status='collected'`, `audio_s3_key IS NOT NULL`,
+`transcription_status IS NULL`, and no `source_documents` row exists. Each
+source runs through the same `transcribe()` path in its own DB session.
+Per-source failures are logged, reported in the CLI counts, and do not stop the
+remaining selected rows.
 
 Expected output:
 
@@ -189,7 +199,7 @@ OK
 
 ## Backlog
 
-- **Recurring drain job** — APScheduler / cron over `transcription_status IS NULL AND ingestion_status = 'collected'`. Single-source CLI today.
+- **Cron wiring** — run `make transcribe-drain LIMIT=N` from prod cron once the operator chooses cadence and cost bounds.
 - **Production GPU compute.** Pyannote on Lightsail micro is too slow / memory-tight for prod; Modal / RunPod / dedicated EC2 g4dn worker decision required before this pipeline runs in prod.
 - **Cleaning pass** — `source_documents.cleaned_text`, `source_chunks.clean_text`. Today via `/clean-transcript` skill.
 - **Embedding pass** — `source_chunks.embedding` (text embedding, separate from the voice embedding on `source_speakers`). Not yet built.

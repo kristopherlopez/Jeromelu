@@ -7,10 +7,10 @@ tags: [area/agents, subarea/system, status/live]
 | | |
 |---|---|
 | **Module** | `services/api/app/scout/media/audio.py` |
-| **Driver** | `python -m app.scout.media.cli.audio <source_id>` · `make collect-audio SOURCE_ID=<uuid>` |
+| **Driver** | `python -m app.scout.media.cli.audio <source_id>` · `make collect-audio SOURCE_ID=<uuid>` · `python -m app.scout.media.cli.drain_audio --limit N` · `make collect-audio-drain LIMIT=N` |
 | **Crew counterpart** | [Scout](../crew/scout/README.md) — this is Scout's audio-pull surface (§3.5). |
 | **ETL role** | **Extract only.** Pulls audio bytes via yt-dlp and persists to S3. No interpretation. |
-| **Status** | Single-source CLI shipped. Recurring drain job not yet built. |
+| **Status** | Single-source CLI and bounded drain CLI shipped. No cron entry yet. |
 
 Replaces the legacy Temporal-based `IntelSweepWorkflow` (under `services/worker-ingestion/`, dev-only). Sits at the boundary between Scout's discovery + enumeration surface and Analyst's transcription surface.
 
@@ -67,11 +67,23 @@ OK
   bytes_uploaded:  (skipped — already in S3)
 ```
 
+To drain pending approved YouTube rows in a bounded batch:
+
+```bash
+make collect-audio-drain LIMIT=5
+```
+
+The drain selects at most `LIMIT` sources where `approved_flag=true`,
+`source_type='youtube'`, `ingestion_status='pending'`, and `audio_s3_key IS
+NULL`. Each source runs through the same `acquire_audio()` path in its own DB
+session. Per-source failures are logged, reported in the CLI counts, and do not
+stop the remaining selected rows.
+
 ---
 
 ## Backlog
 
-- **Recurring drain job** — APScheduler / cron over `ingestion_status='pending'`. Single-source CLI today.
+- **Cron wiring** — run `make collect-audio-drain LIMIT=N` from prod cron once the operator chooses cadence and limits.
 - **Backfill of `source_chunks_v1`** — 215 prod sources still ingested under the legacy auto-caption path. Re-collect audio + transcribe via the new flow on highest-leverage channels first.
 - **Member-only / paywalled video handling** — yt-dlp can't reach these. Options: cookies file, manual upload, or skip + log.
 
