@@ -156,19 +156,250 @@ The multi-platform roadmap items below (podcasts, radio, TV shows, Twitter/X, In
 
 ## Multi-platform expansion
 
-Schema (`platform` field on `miner_candidates` / `sources`) is already platform-agnostic. Each new platform instantiates the same shape: discovery surface (det + agentic) → approval → enumerate → refresh → extract. **All entries below are Backlog** until cross-platform identity (see Future improvements) is decided.
+Schema (`platform` field on `miner_candidates` / `sources`) is already
+platform-agnostic, but multi-platform should not mean "add every possible
+scraper." Each platform must earn its place by adding coverage the shipped
+YouTube pipeline cannot already reach.
 
-**Platform vs. format — and YouTube's gravity.** Miner acquires by *platform* (where it fetches); NRL media arrives in *formats* (what the content is — panel/podcast, radio show, TV show). The two are orthogonal, and the key fact is **YouTube's gravity**: most NRL podcasts publish there, many radio segments are re-uploaded there, and TV shows (NRL 360, the Matty Johns Show, panel shows) surface as clips and full episodes there. So the **shipped YouTube pipeline already reaches most of this content** — a re-uploaded radio show or TV episode is just a YouTube video with a format tag. The rows below are therefore the *off-YouTube residual*: native sources for content **not** re-uploaded (standalone podcast RSS, live-radio capture, paywalled broadcaster TV, social, web) — harder and rarer, hence Backlog. The schema piece that makes formats navigable independent of where they were acquired is a `format` / `content_type` tag on `sources` (podcast / radio / tv / panel / written) — not built yet.
+**Platform vs. format — and YouTube's gravity.** Miner acquires by *platform*
+(where it fetches); NRL media arrives in *formats* (what the content is:
+podcast, panel show, radio segment, TV clip, article, social post). The two are
+orthogonal. Most NRL podcasts publish to YouTube, many radio segments are
+re-uploaded there, and TV shows surface as clips or full episodes there. The
+shipped YouTube pipeline therefore already reaches much of the "podcast/radio/TV"
+surface. Multi-platform work should target the off-YouTube residual:
+standalone RSS feeds, article pages, Reddit threads, social posts, and native
+audio/video that is not re-uploaded.
 
-| Platform / format | Discovery surface | Content extraction | Notes |
+### Foundation slice: MP0 — platform identity and content taxonomy
+
+Do this before adding new acquisition modules. Without it, new platforms will
+produce duplicate shows, ambiguous source types, and hard-to-query wiki inputs.
+
+**Schema / metadata**
+- Add a stable `source_identity` concept for a show/person/outlet that can span
+  platforms. A single show may have a YouTube channel, podcast RSS feed, website,
+  Twitter/X account, Instagram account, and Reddit presence.
+- Add `sources.content_format` or equivalent metadata with a small controlled
+  vocabulary: `video`, `podcast_audio`, `radio_audio`, `tv_clip`, `article`,
+  `social_post`, `forum_thread`.
+- Add platform-specific external IDs in `metadata_json`, but keep the common
+  columns (`platform`, `external_id`, `canonical_url`, `published_at`, title)
+  consistent across platforms.
+- Extend candidate scoring to include `platform`, `content_format`,
+  `source_identity_hint`, `publisher`, and `rights_risk`.
+
+**Storage convention**
+- Keep bronze raw captures under `s3://{clean_bucket}/miner/{platform}/...`.
+- Store raw platform payloads before any parsing: RSS XML, article HTML, API JSON,
+  Reddit JSON, tweet JSON, captions, or media metadata.
+- Store downloaded audio/video under the existing media buckets only after the
+  row is approved and enumerated as a source.
+
+**Operational rules**
+- Every new platform folder follows D9: `fetcher.py`, `models.py`, `routes.py`,
+  fixtures, unit tests, and env-flagged live drift tests where live access is
+  practical.
+- Every endpoint writes `agent_runs` under `agent_id='miner'` with
+  `detail_json.pipeline='<platform>-<thing>'`.
+- Every platform has an explicit rate limit, retry policy, and robots/ToS note
+  in its README before it is scheduled.
+
+### Recommended sequence
+
+| Phase | Platform | Why this order | Output |
 |---|---|---|---|
-| **Podcasts** (YouTube / Apple / Spotify) | Most NRL podcasts are on YouTube (shipped pipeline); RSS catalogue search only for feeds not re-uploaded | Already captured as a YouTube video, *or* RSS enumerate → mp3 → transcribe | Mostly reachable via YouTube already; standalone RSS is the residual. |
-| **Radio** (Triple M, SEN, ABC Grandstand) | Re-uploads caught by the YouTube pipeline; native live-radio capture (scheduled stream recording) is the residual | Audio → transcribe | Prefer YouTube re-uploads / show podcast feeds; native live capture is low-priority. |
-| **TV shows** (NRL 360, Matty Johns Show, panel shows) | Clips + full episodes mostly on YouTube (shipped); native broadcaster (Fox League / Nine) is paywalled | YouTube video → transcribe | Re-uploads cover most of it; native broadcaster capture is paywalled and hard — defer. |
-| **Twitter / X** (NRL personalities) | Manual seed list + agentic for adjacent accounts | API or scrape; tweets become `source_chunks` directly (no transcription) | Quote-extraction value high, signal-to-noise low. API now paid/restricted; scraping is ToS-fraught. |
-| **Instagram** (clubs / players / NRL accounts) | Manual seed list + agentic for adjacent accounts | Captions → `source_chunks`; Reels audio → transcribe (like YouTube) | **Hardest acquisition** — auth-gated, anti-scraping, ToS-restrictive. Official club / injury news but brittle; lowest priority. |
-| **Blogs / news** (Roar, NRL.com features, club sites) | RSS where available + agentic web search for new outlets | RSS enumerate → article HTML → readability extract | Off-platform discovery already works for these via §3.2; missing piece is structured ingestion. |
-| **Reddit** (r/nrl, club subs) | API search for high-engagement threads, weekly | Thread + top comments to `source_chunks` | Community signal; complements expert-driven sources. |
+| MP0 | Identity + format taxonomy | Prevents duplicate ingestion before adding more sources | Schema/docs/tests only |
+| MP1 | Blogs/news/RSS articles | Highest value-to-risk ratio; public HTML/RSS; no media pipeline needed | Article sources + raw HTML/text |
+| MP2 | Podcast RSS | High signal and usually open; captures shows not on YouTube | Episode sources + audio hand-off |
+| MP3 | Reddit | Good community signal; official API path exists; lower authority than media | Thread sources + comment trees |
+| MP4 | Twitter/X | High quote value but paid/restricted API and high noise | Social-post sources |
+| MP5 | Instagram | Injury/team-news value but brittle and auth-gated | Captions/Reels only if policy-safe |
+| MP6 | Native radio/TV | Most already re-uploaded; native capture is rights/paywall heavy | Defer unless a specific source is critical |
+
+### Platform slices
+
+#### MP1 — Blogs / news / article pages
+
+**Priority:** First non-YouTube platform.
+
+**Why:** This fills a real gap without introducing audio/video complexity. It
+captures written analysis, injury updates, team news, club announcements, and
+long-form opinion that never appears as video.
+
+**Candidate sources**
+- NRL.com features and club news pages.
+- The Roar, Zero Tackle, ESPN NRL, ABC sport NRL articles.
+- Club websites and official press releases.
+- Independent fantasy/analysis blogs where RSS or stable indexes exist.
+
+**Implementation shape**
+- Folder: `services/api/app/miner/articles/`.
+- Candidate kind: `article_feed` or `article_site`.
+- Source rows: `platform='web'`, `content_format='article'`.
+- Bronze keys:
+  - `miner/web/feed/{publisher}/{YYYYMMDD}.xml`
+  - `miner/web/articles/{publisher}/{YYYY}/{MM}/{slug}.html`
+  - optional extracted text snapshot:
+    `miner/web/articles/{publisher}/{YYYY}/{MM}/{slug}.txt`
+- Extraction: readability-style article text extraction into `source_documents`
+  or equivalent raw text document rows. Analyst still owns claim extraction and
+  interpretation.
+
+**Done definition**
+- One seeded source list with 5-10 publishers.
+- Deterministic feed/page enumerator with dedupe on canonical URL.
+- Fixture tests for RSS, sitemap/listing page, article page, and paywall/blocked
+  fallback.
+- Admin review queue can approve article feeds/sites and enumerate article
+  sources.
+
+#### MP2 — Podcast RSS
+
+**Priority:** Second.
+
+**Why:** Podcast RSS is open, structured, and high signal. It covers shows that
+publish audio feeds but do not reliably upload every episode to YouTube.
+
+**Candidate sources**
+- Podcast RSS feeds from Apple Podcasts / Spotify pages where the canonical RSS
+  URL is discoverable.
+- Publisher-hosted feeds from club/fantasy/news sites.
+
+**Implementation shape**
+- Folder: `services/api/app/miner/podcast_rss/`.
+- Candidate kind: `podcast_feed`.
+- Source rows: `platform='podcast_rss'`, `content_format='podcast_audio'`.
+- Bronze keys:
+  - `miner/podcast_rss/feeds/{feed_hash}/{YYYYMMDD}.xml`
+  - `miner/podcast_rss/episodes/{feed_hash}/{episode_guid}.json`
+- Media hand-off: approved episode rows keep `ingestion_status='pending'`; the
+  existing Miner audio drain downloads the episode enclosure to raw audio S3,
+  then Analyst transcribes.
+
+**Done definition**
+- RSS parser handles GUID, enclosure URL, duration, title, description,
+  published date, and episode URL.
+- Dedupe on `(platform, external_id)` where `external_id` is stable feed GUID +
+  episode GUID hash.
+- At least one feed fixture, one changed-feed fixture, and one missing-enclosure
+  fixture.
+
+#### MP3 — Reddit
+
+**Priority:** Third, if community signal becomes useful.
+
+**Why:** Reddit is not authoritative, but it captures fan consensus, rumours,
+sentiment, and early reactions. It should complement expert sources, not drive
+truth by itself.
+
+**Candidate sources**
+- `r/nrl`, club subreddits, SuperCoach/fantasy subs if signal is sufficient.
+- High-engagement threads around team lists, injuries, trades, judiciary, and
+  game reactions.
+
+**Implementation shape**
+- Folder: `services/api/app/miner/reddit/`.
+- Candidate kind: `subreddit` or `reddit_thread_query`.
+- Source rows: `platform='reddit'`, `content_format='forum_thread'`.
+- Bronze keys:
+  - `miner/reddit/subreddits/{subreddit}/{YYYYMMDD}.json`
+  - `miner/reddit/threads/{thread_id}.json`
+- Extraction: raw thread title/body/top comments into source documents/chunks
+  with comment IDs preserved. Analyst owns summarisation, claim extraction, and
+  credibility treatment.
+
+**Done definition**
+- Uses an official API path where available.
+- Configurable score threshold using upvotes, comments, recency, and keyword
+  match.
+- Explicit filters for low-signal meme/banter posts.
+- No automatic wiki facts from Reddit without downstream corroboration.
+
+#### MP4 — Twitter / X
+
+**Priority:** Fourth, only if API/access economics make sense.
+
+**Why:** High quote value for players, journalists, clubs, and insiders, but
+high noise and high acquisition risk.
+
+**Candidate sources**
+- Manual seed list of NRL journalists, clubs, players, SuperCoach analysts,
+  and official league accounts.
+- Agentic discovery can suggest adjacent accounts, but approval should stay
+  manual.
+
+**Implementation shape**
+- Folder: `services/api/app/miner/twitter/`.
+- Candidate kind: `twitter_account`.
+- Source rows: `platform='twitter'`, `content_format='social_post'`.
+- Bronze keys:
+  - `miner/twitter/accounts/{handle}/{YYYYMMDD}.json`
+  - `miner/twitter/posts/{post_id}.json`
+- Extraction: post text, author, timestamp, URL, conversation/repost metadata.
+  Media attachments are metadata-only unless explicit download is policy-safe.
+
+**Done definition**
+- API cost and access model documented before implementation.
+- Strict allowlist for accounts; no broad scraping.
+- Quote extraction downstream can distinguish first-party posts from reports
+  about someone else's comments.
+
+#### MP5 — Instagram
+
+**Priority:** Fifth / lowest among social platforms.
+
+**Why:** Clubs and players often break training, injury, and selection hints
+through Instagram, but acquisition is brittle, auth-gated, and policy-sensitive.
+
+**Implementation shape**
+- Folder only if a policy-safe API or export path exists:
+  `services/api/app/miner/instagram/`.
+- Candidate kind: `instagram_account`.
+- Source rows: `platform='instagram'`, `content_format='social_post'` or
+  `video` for Reels only when media download is permitted.
+- Bronze keys:
+  - `miner/instagram/accounts/{handle}/{YYYYMMDD}.json`
+  - `miner/instagram/posts/{post_id}.json`
+
+**Done definition**
+- No credential scraping.
+- Captions and public metadata only unless a compliant API grants more.
+- Reels audio/video enters the normal media pipeline only when rights and access
+  are explicit.
+
+#### MP6 — Native radio / TV / paywalled broadcasters
+
+**Priority:** Defer unless a specific source is strategically critical.
+
+**Why:** Most usable clips are already on YouTube or podcast RSS. Native capture
+adds legal, operational, and engineering complexity: schedules, stream recording,
+paywalls, DRM, missed-airing retries, and rights policy.
+
+**Potential shape**
+- Radio: prefer official podcast RSS feeds first. Native live stream recording
+  only for a named show with clear access rights.
+- TV: prefer official YouTube clips and public video pages. Do not build around
+  paywalled/DRM sources.
+- Source rows remain audio/video sources and flow through the existing Miner
+  media + Analyst transcription path.
+
+### Platform readiness checklist
+
+A new platform is ready to implement when all are true:
+
+- It adds material coverage not already available through YouTube.
+- There is a stable public/API acquisition path.
+- S3 bronze keys and DB source/candidate shapes are specified.
+- Dedupe keys are stable and documented.
+- Rate limits, auth requirements, and policy risks are explicit.
+- At least one fixture can be checked into `tests/fixtures/miner/<platform>/`.
+- A minimal operator path exists: admin endpoint, dry-run, and run audit.
+
+Until MP0 lands, treat platform-specific work as exploratory only. The most
+practical first execution thread is MP1 Blogs/news/RSS, because it avoids media
+download, is easy to fixture-test, and gives downstream agents written text that
+YouTube will never provide.
 
 ---
 
