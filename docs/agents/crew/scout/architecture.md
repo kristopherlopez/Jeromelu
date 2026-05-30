@@ -364,6 +364,11 @@ External world
 3. Each module's wrapper writes one `agent_runs` row with `agent_id='scout'`, `detail_json.pipeline='<module>'`, plus per-run counts (rows fetched, rows upserted, rows skipped, errors).
 4. Each module is independently cron-triggerable via the endpoint.
 5. Each module emits unknown-field warnings to `agent_events` when the upstream source returns shapes the parser doesn't recognise — early-warning for source drift.
+6. `GET /api/admin/scout/dashboard` is the read-only operator rollup over those
+   rows: it filters to `agent_id='scout'`, groups recent runs by
+   `detail_json.pipeline`, and returns last-run status/timestamps, compact
+   detail counts, recent failure counts, and cost rollups without calling any
+   upstream service.
 
 This is the pattern Scout's media side already follows; the expansion just instantiates it for more modules.
 
