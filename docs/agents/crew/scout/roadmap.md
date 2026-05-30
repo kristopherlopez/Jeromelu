@@ -133,12 +133,12 @@ The multi-platform roadmap items below (podcasts, radio, TV shows, Twitter/X, In
 
 | Capability | Status | Notes |
 |---|---|---|
-| **Deterministic discovery surface (§3.1)** — `youtube_search` + `find_related_channels` with server-side `filter_known=True` | In design | Spec recorded in [architecture.md §3.1](architecture.md). Promotes the former "Tier 2" to a first-class architectural change. |
+| **Deterministic discovery surface (§3.1)** — `youtube_search` + `find_related_channels` with server-side `filter_known=True` | Shipped | Admin endpoint and CLI file novel YouTube candidates into `scout_candidates` with server-side dedupe and `agent_runs` audit rows. |
 | Refocus agentic Scout brief on off-platform + long-tail (instead of competing with deterministic) | Planned | Tied to §3.1 landing |
 | Admin review queue UI at `/admin/recon` | In design | Backend endpoints shipped; UI not started |
 | Live Recon SSE stream in `/pulse` (theatric reasoning visible to users) | Planned | Drives the visible-reasoning UX |
 | `Event` rows for the reasoning trace (Pulse feed integration) | Backlog | TBD when live stream lands |
-| Scheduled Scout runs (cron / APScheduler) for the agentic surface | Planned | Manual CLI only today |
+| Scheduled deterministic YouTube discovery | Shipped (2026-05-30) | Weekly Lightsail cron invokes `scout-refresh.sh source-discovery-youtube` at Monday 06:30 AEST; operator `--dry-run` is static/no-op. Agentic off-platform discovery remains manual. |
 | **Weekly channel-metadata refresh** — periodic re-snapshot of subs/views/video count and active/inactive detection (extends §3.4) | Planned | Channel metadata only written at approval today |
 | **Source health / liveness monitoring** — detect stalled channels, 404 sources, transcript fetch failures, caption regenerations | Backlog | Not built |
 | Audio acquisition surface (Scout owns yt-dlp → S3) | Shipped (2026-05-03) | `make collect-audio SOURCE_ID=...`. Diarised transcription split out to Analyst. |

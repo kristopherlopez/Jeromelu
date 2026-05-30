@@ -3,7 +3,7 @@
 # Used by cron (scripts/cron.d/jeromelu) to run Scout media and data
 # refresh jobs on a schedule.
 #
-# Usage: scout-refresh.sh {channel-stats|videos|supercoach-roster|supercoach-stats [ROUND|current]|supercoach-teams|supercoach-settings|nrlcom-draw|nrlcom-match-centre|nrlcom-casualty-ward|nrlcom-ladder|nrlcom-stats|nrlcom-players-roster} [--dry-run]
+# Usage: scout-refresh.sh {channel-stats|videos|source-discovery-youtube|supercoach-roster|supercoach-stats [ROUND|current]|supercoach-teams|supercoach-settings|nrlcom-draw|nrlcom-match-centre|nrlcom-casualty-ward|nrlcom-ladder|nrlcom-stats|nrlcom-players-roster} [--dry-run]
 #
 # Sources /opt/jeromelu/.env to pick up ADMIN_KEY. ALWAYS appends a
 # status line to /var/log/jeromelu/scout-refresh.log — including on
@@ -29,7 +29,7 @@
 set -uo pipefail
 
 usage() {
-  echo "usage: $0 {channel-stats|videos|supercoach-roster|supercoach-stats [ROUND|current]|supercoach-teams|supercoach-settings|nrlcom-draw|nrlcom-match-centre|nrlcom-casualty-ward|nrlcom-ladder|nrlcom-stats|nrlcom-players-roster} [--dry-run]" >&2
+  echo "usage: $0 {channel-stats|videos|source-discovery-youtube|supercoach-roster|supercoach-stats [ROUND|current]|supercoach-teams|supercoach-settings|nrlcom-draw|nrlcom-match-centre|nrlcom-casualty-ward|nrlcom-ladder|nrlcom-stats|nrlcom-players-roster} [--dry-run]" >&2
 }
 
 resolve_supercoach_round() {
@@ -72,13 +72,29 @@ fi
 
 JOB="${1:-}"
 ARG="${2:-}"
-SEASON="${SCOUT_SEASON:-$(date -u +%Y)}"
+SEASON=""
+
+resolve_season() {
+  if [[ -n "${SEASON}" ]]; then
+    printf '%s\n' "$SEASON"
+    return 0
+  fi
+  SEASON="${SCOUT_SEASON:-$(date -u +%Y)}"
+  printf '%s\n' "$SEASON"
+}
 
 case "$JOB" in
   channel-stats) ENDPOINT="refresh-channel-stats" ;;
   videos)        ENDPOINT="refresh-videos" ;;
-  supercoach-roster)   ENDPOINT="supercoach-roster?season=${SEASON}" ;;
+  source-discovery-youtube)
+    DISCOVERY_MAX_RESULTS="${SCOUT_SOURCE_DISCOVERY_MAX_RESULTS:-10}"
+    DISCOVERY_MAX_VIDEOS="${SCOUT_SOURCE_DISCOVERY_MAX_VIDEOS:-25}"
+    DISCOVERY_MIN_SCORE="${SCOUT_SOURCE_DISCOVERY_MIN_SCORE:-0.55}"
+    ENDPOINT="source-discovery/youtube?max_results=${DISCOVERY_MAX_RESULTS}&max_videos=${DISCOVERY_MAX_VIDEOS}&min_score=${DISCOVERY_MIN_SCORE}"
+    ;;
+  supercoach-roster)   ENDPOINT="supercoach-roster?season=$(resolve_season)" ;;
   supercoach-stats)
+    SEASON="$(resolve_season)"
     ROUND="${ARG:-${SCOUT_SUPERCOACH_STATS_ROUND:-current}}"
     if [[ "$ROUND" == "current" ]]; then
       if [[ "$DRY_RUN" -eq 0 ]]; then
@@ -102,11 +118,11 @@ case "$JOB" in
     ;;
   supercoach-teams)    ENDPOINT="supercoach-teams" ;;
   supercoach-settings) ENDPOINT="supercoach-settings" ;;
-  nrlcom-draw)         ENDPOINT="nrlcom-draw?competition=111&season=${SEASON}" ;;
-  nrlcom-match-centre) ENDPOINT="nrlcom-match-centre?competition=111&season=${SEASON}" ;;
+  nrlcom-draw)         ENDPOINT="nrlcom-draw?competition=111&season=$(resolve_season)" ;;
+  nrlcom-match-centre) ENDPOINT="nrlcom-match-centre?competition=111&season=$(resolve_season)" ;;
   nrlcom-casualty-ward) ENDPOINT="nrlcom-casualty-ward?competition=111" ;;
-  nrlcom-ladder)        ENDPOINT="nrlcom-ladder?competition=111&season=${SEASON}" ;;
-  nrlcom-stats)         ENDPOINT="nrlcom-stats?competition=111&season=${SEASON}" ;;
+  nrlcom-ladder)        ENDPOINT="nrlcom-ladder?competition=111&season=$(resolve_season)" ;;
+  nrlcom-stats)         ENDPOINT="nrlcom-stats?competition=111&season=$(resolve_season)" ;;
   nrlcom-players-roster) ENDPOINT="nrlcom-players-roster/refresh-all?competition=111" ;;
   *) usage; exit 2 ;;
 esac
