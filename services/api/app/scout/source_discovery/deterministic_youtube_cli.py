@@ -99,10 +99,11 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
     else:
         verb = "would insert" if result.dry_run else "inserted"
+        insert_count = result.candidates_selected if result.dry_run else result.candidates_inserted
         print(
             "Deterministic YouTube discovery "
             f"{result.run_id}: selected={result.candidates_selected}, "
-            f"{verb}={result.candidates_inserted}, duplicates={result.duplicates_skipped}, "
+            f"{verb}={insert_count}, duplicates={result.duplicates_skipped}, "
             f"below_threshold={result.candidates_below_threshold}, missing_metadata={result.candidates_missing_api_metadata}"
         )
 

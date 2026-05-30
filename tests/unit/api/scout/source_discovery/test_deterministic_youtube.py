@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from uuid import uuid4
 
+from app.scout import routes as scout_routes
 from app.scout.source_discovery import deterministic_youtube as dy
+from app.scout.source_discovery import deterministic_youtube_cli as dy_cli
 
 
 def _draft(kind: str, external_id: str) -> dy.CandidateDraft:
@@ -23,6 +25,79 @@ def _draft(kind: str, external_id: str) -> dy.CandidateDraft:
         metadata={"discovery_signals": [{"mode": "test"}]},
         discovered_via="deterministic_youtube:test",
     )
+
+
+def _result(*, dry_run: bool, inserted: int, selected: int) -> dy.DeterministicYouTubeDiscoveryResult:
+    return dy.DeterministicYouTubeDiscoveryResult(
+        run_id="scout-test",
+        dry_run=dry_run,
+        channel_queries=[],
+        video_queries=[],
+        harvest_queries=[],
+        related_channel_ids=[],
+        known_channels_at_start=0,
+        known_videos_at_start=0,
+        channel_seeds_seen=selected,
+        video_seeds_seen=0,
+        candidates_scored=selected,
+        candidates_below_threshold=1,
+        candidates_missing_api_metadata=0,
+        candidates_inserted=inserted,
+        duplicates_skipped=0,
+        candidate_ids=[f"id-{i}" for i in range(inserted)],
+        candidates=[{"external_id": f"candidate-{i}"} for i in range(selected)],
+    )
+
+
+class _FakeSession:
+    def __init__(self):
+        self.closed = False
+
+    def close(self):
+        self.closed = True
+
+
+def test_cli_dry_run_summary_prints_would_insert_count(monkeypatch, capsys):
+    session = _FakeSession()
+    captured: dict[str, object] = {}
+
+    def fake_run(session_arg, **kwargs):
+        captured["session"] = session_arg
+        captured["dry_run"] = kwargs["dry_run"]
+        return _result(dry_run=True, inserted=0, selected=2)
+
+    monkeypatch.setattr(dy_cli, "SessionLocal", lambda: session)
+    monkeypatch.setattr(dy_cli, "run_deterministic_youtube_discovery", fake_run)
+
+    assert dy_cli.main(["--dry-run", "--run-id", "scout-test"]) == 0
+
+    out = capsys.readouterr().out
+    assert "selected=2, would insert=2, duplicates=0" in out
+    assert captured == {"session": session, "dry_run": True}
+    assert session.closed is True
+
+
+def test_cli_real_run_summary_preserves_inserted_count(monkeypatch, capsys):
+    session = _FakeSession()
+
+    monkeypatch.setattr(dy_cli, "SessionLocal", lambda: session)
+    monkeypatch.setattr(
+        dy_cli,
+        "run_deterministic_youtube_discovery",
+        lambda _session, **_kwargs: _result(dry_run=False, inserted=1, selected=3),
+    )
+
+    assert dy_cli.main(["--run-id", "scout-test"]) == 0
+
+    out = capsys.readouterr().out
+    assert "selected=3, inserted=1, duplicates=0" in out
+    assert session.closed is True
+
+
+def test_scout_router_registers_deterministic_youtube_endpoint():
+    route_paths = {getattr(route, "path", None) for route in scout_routes.router.routes}
+
+    assert "/admin/scout/source-discovery/youtube" in route_paths
 
 
 def test_run_filters_known_ids_scores_and_persists_novel_candidates(monkeypatch):
